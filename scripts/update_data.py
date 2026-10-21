@@ -57,6 +57,8 @@ def log(msg):
 def get_json(url, params=None, tries=3, timeout=40):
     if params:
         url += '?' + urllib.parse.urlencode(params)
+    if os.environ.get('SKIP_NBA_CDN') and 'cdn.nba.com' in url:  # simulate a server the NBA data server blocks
+        raise RuntimeError('skipped by SKIP_NBA_CDN')
     last = None
     for i in range(tries):
         try:
@@ -265,14 +267,27 @@ def season_from_boxes(games):
 
 
 def load_previous():
-    """Last saved players.json, by player id, for numbers we can't refresh this run."""
+    """Last saved players.json, for anything we can't refresh this run."""
     if not os.path.exists(OUT):
         return {}
     try:
         with open(OUT, encoding='utf-8') as f:
-            return {p['id']: p for p in json.load(f).get('players', [])}
+            return json.load(f)
     except Exception:
         return {}
+
+
+def index_from_saved(saved, start_year):
+    """Rebuild player-index rows from the saved file when NBA.com won't give us its list."""
+    rows = []
+    for p in saved.get('players', []):
+        first, _, last = p['name'].partition(' ')
+        rows.append({
+            'PERSON_ID': p['id'], 'PLAYER_FIRST_NAME': first, 'PLAYER_LAST_NAME': last,
+            'TEAM_ABBREVIATION': p.get('team', ''), 'TEAM_ID': p.get('tid', 0), 'POSITION': p.get('nbaPos', ''),
+            'JERSEY_NUMBER': p.get('jersey', ''), 'FROM_YEAR': str(start_year - (p.get('exp') or 0)), 'TO_YEAR': str(start_year),
+        })
+    return rows
 
 
 def fantrax_name(name):
@@ -337,7 +352,8 @@ def main():
     season, prev_season = season_str(start_year), season_str(start_year - 1)
     log(f'Season {season} (previous {prev_season})')
 
-    old = load_previous()
+    saved = load_previous()
+    old = {p['id']: p for p in saved.get('players', [])}
 
     def optional(label, fn, default):
         log(f'- {label}...')
@@ -358,14 +374,32 @@ def main():
             'LeagueID': '00', 'Season': season, 'Historical': 0, 'Active': 1}, tries=1, timeout=25))
     except Exception as e:
         stats_ok = False
-        log(f'  stats.nba.com unavailable ({str(e)[:60]}...); using the NBA.com data server')
-        index = [r for r in result_rows(get_json(CDN + 'staticData/playerIndex.json', timeout=60))
-                 if r.get('ROSTER_STATUS') and r.get('TEAM_ID')]
+        log(f'  stats.nba.com unavailable ({str(e)[:60]}...)')
+        try:
+            index = [r for r in result_rows(get_json(CDN + 'staticData/playerIndex.json', tries=2, timeout=30))
+                     if r.get('ROSTER_STATUS') and r.get('TEAM_ID')]
+            log('  using the NBA.com data server player list')
+        except Exception as e2:
+            if not saved.get('players'):
+                raise
+            log(f'  data server list unavailable too ({str(e2)[:50]}...); keeping the saved player list')
+            index = index_from_saved(saved, start_year)
     log(f'  {len(index)} players')
 
-    week, teams, finals = optional('Schedule (NBA.com)', lambda: schedule(today), (None, {}, []))
+    sched = optional('Schedule (NBA.com)', lambda: schedule(today), None)
+    if sched:
+        week, teams, finals = sched
+    else:
+        log('  keeping the saved schedule')
+        week, teams, finals = saved.get('week'), saved.get('teams') or {}, []
     games = optional(f'{season} box scores (NBA.com)', lambda: box_scores(season, finals), {})
+    if not finals and os.path.exists(BOX_CACHE):  # no schedule: still use the games we already have
+        with open(BOX_CACHE, encoding='utf-8') as f:
+            cached = json.load(f)
+        if cached.get('season') == season:
+            games = cached.get('games', {})
     cur, l10, logs = season_from_boxes(games) if games else ({}, {}, {})
+    latest_team = {pid: rows[0][1].split(' ')[0] for pid, rows in logs.items()}
     if stats_ok:
         prev = optional(f'{prev_season} per-game stats', lambda: dash_stats(prev_season), {})
         pre_logs = optional(f'{season} preseason game logs', lambda: game_logs(season, 'Pre Season', 'PRE'), {})
@@ -387,7 +421,7 @@ def main():
     for r in index:
         pid = r['PERSON_ID']
         name = f"{r['PLAYER_FIRST_NAME']} {r['PLAYER_LAST_NAME']}".strip()
-        team = r['TEAM_ABBREVIATION'] or ''
+        team = (latest_team.get(pid) if not stats_ok else None) or r['TEAM_ABBREVIATION'] or ''
         p = {
             'id': pid, 'name': name, 'team': team, 'tid': r['TEAM_ID'] or 0,
             'pos': POS_MAP.get(r['POSITION'] or '', ['SF']), 'nbaPos': r['POSITION'] or '',
