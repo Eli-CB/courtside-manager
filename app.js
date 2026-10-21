@@ -494,7 +494,7 @@ function nextGame(next) {
 function dataLine() {
   if (!NBA) return '<span class="muted small">Live NBA data unavailable. Stats are entered by hand.</span>';
   const w = NBA.week;
-  return `<span class="muted small">NBA.com stats &amp; schedule, ESPN injuries${NBA.league ? ', Fantrax league' : ''} ${infoBtn('data')} · updated ${ago(NBA.updated)}${w ? ` · Week ${w.num}: ${fmtDay(w.start)} – ${fmtDay(w.end)}` : ''}</span>`;
+  return `<span class="muted small">${esc((NBA.sources || []).map(x => x.replace(' (saved copy)', '')).join(', ') || 'NBA.com stats & schedule, ESPN injuries')}${NBA.league ? ', Fantrax league' : ''} ${infoBtn('data')} · updated ${ago(NBA.updated)}${w ? ` · Week ${w.num}: ${fmtDay(w.start)} – ${fmtDay(w.end)}` : ''}</span>`;
 }
 
 /* =========================================================
@@ -765,10 +765,10 @@ const INFO = {
     <p><b>Drivers and drags.</b> The players who add the most to (or take the most from) that category compared with a typical rostered player.</p>
     <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank. <b>Punt candidates</b> are bottom-three categories where you're also below the league average.</p>`],
   data: ['Where the data comes from', `
-    <ul><li><b>NBA.com:</b> active players, per-game stats (this season, last season, last 10 games), game logs, and the full schedule.</li>
-    <li><b>ESPN:</b> the injury report (Out / day-to-day and the latest note).</li>
+    <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
+    <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
     <li><b>Fantrax:</b> your league's position eligibility, every team's roster and lineup, matchups, and who's available.</li></ul>
-    <p>The data is a snapshot from the last refresh. The local copy refreshes itself every 6 hours or when you tap Refresh stats. The hosted link updates when it's republished.</p>`],
+    <p>The website refreshes every morning (7 a.m. Eastern). The local app refreshes itself every 6 hours or when you tap Refresh stats.</p>`],
 };
 
 const infoBtn = key => `<button type="button" class="info-btn" data-action="info" data-key="${key}" aria-label="How this is calculated" title="How this is calculated">i</button>`;

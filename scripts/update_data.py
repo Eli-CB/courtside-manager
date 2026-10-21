@@ -465,8 +465,10 @@ def main():
     log(f'  {len(index)} players')
 
     name_to_id = {norm_name(f"{r['PLAYER_FIRST_NAME']} {r['PLAYER_LAST_NAME']}"): r['PERSON_ID'] for r in index}
+    sched_src = 'NBA.com'
     sched = optional('Schedule (NBA.com)', lambda: schedule(today, nba_games()), None)
     if not sched:
+        sched_src = 'ESPN'
         sched = optional('Schedule (ESPN)', lambda: schedule(today, espn_games(start_year)), None)
     if sched:
         week, teams, finals = sched
@@ -540,7 +542,7 @@ def main():
     out = {
         'updated': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
         'season': season, 'prevSeason': prev_season,
-        'sources': ['NBA.com box scores & schedule', 'NBA.com stats' if stats_ok else 'NBA.com stats (saved copy)', 'ESPN injury report'],
+        'sources': [f'{sched_src} box scores & schedule', 'NBA.com stats' if stats_ok else 'NBA.com stats (saved copy)', 'ESPN injury report'],
         'statKeys': STAT_KEYS, 'logKeys': LOG_KEYS, 'sdKeys': SD_KEYS,
         'week': week, 'teams': teams, 'players': players, 'league': league,
     }
