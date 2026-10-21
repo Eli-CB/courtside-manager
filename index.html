@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Courtside Manager</title>
+  <meta name="description" content="Manage your fantasy basketball roster, lineup, matchups and trades.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23f97316'/><path d='M4 50h92M50 4v92M18 18c18 18 18 46 0 64M82 18c-18 18-18 46 0 64' stroke='%23161a22' stroke-width='5' fill='none'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="var(--accent)"/><path d="M4 50h92M50 4v92M20 16c18 20 18 48 0 68M80 16c-18 20-18 48 0 68" stroke="rgba(0,0,0,.55)" stroke-width="5" fill="none"/></svg>
+        <div>
+          <div class="brand-name">Courtside Manager</div>
+          <div class="brand-team" id="brandTeam"></div>
+        </div>
+      </div>
+      <div class="top-right"><span class="sync" id="syncStatus" hidden></span><button class="icon-btn" data-action="toggle-theme" aria-label="Toggle light/dark theme" title="Toggle theme">◐</button></div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <a href="#week" data-tab="week">This week</a>
+      <a href="#dashboard" data-tab="dashboard">Dashboard</a>
+      <a href="#roster" data-tab="roster">Roster</a>
+      <a href="#players" data-tab="players">Players</a>
+      <a href="#matchups" data-tab="matchups">Results</a>
+      <a href="#trade" data-tab="trade">Trades</a>
+      <a href="#pool" data-tab="pool">Watchlist</a>
+      <a href="#settings" data-tab="settings">Settings</a>
+    </nav>
+  </header>
+
+  <main id="view" class="container" tabindex="-1"></main>
+
+  <dialog id="playerDialog" class="modal">
+    <form id="playerForm" method="dialog" novalidate>
+      <div class="modal-head">
+        <h2 id="playerDialogTitle">Add player</h2>
+        <button type="button" class="icon-btn" data-action="close-dialog" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="id">
+        <input type="hidden" name="dest">
+        <div class="grid-2">
+          <label class="field">Name<input name="name" required autocomplete="off"></label>
+          <label class="field">NBA team<input name="team" maxlength="4" placeholder="e.g. BOS" autocomplete="off"></label>
+        </div>
+        <fieldset class="field">
+          <legend>Positions</legend>
+          <div class="chips" id="posChips"></div>
+        </fieldset>
+        <div class="grid-2">
+          <label class="field" id="statusField">Status
+            <select name="status">
+              <option>Healthy</option><option>DTD</option><option>Out</option>
+            </select>
+          </label>
+          <label class="field" id="tagField">Tag
+            <input name="tag" placeholder="FA, Trade target, team name…" autocomplete="off">
+          </label>
+        </div>
+        <p class="small muted" id="linkedNote" hidden>Stats, injury status and games this week update automatically from NBA data.</p>
+        <div id="statSection">
+          <h3 class="sub">Per-game averages</h3>
+          <div class="stat-grid" id="statInputs"></div>
+        </div>
+        <label class="field">Notes<textarea name="notes" rows="2" placeholder="Injury timeline, schedule notes, trade ideas…"></textarea></label>
+        <p class="form-error" id="formError" role="alert"></p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn ghost" data-action="close-dialog">Cancel</button>
+        <button type="submit" class="btn primary">Save player</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="modal modal-lg">
+    <div class="modal-head">
+      <span class="muted small">Player card</span>
+      <button type="button" class="icon-btn" data-action="close-detail" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-foot" id="detailFoot"></div>
+  </dialog>
+
+  <dialog id="pasteDialog" class="modal">
+    <div class="modal-head">
+      <h2 id="pasteTitle">Paste a roster</h2>
+      <button type="button" class="icon-btn" data-action="paste-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pasteTarget">
+      <p class="muted small" style="margin-top:0">Copy the roster page from ESPN, Yahoo, Sleeper or anywhere else and paste it here. Each line that contains a player's name gets matched; everything else is ignored.</p>
+      <label class="field" for="pasteText">Roster text<textarea id="pasteText" rows="10" spellcheck="false" placeholder="Stephen Curry  GSW - PG,SG&#10;Nikola Jokic  DEN - C&#10;…"></textarea></label>
+      <label class="check"><input type="checkbox" id="pasteReplace"> Replace the current list</label>
+      <p class="form-error" id="pasteResult" role="alert"></p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn ghost" data-action="paste-close">Cancel</button>
+      <button type="button" class="btn primary" data-action="paste-apply">Add players</button>
+    </div>
+  </dialog>
+
+  <dialog id="infoDialog" class="modal info-modal" aria-labelledby="infoTitle">
+    <div class="modal-head">
+      <h2 id="infoTitle">How this works</h2>
+      <button type="button" class="icon-btn" data-action="close-info" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body prose" id="infoBody"></div>
+  </dialog>
+
+  <dialog id="confirmDialog" class="modal modal-sm">
+    <form method="dialog">
+      <div class="modal-body">
+        <h2 id="confirmTitle">Are you sure?</h2>
+        <p id="confirmBody" class="muted"></p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ghost" value="cancel">Cancel</button>
+        <button class="btn primary" value="ok" id="confirmOk">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="backupDialog" class="modal">
+    <div class="modal-head">
+      <h2>Backup &amp; restore</h2>
+      <button type="button" class="icon-btn" data-action="close-backup" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted small" style="margin-top:0">Copy this text and keep it somewhere safe. To restore, paste a backup here and choose Restore.</p>
+      <label class="field" for="backupText">Backup data<textarea id="backupText" rows="8" spellcheck="false"></textarea></label>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn ghost" data-action="restore-backup">Restore from this text</button>
+      <button type="button" class="btn primary" data-action="copy-backup">Copy backup</button>
+    </div>
+  </dialog>
+
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
