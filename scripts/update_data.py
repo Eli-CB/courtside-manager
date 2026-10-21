@@ -8,7 +8,8 @@ Sources (all public, no API key):
     saved copy is kept (those numbers don't change during the season).
   - Fantrax (when league.json names a league): your league's position
     eligibility, every team's roster and lineup, matchups, and who's available
-  - ESPN: league injury report
+  - ESPN: league injury report, plus the schedule and box scores when the NBA
+    blocks the server running this (GitHub's servers can't reach NBA.com at all)
 
 Run:  python scripts/update_data.py
 """
@@ -26,6 +27,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'data', 'players.json')
 BOX_CACHE = os.path.join(ROOT, 'data', 'boxscores.json')
 CDN = 'https://cdn.nba.com/static/json/'
+ESPN = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/'
+ESPN_TEAMS = {'GS': 'GSW', 'NY': 'NYK', 'NO': 'NOP', 'SA': 'SAS', 'UTAH': 'UTA', 'WSH': 'WAS'}
+NBA_TEAMS = {'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW', 'HOU', 'IND', 'LAC', 'LAL', 'MEM',
+             'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS'}
 LEAGUE_CFG = os.path.join(ROOT, 'league.json')
 FX = 'https://www.fantrax.com/fxea/general/'
 BASE_POS = ['PG', 'SG', 'SF', 'PF', 'C']
@@ -153,7 +158,8 @@ def injuries():
     return out
 
 
-def schedule(today):
+def nba_games():
+    """Regular-season games from the NBA data server."""
     data = get_json(CDN + 'staticData/scheduleLeagueV2.json', timeout=60)
     games = []
     for day in data['leagueSchedule']['gameDates']:
@@ -167,7 +173,38 @@ def schedule(today):
                 'id': str(g['gameId']), 'date': d, 'week': g.get('weekNumber') or 0, 'final': g.get('gameStatus') == 3,
                 'home': g['homeTeam']['teamTricode'], 'away': g['awayTeam']['teamTricode'],
             })
-    games.sort(key=lambda g: g['date'])
+    return games
+
+
+def espn_games(start_year):
+    """Regular-season games from ESPN's monthly scoreboards (October through April)."""
+    months = [(start_year, m) for m in (10, 11, 12)] + [(start_year + 1, m) for m in (1, 2, 3, 4)]
+    games = []
+    for y, m in months:
+        data = get_json(ESPN + 'scoreboard', {'dates': f'{y}{m:02d}', 'limit': 300}, timeout=40)
+        for e in data.get('events', []):
+            if (e.get('season') or {}).get('type') != 2:  # regular season only
+                continue
+            side = {t['homeAway']: t for t in e['competitions'][0]['competitors']}
+            home = ESPN_TEAMS.get(side['home']['team']['abbreviation'], side['home']['team']['abbreviation'])
+            away = ESPN_TEAMS.get(side['away']['team']['abbreviation'], side['away']['team']['abbreviation'])
+            if home not in NBA_TEAMS or away not in NBA_TEAMS:
+                continue
+            # tip-offs are listed in UTC; 5 hours back always lands on the US game date
+            when = dt.datetime.fromisoformat(e['date'].replace('Z', '+00:00')) - dt.timedelta(hours=5)
+            games.append({'id': 'espn:' + e['id'], 'date': when.date().isoformat(), 'week': 0,
+                          'final': e['status']['type']['name'] == 'STATUS_FINAL', 'home': home, 'away': away})
+    # number the weeks Monday to Sunday from the first week of the season
+    if games:
+        first = min(dt.date.fromisoformat(g['date']) for g in games)
+        monday = first - dt.timedelta(days=first.weekday())
+        for g in games:
+            g['week'] = (dt.date.fromisoformat(g['date']) - monday).days // 7 + 1
+    return games
+
+
+def schedule(today, games):
+    games = sorted(games, key=lambda g: g['date'])
     weeks = {}
     for g in games:
         if g['week']:
@@ -217,6 +254,41 @@ def box_score(game):
             'hs': g['homeTeam'].get('score', 0), 'as': g['awayTeam'].get('score', 0), 'rows': rows}
 
 
+def split_made(v):
+    """'8-18' -> (8, 18)"""
+    a, _, b = str(v or '0-0').partition('-')
+    return int(a or 0), int(b or 0)
+
+
+def espn_box(game, name_to_id):
+    """One finished game from ESPN, as the same stat rows the NBA box scores give."""
+    sm = get_json(ESPN + 'summary', {'event': game['id'].split(':', 1)[1]}, timeout=30)
+    scores = {}
+    for t in sm['header']['competitions'][0]['competitors']:
+        scores[ESPN_TEAMS.get(t['team']['abbreviation'], t['team']['abbreviation'])] = int(t.get('score') or 0)
+    rows = []
+    for team in sm['boxscore'].get('players', []):
+        tri = ESPN_TEAMS.get(team['team']['abbreviation'], team['team']['abbreviation'])
+        st = team['statistics'][0]
+        i = {k: n for n, k in enumerate(st['keys'])}
+        for a in st.get('athletes', []):
+            v = a.get('stats') or []
+            if a.get('didNotPlay') or not v:
+                continue
+            mins = float(v[i['minutes']] or 0)
+            pid = name_to_id.get(norm_name(a['athlete']['displayName']))
+            if mins <= 0 or not pid:
+                continue
+            fgm, fga = split_made(v[i['fieldGoalsMade-fieldGoalsAttempted']])
+            tpm, _ = split_made(v[i['threePointFieldGoalsMade-threePointFieldGoalsAttempted']])
+            ftm, fta = split_made(v[i['freeThrowsMade-freeThrowsAttempted']])
+            num = lambda k: int(float(v[i[k]] or 0))
+            rows.append([pid, tri, round(mins, 1), num('points'), num('rebounds'), num('assists'), num('steals'),
+                         num('blocks'), tpm, num('turnovers'), fgm, fga, ftm, fta])
+    return {'d': game['date'], 'home': game['home'], 'away': game['away'],
+            'hs': scores.get(game['home'], 0), 'as': scores.get(game['away'], 0), 'rows': rows}
+
+
 def _try(fn, *a):
     try:
         return fn(*a)
@@ -224,7 +296,7 @@ def _try(fn, *a):
         return None
 
 
-def box_scores(season, finals):
+def box_scores(season, finals, name_to_id):
     """All finished games this season, cached in data/boxscores.json so each game downloads once."""
     import concurrent.futures
     cache = {'season': season, 'games': {}}
@@ -235,7 +307,8 @@ def box_scores(season, finals):
             cache = saved
     todo = [g for g in finals if g['id'] not in cache['games']]
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        for game, res in zip(todo, pool.map(lambda g: _try(box_score, g), todo)):
+        fetch = lambda g: _try(espn_box, g, name_to_id) if g['id'].startswith('espn:') else _try(box_score, g)
+        for game, res in zip(todo, pool.map(fetch, todo)):
             if res:
                 cache['games'][game['id']] = res
     with open(BOX_CACHE, 'w', encoding='utf-8') as f:
@@ -246,8 +319,13 @@ def box_scores(season, finals):
 
 def season_from_boxes(games):
     """Per-game averages (season and last 10) and newest-first game logs from box scores."""
+    unique = {}
+    for gid, g in games.items():
+        key = (g['d'], g['home'], g['away'])
+        if key not in unique or not gid.startswith('espn:'):
+            unique[key] = g
     per = {}
-    for g in sorted(games.values(), key=lambda g: g['d'], reverse=True):
+    for g in sorted(unique.values(), key=lambda g: g['d'], reverse=True):
         for r in g['rows']:
             pid, team = r[0], r[1]
             home = team == g['home']
@@ -386,13 +464,16 @@ def main():
             index = index_from_saved(saved, start_year)
     log(f'  {len(index)} players')
 
-    sched = optional('Schedule (NBA.com)', lambda: schedule(today), None)
+    name_to_id = {norm_name(f"{r['PLAYER_FIRST_NAME']} {r['PLAYER_LAST_NAME']}"): r['PERSON_ID'] for r in index}
+    sched = optional('Schedule (NBA.com)', lambda: schedule(today, nba_games()), None)
+    if not sched:
+        sched = optional('Schedule (ESPN)', lambda: schedule(today, espn_games(start_year)), None)
     if sched:
         week, teams, finals = sched
     else:
         log('  keeping the saved schedule')
         week, teams, finals = saved.get('week'), saved.get('teams') or {}, []
-    games = optional(f'{season} box scores (NBA.com)', lambda: box_scores(season, finals), {})
+    games = optional(f'{season} box scores', lambda: box_scores(season, finals, name_to_id), {})
     if not finals and os.path.exists(BOX_CACHE):  # no schedule: still use the games we already have
         with open(BOX_CACHE, encoding='utf-8') as f:
             cached = json.load(f)
