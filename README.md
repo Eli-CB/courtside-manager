@@ -12,7 +12,8 @@ It's a plain static site (`index.html`, `styles.css`, `app.js`) reading data fil
 
 `scripts/update_data.py` builds `data/players.json` from:
 
-- NBA.com: active players, per-game stats, game logs, schedule
+- NBA.com data server (cdn.nba.com): schedule, active players, and every finished game's box score, which this season's stats and game logs are built from (cached in `data/boxscores.json`)
+- NBA.com stats (stats.nba.com): last season's stats and game-to-game spreads. It blocks most cloud servers, so the GitHub workflow keeps the saved copy; refresh it from your PC now and then with `python scripts/update_data.py` and push.
 - ESPN: injury report
 - Fantrax: positions, rosters, lineups, matchups and availability for the league in `league.json`
 

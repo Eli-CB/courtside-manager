@@ -968,7 +968,6 @@ function buildAlerts() {
    Rendering
    ========================================================= */
 function render() {
-  $('#brandTeam').textContent = [state.teamName, state.leagueName].filter(Boolean).join(' · ');
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
   const views = { week: () => withViewedTeam(viewWeek), players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool, settings: viewSettings };
   // keep scroll position of inner lists (e.g. trade picker) across re-renders
@@ -2585,6 +2584,9 @@ function route() {
   ui.tab = ['week', 'dashboard', 'roster', 'players', 'matchups', 'trade', 'pool', 'settings'].includes(tab) ? tab : 'week';
   render();
   window.scrollTo(0, 0);
+  // on phones the tab bar scrolls sideways; keep the current tab visible
+  const active = document.querySelector('#tabs a.active');
+  if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 window.addEventListener('hashchange', route);
 

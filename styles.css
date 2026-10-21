@@ -94,24 +94,19 @@ a { color: var(--accent); }
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
+/* one slim bar: tabs on the left (scroll sideways if needed), theme toggle on the right */
 .topbar-inner {
-  max-width: 1200px; margin: 0 auto; padding-block: 12px 6px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-}
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.logo { width: 34px; height: 34px; flex: none; }
-.brand-name { font-weight: 700; letter-spacing: -.01em; }
-.brand-team { color: var(--muted); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.tabs {
   max-width: 1200px; margin: 0 auto;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
+  display: flex; align-items: center; gap: 8px;
+}
+.tabs {
+  flex: 1; min-width: 0;
   display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs a {
-  padding: 10px 12px; white-space: nowrap; text-decoration: none;
+  padding: 13px 12px 11px; white-space: nowrap; text-decoration: none;
   color: var(--muted); font-weight: 600; font-size: .92rem;
   border-bottom: 2px solid transparent;
 }
@@ -122,7 +117,8 @@ a { color: var(--accent); }
   max-width: 1200px; margin: 0 auto; padding-block: 20px 64px; outline: none;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.top-right { display: flex; align-items: center; gap: 10px; }
+.top-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.top-right .icon-btn { width: 30px; height: 30px; }
 .sync { color: var(--muted); font-size: .8rem; white-space: nowrap; }
 .modal-sm { width: min(420px, calc(100vw - 24px)); }
 .modal-sm h2 { margin-bottom: 6px; }
