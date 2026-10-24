@@ -382,6 +382,10 @@ def fantrax(league_id, index):
         msg = (info.get('error') or {}).get('message') or 'no teams returned'
         raise RuntimeError(f'Fantrax league {league_id}: {msg}')
     rosters = get_json(FX + 'getTeamRosters', {'leagueId': league_id})
+    try:
+        draft = get_json(FX + 'getDraftResults', {'leagueId': league_id})
+    except Exception:
+        draft = {}
 
     # match Fantrax players to NBA.com ids by name (team breaks ties)
     by_name = {}
@@ -415,6 +419,12 @@ def fantrax(league_id, index):
         'matchups': {str(m['period']): [[x['away']['id'], x['home']['id']] for x in m.get('matchupList', [])
                                         if x.get('away', {}).get('id') and x.get('home', {}).get('id')] for m in info.get('matchups', [])},
         'rosterPeriod': rosters.get('period'),
+        # [round, overall pick, fantasy team id, NBA.com player id, name] for every pick made
+        'draft': {
+            'date': (draft.get('draftDate') or '')[:10], 'type': draft.get('draftType', ''), 'state': draft.get('draftState', ''),
+            'picks': [[d['round'], d['pick'], d['teamId'], fx_to_nba.get(d['playerId']), fx_names.get(d['playerId'], '')]
+                      for d in draft.get('draftPicks', []) if d.get('playerId')],
+        } if draft.get('draftPicks') else None,
         'rosters': {
             tid: [{'nba': fx_to_nba.get(it['id']), 'name': fx_names.get(it['id'], ''), 'slot': it.get('position', ''), 'st': it.get('status', '')}
                   for it in r.get('rosterItems', [])]

@@ -764,6 +764,12 @@ const INFO = {
     <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
     <p><b>Drivers and drags.</b> The players who add the most to (or take the most from) that category compared with a typical rostered player.</p>
     <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank. <b>Punt candidates</b> are bottom-three categories where you're also below the league average.</p>`],
+  draft: ['How draft picks are graded', `
+    <p><b>Now.</b> Every drafted player is ranked by his value per game using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
+    <p><b>+/−.</b> Draft slot minus current rank. A #40 pick who's playing like the #5 player is +35; a #3 pick playing like #50 is −47.</p>
+    <p><b>Team drafts.</b> The average +/− across all of a team's picks. Total value adds up the per-game value of every pick who has played.</p>
+    <p><b>Board.</b> Each pick is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
+    <p>Kept players aren't in the draft, so they aren't graded here.</p>`],
   data: ['Where the data comes from', `
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
@@ -969,7 +975,7 @@ function buildAlerts() {
    ========================================================= */
 function render() {
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
-  const views = { week: () => withViewedTeam(viewWeek), players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool, settings: viewSettings };
+  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool, settings: viewSettings };
   // keep scroll position of inner lists (e.g. trade picker) across re-renders
   const scrolls = [...document.querySelectorAll('.pick-list')].map(el => el.scrollTop);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
@@ -1975,6 +1981,114 @@ function viewWeek() {
   </div>`;
 }
 
+/* ---------- Draft: how every pick is playing so far ---------- */
+// Each drafted player is ranked by his value per game this season (this season's stats only).
+// Gain = draft slot − current rank: a #40 pick playing like the #5 player is +35.
+function draftData() {
+  const L = fxLeague();
+  if (!L || !L.draft || !L.draft.picks.length) return null;
+  const picks = L.draft.picks.map(([round, pick, teamId, nba, name]) => {
+    const raw = nba ? nbaById.get(nba) : null;
+    const s = raw ? nbaStats(raw, 'cur') : null;
+    const gp = s ? Math.round(s.gp) : 0;
+    const p = { round, pick, teamId, team: fxTeamName(teamId), raw, nbaId: nba, name: raw ? raw.name : name, gp, val: null, s };
+    if (s && gp) p.val = value({ ...s, pos: raw.pos });
+    return p;
+  });
+  const played = picks.filter(p => p.val != null).sort((a, b) => b.val - a.val);
+  played.forEach((p, i) => { p.rank = i + 1; });
+  // players who haven't played yet rank below everyone who has, in draft order
+  picks.filter(p => p.val == null).sort((a, b) => a.pick - b.pick).forEach((p, i) => { p.rank = played.length + i + 1; });
+  picks.forEach(p => { p.gain = p.pick - p.rank; });
+  const maxGp = Math.max(0, ...picks.map(p => p.gp));
+  return { picks, played: played.length, maxGp, date: L.draft.date, type: L.draft.type };
+}
+
+function draftRow(p, mine) {
+  const gainCls = p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted';
+  return `<tr class="${p.teamId === mine ? 'dr-mine' : ''}">
+    <td class="st-name"><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, 28)}<div class="bmain"><div class="bname">${p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : esc(p.name)}</div>
+      <div class="pmeta">${esc(p.team)}${p.teamId === mine ? ' <span class="badge accent">you</span>' : ''}</div></div></div></td>
+    <td class="num">R${p.round} · <b>#${p.pick}</b></td>
+    <td class="num">${p.gp ? `#${p.rank}` : '<span class="muted">—</span>'}</td>
+    <td class="num"><b class="${gainCls}">${p.gp ? signed(p.gain, 0) : 'DNP'}</b></td>
+    <td class="num hide-sm">${p.gp}</td>
+    <td class="num hide-sm">${p.val != null ? fmtValue(p.val) : '—'}</td>
+  </tr>`;
+}
+
+function draftList(title, list, mine, info) {
+  return `<div class="card">
+    <div class="card-head"><h2>${title} ${info ? infoBtn('draft') : ''}</h2></div>
+    <div class="table-wrap"><table class="dr-table">
+      <thead><tr><th>Player</th><th class="num">Drafted</th><th class="num">Now</th><th class="num">+/−</th><th class="num hide-sm">GP</th><th class="num hide-sm">${valueLabel()}</th></tr></thead>
+      <tbody>${list.map(p => draftRow(p, mine)).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function viewDraft() {
+  const d = draftData();
+  if (!d) {
+    return `<div class="page-head"><div><h1>Draft</h1><p>${dataLine()}</p></div></div>
+      <div class="card"><div class="empty"><strong>No draft found</strong>Connect your Fantrax league in Settings to see your draft.</div></div>`;
+  }
+  const mine = state.fxTeam;
+  const best = [...d.picks].filter(p => p.gp).sort((a, b) => (b.gain - a.gain) || (b.val - a.val)).slice(0, 10);
+  const worst = [...d.picks].sort((a, b) => (a.gain - b.gain) || (a.pick - b.pick)).slice(0, 10);
+
+  // team rankings: average +/− of every pick, plus best and worst pick
+  const byTeam = {};
+  for (const p of d.picks) (byTeam[p.teamId] = byTeam[p.teamId] || []).push(p);
+  const teamRows = Object.entries(byTeam).map(([id, ps]) => {
+    const avg = sum(ps.map(p => p.gain)) / ps.length;
+    const top = ps.reduce((a, b) => (b.gain > a.gain ? b : a));
+    const low = ps.reduce((a, b) => (b.gain < a.gain ? b : a));
+    const total = sum(ps.filter(p => p.val != null).map(p => p.val));
+    return { id, name: fxTeamName(id), n: ps.length, avg, top, low, total };
+  }).sort((a, b) => b.avg - a.avg);
+
+  // board: one column per team in round-1 order, one row per round
+  const order = d.picks.filter(p => p.round === 1).sort((a, b) => a.pick - b.pick).map(p => p.teamId);
+  const rounds = Math.max(...d.picks.map(p => p.round));
+  const cell = {};
+  for (const p of d.picks) cell[`${p.round}|${p.teamId}`] = p;
+  const board = Array.from({ length: rounds }, (_, r) => `<tr><th scope="row" class="num">R${r + 1}</th>${order.map(t => {
+    const p = cell[`${r + 1}|${t}`];
+    if (!p) return '<td class="dr-cell"></td>';
+    return `<td class="dr-cell" style="${p.gp ? shade(p.gain / 15) : ''}" title="${esc(p.name)} · pick #${p.pick} · ${p.gp ? `playing like #${p.rank} (${signed(p.gain, 0)})` : "hasn't played"}">
+      <span class="dr-pick">#${p.pick}</span> ${p.nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${p.nbaId}"><span class="n-full">${esc(p.name)}</span><span class="n-short">${esc(shortName(p.name))}</span></button>` : esc(p.name)}
+      <span class="dr-gain ${p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted'}">${p.gp ? signed(p.gain, 0) : 'DNP'}</span></td>`;
+  }).join('')}</tr>`).join('');
+
+  return `
+  <div class="page-head">
+    <div><h1>Draft ${infoBtn('draft')}</h1><p>${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)</p></div>
+  </div>
+  ${d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
+  <div class="trade-grid">
+    ${draftList('Best picks so far', best, mine, true)}
+    ${draftList('Worst picks so far', worst, mine, false)}
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-head"><h2>Team drafts</h2><span class="muted small">ranked by average +/− per pick</span></div>
+    <div class="table-wrap"><table class="dr-teams">
+      <thead><tr><th class="num">#</th><th>Team</th><th class="num">Avg +/−</th><th class="num">Total ${valueLabel()}</th><th>Best pick</th><th>Worst pick</th></tr></thead>
+      <tbody>${teamRows.map((t, i) => `<tr class="${t.id === mine ? 'dr-mine' : ''}"><td class="num">${i + 1}</td><td><b>${esc(t.name)}</b>${t.id === mine ? ' <span class="badge accent">you</span>' : ''}</td>
+        <td class="num"><b class="${t.avg > 0 ? 'pos-good' : t.avg < 0 ? 'pos-bad' : ''}">${signed(t.avg, 1)}</b></td><td class="num">${fmtValue(t.total)}</td>
+        <td>${esc(lastName(t.top.name))} <span class="muted small">#${t.top.pick}</span> <span class="pos-good small">${t.top.gp ? signed(t.top.gain, 0) : ''}</span></td>
+        <td>${esc(lastName(t.low.name))} <span class="muted small">#${t.low.pick}</span> <span class="pos-bad small">${t.low.gp ? signed(t.low.gain, 0) : 'DNP'}</span></td></tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-head"><h2>Draft board</h2></div>
+    <div class="table-wrap"><table class="dr-board">
+      <thead><tr><th></th>${order.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${esc(fxTeamName(t))}</th>`).join('')}</tr></thead>
+      <tbody>${board}</tbody>
+    </table></div>
+  </div>`;
+}
+
 /* ---------- Settings ---------- */
 function viewSettings() {
   const counts = Object.fromEntries(SLOT_TYPES.map(t => [t, state.slots.filter(s => s === t).length]));
@@ -2581,7 +2695,7 @@ $('#importFile').addEventListener('change', async e => {
 function route() {
   let tab = location.hash.replace('#', '') || 'week';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
-  ui.tab = ['week', 'dashboard', 'roster', 'players', 'matchups', 'trade', 'pool', 'settings'].includes(tab) ? tab : 'week';
+  ui.tab = ['week', 'dashboard', 'roster', 'players', 'draft', 'matchups', 'trade', 'pool', 'settings'].includes(tab) ? tab : 'week';
   render();
   window.scrollTo(0, 0);
   // on phones the tab bar scrolls sideways; keep the current tab visible
