@@ -374,7 +374,7 @@ def fantrax_name(name):
     return f'{first} {last}'.strip() if first else name
 
 
-def fantrax(league_id, index):
+def fantrax(league_id, index, saved_league=None):
     """League positions, rosters and matchups from Fantrax's public league API."""
     ids = get_json(FX + 'getPlayerIds', {'sport': 'NBA'})
     info = get_json(FX + 'getLeagueInfo', {'leagueId': league_id})
@@ -422,6 +422,7 @@ def fantrax(league_id, index):
         # [round, overall pick, fantasy team id, NBA.com player id, name] for every pick made
         'draft': {
             'date': (draft.get('draftDate') or '')[:10], 'type': draft.get('draftType', ''), 'state': draft.get('draftState', ''),
+            'perRound': max((d.get('pickInRound') or 0) for d in draft.get('draftPicks', [])) if draft.get('draftPicks') else 0,
             'picks': [[d['round'], d['pick'], d['teamId'], fx_to_nba.get(d['playerId']), fx_names.get(d['playerId'], '')]
                       for d in draft.get('draftPicks', []) if d.get('playerId')],
         } if draft.get('draftPicks') else None,
@@ -431,6 +432,16 @@ def fantrax(league_id, index):
             for tid, r in rosters.get('rosters', {}).items()
         },
     }
+    # Keepers: players each team rostered without drafting them. Saved the first time and kept
+    # after that, so later waiver pickups aren't mistaken for keepers.
+    if league['draft']:
+        prev = (saved_league or {}).get('draft') or {}
+        if prev.get('date') == league['draft']['date'] and prev.get('keepers'):
+            league['draft']['keepers'] = prev['keepers']
+        else:
+            drafted = {p[3] for p in league['draft']['picks']}
+            league['draft']['keepers'] = {tid: [it['nba'] for it in items if it['nba'] and it['nba'] not in drafted]
+                                          for tid, items in league['rosters'].items()}
     return players, league
 
 
@@ -507,7 +518,7 @@ def main():
         with open(LEAGUE_CFG, encoding='utf-8') as f:
             league_id = (json.load(f).get('fantraxLeagueId') or '').strip()
     if league_id:
-        fx_players, league = optional('Fantrax league', lambda: fantrax(league_id, index), ({}, None))
+        fx_players, league = optional('Fantrax league', lambda: fantrax(league_id, index, saved.get('league')), ({}, None))
 
     players = []
     matched_inj = 0

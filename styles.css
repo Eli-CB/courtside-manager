@@ -555,6 +555,9 @@ tr.dr-mine td { background: color-mix(in srgb, var(--accent-soft) 60%, transpare
 .dr-pick { display: block; font-size: .66rem; color: var(--muted); }
 .dr-gain { display: block; font-size: .7rem; font-weight: 700; }
 .dr-board .n-short { display: none; }
+.dr-keeper { background: var(--surface-2); }
+.dr-board tr.dr-krow + tr:not(.dr-krow) th, .dr-board tr.dr-krow + tr:not(.dr-krow) td { border-top: 2px solid var(--border); }
+.dr-via { display: block; font-size: .64rem; color: var(--muted); font-style: italic; }
 
 /* ---------- Phone tidy-up ---------- */
 @media (max-width: 640px) {

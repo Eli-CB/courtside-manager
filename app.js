@@ -769,7 +769,8 @@ const INFO = {
     <p><b>+/−.</b> Draft slot minus current rank. A #40 pick who's playing like the #5 player is +35; a #3 pick playing like #50 is −47.</p>
     <p><b>Team drafts.</b> The average +/− across all of a team's picks. Total value adds up the per-game value of every pick who has played.</p>
     <p><b>Board.</b> Each pick is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
-    <p>Kept players aren't in the draft, so they aren't graded here.</p>`],
+    <p><b>Keepers</b> fill the two rows above round 1. They have no pick number, so they get no +/−; instead each shows which of this year's picks he's playing like.</p>
+    <p><b>Traded picks</b> sit in their original slot, marked with the team that made the pick. "No pick" means the slot went unused.</p>`],
   data: ['Where the data comes from', `
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
@@ -2001,7 +2002,19 @@ function draftData() {
   picks.filter(p => p.val == null).sort((a, b) => a.pick - b.pick).forEach((p, i) => { p.rank = played.length + i + 1; });
   picks.forEach(p => { p.gain = p.pick - p.rank; });
   const maxGp = Math.max(0, ...picks.map(p => p.gp));
-  return { picks, played: played.length, maxGp, date: L.draft.date, type: L.draft.type };
+  // keepers: where each would slot among this year's picks, by value per game so far
+  const keepers = {};
+  for (const [tid, ids] of Object.entries(L.draft.keepers || {})) {
+    keepers[tid] = ids.map(nba => {
+      const raw = nbaById.get(nba);
+      const s = raw ? nbaStats(raw, 'cur') : null;
+      const gp = s ? Math.round(s.gp) : 0;
+      const val = s && gp ? value({ ...s, pos: raw.pos }) : null;
+      const like = val == null ? null : played.filter(p => p.val > val).length + 1;
+      return { nbaId: nba, name: raw ? raw.name : '', gp, val, like, sort: raw ? value({ ...(nbaStats(raw) || {}), pos: raw.pos }) : -99 };
+    }).sort((a, b) => b.sort - a.sort);
+  }
+  return { picks, played: played.length, maxGp, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers };
 }
 
 function draftRow(p, mine) {
@@ -2048,17 +2061,39 @@ function viewDraft() {
     return { id, name: fxTeamName(id), n: ps.length, avg, top, low, total };
   }).sort((a, b) => b.avg - a.avg);
 
-  // board: one column per team in round-1 order, one row per round
-  const order = d.picks.filter(p => p.round === 1).sort((a, b) => a.pick - b.pick).map(p => p.teamId);
+  // board: one column per draft slot (round-1 order), one row per round, snaking back on even rounds.
+  // Picks sit in their true slot even when traded; keepers fill two rows on top.
+  const T = d.perRound;
   const rounds = Math.max(...d.picks.map(p => p.round));
-  const cell = {};
-  for (const p of d.picks) cell[`${p.round}|${p.teamId}`] = p;
-  const board = Array.from({ length: rounds }, (_, r) => `<tr><th scope="row" class="num">R${r + 1}</th>${order.map(t => {
-    const p = cell[`${r + 1}|${t}`];
-    if (!p) return '<td class="dr-cell"></td>';
-    return `<td class="dr-cell" style="${p.gp ? shade(p.gain / 15) : ''}" title="${esc(p.name)} · pick #${p.pick} · ${p.gp ? `playing like #${p.rank} (${signed(p.gain, 0)})` : "hasn't played"}">
-      <span class="dr-pick">#${p.pick}</span> ${p.nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${p.nbaId}"><span class="n-full">${esc(p.name)}</span><span class="n-short">${esc(shortName(p.name))}</span></button>` : esc(p.name)}
-      <span class="dr-gain ${p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted'}">${p.gp ? signed(p.gain, 0) : 'DNP'}</span></td>`;
+  const slotTeam = d.picks.filter(p => p.round === 1).sort((a, b) => a.pick - b.pick).map(p => p.teamId);
+  // read each round's direction from the picks themselves (this league's order isn't a plain snake)
+  const inRound = p => p.pick - (p.round - 1) * T;
+  const forward = {};
+  for (let r = 1; r <= rounds; r++) {
+    const rp = d.picks.filter(p => p.round === r);
+    const fwd = rp.filter(p => slotTeam[inRound(p) - 1] === p.teamId).length;
+    const rev = rp.filter(p => slotTeam[T - inRound(p)] === p.teamId).length;
+    forward[r] = fwd >= rev;
+  }
+  const colOf = p => (forward[p.round] ? inRound(p) - 1 : T - inRound(p));
+  const grid = {};
+  for (const p of d.picks) grid[`${p.round}|${colOf(p)}`] = p;
+  const order = slotTeam;
+  const nameBtn = (nbaId, name) => nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${nbaId}"><span class="n-full">${esc(name)}</span><span class="n-short">${esc(shortName(name))}</span></button>` : esc(name);
+  const keeperRows = [0, 1].map(i => `<tr class="dr-krow"><th scope="row" class="num">K${i + 1}</th>${order.map(t => {
+    const k = (d.keepers[t] || [])[i];
+    if (!k) return '<td class="dr-cell dr-keeper"></td>';
+    return `<td class="dr-cell dr-keeper" title="${esc(k.name)} · keeper · ${k.like ? `playing like pick #${k.like}` : "hasn't played"}">
+      <span class="dr-pick">Keeper</span> ${nameBtn(k.nbaId, k.name)}
+      <span class="dr-gain muted">${k.like ? `like #${k.like}` : 'DNP'}</span></td>`;
+  }).join('')}</tr>`).join('');
+  const board = keeperRows + Array.from({ length: rounds }, (_, r) => `<tr><th scope="row" class="num">R${r + 1}</th>${order.map((t, c) => {
+    const p = grid[`${r + 1}|${c}`];
+    if (!p) return '<td class="dr-cell"><span class="dr-pick">No pick</span></td>';
+    const via = p.teamId !== t ? `<span class="dr-via">by ${esc(p.team)}</span>` : '';
+    return `<td class="dr-cell" style="${p.gp ? shade(p.gain / 15) : ''}" title="${esc(p.name)} · pick #${p.pick}${p.teamId !== t ? ` (traded, made by ${esc(p.team)})` : ''} · ${p.gp ? `playing like #${p.rank} (${signed(p.gain, 0)})` : "hasn't played"}">
+      <span class="dr-pick">#${p.pick}</span> ${nameBtn(p.nbaId, p.name)}
+      <span class="dr-gain ${p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted'}">${p.gp ? signed(p.gain, 0) : 'DNP'}</span>${via}</td>`;
   }).join('')}</tr>`).join('');
 
   return `
