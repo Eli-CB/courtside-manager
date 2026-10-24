@@ -113,7 +113,7 @@ function sampleState() {
 function emptyState() {
   return {
     version: 1, sample: false, teamName: 'My Team', leagueName: '', format: 'cat', basis: 'blend',
-    matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] },
+    matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] }, savedLeagues: [], leagueStates: {},
     scoring: { ...DEFAULT_SCORING }, slots: [...DEFAULT_SLOTS], benchSize: 5, ilSize: 1, slotsSet: true, lineupMode: 'weekly',
     players: [], pool: [], lineup: [], il: [], matchups: [],
   };
@@ -457,7 +457,9 @@ async function loadNba(fresh = false) {
       }
     }
     if (state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
-    if (syncLinked()) commit(); else render();
+    const migrate = state.fxTeam && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
+    if (migrate) rememberLeague(NBA.league.id, NBA.league.name);
+    if (syncLinked() || migrate) commit(); else render();
     return true;
   } catch (e) {
     render();
@@ -741,12 +743,12 @@ const INFO = {
     <p><b>Projected totals.</b> For each category we add up every starter's per-game average × the games they play on your matchup days (from the NBA schedule). Players who are Out count zero. Bench games never count while lineups are locked for the week.</p>
     <p><b>Uncertainty.</b> Each player's game-to-game spread (standard deviation) comes from his NBA game logs: last season plus this season, games of 10+ minutes, at least 8 games. Spreads add up across every starter game, so a team's weekly total has a known range.</p>
     <p><b>Category win chance.</b> For counting stats: the chance your total beats theirs, using a bell curve with the gap divided by the combined spread. Turnovers are reversed (fewer wins). FG% and FT% use team makes ÷ attempts, with shot-making luck (binomial, widened 30%) as the spread.</p>
-    <p><b>Lineups.</b> Both teams' starters as set on Fantrax (or as you've adjusted them with ↑/↓). Projections use the stats chosen in Settings (smart blend by default).</p>
+    <p><b>Lineups.</b> Both teams' starters as set on Fantrax (or as you've adjusted them with ↑/↓). Projections use the stats chosen in the league menu (smart blend by default).</p>
     <p><b>Winning the week.</b> Categories are treated as independent, and we add up the chances of every way to take 5 or more of the 9. The projected category score is the sum of the nine category win chances.</p>`],
   suggest: ['How lineup suggestions work', `
     <p><b>Starting point.</b> Starters are ranked by games this week × (player value + 4), then fitted into your slots (PG, SG, G, SF, PF, F, C, Flx) so every slot gets an eligible player.</p>
     <p><b>Search.</b> We try every single swap of a starter for a bench player that still fits the slots and keep the one that improves the goal most, repeating up to 6 times until nothing helps.</p>
-    <p><b>The goal.</b> Your league gives one win to whoever takes more categories, so the goal is your chance of winning the week. Total categories won only breaks ties. You can change this in Settings → Matchup scoring.</p>
+    <p><b>The goal.</b> Your league gives one win to whoever takes more categories, so the goal is your chance of winning the week. Total categories won only breaks ties.</p>
     <p><b>Punting.</b> A category's win chance follows a bell curve, so adding stats to one you're far behind in (or far ahead in) barely moves it. Those categories effectively get ignored, and players are used where the matchup is close.</p>
     <p><b>Explaining it.</b> The suggested lineup is broken into one-for-one swaps, best first. Each swap's numbers assume the swaps above it are already made.</p>`],
   shading: ['Stat shading', `
@@ -766,7 +768,7 @@ const INFO = {
     <p>FG% and FT% count shot volume, and turnovers count against. In a points league, value is fantasy points per game from your scoring settings instead.</p>`],
   projection: ['Which stats are used', `
     <p><b>Smart blend (default):</b> this season's averages with 10 games of last season mixed in: (this season × games played + last season × 10) ÷ (games played + 10). Early on it leans on last season; after a month or two it's mostly this season.</p>
-    <p>You can switch to this season only, last season only, or the last 10 games in Settings.</p>`],
+    <p>Switch to this season only, last season only, or the last 10 games from the league menu at the top.</p>`],
   strengths: ['Category strengths', `
     <p><b>You.</b> Your players' real per-game numbers: the average per player for counting stats (starters, or your whole active roster), and team FG% and FT% as total makes ÷ total attempts.</p>
     <p><b>League avg.</b> The same number averaged across every team in your Fantrax league, using each team's current roster and lineup.</p>
@@ -785,7 +787,7 @@ const INFO = {
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
     <li><b>Fantrax:</b> your league's position eligibility, every team's roster and lineup, matchups, and who's available.</li></ul>
-    <p>NBA stats refresh every morning (7 a.m. Eastern). If you connected your own league in Settings, its Fantrax data loads fresh each time you open the site.</p>`],
+    <p>NBA stats refresh every morning (7 a.m. Eastern). Your league's Fantrax data (rosters, lineups, matchups, draft) loads fresh each time you open the site.</p>`],
 };
 
 const infoBtn = key => `<button type="button" class="info-btn" data-action="info" data-key="${key}" aria-label="How this is calculated" title="How this is calculated">i</button>`;
@@ -1084,12 +1086,39 @@ function buildAlerts() {
 /* =========================================================
    Rendering
    ========================================================= */
+function leagueMenu() {
+  const el = $('#leagueMenu');
+  if (!el) return;
+  const L = fxLeague();
+  if (!L || needsLanding()) { el.innerHTML = ''; return; }
+  const cur = currentLeagueId();
+  const saved = state.savedLeagues || [];
+  const site = NBA && NBA.siteLeague;
+  const wasOpen = el.querySelector('details') && el.querySelector('details').open;
+  el.innerHTML = `<details class="lm"${wasOpen ? ' open' : ''}>
+    <summary aria-label="League menu"><span class="lm-name">${esc(L.name)}</span><span class="lm-caret" aria-hidden="true">▾</span></summary>
+    <div class="lm-pop">
+      <div class="lm-sec">Leagues</div>
+      ${saved.map(l => `<div class="lm-row"><button type="button" class="lm-item${l.id === cur ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${l.id === cur ? '✓ ' : ''}${esc(l.name)}</button>${l.id !== cur ? `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>` : ''}</div>`).join('')}
+      ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)} <span class="muted">(demo)</span></span></div>` : ''}
+      <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
+      ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
+      <div class="lm-sec">Stats used ${infoBtn('projection')}</div>
+      ${Object.entries(BASIS_LABELS).map(([k, l]) => `<button type="button" class="lm-item${state.basis === k ? ' on' : ''}" data-action="set-basis" data-basis="${k}">${state.basis === k ? '✓ ' : ''}${l}</button>`).join('')}
+      <div class="lm-sec">This device</div>
+      <button type="button" class="lm-item" data-action="export">Backup &amp; restore</button>
+      <button type="button" class="lm-item danger" data-action="start-fresh">Reset and start over</button>
+    </div>
+  </details>`;
+}
+
 function render() {
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
+  leagueMenu();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
-  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool, settings: viewSettings };
+  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool };
   // keep scroll position of inner lists (e.g. trade picker) across re-renders
   const scrolls = [...document.querySelectorAll('.pick-list')].map(el => el.scrollTop);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
@@ -2083,7 +2112,7 @@ function viewWeek() {
         <h1>${ui.weekShift === 0 ? 'This week' : ui.weekShift === 1 ? 'Next week' : 'Week of ' + fmtDay(start)}</h1>
         <button class="icon-btn" data-action="week-shift" data-step="1" aria-label="Next week">›</button>
       </div>
-      <p>${range} · <a href="#settings">settings</a></p>
+      <p>${range}</p>
     </div>
   </div>
   ${staleOpp ? `<div class="sample-banner"><span>This opponent was entered for the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="opp-new-week">Start this week's opponent</button></div>` : ''}
@@ -2161,7 +2190,7 @@ function viewDraft() {
   const d = draftData();
   if (!d) {
     return `<div class="page-head"><div><h1>Draft</h1><p>${dataLine()}</p></div></div>
-      <div class="card"><div class="empty"><strong>No draft found</strong>Connect your Fantrax league in Settings to see your draft.</div></div>`;
+      <div class="card"><div class="empty"><strong>No draft found</strong>Add your Fantrax league from the league menu at the top to see your draft.</div></div>`;
   }
   const mine = state.fxTeam;
   const best = [...d.picks].filter(p => p.gp).sort((a, b) => (b.gain - a.gain) || (b.val - a.val)).slice(0, 10);
@@ -2237,8 +2266,46 @@ function viewDraft() {
   </div>`;
 }
 
-// Connect a Fantrax league by ID (from Settings or the landing page). Throws a readable message.
-async function connectLeague(id) {
+// ----- Saved leagues -----
+// Each league you add keeps its own team, roster, opponent, lineup settings, matchup log and
+// watchlist; switching stashes the current league's and restores the other's.
+const LEAGUE_FIELDS = ['fxTeam', 'players', 'il', 'lineup', 'opp', 'teamName', 'leagueName', 'slots', 'benchSize', 'ilSize',
+  'slotsSet', 'matchups', 'pool', 'sample', 'lineupMode', 'matchDays', 'scoringType'];
+const emptyOpp = () => ({ name: '', week: null, players: [], starters: null, fxId: null });
+const currentLeagueId = () => state.fxLeagueId || (NBA && NBA.siteLeague && NBA.siteLeague.id) || null;
+
+function rememberLeague(id, name) {
+  const list = (state.savedLeagues || []).filter(l => l.id !== id);
+  const at = (state.savedLeagues || []).findIndex(l => l.id === id);
+  list.splice(at === -1 ? list.length : at, 0, { id, name });
+  state.savedLeagues = list;
+}
+
+function stashLeague() {
+  const id = currentLeagueId();
+  if (!id || !state.fxTeam) return;
+  state.leagueStates = state.leagueStates || {};
+  state.leagueStates[id] = JSON.parse(JSON.stringify(Object.fromEntries(LEAGUE_FIELDS.map(k => [k, state[k]]))));
+}
+
+// Lineup rules read from the league: slots, bench and IR sizes, weekly or daily lineups
+function applyLeagueRules(league) {
+  const cfg = slotsFromLeague(league);
+  if (cfg) {
+    state.slots = cfg.slots;
+    if (cfg.bench != null) state.benchSize = cfg.bench;
+    if (cfg.ir != null) state.ilSize = cfg.ir;
+    state.slotsSet = true;
+  }
+  const p = (league.periods || [])[0];
+  const days = p ? (new Date(p.end) - new Date(p.start)) / 86400000 : 7;
+  state.lineupMode = days >= 5 ? 'weekly' : 'daily';
+  state.matchDays = [0, 1, 2, 3, 4, 5, 6];
+  state.scoringType = null; // read from the league
+}
+
+// Switch the whole app to a Fantrax league by ID. Throws a readable message.
+async function switchLeague(id) {
   if (!/^[A-Za-z0-9]{6,32}$/.test(id || '')) throw new Error("That doesn't look like a Fantrax league ID. It's letters and numbers only.");
   if (!NBA) await nbaLoading;
   if (!NBA) throw new Error("Couldn't load NBA data. Check your connection and try again.");
@@ -2248,33 +2315,32 @@ async function connectLeague(id) {
   } catch (e) {
     throw new Error(`Fantrax didn't find that league (${e.message}). Check the ID in your league's address.`);
   }
+  const wasCurrent = currentLeagueId() === id;
+  if (!wasCurrent) stashLeague();
   applyFantraxLeague(res);
-  const site = NBA.siteLeague && NBA.siteLeague.id === id;
-  const sameLeague = state.fxLeagueId === id || (!state.fxLeagueId && site && (state.leagueChosen || state.fxTeam));
-  state.fxLeagueId = site ? null : id;
+  state.fxLeagueId = NBA.siteLeague && NBA.siteLeague.id === id ? null : id;
   state.demo = false;
-  if (!sameLeague) {
-    // a different league: start fresh with its roster settings, then pick your team
-    state.fxTeam = null;
-    state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
-    ui.viewA = null; ui.viewB = null;
-    const cfg = slotsFromLeague(res.league);
-    if (cfg) {
-      state.slots = cfg.slots;
-      if (cfg.bench != null) state.benchSize = cfg.bench;
-      if (cfg.ir != null) state.ilSize = cfg.ir;
-      state.slotsSet = true;
+  state.leagueChosen = true;
+  ui.viewA = null; ui.viewB = null;
+  if (!wasCurrent) {
+    const saved = state.leagueStates && state.leagueStates[id];
+    if (saved) Object.assign(state, JSON.parse(JSON.stringify(saved)));
+    else {
+      Object.assign(state, { fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp(), teamName: res.league.name, matchups: [], pool: [], sample: false });
+      applyLeagueRules(res.league);
     }
-    state.lineup = autoLineupIds();
   }
+  if (state.fxTeam) rememberLeague(id, res.league.name);
   syncLinked();
-  return { league: res.league, sameLeague };
+  validateLineup();
+  return res.league;
 }
 
 // Make a league team "yours": load its roster and lineup, and this week's opponent
 function adoptTeam(teamId) {
   const side = fxTeamSide(teamId);
   state.fxTeam = teamId;
+  if (fxLeague()) rememberLeague(currentLeagueId(), fxLeague().name);
   state.players = side.players;
   state.il = side.il;
   state.lineup = side.lineup;
@@ -2291,20 +2357,20 @@ function adoptTeam(teamId) {
 }
 
 /* ---------- Landing page: connect a league, then pick your team ---------- */
-const needsLanding = () => !state.fxTeam && !state.demo;
+const needsLanding = () => ui.addingLeague || (!state.fxTeam && !state.demo);
 
 function viewLanding() {
-  const chosen = state.leagueChosen && fxLeague();
+  const chosen = !ui.addingLeague && state.leagueChosen && fxLeague() && !state.fxTeam;
   const step2 = chosen ? `
       <p class="land-step">Step 2 of 2</p>
       <h1>Which team is yours?</h1>
       <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. Pick your team to load your roster and this week's matchup.</p>
       <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
-      <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button></p>` : '';
+      <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const step1 = chosen ? '' : `
-      <p class="land-step">Courtside Manager</p>
-      <h1>Plan your fantasy basketball week</h1>
-      <p class="muted">Connect your Fantrax league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up.</p>
+      <p class="land-step">${ui.addingLeague && state.fxTeam ? 'Add a league' : 'Courtside Manager'}</p>
+      <h1>${ui.addingLeague && state.fxTeam ? 'Connect another Fantrax league' : 'Plan your fantasy basketball week'}</h1>
+      <p class="muted">${ui.addingLeague && state.fxTeam ? "Enter its league ID. Each league keeps its own team and notes, and you can switch between them from the menu at the top." : "Connect your Fantrax league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
       <form class="land-form" data-form="land-league">
         <label class="field" for="landLeague">Fantrax league ID
           <input id="landLeague" name="leagueId" placeholder="e.g. abc123def456" autocomplete="off" spellcheck="false" autofocus>
@@ -2317,99 +2383,8 @@ function viewLanding() {
         <p>Open your league on fantrax.com. The ID is the part of the address right after <b>/league/</b>:<br>
         <span class="land-url">fantrax.com/fantasy/league/<b>abc123def456</b>/home</span></p>
       </details>
-      <p class="small muted land-foot">Built for head-to-head category leagues on Fantrax. ${NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
+      <p class="small muted land-foot">Built for head-to-head category leagues on Fantrax. ${ui.addingLeague && state.fxTeam ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
-}
-
-/* ---------- Settings ---------- */
-function viewSettings() {
-  const counts = Object.fromEntries(SLOT_TYPES.map(t => [t, state.slots.filter(s => s === t).length]));
-  return `
-  <div class="page-head"><div><h1>Settings</h1><p>League format, roster slots, scoring and your data.</p></div></div>
-  <div class="settings-grid">
-    <div>
-      <form class="card" data-form="team">
-        <div class="card-head"><h2>Team</h2></div>
-        <label class="field">Team name<input name="teamName" value="${esc(state.teamName)}" required></label>
-        <label class="field">League name<input name="leagueName" value="${esc(state.leagueName)}"></label>
-        <div class="field">Scoring format
-          <div class="seg" role="radiogroup">
-            <label><input type="radio" name="format" value="cat" ${!isPoints() ? 'checked' : ''}><span>9-cat H2H</span></label>
-            <label><input type="radio" name="format" value="points" ${isPoints() ? 'checked' : ''}><span>Points</span></label>
-          </div>
-        </div>
-        <label class="field" for="basisSelect"><span>Stats used for values ${infoBtn('projection')}</span>
-          <select name="basis" id="basisSelect">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-        </label>
-        <button class="btn primary" type="submit">Save team</button>
-      </form>
-      <form class="card" data-form="slots">
-        <div class="card-head"><h2>Roster slots</h2><span class="muted small">${state.slots.length} starters</span></div>
-        <div class="count-grid">
-          ${SLOT_TYPES.map(t => `<label class="field">${t}<input type="number" name="slot_${t}" min="0" max="6" value="${counts[t]}"></label>`).join('')}
-        </div>
-        <div class="grid-2" style="margin-top:12px">
-          <label class="field">Bench spots<input type="number" name="benchSize" min="0" max="15" value="${state.benchSize}"></label>
-          <label class="field">IL spots<input type="number" name="ilSize" min="0" max="6" value="${state.ilSize}"></label>
-        </div>
-        <div class="field" style="margin-top:12px">Lineup changes
-          <div class="seg" role="radiogroup">
-            <label><input type="radio" name="lineupMode" value="weekly" ${state.lineupMode === 'weekly' ? 'checked' : ''}><span>Locked for the week</span></label>
-            <label><input type="radio" name="lineupMode" value="daily" ${state.lineupMode === 'daily' ? 'checked' : ''}><span>Daily</span></label>
-          </div>
-        </div>
-        <label class="field" for="scoringSel" style="margin-top:12px">Matchup scoring
-          <select id="scoringSel" name="scoringType">
-            <option value="" ${!state.scoringType ? 'selected' : ''}>From Fantrax (${matchupScoring() === 'most' ? 'one win for most categories' : 'each category counts'})</option>
-            <option value="most" ${state.scoringType === 'most' ? 'selected' : ''}>One win for most categories</option>
-            <option value="each" ${state.scoringType === 'each' ? 'selected' : ''}>Each category counts</option>
-          </select>
-        </label>
-        <fieldset class="field" style="margin-top:12px"><legend>Matchup days</legend>
-          <div class="chips">${DAY_LABELS.map((d, i) => `<label class="chip"><input type="checkbox" name="matchDay" value="${i}" ${state.matchDays.includes(i) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div>
-        </fieldset>
-        <button class="btn primary" type="submit">Save slots</button>
-        <span class="muted small" style="margin-left:8px">Lineup is re-optimized after saving.</span>
-      </form>
-    </div>
-    <div>
-      <form class="card" data-form="scoring">
-        <div class="card-head"><h2>Points scoring</h2><span class="muted small">${isPoints() ? 'Active' : 'Used only in Points format'}</span></div>
-        <div class="score-grid">
-          ${Object.keys(DEFAULT_SCORING).map(k => `<label class="field">${SCORING_LABELS[k]}<input type="number" step="any" name="${k}" value="${state.scoring[k]}"></label>`).join('')}
-        </div>
-        <div class="actions" style="margin-top:12px">
-          <button class="btn primary" type="submit">Save scoring</button>
-          <button class="btn ghost" type="button" data-action="reset-scoring">Reset to default</button>
-        </div>
-      </form>
-      <div class="card">
-        <div class="card-head"><h2>Fantrax league</h2>${fxLeague() ? `<span class="muted small">${esc(fxLeague().name)}</span>` : ''}</div>
-        <form class="fx-connect" data-form="fx-league">
-          <label class="field" for="fxLeagueId">League ID
-            <input id="fxLeagueId" name="leagueId" value="${esc((fxLeague() && fxLeague().id) || '')}" placeholder="e.g. abc123def456" autocomplete="off" spellcheck="false">
-          </label>
-          <button class="btn primary" type="submit">Connect &amp; refresh</button>
-        </form>
-        <p class="small muted" style="margin:6px 0 12px">Find it in your league's address on Fantrax: fantrax.com/fantasy/league/<b>league-id</b>/… Connecting loads your league's rosters, lineups, matchups, positions and draft straight from Fantrax. It's saved for you on this device; NBA stats come from the site's daily update.${state.fxLeagueId && NBA && NBA.siteLeague ? ` <button class="link-btn" data-action="fx-site-league">Use the demo league (${esc(NBA.siteLeague.name)})</button>` : ''}</p>
-        <p class="form-error" id="fxConnectMsg" role="status"></p>
-        ${fxLeague() ? `<label class="field" for="fxTeamSel">Your team
-          <select id="fxTeamSel" data-change="fx-team"><option value="">Not set</option>${fxPickable().map(t => `<option value="${esc(t.id)}" ${state.fxTeam === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
-        </label>
-        <p class="small muted" style="margin:0">Positions come from your league's eligibility. ${state.fxLeagueId ? 'Rosters and lineups were loaded from Fantrax when you opened the site.' : `Rosters and lineups are as of the last data refresh (${ago(NBA.updated)}).`}</p>` : ''}
-      </div>
-      <div class="card">
-        <div class="card-head"><h2>Your data</h2></div>
-        <p class="small muted" style="margin-top:0">Your team saves automatically. Copy a backup to keep a snapshot or move it somewhere else.</p>
-        <div class="actions">
-          <button class="btn" data-action="export">Backup &amp; restore</button>
-          <button class="btn" data-action="import">Restore from file</button>
-          <button class="btn" data-action="load-sample">Load sample team</button>
-          <button class="btn danger" data-action="start-fresh">Clear everything</button>
-        </div>
-      </div>
-    </div>
-  </div>`;
 }
 
 /* =========================================================
@@ -2557,22 +2532,51 @@ const actions = {
     commit(`Welcome, ${state.teamName}`);
     location.hash = '#week';
   },
-  'land-back'() { state.leagueChosen = false; commit(); },
-  async 'land-demo'() {
-    state.demo = true;
-    state.leagueChosen = false;
-    if (state.fxLeagueId) await actions['fx-site-league']();
+  'land-back'() { state.leagueChosen = false; ui.addingLeague = true; commit(); },
+  async 'land-cancel'() {
+    ui.addingLeague = false;
+    const back = (state.savedLeagues || [])[0];
+    if (!state.fxTeam && back) await actions['league-switch']({ dataset: { id: back.id } });
     else commit();
-    location.hash = '#week';
   },
-  async 'fx-site-league'() {
-    state.fxLeagueId = null;
-    state.fxTeam = null;
-    state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
-    ui.viewA = null; ui.viewB = null;
-    save();
-    await loadNba(true);
-    toast(`Switched back to ${fxLeague() ? fxLeague().name : 'the site league'}`);
+  async 'land-demo'() {
+    const site = NBA && NBA.siteLeague;
+    if (!site) return;
+    try {
+      await switchLeague(site.id);
+      ui.addingLeague = false;
+      if (!state.fxTeam) state.demo = true;
+      commit(`Exploring ${site.name}`);
+      location.hash = '#week';
+    } catch (e) { toast(e.message); }
+  },
+  async 'league-switch'(el) {
+    const id = el.dataset.id;
+    $('#leagueMenu details')?.removeAttribute('open');
+    if (id === currentLeagueId() && state.fxTeam) return;
+    try {
+      const league = await switchLeague(id);
+      ui.addingLeague = false;
+      commit(`Switched to ${league.name}`);
+    } catch (e) { toast(e.message); }
+  },
+  'league-add'() {
+    $('#leagueMenu details')?.removeAttribute('open');
+    ui.addingLeague = true;
+    render();
+  },
+  async 'league-remove'(el) {
+    const id = el.dataset.id;
+    const l = (state.savedLeagues || []).find(x => x.id === id);
+    if (!l || !(await askConfirm(`Remove ${l.name}?`, 'Removes it from your list on this device, along with your team and notes for it. You can add it again any time.', 'Remove'))) return;
+    state.savedLeagues = state.savedLeagues.filter(x => x.id !== id);
+    if (state.leagueStates) delete state.leagueStates[id];
+    commit(`Removed ${l.name}`);
+  },
+  'set-basis'(el) {
+    state.basis = el.dataset.basis;
+    syncLinked();
+    commit(`Using ${BASIS_LABELS[state.basis].toLowerCase()} stats`);
   },
   'board-mode'(el) {
     ui.boardMode = el.dataset.mode;
@@ -2765,10 +2769,6 @@ const actions = {
     state.lineup = autoLineupIds();
     commit('Trade accepted — lineup re-optimized');
   },
-  'reset-scoring'() {
-    state.scoring = { ...DEFAULT_SCORING };
-    commit('Scoring reset to default');
-  },
   export() {
     const box = $('#backupText');
     box.value = JSON.stringify(state);
@@ -2788,43 +2788,27 @@ const actions = {
   },
   'close-backup'() { $('#backupDialog').close(); },
   import() { $('#importFile').click(); },
-  async 'load-sample'() {
-    if (!(await askConfirm('Load the sample team?', 'This replaces your current players, matchups and settings.', 'Load sample'))) return;
-    state = sampleState();
-    state.lineup = autoLineupIds();
-    commit('Sample team loaded');
-  },
   async 'start-fresh'() {
-    if (!(await askConfirm('Clear everything?', 'This removes all players, matchups and settings. Copy a backup first if you want to keep anything.', 'Clear everything'))) return;
+    $('#leagueMenu details')?.removeAttribute('open');
+    if (!(await askConfirm('Reset and start over?', 'Removes your leagues, teams, matchup logs and watchlists from this device. Copy a backup first if you want to keep anything.', 'Reset'))) return;
     state = emptyState();
     ui.tradeGive.clear(); ui.tradeGet.clear();
-    commit('Started fresh');
+    ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
+    location.hash = '';
+    await loadNba(true);
+    commit();
   },
 };
 
 const forms = {
-  async 'fx-league'(f) {
-    const id = f.leagueId.value.trim();
-    const msg = $('#fxConnectMsg');
-    const btn = f.querySelector('button[type=submit]');
-    btn.disabled = true; btn.textContent = 'Connecting…'; msg.textContent = '';
-    try {
-      const { league, sameLeague } = await connectLeague(id);
-      commit(sameLeague ? `Reloaded ${league.name} from Fantrax` : `Connected to ${league.name}. Pick your team on This week.`);
-    } catch (e) {
-      msg.textContent = e.message;
-    } finally {
-      btn.disabled = false; btn.textContent = 'Connect & refresh';
-    }
-  },
   async 'land-league'(f) {
     const id = f.leagueId.value.trim();
     const msg = $('#landMsg');
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true; btn.textContent = 'Connecting…'; msg.textContent = '';
     try {
-      await connectLeague(id);
-      state.leagueChosen = true;
+      await switchLeague(id);
+      ui.addingLeague = false;
       commit();
     } catch (e) {
       msg.textContent = e.message;
@@ -2840,50 +2824,15 @@ const forms = {
     });
     commit(my > opp ? 'Win logged 🏀' : my < opp ? 'Loss logged' : 'Tie logged');
   },
-  team(f) {
-    state.teamName = f.teamName.value.trim() || 'My Team';
-    state.leagueName = f.leagueName.value.trim();
-    const fmtChanged = state.format !== f.format.value || state.basis !== f.basis.value;
-    state.format = f.format.value;
-    state.basis = f.basis.value;
-    syncLinked();
-    if (fmtChanged) state.lineup = autoLineupIds();
-    commit(fmtChanged ? 'Settings saved — lineup re-optimized' : 'Team saved');
-  },
-  slots(f) {
-    const slots = [];
-    for (const t of SLOT_TYPES) {
-      const n = Math.max(0, Math.min(6, parseInt(f['slot_' + t].value, 10) || 0));
-      for (let i = 0; i < n; i++) slots.push(t);
-    }
-    if (!slots.length) return toast('You need at least one starting slot');
-    const days = [...f.querySelectorAll('input[name=matchDay]:checked')].map(i => +i.value);
-    if (!days.length) return toast('Pick at least one matchup day');
-    state.matchDays = days;
-    state.matchDaysSet = true;
-    state.slotsSet = true;
-    state.lineupMode = f.lineupMode.value === 'daily' ? 'daily' : 'weekly';
-    state.scoringType = f.scoringType.value || null;
-    state.slots = slots;
-    state.benchSize = Math.max(0, parseInt(f.benchSize.value, 10) || 0);
-    state.ilSize = Math.max(0, parseInt(f.ilSize.value, 10) || 0);
-    state.lineup = [];
-    state.lineup = autoLineupIds();
-    commit('Roster slots saved');
-  },
-  scoring(f) {
-    for (const k of Object.keys(DEFAULT_SCORING)) {
-      const v = parseFloat(f[k].value);
-      state.scoring[k] = Number.isFinite(v) ? v : 0;
-    }
-    commit('Scoring saved');
-  },
+
 };
 
 /* =========================================================
    Wiring
    ========================================================= */
 document.addEventListener('click', e => {
+  const menu = $('#leagueMenu details');
+  if (menu && menu.open && !e.target.closest('#leagueMenu')) menu.removeAttribute('open');
   const el = e.target.closest('[data-action]');
   if (!el || !actions[el.dataset.action]) return;
   e.preventDefault();
@@ -2958,7 +2907,7 @@ $('#importFile').addEventListener('change', async e => {
 function route() {
   let tab = location.hash.replace('#', '') || 'week';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
-  ui.tab = ['week', 'dashboard', 'roster', 'players', 'draft', 'matchups', 'trade', 'pool', 'settings'].includes(tab) ? tab : 'week';
+  ui.tab = ['week', 'dashboard', 'roster', 'players', 'draft', 'matchups', 'trade', 'pool'].includes(tab) ? tab : 'week';
   render();
   window.scrollTo(0, 0);
   // on phones the tab bar scrolls sideways; keep the current tab visible
