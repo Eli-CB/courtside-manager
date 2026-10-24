@@ -9,6 +9,12 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="ctxBar" class="ctx" hidden>
+    <div class="ctx-inner">
+      <div class="ctx-row"><div id="leagueMenu"></div><span class="ctx-sep" aria-hidden="true">/</span><span class="ctx-team-wrap" id="ctxTeam"></span></div>
+      <div class="ctx-meta" id="ctxMeta"></div>
+    </div>
+  </div>
   <header class="topbar">
     <div class="topbar-inner">
       <nav class="tabs" id="tabs" aria-label="Sections">
@@ -25,10 +31,6 @@
     </div>
   </header>
 
-  <div id="ctxBar" class="container ctx" hidden>
-    <div class="ctx-row"><div id="leagueMenu"></div><span class="ctx-sep" aria-hidden="true">/</span><span class="ctx-team-wrap" id="ctxTeam"></span></div>
-    <div class="ctx-meta" id="ctxMeta"></div>
-  </div>
   <main id="view" class="container" tabindex="-1"></main>
 
   <dialog id="detailDialog" class="modal modal-lg">
