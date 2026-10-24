@@ -382,6 +382,10 @@ def fantrax(league_id, index, saved_league=None):
         msg = (info.get('error') or {}).get('message') or 'no teams returned'
         raise RuntimeError(f'Fantrax league {league_id}: {msg}')
     rosters = get_json(FX + 'getTeamRosters', {'leagueId': league_id})
+    try:  # Fantrax-wide average draft position, used to order keepers
+        adp = {a['id']: a.get('ADP') for a in get_json(FX + 'getAdp', {'sport': 'NBA'}) if a.get('id')}
+    except Exception:
+        adp = {}
     try:
         draft = get_json(FX + 'getDraftResults', {'leagueId': league_id})
     except Exception:
@@ -407,7 +411,7 @@ def fantrax(league_id, index, saved_league=None):
         if not nba:
             continue
         elig = set((pi.get('eligiblePos') or '').split(','))
-        players[nba] = {'id': fid, 'st': pi.get('status') or '', 'pos': [x for x in BASE_POS if x in elig]}
+        players[nba] = {'id': fid, 'st': pi.get('status') or '', 'pos': [x for x in BASE_POS if x in elig], 'adp': adp.get(fid)}
 
     league = {
         'id': league_id,
@@ -536,6 +540,7 @@ def main():
             if fx['pos']:
                 p['pos'] = fx['pos']  # your league's eligibility beats NBA.com's broad G/F/C
             p['fx'] = {'id': fx['id'], 'st': fx['st']}
+            if fx.get('adp'): p['fx']['adp'] = fx['adp']
         was = old.get(pid, {})
         if games:
             if pid in cur: p['cur'] = cur[pid]

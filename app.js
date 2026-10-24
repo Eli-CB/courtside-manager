@@ -768,9 +768,9 @@ const INFO = {
     <p><b>Now.</b> Every drafted player is ranked by his value per game using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
     <p><b>+/−.</b> Draft slot minus current rank. A #40 pick who's playing like the #5 player is +35; a #3 pick playing like #50 is −47.</p>
     <p><b>Team drafts.</b> The average +/− across all of a team's picks. Total value adds up the per-game value of every pick who has played.</p>
-    <p><b>Board.</b> Each pick is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
-    <p><b>Keepers</b> fill the two rows above round 1. They have no pick number, so they get no +/−; instead each shows which of this year's picks he's playing like.</p>
-    <p><b>Traded picks</b> sit in their original slot, marked with the team that made the pick. "No pick" means the slot went unused.</p>`],
+    <p><b>Colors.</b> Each pick and keeper is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
+    <p><b>Keepers</b> fill the top two rows. The one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks.</p>
+    <p><b>Board.</b> Each team's column lists the picks that team made, in order, labeled with the round and overall pick. "via" marks a pick acquired by trade, with the team that originally held it.</p>`],
   data: ['Where the data comes from', `
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
@@ -1985,6 +1985,8 @@ function viewWeek() {
 /* ---------- Draft: how every pick is playing so far ---------- */
 // Each drafted player is ranked by his value per game this season (this season's stats only).
 // Gain = draft slot − current rank: a #40 pick playing like the #5 player is +35.
+const KEEPER_SLOTS = [5, 15];
+
 function draftData() {
   const L = fxLeague();
   if (!L || !L.draft || !L.draft.picks.length) return null;
@@ -2011,8 +2013,10 @@ function draftData() {
       const gp = s ? Math.round(s.gp) : 0;
       const val = s && gp ? value({ ...s, pos: raw.pos }) : null;
       const like = val == null ? null : played.filter(p => p.val > val).length + 1;
-      return { nbaId: nba, name: raw ? raw.name : '', gp, val, like, sort: raw ? value({ ...(nbaStats(raw) || {}), pos: raw.pos }) : -99 };
-    }).sort((a, b) => b.sort - a.sort);
+      return { nbaId: nba, name: raw ? raw.name : '', gp, val, like, adp: (raw && raw.fx && raw.fx.adp) || 999 };
+    }).sort((a, b) => a.adp - b.adp);
+    // the better keeper (lower ADP) counts as the #5 pick, the other as #15
+    keepers[tid].forEach((k, i) => { k.slot = KEEPER_SLOTS[i] || 25; k.gain = k.like == null ? null : k.slot - k.like; });
   }
   return { picks, played: played.length, maxGp, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers };
 }
@@ -2061,39 +2065,37 @@ function viewDraft() {
     return { id, name: fxTeamName(id), n: ps.length, avg, top, low, total };
   }).sort((a, b) => b.avg - a.avg);
 
-  // board: one column per draft slot (round-1 order), one row per round, snaking back on even rounds.
-  // Picks sit in their true slot even when traded; keepers fill two rows on top.
+  // board: one column per team (round-1 order) holding the picks that team made, in order.
+  // Each pick shows its round and overall number; picks acquired by trade note the original owner.
   const T = d.perRound;
   const rounds = Math.max(...d.picks.map(p => p.round));
-  const slotTeam = d.picks.filter(p => p.round === 1).sort((a, b) => a.pick - b.pick).map(p => p.teamId);
+  const order = d.picks.filter(p => p.round === 1).sort((a, b) => a.pick - b.pick).map(p => p.teamId);
   // read each round's direction from the picks themselves (this league's order isn't a plain snake)
   const inRound = p => p.pick - (p.round - 1) * T;
   const forward = {};
   for (let r = 1; r <= rounds; r++) {
     const rp = d.picks.filter(p => p.round === r);
-    const fwd = rp.filter(p => slotTeam[inRound(p) - 1] === p.teamId).length;
-    const rev = rp.filter(p => slotTeam[T - inRound(p)] === p.teamId).length;
-    forward[r] = fwd >= rev;
+    forward[r] = rp.filter(p => order[inRound(p) - 1] === p.teamId).length >= rp.filter(p => order[T - inRound(p)] === p.teamId).length;
   }
-  const colOf = p => (forward[p.round] ? inRound(p) - 1 : T - inRound(p));
-  const grid = {};
-  for (const p of d.picks) grid[`${p.round}|${colOf(p)}`] = p;
-  const order = slotTeam;
+  const ownerOf = p => order[forward[p.round] ? inRound(p) - 1 : T - inRound(p)];
+  const picksOf = {};
+  for (const p of [...d.picks].sort((a, b) => a.pick - b.pick)) (picksOf[p.teamId] = picksOf[p.teamId] || []).push(p);
+  const maxPicks = Math.max(...order.map(t => (picksOf[t] || []).length));
   const nameBtn = (nbaId, name) => nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${nbaId}"><span class="n-full">${esc(name)}</span><span class="n-short">${esc(shortName(name))}</span></button>` : esc(name);
-  const keeperRows = [0, 1].map(i => `<tr class="dr-krow"><th scope="row" class="num">K${i + 1}</th>${order.map(t => {
+  const gainTag = (gain, gp) => `<span class="dr-gain ${gain > 0 ? 'pos-good' : gain < 0 ? 'pos-bad' : 'muted'}">${gp ? signed(gain, 0) : 'DNP'}</span>`;
+  const keeperRows = [0, 1].map(i => `<tr class="dr-krow"><th scope="row">K${i + 1}</th>${order.map(t => {
     const k = (d.keepers[t] || [])[i];
     if (!k) return '<td class="dr-cell dr-keeper"></td>';
-    return `<td class="dr-cell dr-keeper" title="${esc(k.name)} · keeper · ${k.like ? `playing like pick #${k.like}` : "hasn't played"}">
-      <span class="dr-pick">Keeper</span> ${nameBtn(k.nbaId, k.name)}
-      <span class="dr-gain muted">${k.like ? `like #${k.like}` : 'DNP'}</span></td>`;
+    return `<td class="dr-cell dr-keeper" style="${k.gain != null ? shade(k.gain / 15) : ''}" title="${esc(k.name)} · keeper, graded as pick #${k.slot} · ${k.like ? `playing like #${k.like} (${signed(k.gain, 0)})` : "hasn't played"}">
+      <span class="dr-pick">Keeper · as #${k.slot}</span> ${nameBtn(k.nbaId, k.name)} ${gainTag(k.gain, k.gp)}</td>`;
   }).join('')}</tr>`).join('');
-  const board = keeperRows + Array.from({ length: rounds }, (_, r) => `<tr><th scope="row" class="num">R${r + 1}</th>${order.map((t, c) => {
-    const p = grid[`${r + 1}|${c}`];
-    if (!p) return '<td class="dr-cell"><span class="dr-pick">No pick</span></td>';
-    const via = p.teamId !== t ? `<span class="dr-via">by ${esc(p.team)}</span>` : '';
-    return `<td class="dr-cell" style="${p.gp ? shade(p.gain / 15) : ''}" title="${esc(p.name)} · pick #${p.pick}${p.teamId !== t ? ` (traded, made by ${esc(p.team)})` : ''} · ${p.gp ? `playing like #${p.rank} (${signed(p.gain, 0)})` : "hasn't played"}">
-      <span class="dr-pick">#${p.pick}</span> ${nameBtn(p.nbaId, p.name)}
-      <span class="dr-gain ${p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted'}">${p.gp ? signed(p.gain, 0) : 'DNP'}</span>${via}</td>`;
+  const board = keeperRows + Array.from({ length: maxPicks }, (_, i) => `<tr><th scope="row"></th>${order.map(t => {
+    const p = (picksOf[t] || [])[i];
+    if (!p) return '<td class="dr-cell"></td>';
+    const owner = ownerOf(p);
+    const via = owner && owner !== p.teamId ? `<span class="dr-via">via ${esc(fxTeamName(owner))}</span>` : '';
+    return `<td class="dr-cell" style="${p.gp ? shade(p.gain / 15) : ''}" title="${esc(p.name)} · round ${p.round}, pick #${p.pick}${via ? ` (from ${esc(fxTeamName(owner))})` : ''} · ${p.gp ? `playing like #${p.rank} (${signed(p.gain, 0)})` : "hasn't played"}">
+      <span class="dr-pick">R${p.round} · #${p.pick}</span> ${nameBtn(p.nbaId, p.name)} ${gainTag(p.gain, p.gp)}${via}</td>`;
   }).join('')}</tr>`).join('');
 
   return `
