@@ -29,6 +29,8 @@ python serve.py
 
 Then open http://localhost:5173. The local server refreshes data when it's more than 6 hours old, and lets you switch leagues from Settings.
 
-## Changing leagues
+## Leagues
 
-Put your Fantrax league ID (from your league's URL, `fantrax.com/fantasy/league/<id>/…`) in `league.json`, then run the workflow or `python scripts/update_data.py`.
+Anyone can use the site with their own Fantrax league: enter the league ID (from the league's address, `fantrax.com/fantasy/league/<id>/…`) in Settings. The browser loads that league's rosters, lineups, matchups, positions and draft straight from Fantrax, which allows requests from any site, and remembers it on that device. NBA stats, the schedule and injuries come from the shared daily data.
+
+`league.json` sets the default league that first-time visitors see and that the daily data includes.

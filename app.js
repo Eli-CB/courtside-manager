@@ -446,6 +446,15 @@ async function loadNba(fresh = false) {
     for (const raw of NBA.players) { nbaById.set(raw.id, raw); nbaByName.set(normName(raw.name), raw.id); }
     teamDates = new Map(Object.entries(NBA.teams || {}).map(([t, v]) => [t, new Set(v.dates || [])]));
     nbaNames = NBA.players.map(raw => { const n = normName(raw.name); const parts = n.split(' '); return { raw, n, first: parts[0] || '', last: parts.slice(1).join(' ') }; });
+    for (const raw of NBA.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
+    NBA.siteLeague = NBA.league;
+    if (state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId)) {
+      try {
+        applyFantraxLeague(await fetchFantraxLeague(state.fxLeagueId));
+      } catch (e) {
+        toast(`Couldn't load your Fantrax league right now. Showing ${NBA.league ? NBA.league.name : 'the site league'}.`);
+      }
+    }
     if (state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
     if (syncLinked()) commit(); else render();
     return true;
@@ -775,10 +784,110 @@ const INFO = {
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
     <li><b>Fantrax:</b> your league's position eligibility, every team's roster and lineup, matchups, and who's available.</li></ul>
-    <p>The website refreshes every morning (7 a.m. Eastern). The local app refreshes itself every 6 hours or when you tap Refresh stats.</p>`],
+    <p>NBA stats refresh every morning (7 a.m. Eastern). If you connected your own league in Settings, its Fantrax data loads fresh each time you open the site.</p>`],
 };
 
 const infoBtn = key => `<button type="button" class="info-btn" data-action="info" data-key="${key}" aria-label="How this is calculated" title="How this is calculated">i</button>`;
+
+// ----- Any visitor's Fantrax league, fetched in the browser -----
+// The daily data file carries NBA stats for everyone plus the site's default league. Fantrax's
+// public league API allows requests from any site, so a visitor's own league can be loaded here.
+const FX_API = 'https://www.fantrax.com/fxea/general/';
+const NBA_POS_MAP = { G: ['PG', 'SG'], F: ['SF', 'PF'], C: ['C'], 'G-F': ['SG', 'SF'], 'F-G': ['SG', 'SF'], 'F-C': ['PF', 'C'], 'C-F': ['PF', 'C'] };
+const FX_SLOT_MAP = { PG: 'PG', SG: 'SG', G: 'G', SF: 'SF', PF: 'PF', F: 'F', C: 'C', Flx: 'FLX', Util: 'FLX', UT: 'FLX' };
+
+async function fxGet(path) {
+  const r = await fetch(FX_API + path);
+  if (!r.ok) throw new Error(`Fantrax answered ${r.status}`);
+  return JSON.parse(await r.text()); // served as text/plain
+}
+
+// "Last, First" -> "First Last"
+const fxName = n => { const [last, first] = String(n).split(', '); return first ? `${first} ${last}` : String(n); };
+
+async function fetchFantraxLeague(id) {
+  const q = encodeURIComponent(id);
+  const [ids, info, rosters, draft, adpList] = await Promise.all([
+    fxGet('getPlayerIds?sport=NBA'), fxGet(`getLeagueInfo?leagueId=${q}`), fxGet(`getTeamRosters?leagueId=${q}`),
+    fxGet(`getDraftResults?leagueId=${q}`).catch(() => ({})), fxGet('getAdp?sport=NBA').catch(() => []),
+  ]);
+  if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
+
+  // match Fantrax players to NBA.com players by name (team breaks ties)
+  const byName = new Map();
+  for (const raw of NBA.players) {
+    const n = normName(raw.name);
+    if (!byName.has(n)) byName.set(n, []);
+    byName.get(n).push(raw);
+  }
+  const toNba = {}, names = {};
+  for (const [fid, v] of Object.entries(ids)) {
+    names[fid] = fxName(v.name || '');
+    const hits = byName.get(normName(names[fid])) || [];
+    const hit = hits.length > 1 ? (hits.find(h => h.team === v.team) || hits[0]) : hits[0];
+    if (hit) toNba[fid] = hit.id;
+  }
+  const adp = Object.fromEntries((Array.isArray(adpList) ? adpList : []).filter(a => a.id).map(a => [a.id, a.ADP]));
+  const fxPlayers = {};
+  for (const [fid, pi] of Object.entries(info.playerInfo || {})) {
+    const nba = toNba[fid];
+    if (!nba) continue;
+    const elig = new Set((pi.eligiblePos || '').split(','));
+    fxPlayers[nba] = { id: fid, st: pi.status || '', pos: POSITIONS.filter(x => elig.has(x)), adp: adp[fid] };
+  }
+  const league = {
+    id, name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
+    teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
+    periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10) })),
+    matchups: Object.fromEntries((info.matchups || []).map(m => [String(m.period),
+      (m.matchupList || []).filter(x => x.away && x.away.id && x.home && x.home.id).map(x => [x.away.id, x.home.id])])),
+    rosterPeriod: rosters.period,
+    rosters: Object.fromEntries(Object.entries(rosters.rosters || {}).map(([tid, r]) => [tid,
+      (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
+    rosterInfo: info.rosterInfo || null,
+    draft: null,
+  };
+  const picks = (draft.draftPicks || []).filter(d => d.playerId);
+  if (picks.length) {
+    const drafted = new Set(picks.map(d => toNba[d.playerId]).filter(Boolean));
+    league.draft = {
+      date: String(draft.draftDate || '').slice(0, 10), type: draft.draftType || '', state: draft.draftState || '',
+      perRound: Math.max(...draft.draftPicks.map(d => d.pickInRound || 0)),
+      picks: picks.map(d => [d.round, d.pick, d.teamId, toNba[d.playerId] || null, names[d.playerId] || '']),
+      // keepers: rostered players who weren't drafted (later pickups show up here too)
+      keepers: Object.fromEntries(Object.entries(league.rosters).map(([tid, items]) => [tid, items.map(it => it.nba).filter(n => n && !drafted.has(n))])),
+    };
+  }
+  return { league, fxPlayers };
+}
+
+// Swap the league the whole app works from; NBA stats stay as they are
+function applyFantraxLeague({ league, fxPlayers }) {
+  for (const raw of NBA.players) {
+    const fx = fxPlayers[raw.id];
+    raw.pos = fx && fx.pos.length ? fx.pos : raw.basePos;
+    if (fx) raw.fx = { id: fx.id, st: fx.st, ...(fx.adp ? { adp: fx.adp } : {}) };
+    else delete raw.fx;
+  }
+  NBA.league = league;
+  nbaCache = null;
+}
+
+// Roster slots from the league's settings (8 starters, bench and IR sizes)
+function slotsFromLeague(league) {
+  const ri = league && league.rosterInfo;
+  if (!ri || !ri.positionConstraints) return null;
+  const slots = [];
+  for (const type of SLOT_TYPES) {
+    for (const [k, v] of Object.entries(ri.positionConstraints)) {
+      if (FX_SLOT_MAP[k] === type) for (let i = 0; i < (v.maxActive || 0); i++) slots.push(type);
+    }
+  }
+  if (!slots.length || (ri.maxTotalActivePlayers && slots.length !== ri.maxTotalActivePlayers)) return null;
+  const bench = ri.maxTotalReservePlayers ?? null;
+  const ir = ri.maxTotalPlayers && bench != null ? Math.max(0, ri.maxTotalPlayers - slots.length - bench) : null;
+  return { slots, bench, ir };
+}
 
 // ----- Fantrax league (positions, rosters, matchups) -----
 const fxLeague = () => (NBA && NBA.league) || null;
@@ -2194,12 +2303,12 @@ function viewSettings() {
           </label>
           <button class="btn primary" type="submit">Connect &amp; refresh</button>
         </form>
-        <p class="small muted" style="margin:6px 0 12px">Find it in your league's address on Fantrax: fantrax.com/fantasy/league/<b>league-id</b>/… Connecting re-pulls rosters, lineups, matchups and positions. This works in the local app (python serve.py). On the website, the league comes from league.json in the GitHub repo.</p>
+        <p class="small muted" style="margin:6px 0 12px">Find it in your league's address on Fantrax: fantrax.com/fantasy/league/<b>league-id</b>/… Connecting loads your league's rosters, lineups, matchups, positions and draft straight from Fantrax. It's saved for you on this device; NBA stats come from the site's daily update.${state.fxLeagueId && NBA && NBA.siteLeague ? ` <button class="link-btn" data-action="fx-site-league">Switch back to ${esc(NBA.siteLeague.name)}</button>` : ''}</p>
         <p class="form-error" id="fxConnectMsg" role="status"></p>
         ${fxLeague() ? `<label class="field" for="fxTeamSel">Your team
           <select id="fxTeamSel" data-change="fx-team"><option value="">Not set</option>${fxPickable().map(t => `<option value="${esc(t.id)}" ${state.fxTeam === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
         </label>
-        <p class="small muted" style="margin:0">Positions come from your league's eligibility. Rosters and lineups are as of the last data refresh (${ago(NBA.updated)}).</p>` : ''}
+        <p class="small muted" style="margin:0">Positions come from your league's eligibility. ${state.fxLeagueId ? 'Rosters and lineups were loaded from Fantrax when you opened the site.' : `Rosters and lineups are as of the last data refresh (${ago(NBA.updated)}).`}</p>` : ''}
       </div>
       <div class="card">
         <div class="card-head"><h2>Your data</h2></div>
@@ -2354,6 +2463,15 @@ const actions = {
     ui.strBasis = el.dataset.basis;
     try { localStorage.setItem(STR_KEY, ui.strBasis); } catch (e) { /* ignore */ }
     render();
+  },
+  async 'fx-site-league'() {
+    state.fxLeagueId = null;
+    state.fxTeam = null;
+    state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
+    ui.viewA = null; ui.viewB = null;
+    save();
+    await loadNba(true);
+    toast(`Switched back to ${fxLeague() ? fxLeague().name : 'the site league'}`);
   },
   'board-mode'(el) {
     ui.boardMode = el.dataset.mode;
@@ -2589,19 +2707,35 @@ const forms = {
     const msg = $('#fxConnectMsg');
     const btn = f.querySelector('button[type=submit]');
     if (!/^[A-Za-z0-9]{6,32}$/.test(id)) { msg.textContent = "That doesn't look like a Fantrax league ID (letters and numbers only)."; return; }
+    if (!NBA) { msg.textContent = 'NBA data is still loading. Try again in a moment.'; return; }
     btn.disabled = true; btn.textContent = 'Connecting…'; msg.textContent = '';
-    let res = null;
     try {
-      const r = await fetch('api/league', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leagueId: id }) });
-      res = await r.json().catch(() => null);
-      if (!res) res = { ok: false, message: '' };
-    } catch (e) { res = null; }
-    btn.disabled = false; btn.textContent = 'Connect & refresh';
-    const noServer = "The website can't switch leagues by itself. Change league.json in the GitHub repo (the site refreshes overnight), or use the local app (python serve.py).";
-    if (!res) { msg.textContent = noServer; return; }
-    if (!res.ok) { msg.textContent = res.message || noServer; return; }
-    await loadNba(true);
-    toast(res.message || 'League connected');
+      const res = await fetchFantraxLeague(id);
+      applyFantraxLeague(res);
+      const site = NBA.siteLeague && NBA.siteLeague.id === id;
+      const sameLeague = state.fxLeagueId === id || (!state.fxLeagueId && site);
+      state.fxLeagueId = site ? null : id;
+      if (!sameLeague) {
+        // a different league: start fresh with its roster settings, then pick your team
+        state.fxTeam = null;
+        state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
+        ui.viewA = null; ui.viewB = null;
+        const cfg = slotsFromLeague(res.league);
+        if (cfg) {
+          state.slots = cfg.slots;
+          if (cfg.bench != null) state.benchSize = cfg.bench;
+          if (cfg.ir != null) state.ilSize = cfg.ir;
+          state.slotsSet = true;
+        }
+        state.lineup = autoLineupIds();
+      }
+      syncLinked();
+      commit(sameLeague ? `Reloaded ${res.league.name} from Fantrax` : `Connected to ${res.league.name}. Pick your team on This week.`);
+    } catch (e) {
+      msg.textContent = `Fantrax didn't return that league (${e.message}). Check the ID in your league's address.`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Connect & refresh';
+    }
   },
   matchup(f) {
     const my = parseFloat(f.my.value), opp = parseFloat(f.opp.value);
