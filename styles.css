@@ -575,6 +575,7 @@ body.landing .tabs { visibility: hidden; }
 .land-help p { margin: 8px 0 0; color: var(--muted); }
 .land-url { display: inline-block; margin-top: 4px; font-family: ui-monospace, Consolas, monospace; font-size: .85rem; color: var(--text); background: var(--surface-2); padding: 3px 8px; border-radius: 6px; word-break: break-all; }
 .land-foot { margin: 0 !important; padding-top: 14px; border-top: 1px solid var(--border); }
+.land-note { font-size: .88rem; background: var(--surface-2); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px !important; }
 .land-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .land-team { font: inherit; font-weight: 600; text-align: left; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
 .land-team:hover, .land-team:focus-visible { border-color: var(--accent); background: var(--accent-soft); }

@@ -849,6 +849,7 @@ async function fetchFantraxLeague(id) {
       (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
     rosterInfo: info.rosterInfo || null,
     draft: null,
+    draftAt: draft.draftDate || null,
   };
   const picks = (draft.draftPicks || []).filter(d => d.playerId);
   if (picks.length) {
@@ -1118,11 +1119,42 @@ function render() {
   leagueMenu();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
+  const early = preDraft();
+  if (early && ['week', 'dashboard', 'roster', 'draft', 'matchups', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
   const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool };
   // keep scroll position of inner lists (e.g. trade picker) across re-renders
   const scrolls = [...document.querySelectorAll('.pick-list')].map(el => el.scrollTop);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
   document.querySelectorAll('.pick-list').forEach((el, i) => { el.scrollTop = scrolls[i] || 0; });
+}
+
+// A league that hasn't drafted: no picks made and every roster empty
+function preDraft() {
+  const L = fxLeague();
+  if (!L || (L.draft && L.draft.picks.length)) return null;
+  return Object.values(L.rosters || {}).some(r => r.length) ? null : L;
+}
+
+// Fantrax sends "2026-10-25T19:00:00.0-0400"
+function draftTime(L) {
+  const dt = new Date(String(L.draftAt || '').replace(/\.\d+(?=[-+])/, '').replace(/([-+]\d\d)(\d\d)$/, '$1:$2'));
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function draftWhen(L) {
+  const dt = draftTime(L);
+  return dt ? `${dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : '';
+}
+
+const isPointsLeague = (L = fxLeague()) => !!(L && /POINTS/.test(L.scoring || ''));
+
+function viewPreDraft(L) {
+  const when = draftWhen(L);
+  const past = draftTime(L) && draftTime(L) < new Date();
+  return `<div class="page-head"><div><h1>${esc(L.name)}</h1><p>${esc(fxTeamName(state.fxTeam) || '')}</p></div></div>
+    <div class="card"><div class="empty"><strong>${past ? 'Waiting on the draft' : "This league hasn't drafted yet"}</strong>
+      ${when ? `${past ? 'The draft was set for' : 'The draft is set for'} <b>${esc(when)}</b>. ` : ''}Rosters, matchups and the draft board fill in here once teams have players.
+      In the meantime, the <a href="#players">Players</a> tab ranks every NBA player and you can star the ones you want on your Watchlist.</div></div>`;
 }
 
 function sampleBanner() {
@@ -2190,7 +2222,7 @@ function viewDraft() {
   const d = draftData();
   if (!d) {
     return `<div class="page-head"><div><h1>Draft</h1><p>${dataLine()}</p></div></div>
-      <div class="card"><div class="empty"><strong>No draft found</strong>Add your Fantrax league from the league menu at the top to see your draft.</div></div>`;
+      <div class="card"><div class="empty"><strong>No draft results</strong>Fantrax didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
   }
   const mine = state.fxTeam;
   const best = [...d.picks].filter(p => p.gp).sort((a, b) => (b.gain - a.gain) || (b.val - a.val)).slice(0, 10);
@@ -2365,6 +2397,8 @@ function viewLanding() {
       <p class="land-step">Step 2 of 2</p>
       <h1>Which team is yours?</h1>
       <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. Pick your team to load your roster and this week's matchup.</p>
+      ${preDraft() ? `<p class="land-note">This league hasn't drafted yet${draftWhen(fxLeague()) ? ` (draft: ${esc(draftWhen(fxLeague()))})` : ''}, so rosters are empty for now.</p>` : ''}
+      ${isPointsLeague() ? `<p class="land-note">This is a points league. Matchup odds and lineup tips here are built for category leagues, so treat them as a rough guide.</p>` : ''}
       <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const step1 = chosen ? '' : `
