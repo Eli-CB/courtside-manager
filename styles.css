@@ -585,6 +585,8 @@ body.landing .tabs { visibility: hidden; }
   .land-teams { grid-template-columns: minmax(0, 1fr); }
 }
 
+tr.me-row td { background: var(--accent-soft); }
+
 /* ---------- League menu ---------- */
 #leagueMenu { position: relative; }
 .lm summary { list-style: none; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; font-weight: 700; font-size: .85rem; max-width: 220px; }

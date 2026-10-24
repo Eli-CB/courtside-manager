@@ -35,11 +35,6 @@ const BASE = {
   ftPct: [0.78, 0.7], // impact = (FT% - mean) * FTA
 };
 
-const DEFAULT_SCORING = { pts: 1, reb: 1, ast: 2, stl: 4, blk: 4, tpm: 1, to: -2, fgm: 2, fga: -1, ftm: 1, fta: -1 };
-const SCORING_LABELS = {
-  pts: 'Point', reb: 'Rebound', ast: 'Assist', stl: 'Steal', blk: 'Block', tpm: '3PT made',
-  to: 'Turnover', fgm: 'FG made', fga: 'FG attempt', ftm: 'FT made', fta: 'FT attempt',
-};
 
 const STAT_FIELDS = [
   ['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'],
@@ -48,74 +43,17 @@ const STAT_FIELDS = [
 ];
 
 const DEFAULT_SLOTS = ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'];
+// the local app (python serve.py) can re-pull NBA data on demand; the website updates daily on its own
+const LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
-/* =========================================================
-   Sample data
-   ========================================================= */
 const uid = () => Math.random().toString(36).slice(2, 10);
-
-// a = [min, pts, reb, ast, stl, blk, 3pm, to, fg%, fga, ft%, fta]
-function P(name, team, pos, a, extra = {}) {
-  return {
-    id: uid(), name, team, pos: pos.split('/'), status: 'Healthy', games: 4, notes: '', tag: '',
-    min: a[0], pts: a[1], reb: a[2], ast: a[3], stl: a[4], blk: a[5], tpm: a[6], to: a[7],
-    fgPct: a[8], fga: a[9], ftPct: a[10], fta: a[11],
-    ...extra,
-  };
-}
-
-function sampleState() {
-  const tatum = P('Jayson Tatum', 'BOS', 'SF/PF', [36, 26.8, 8.7, 6.0, 1.1, 0.5, 3.5, 2.8, .45, 20.3, .81, 6.8], { status: 'Out', notes: 'Achilles rehab — stash on IL.' });
-  const players = [
-    P('Shai Gilgeous-Alexander', 'OKC', 'PG/SG', [34, 32.0, 5.0, 6.4, 1.7, 1.0, 2.1, 2.4, .52, 21.8, .89, 8.8]),
-    P('Nikola Jokić', 'DEN', 'C', [36, 29.6, 12.7, 10.2, 1.8, 0.6, 2.0, 3.3, .57, 20.0, .80, 6.4]),
-    P('Victor Wembanyama', 'SAS', 'PF/C', [33, 24.3, 11.0, 3.7, 1.1, 3.8, 3.2, 3.2, .48, 18.0, .84, 5.0]),
-    P('Anthony Edwards', 'MIN', 'SG/SF', [36, 27.6, 5.7, 4.5, 1.2, 0.6, 4.1, 3.2, .45, 21.5, .84, 6.3]),
-    P('Tyrese Maxey', 'PHI', 'PG/SG', [37, 26.3, 3.3, 6.1, 1.8, 0.4, 3.0, 2.4, .43, 21.0, .88, 7.0]),
-    P('Jalen Brunson', 'NYK', 'PG', [35, 26.0, 2.9, 7.3, 0.9, 0.1, 2.2, 2.4, .49, 19.5, .82, 7.0], { games: 3 }),
-    P('Scottie Barnes', 'TOR', 'SF/PF', [35, 19.3, 7.7, 5.8, 1.4, 1.0, 1.3, 2.6, .46, 15.7, .75, 4.5]),
-    P('Paolo Banchero', 'ORL', 'PF', [35, 25.9, 7.5, 4.8, 0.8, 0.5, 1.6, 2.9, .45, 20.5, .74, 8.0], { status: 'DTD', notes: 'Ankle — check status before tip.' }),
-    P('Evan Mobley', 'CLE', 'PF/C', [34, 18.5, 9.3, 3.2, 0.9, 1.6, 1.0, 2.0, .56, 13.5, .70, 5.0]),
-    P('Alperen Şengün', 'HOU', 'C', [32, 19.1, 10.3, 4.9, 1.4, 0.8, 0.3, 2.9, .50, 15.6, .69, 5.0], { games: 3 }),
-    P('Jalen Williams', 'OKC', 'SG/SF', [32, 21.6, 5.3, 5.1, 1.6, 0.6, 1.8, 2.2, .48, 17.0, .79, 4.0]),
-    P('Derrick White', 'BOS', 'PG/SG', [34, 16.4, 4.5, 4.8, 1.1, 1.2, 3.0, 1.4, .44, 13.3, .90, 2.8]),
-    P('Mikal Bridges', 'NYK', 'SF', [37, 17.6, 3.2, 3.7, 0.9, 0.5, 1.9, 1.6, .50, 14.4, .80, 1.9], { games: 3 }),
-    tatum,
-  ];
-  const pool = [
-    P('Ausar Thompson', 'DET', 'SF', [26, 12.0, 6.0, 2.6, 1.6, 0.9, 0.3, 1.4, .53, 9.5, .62, 2.0], { tag: 'FA' }),
-    P('Keegan Murray', 'SAC', 'PF', [30, 14.0, 6.7, 1.6, 1.0, 0.6, 1.9, 1.0, .46, 11.0, .78, 1.7], { tag: 'FA' }),
-    P('Naji Marshall', 'DAL', 'SF', [28, 13.2, 4.6, 3.1, 0.9, 0.3, 0.8, 1.6, .51, 10.4, .72, 2.2], { tag: 'FA' }),
-    P('Trae Young', 'ATL', 'PG', [36, 24.2, 3.1, 11.6, 1.2, 0.2, 2.6, 4.7, .41, 19.3, .87, 7.4], { tag: 'Trade target' }),
-    P('Domantas Sabonis', 'SAC', 'C', [35, 19.1, 13.9, 6.0, 0.7, 0.4, 0.8, 3.2, .59, 13.5, .74, 4.5], { tag: 'Trade target' }),
-  ];
-  const s = {
-    version: 1,
-    sample: true,
-    teamName: 'Pick & Roll Call',
-    leagueName: 'Home League',
-    format: 'cat',
-    basis: 'blend',
-    scoring: { ...DEFAULT_SCORING },
-    slots: [...DEFAULT_SLOTS],
-    benchSize: 5,
-    ilSize: 1,
-    slotsSet: true,
-    players,
-    pool,
-    lineup: [],
-    il: [tatum.id],
-    matchups: [],
-  };
-  return s;
-}
 
 function emptyState() {
   return {
-    version: 1, sample: false, teamName: 'My Team', leagueName: '', format: 'cat', basis: 'blend',
+    version: 2, teamName: 'My Team', basis: 'blend',
     matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] }, savedLeagues: [], leagueStates: {},
-    scoring: { ...DEFAULT_SCORING }, slots: [...DEFAULT_SLOTS], benchSize: 5, ilSize: 1, slotsSet: true, lineupMode: 'weekly',
-    players: [], pool: [], lineup: [], il: [], matchups: [],
+    slots: [...DEFAULT_SLOTS], benchSize: 5, ilSize: 1, slotsSet: true, lineupMode: 'weekly',
+    players: [], pool: [], lineup: [], il: [],
   };
 }
 
@@ -131,22 +69,19 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) s = JSON.parse(raw);
   } catch (e) { /* storage unavailable or corrupt */ }
-  if (!s || !Array.isArray(s.players)) {
-    s = sampleState();
-    s.lineup = autoLineupIds(s);
-  }
-  return normalize(s);
+  return normalize(s && Array.isArray(s.players) ? s : emptyState());
 }
 
 function normalize(s) {
   const base = emptyState();
   const migrateSlots = !s.slotsSet;
   s = { ...base, ...s };
-  s.scoring = { ...DEFAULT_SCORING, ...(s.scoring || {}) };
+  // fields from the hand-entry days; everything here now comes from Fantrax
+  for (const k of ['sample', 'format', 'scoring', 'scoringType', 'leagueName', 'matchups', 'matchDaysSet']) delete s[k];
+  for (const ls of Object.values(s.leagueStates || {})) for (const k of ['sample', 'scoringType', 'leagueName', 'matchups']) delete ls[k];
   s.players = (s.players || []).map(normalizePlayer);
   s.pool = (s.pool || []).map(normalizePlayer);
   s.il = (s.il || []).filter(id => s.players.some(p => p.id === id));
-  s.matchups = s.matchups || [];
   if (!Array.isArray(s.slots) || !s.slots.length) s.slots = [...DEFAULT_SLOTS];
   s.slots = s.slots.map(x => (x === 'UTIL' ? 'FLX' : x)).filter(x => SLOT_TYPES.includes(x));
   // league setup from the owner: 8 starters (FLX = anyone), 5 bench, 1 IR
@@ -156,16 +91,14 @@ function normalize(s) {
   }
   if (s.lineupMode !== 'daily') s.lineupMode = 'weekly';
   if (!BASIS_LABELS[s.basis]) s.basis = 'blend';
-  if (!Array.isArray(s.matchDays) || !s.matchDays.length) s.matchDays = [0, 1, 2, 3, 4, 5, 6];
-  // the first version defaulted to Mon–Fri by mistake; move untouched saves to the full week
-  if (!s.matchDaysSet && s.matchDays.join() === '0,1,2,3,4') s.matchDays = [0, 1, 2, 3, 4, 5, 6];
+  if (!Array.isArray(s.matchDays) || !s.matchDays.length || s.matchDays.join() === '0,1,2,3,4') s.matchDays = [0, 1, 2, 3, 4, 5, 6];
   s.opp = { name: '', week: null, starters: null, fxId: null, ...(s.opp || {}) };
   s.opp.players = (s.opp.players || []).map(normalizePlayer);
   return s;
 }
 
 function normalizePlayer(p) {
-  const out = { id: p.id || uid(), name: String(p.name || 'Unnamed'), team: String(p.team || '').toUpperCase(), pos: Array.isArray(p.pos) ? p.pos.filter(x => POSITIONS.includes(x)) : [], status: STATUSES.includes(p.status) ? p.status : 'Healthy', notes: p.notes || '', tag: p.tag || '' };
+  const out = { id: p.id || uid(), name: String(p.name || 'Unnamed'), team: String(p.team || '').toUpperCase(), pos: Array.isArray(p.pos) ? p.pos.filter(x => POSITIONS.includes(x)) : [], status: STATUSES.includes(p.status) ? p.status : 'Healthy', tag: p.tag || '' };
   if (!out.pos.length) out.pos = ['SF'];
   for (const [k] of STAT_FIELDS) out[k] = Number.isFinite(+p[k]) ? +p[k] : 0;
   if (!p.games && p.games !== 0) out.games = 3;
@@ -178,7 +111,6 @@ function normalizePlayer(p) {
 
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
-  cloud.queue();
 }
 
 function restoreFrom(data) {
@@ -213,50 +145,6 @@ function askConfirm(title, body, okLabel = 'Confirm') {
   });
 }
 
-/* =========================================================
-   Account sync (only when hosted as a claude.ai artifact)
-   ========================================================= */
-const cloud = {
-  ref: null, timer: null, writing: Promise.resolve(), ready: false,
-  status(text) { const el = $('#syncStatus'); if (el) { el.textContent = text; el.hidden = !text; } },
-  async init() {
-    if (!window.claude || typeof window.claude.use !== 'function') return;
-    try {
-      const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
-      const id = db && user ? await user.id() : null;
-      if (!id) { this.status('Saved in this browser'); return; }
-      this.ref = db.collection('data/users/' + id).doc('team');
-      const snap = await this.ref.get();
-      const saved = snap.exists ? snap.data().state : null;
-      if (saved && Array.isArray(saved.players)) {
-        state = normalize(JSON.parse(JSON.stringify(saved)));
-        syncLinked();
-        validateLineup();
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
-        render();
-      }
-      this.ready = true;
-      if (!saved) this.queue(0);
-      else this.status('Saved to your account');
-    } catch (e) {
-      this.ref = null;
-      this.status('Saved in this browser');
-    }
-  },
-  queue(delay = 800) {
-    if (!this.ref || !this.ready) return;
-    clearTimeout(this.timer);
-    this.status('Saving…');
-    this.timer = setTimeout(() => {
-      const body = { state: JSON.parse(JSON.stringify(state)), updatedAt: new Date().toISOString() };
-      this.writing = this.writing
-        .then(() => this.ref.set(body))
-        .then(() => this.status('Saved to your account'))
-        .catch(() => this.status('Saved in this browser only'));
-    }, delay);
-  },
-};
-
 function commit(msg) {
   validateLineup();
   save();
@@ -276,7 +164,6 @@ const sum = arr => arr.reduce((a, b) => a + b, 0);
 
 const byId = id => state.players.find(p => p.id === id) || state.pool.find(p => p.id === id);
 const canPlay = (p, slot) => p.pos.some(x => ELIG[slot].includes(x));
-const isPoints = () => state.format === 'points';
 
 function catZ(p) {
   const z = {};
@@ -287,27 +174,20 @@ function catZ(p) {
   return z;
 }
 
-function fantasyPoints(p, sc = state.scoring) {
-  const fgm = p.fgPct * p.fga, ftm = p.ftPct * p.fta;
-  return p.pts * sc.pts + p.reb * sc.reb + p.ast * sc.ast + p.stl * sc.stl + p.blk * sc.blk +
-    p.tpm * sc.tpm + p.to * sc.to + fgm * sc.fgm + p.fga * sc.fga + ftm * sc.ftm + p.fta * sc.fta;
-}
-
 function value(p) {
-  return isPoints() ? fantasyPoints(p) : sum(Object.values(catZ(p)));
+  return sum(Object.values(catZ(p)));
 }
-const valueLabel = () => (isPoints() ? 'FP/G' : 'Value');
-const fmtValue = v => (isPoints() ? fmt(v, 1) : signed(v, 1));
+const valueLabel = () => 'Value';
+const fmtValue = v => signed(v, 1);
 
 // Aggregate per-game totals for a group of players (counting stats summed, % weighted by attempts)
 function totals(list, mult = () => 1) {
-  const t = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tpm: 0, to: 0, fgm: 0, fga: 0, ftm: 0, fta: 0, fp: 0 };
+  const t = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tpm: 0, to: 0, fgm: 0, fga: 0, ftm: 0, fta: 0 };
   for (const p of list) {
     const m = mult(p);
     for (const k of ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fga', 'fta']) t[k] += p[k] * m;
     t.fgm += p.fgPct * p.fga * m;
     t.ftm += p.ftPct * p.fta * m;
-    t.fp += fantasyPoints(p) * m;
   }
   t.fgPct = t.fga ? t.fgm / t.fga : 0;
   t.ftPct = t.fta ? t.ftm / t.fta : 0;
@@ -446,7 +326,6 @@ async function loadNba(fresh = false) {
     nbaById.clear(); nbaByName.clear();
     for (const raw of NBA.players) { nbaById.set(raw.id, raw); nbaByName.set(normName(raw.name), raw.id); }
     teamDates = new Map(Object.entries(NBA.teams || {}).map(([t, v]) => [t, new Set(v.dates || [])]));
-    nbaNames = NBA.players.map(raw => { const n = normName(raw.name); const parts = n.split(' '); return { raw, n, first: parts[0] || '', last: parts.slice(1).join(' ') }; });
     for (const raw of NBA.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
     NBA.siteLeague = NBA.league;
     if (state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId)) {
@@ -469,7 +348,7 @@ async function loadNba(fresh = false) {
 
 function nbaPlayers() {
   if (!NBA) return [];
-  if (nbaCache && nbaCache.basis === state.basis && nbaCache.format === state.format) return nbaCache.list;
+  if (nbaCache && nbaCache.basis === state.basis) return nbaCache.list;
   const list = NBA.players.map(raw => {
     const s = nbaStats(raw) || {};
     const t = teamInfo(raw.team);
@@ -482,7 +361,7 @@ function nbaPlayers() {
     p.val = p.gp ? value(p) : -99;
     return p;
   });
-  nbaCache = { basis: state.basis, format: state.format, list };
+  nbaCache = { basis: state.basis, list };
   return list;
 }
 
@@ -504,7 +383,7 @@ function nextGame(next) {
 }
 
 function dataLine() {
-  if (!NBA) return '<span class="muted small">Live NBA data unavailable. Stats are entered by hand.</span>';
+  if (!NBA) return '<span class="muted small">NBA data is unavailable right now.</span>';
   const w = NBA.week;
   return `<span class="muted small">${esc((NBA.sources || []).map(x => x.replace(' (saved copy)', '')).join(', ') || 'NBA.com stats & schedule, ESPN injuries')}${NBA.league ? ', Fantrax league' : ''} ${infoBtn('data')} · updated ${ago(NBA.updated)}${w ? ` · Week ${w.num}: ${fmtDay(w.start)} – ${fmtDay(w.end)}` : ''}</span>`;
 }
@@ -566,7 +445,6 @@ function fillSlots(cands, slots) {
 const COUNT_KEYS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 let teamDates = new Map();
-let nbaNames = [];
 
 const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayIso = () => isoDay(new Date());
@@ -664,7 +542,6 @@ function matchOdds(cats) {
 // How a week is decided. "most": one win for taking more categories (Fantrax
 // HEAD_TO_HEAD_ROTI_SINGLE_WIN). "each": every category counts in the standings.
 function matchupScoring() {
-  if (state.scoringType === 'most' || state.scoringType === 'each') return state.scoringType;
   const L = NBA && NBA.league;
   if (L && L.scoring) return /SINGLE_WIN/.test(L.scoring) ? 'most' : 'each';
   return 'most';
@@ -678,7 +555,7 @@ function objective(odds) {
 }
 
 function playerFromRaw(raw, extra = {}) {
-  const p = { id: uid(), name: raw.name, pos: [...raw.pos], notes: '', tag: '', ...extra };
+  const p = { id: uid(), name: raw.name, pos: [...raw.pos], tag: '', ...extra };
   applyNba(p, raw);
   return p;
 }
@@ -730,20 +607,13 @@ function oppStarterIds(dates) {
   return bestWeeklyIds(opp, dates, null);
 }
 
-// Slot label at the start of a pasted roster line ("PG", "Bench", "IR", …)
-function slotPrefix(line) {
-  const m = String(line).trim().match(/^(PG|SG|SF|PF|C|G|F|FLX|FLEX|UTIL|UT|BE|BN|BENCH|IR|IL|INJ)\b/i);
-  if (!m) return null;
-  return /^(BE|BN|BENCH|IR|IL|INJ)$/i.test(m[1]) ? 'bench' : 'start';
-}
-
 // ----- ⓘ explanations of how things are calculated -----
 const INFO = {
   win: ['Win chances', `
     <p><b>Projected totals.</b> For each category we add up every starter's per-game average × the games they play on your matchup days (from the NBA schedule). Players who are Out count zero. Bench games never count while lineups are locked for the week.</p>
     <p><b>Uncertainty.</b> Each player's game-to-game spread (standard deviation) comes from his NBA game logs: last season plus this season, games of 10+ minutes, at least 8 games. Spreads add up across every starter game, so a team's weekly total has a known range.</p>
     <p><b>Category win chance.</b> For counting stats: the chance your total beats theirs, using a bell curve with the gap divided by the combined spread. Turnovers are reversed (fewer wins). FG% and FT% use team makes ÷ attempts, with shot-making luck (binomial, widened 30%) as the spread.</p>
-    <p><b>Lineups.</b> Both teams' starters as set on Fantrax (or as you've adjusted them with ↑/↓). Projections use the stats chosen in the league menu (smart blend by default).</p>
+    <p><b>Lineups.</b> Both teams' starters as set on Fantrax. Projections use the stats chosen in the league menu (smart blend by default).</p>
     <p><b>Winning the week.</b> Categories are treated as independent, and we add up the chances of every way to take 5 or more of the 9. The projected category score is the sum of the nine category win chances.</p>`],
   suggest: ['How lineup suggestions work', `
     <p><b>Starting point.</b> Starters are ranked by games this week × (player value + 4), then fitted into your slots (PG, SG, G, SF, PF, F, C, Flx) so every slot gets an eligible player.</p>
@@ -765,7 +635,7 @@ const INFO = {
     <p>The number on the right is games this week.</p>`],
   value: ['Player value', `
     <p>Value is the sum of a player's nine category contributions per game, each measured against an average rostered player (see Stat shading for the exact averages). +5 is an elite all-around player; around 0 is replacement level in a 12-team league.</p>
-    <p>FG% and FT% count shot volume, and turnovers count against. In a points league, value is fantasy points per game from your scoring settings instead.</p>`],
+    <p>FG% and FT% count shot volume, and turnovers count against.</p>`],
   projection: ['Which stats are used', `
     <p><b>Smart blend (default):</b> this season's averages with 10 games of last season mixed in: (this season × games played + last season × 10) ÷ (games played + 10). Early on it leans on last season; after a month or two it's mostly this season.</p>
     <p>Switch to this season only, last season only, or the last 10 games from the league menu at the top.</p>`],
@@ -808,11 +678,20 @@ async function fxGet(path) {
 // "Last, First" -> "First Last"
 const fxName = n => { const [last, first] = String(n).split(', '); return first ? `${first} ${last}` : String(n); };
 
+// [{id, name, rank, w, l, t, gb}] from Fantrax's standings ("points" is "W-L-T")
+function parseStandings(rows) {
+  return (Array.isArray(rows) ? rows : []).filter(r => r.teamId).map(r => {
+    const [w, l, t] = String(r.points || '').split('-').map(n => +n || 0);
+    return { id: r.teamId, name: r.teamName || '', rank: r.rank, w, l, t, gb: +r.gamesBack || 0 };
+  });
+}
+
 async function fetchFantraxLeague(id) {
   const q = encodeURIComponent(id);
-  const [ids, info, rosters, draft, adpList] = await Promise.all([
+  const [ids, info, rosters, draft, adpList, standings] = await Promise.all([
     fxGet('getPlayerIds?sport=NBA'), fxGet(`getLeagueInfo?leagueId=${q}`), fxGet(`getTeamRosters?leagueId=${q}`),
     fxGet(`getDraftResults?leagueId=${q}`).catch(() => ({})), fxGet('getAdp?sport=NBA').catch(() => []),
+    fxGet(`getStandings?leagueId=${q}`).catch(() => []),
   ]);
   if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
 
@@ -850,6 +729,7 @@ async function fetchFantraxLeague(id) {
     rosterInfo: info.rosterInfo || null,
     draft: null,
     draftAt: draft.draftDate || null,
+    standings: parseStandings(standings),
   };
   const picks = (draft.draftPicks || []).filter(d => d.playerId);
   if (picks.length) {
@@ -932,9 +812,9 @@ function fxRoster(teamId) {
 }
 
 // A league team as players, with Fantrax starters in their own slots and IR players on IR
-function fxTeamSide(teamId, notes = new Map()) {
+function fxTeamSide(teamId) {
   const roster = fxRoster(teamId);
-  const players = roster.map(x => playerFromRaw(x.raw, { notes: notes.get(x.raw.id) || '' }));
+  const players = roster.map(x => playerFromRaw(x.raw));
   const lineup = Array(state.slots.length).fill(null);
   const leftover = [];
   roster.forEach((x, i) => {
@@ -1012,22 +892,6 @@ function fxStrip(ctx) {
     <span class="actions">${ui.viewing
       ? `<span class="badge">Viewing only</span><button class="btn sm primary" data-action="fx-view-mine">Back to my team</button>`
       : `${cur ? `<button class="btn sm" data-action="fx-reload-opp">Reload ${esc(state.opp.name)}</button>` : ''}<button class="btn sm" data-action="fx-load-mine">Reload my roster</button>`}</span></div>`;
-}
-
-// Find the NBA player named in a line of pasted text ("Stephen Curry GSW - PG,SG", "S. Curry", …)
-function matchLine(line) {
-  const n = ' ' + normName(line) + ' ';
-  if (n.trim().length < 3) return null;
-  let best = null;
-  for (const x of nbaNames) if (n.includes(' ' + x.n) && (!best || x.n.length > best.n.length)) best = x;
-  if (best) return best.raw;
-  for (const x of nbaNames) if (x.last && n.includes(' ' + x.first[0] + ' ' + x.last + ' ')) return x.raw;
-  return null;
-}
-
-
-function lineupValue(ids) {
-  return sum(ids.map(byId).filter(Boolean).map(p => value(p) * (p.status === 'Out' ? 0 : 1)));
 }
 
 function validateLineup() {
@@ -1120,8 +984,8 @@ function render() {
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
   const early = preDraft();
-  if (early && ['week', 'dashboard', 'roster', 'draft', 'matchups', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
-  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool };
+  if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
+  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, trade: viewTrade, pool: viewPool };
   // keep scroll position of inner lists (e.g. trade picker) across re-renders
   const scrolls = [...document.querySelectorAll('.pick-list')].map(el => el.scrollTop);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
@@ -1157,19 +1021,11 @@ function viewPreDraft(L) {
       In the meantime, the <a href="#players">Players</a> tab ranks every NBA player and you can star the ones you want on your Watchlist.</div></div>`;
 }
 
-function sampleBanner() {
-  if (!state.sample) return '';
-  return `<div class="sample-banner"><span>You're viewing a <b>sample roster</b>. Start fresh, then add your real players from the Players tab.</span>
-    <button class="btn sm" data-action="start-fresh">Start with an empty team</button></div>`;
+function standingOf(teamId) {
+  const L = fxLeague();
+  return L && L.standings ? L.standings.find(r => r.id === teamId) || null : null;
 }
 
-function record() {
-  let w = 0, l = 0, t = 0;
-  for (const m of state.matchups) {
-    if (m.my > m.opp) w++; else if (m.my < m.opp) l++; else t++;
-  }
-  return { w, l, t };
-}
 
 // ----- Dashboard: category strengths vs your league -----
 const STR_KEY = 'courtside-strengths';
@@ -1280,25 +1136,22 @@ function strengthsCard() {
 /* ---------- Dashboard ---------- */
 function viewDashboard() {
   const st = starters();
-  const r = record();
+  const r = standingOf(ui.viewing ? ui.viewA : state.fxTeam);
+  const nTeams = fxPickable().length;
   const injured = state.players.filter(p => p.status !== 'Healthy').length;
   const teamVal = sum(st.map(value));
   const top = [...state.players].sort((a, b) => value(b) - value(a)).slice(0, 5);
 
-  const last = state.matchups[state.matchups.length - 1];
-
   return `
-  ${sampleBanner()}
   <div class="page-head">
-    <div><h1>${esc(state.teamName)}</h1><p>${esc(state.leagueName || 'Fantasy basketball')} · ${isPoints() ? 'Points league' : '9-category H2H'}</p><p>${dataLine()}</p></div>
-    ${ui.viewing ? '' : '<div class="actions"><a class="btn primary" href="#players">+ Add players</a></div>'}
+    <div><h1>${esc(state.teamName)}</h1><p>${esc(fxLeague() ? fxLeague().name : 'Fantasy basketball')} · ${matchupScoring() === 'most' ? '9-category H2H, one win per week' : '9-category H2H, one win per category'}</p><p>${dataLine()}</p></div>
   </div>
   ${teamViewBar() ? `<div style="margin-bottom:16px">${teamViewBar()}</div>` : ''}
   <div class="kpis">
-    ${ui.viewing
-      ? `<div class="card kpi"><div class="label">Games this week</div><div class="value">${sum(st.map(p => NBA ? weekGames(p, matchDates(weekStart())) : p.games))}</div><div class="hint">from ${st.length} starters</div></div>`
-      : `<div class="card kpi"><div class="label">Record</div><div class="value">${r.w}-${r.l}${r.t ? '-' + r.t : ''}</div><div class="hint">${last ? `Last: Wk ${esc(last.week)} vs ${esc(last.opponent)}` : 'No matchups logged yet'}</div></div>`}
-    <div class="card kpi"><div class="label">${isPoints() ? 'Starters FP/G' : 'Starter value'} ${infoBtn('value')}</div><div class="value">${fmtValue(teamVal)}</div><div class="hint">${st.length} of ${state.slots.length} slots filled</div></div>
+    ${r
+      ? `<div class="card kpi"><div class="label">Record</div><div class="value">${r.w}-${r.l}${r.t ? '-' + r.t : ''}</div><div class="hint"><a href="#standings">${ordinal(r.rank)} of ${nTeams}</a>${r.gb ? ` · ${fmt(r.gb, 1)} back` : ''}</div></div>`
+      : `<div class="card kpi"><div class="label">Games this week</div><div class="value">${sum(st.map(p => NBA ? weekGames(p, matchDates(weekStart())) : p.games))}</div><div class="hint">from ${st.length} starters</div></div>`}
+    <div class="card kpi"><div class="label">Starter value ${infoBtn('value')}</div><div class="value">${fmtValue(teamVal)}</div><div class="hint">${st.length} of ${state.slots.length} slots filled</div></div>
     <div class="card kpi"><div class="label">Roster</div><div class="value">${activeCount()}/${rosterLimit()}</div><div class="hint">${state.il.length}/${state.ilSize} on IL</div></div>
     <div class="card kpi"><div class="label">Injuries</div><div class="value">${injured}</div><div class="hint">${state.players.filter(p => p.status === 'DTD').length} day-to-day</div></div>
   </div>
@@ -1412,81 +1265,55 @@ function viewRoster() {
   const t = totals(state.players.filter(p => !state.il.includes(p.id)));
   const ro = ui.viewing;
   return `
-  ${sampleBanner()}
   <div class="page-head">
     <div><h1>${ro ? esc(state.teamName) : 'Roster'} ${infoBtn('value')}</h1><p>${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR</p></div>
-    ${ro ? '' : '<div class="actions"><a class="btn primary" href="#players">+ Add from NBA players</a><button class="btn" data-action="paste-roster" data-target="mine">Paste roster</button><button class="btn" data-action="add-player" data-dest="players">Add custom player</button></div>'}
   </div>
   <div class="week-stack">
   ${teamViewBar()}
   ${list.length && !ro ? lineupEditor() : ''}
   <div class="card">
     ${list.length ? `<div class="table-wrap"><table>
-      <thead><tr>${headerRow(ROSTER_COLS, ui.rosterSort, 'roster')}<th></th></tr></thead>
+      <thead><tr>${headerRow(ROSTER_COLS, ui.rosterSort, 'roster')}</tr></thead>
       <tbody>${list.map(p => `<tr>
-        <td class="player">${playerCell(p)}${p.notes ? `<div class="pmeta" title="${esc(p.notes)}">📝 ${esc(p.notes.length > 38 ? p.notes.slice(0, 38) + '…' : p.notes)}</div>` : ''}</td>
+        <td class="player">${playerCell(p)}</td>
         <td>${statusBadge(p)}</td><td>${slotBadge(slotOf(p))}</td>${statCells(p)}
-        <td class="row-actions">${ro ? '' : `
-          <button class="btn sm ghost" data-action="edit-player" data-id="${p.id}">Edit</button>
-          <button class="btn sm ghost" data-action="toggle-il" data-id="${p.id}">${state.il.includes(p.id) ? 'Activate' : 'IR'}</button>
-          <button class="btn sm ghost danger" data-action="drop-player" data-id="${p.id}">Drop</button>`}
-        </td></tr>`).join('')}
+        </tr>`).join('')}
       </tbody>
       <tfoot><tr><td colspan="3"><b>Active totals</b> <span class="muted small">(per game)</span></td><td></td>
         <td class="num"><b>${fmt(t.pts)}</b></td><td class="num"><b>${fmt(t.reb)}</b></td><td class="num"><b>${fmt(t.ast)}</b></td><td class="num"><b>${fmt(t.stl)}</b></td>
         <td class="num"><b>${fmt(t.blk)}</b></td><td class="num"><b>${fmt(t.tpm)}</b></td><td class="num"><b>${fmt(t.to)}</b></td>
-        <td class="num"><b>${fmtPct(t.fgPct)}</b></td><td class="num"><b>${fmtPct(t.ftPct)}</b></td><td></td><td></td></tr></tfoot>
-    </table></div>` : `<div class="empty"><strong>No players yet</strong>Load your roster from Fantrax on the This week tab, paste it, or add players one by one.<br><br><a class="btn primary" href="#players">+ Add from NBA players</a></div>`}
+        <td class="num"><b>${fmtPct(t.fgPct)}</b></td><td class="num"><b>${fmtPct(t.ftPct)}</b></td><td></td></tr></tfoot>
+    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from Fantrax. Use Reload my roster on the This week tab to pull the latest.</div>`}
   </div>
   </div>`;
 }
 
-/* ---------- Matchups ---------- */
-function viewMatchups() {
-  const r = record();
-  const nextWeek = state.matchups.length ? Math.max(...state.matchups.map(m => +m.week || 0)) + 1 : 1;
-  const label = isPoints() ? ['Your pts', 'Their pts'] : ['Cats won', 'Cats lost'];
-  const maxMargin = Math.max(1, ...state.matchups.map(m => Math.abs(m.my - m.opp)));
-  const totalFor = sum(state.matchups.map(m => +m.my || 0));
-  const totalAgainst = sum(state.matchups.map(m => +m.opp || 0));
-  const list = [...state.matchups].sort((a, b) => (+b.week || 0) - (+a.week || 0));
+/* ---------- Standings ---------- */
 
+function viewStandings() {
+  const L = fxLeague();
+  const rows = (L && L.standings) || [];
+  const week = fxPeriodFor(weekStart());
+  const pairs = week && L.matchups ? L.matchups[String(week.n)] || [] : [];
+  const name = id => esc(fxTeamName(id) || '');
   return `
   <div class="page-head">
-    <div><h1>Results</h1><p>Log each week's result to track your season.</p></div>
-  </div>
-  <div class="kpis">
-    <div class="card kpi"><div class="label">Record</div><div class="value">${r.w}-${r.l}${r.t ? '-' + r.t : ''}</div></div>
-    <div class="card kpi"><div class="label">Win %</div><div class="value">${state.matchups.length ? fmt(((r.w + r.t / 2) / state.matchups.length) * 100, 0) + '%' : '—'}</div></div>
-    <div class="card kpi"><div class="label">${isPoints() ? 'Points for' : 'Cats won'}</div><div class="value">${fmt(totalFor, 0)}</div></div>
-    <div class="card kpi"><div class="label">${isPoints() ? 'Points against' : 'Cats lost'}</div><div class="value">${fmt(totalAgainst, 0)}</div></div>
+    <div><h1>Standings</h1><p>${esc(L ? L.name : '')} · from Fantrax</p></div>
   </div>
   <div class="card">
-    <div class="card-head"><h2>Log a week</h2></div>
-    <form class="inline-form" data-form="matchup">
-      <label class="field">Week<input name="week" type="number" min="1" value="${nextWeek}" required></label>
-      <label class="field wide">Opponent<input name="opponent" placeholder="Team name" required autocomplete="off"></label>
-      <label class="field">${label[0]}<input name="my" type="number" step="any" min="0" required></label>
-      <label class="field">${label[1]}<input name="opp" type="number" step="any" min="0" required></label>
-      <label class="field">${isPoints() ? 'Notes' : 'Ties'}<input name="${isPoints() ? 'notes' : 'ties'}" ${isPoints() ? '' : 'type="number" min="0" max="9" value="0"'}></label>
-      <button class="btn primary" type="submit">Add result</button>
-    </form>
-  </div>
-  <div class="card">
-    <div class="card-head"><h2>Season log</h2></div>
-    ${list.length ? `<div class="table-wrap"><table>
-      <thead><tr><th>Wk</th><th>Opponent</th><th>Result</th><th class="num">Score</th><th class="hide-sm">Margin</th><th></th></tr></thead>
-      <tbody>${list.map(m => {
-        const res = m.my > m.opp ? 'win' : m.my < m.opp ? 'loss' : 'tie';
-        const badge = res === 'win' ? '<span class="badge good">W</span>' : res === 'loss' ? '<span class="badge bad">L</span>' : '<span class="badge">T</span>';
-        const w = (Math.abs(m.my - m.opp) / maxMargin) * 100;
-        return `<tr><td>${esc(m.week)}</td><td><b>${esc(m.opponent)}</b>${m.notes ? `<div class="pmeta">${esc(m.notes)}</div>` : ''}</td><td>${badge}</td>
-          <td class="num">${esc(m.my)}–${esc(m.opp)}${!isPoints() && +m.ties ? `–${esc(m.ties)}` : ''}</td>
-          <td class="hide-sm" style="width:30%"><div class="margin-bar ${res}" style="width:${Math.max(w, 2)}%"></div></td>
-          <td class="row-actions"><button class="btn sm ghost danger" data-action="delete-matchup" data-id="${m.id}">Remove</button></td></tr>`;
+    ${rows.length ? `<div class="table-wrap"><table>
+      <thead><tr><th class="num">#</th><th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">GB</th></tr></thead>
+      <tbody>${rows.filter(r => !/^BYE WEEK$/i.test(r.name)).map(r => {
+        const g = r.w + r.l + r.t;
+        return `<tr${r.id === state.fxTeam ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.id === state.fxTeam ? ' <span class="muted small">(you)</span>' : ''}</td>
+          <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td></tr>`;
       }).join('')}</tbody>
-    </table></div>` : `<div class="empty"><strong>No results yet</strong>Once your season tips off, log each week above.</div>`}
-  </div>`;
+    </table></div>` : `<div class="empty"><strong>No standings yet</strong>Fantrax didn't return standings for this league.</div>`}
+  </div>
+  ${pairs.length ? `<div class="card" style="margin-top:16px">
+    <div class="card-head"><h2>Week ${week.n} matchups</h2><span class="muted small">${fmtDay(week.start)} – ${fmtDay(week.end)}</span></div>
+    <ul class="alerts">${pairs.map(([a, b]) => `<li class="alert"><span class="grow">${a === state.fxTeam || b === state.fxTeam ? '<b>' : ''}${name(a)} vs ${name(b)}${a === state.fxTeam || b === state.fxTeam ? '</b>' : ''}</span></li>`).join('')}</ul>
+  </div>` : ''}`;
 }
 
 /* ---------- Trade ---------- */
@@ -1498,7 +1325,7 @@ function viewTrade() {
   const pick = (list, set, side) => list.length ? `<ul class="pick-list">${[...list].sort((a, b) => value(b) - value(a)).map(p => `
     <li><label><input type="checkbox" data-change="trade" data-side="${side}" value="${p.id}" ${set.has(p.id) ? 'checked' : ''}>
       <span class="grow">${playerCell(p)}</span>${p.status !== 'Healthy' ? statusBadge(p) : ''}<span class="val">${fmtValue(value(p))}</span></label></li>`).join('')}</ul>`
-    : `<p class="muted small">${side === 'get' ? 'Add trade targets to your watchlist to analyze them here.' : 'Your roster is empty.'}</p>`;
+    : `<p class="muted small">${side === 'get' ? 'Watch players from the <a href="#players">Players</a> tab to analyze them here.' : 'Your roster is empty.'}</p>`;
 
   const give = [...ui.tradeGive].map(byId).filter(Boolean);
   const get = [...ui.tradeGet].map(byId).filter(Boolean);
@@ -1517,15 +1344,14 @@ function viewTrade() {
       return `<tr><td><b>${c.label}</b></td><td class="num">${c.pct ? fmtPct(before[c.key]) : fmt(before[c.key])}</td><td class="num">${c.pct ? fmtPct(after[c.key]) : fmt(after[c.key])}</td><td class="num ${Math.abs(d) < 1e-9 ? 'muted' : good ? 'pos-good' : 'pos-bad'}">${shown}</td></tr>`;
     }).join('');
     const rosterAfter = activeCount() - give.length + get.length;
-    const verdict = Math.abs(diff) < (isPoints() ? 1.5 : 0.5) ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'];
+    const verdict = Math.abs(diff) < 0.5 ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'];
     const won = CATS.filter(c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; }).length;
     result = `
-      <div class="card-head"><div><div class="verdict ${verdict[1]}">${verdict[0]}</div><div class="muted small">${valueLabel()}: give ${fmtValue(vGive)} · get ${fmtValue(vGet)} · net <b>${fmtValue(diff)}</b>${!isPoints() ? ` · improves ${won} of 9 cats` : ''}</div></div>
-        <button class="btn primary" data-action="execute-trade" ${give.length && get.length ? '' : 'disabled'}>Accept trade</button></div>
+      <div class="card-head"><div><div class="verdict ${verdict[1]}">${verdict[0]}</div><div class="muted small">${valueLabel()}: give ${fmtValue(vGive)} · get ${fmtValue(vGet)} · net <b>${fmtValue(diff)}</b> · improves ${won} of 9 cats</div></div></div>
       ${rosterAfter > rosterLimit() ? `<p class="alert warn small" style="margin:0 0 12px">This puts you at ${rosterAfter}/${rosterLimit()} — you'd need to drop ${rosterAfter - rosterLimit()}.</p>` : ''}
       <div class="table-wrap"><table class="delta-table">
         <thead><tr><th>Category</th><th class="num">Now</th><th class="num">After</th><th class="num">Change</th></tr></thead>
-        <tbody>${rows}${isPoints() ? `<tr><td><b>FP</b></td><td class="num">${fmt(before.fp)}</td><td class="num">${fmt(after.fp)}</td><td class="num ${after.fp >= before.fp ? 'pos-good' : 'pos-bad'}">${signed(after.fp - before.fp)}</td></tr>` : ''}</tbody>
+        <tbody>${rows}</tbody>
       </table></div>
       <p class="small muted" style="margin:10px 0 0">Totals are per game across your active (non-IL) roster.</p>`;
   }
@@ -1533,7 +1359,7 @@ function viewTrade() {
   return `
   <div class="page-head">
     <div><h1>Trade analyzer</h1><p>Compare what you give against what you get. Players you can receive come from your watchlist.</p></div>
-    <div class="actions"><button class="btn" data-action="add-player" data-dest="pool" data-tag="Trade target">+ Add trade target</button></div>
+    <div class="actions"><a class="btn" href="#players">Find players to watch</a></div>
   </div>
   <div class="trade-grid">
     <div class="card"><div class="card-head"><h2>You give</h2><span class="muted small">${give.length} selected</span></div>${pick(state.players, ui.tradeGive, 'give')}</div>
@@ -1554,7 +1380,7 @@ function viewPool() {
   return `
   <div class="page-head">
     <div><h1>Watchlist</h1><p>Free agents and trade targets you're tracking.${weak ? ` Your weakest active player is <b>${esc(weak.name)}</b> (${fmtValue(value(weak))}).` : ''}</p></div>
-    <div class="actions"><button class="btn primary" data-action="add-player" data-dest="pool" data-tag="FA">+ Track player</button></div>
+    <div class="actions"><a class="btn primary" href="#players">Find players to watch</a></div>
   </div>
   ${pickupsCard()}
   <div class="card">
@@ -1564,13 +1390,9 @@ function viewPool() {
         const d = weak ? value(p) - value(weak) : 0;
         return `<tr><td class="player">${playerCell(p)}</td><td>${p.tag ? `<span class="badge accent">${esc(p.tag)}</span>` : ''}</td><td>${statusBadge(p)}</td>${statCells(p)}
         <td class="num ${d > 0 ? 'pos-good' : 'muted'}">${weak ? signed(d, 1) : '—'}</td>
-        <td class="row-actions">
-          <button class="btn sm" data-action="claim-player" data-id="${p.id}">Add to roster</button>
-          <button class="btn sm ghost" data-action="edit-player" data-id="${p.id}">Edit</button>
-          <button class="btn sm ghost danger" data-action="remove-pool" data-id="${p.id}">Remove</button>
-        </td></tr>`;
+        <td class="row-actions"><button class="btn sm ghost danger" data-action="remove-pool" data-id="${p.id}">Remove</button></td></tr>`;
       }).join('')}</tbody>
-    </table></div>` : `<div class="empty"><strong>Watchlist is empty</strong>Track waiver pickups and trade targets here.<br><br><button class="btn primary" data-action="add-player" data-dest="pool" data-tag="FA">+ Track player</button></div>`}
+    </table></div>` : `<div class="empty"><strong>Watchlist is empty</strong>Watch waiver pickups and trade targets from the Players tab.<br><br><a class="btn primary" href="#players">Find players to watch</a></div>`}
   </div>`;
 }
 
@@ -1611,8 +1433,7 @@ function playerRows() {
       <td>${statusBadge(p)}</td>
       <td class="num">${p.gp || '—'}</td>${p.gp ? statCells(p) : `<td class="num muted" colspan="11">No NBA stats yet</td>`}
       <td class="num">${p.games}</td>
-      <td class="row-actions">${(() => { const raw = nbaById.get(p.nbaId); return raw && raw.fx && !onRoster ? `<span class="badge ${raw.fx.st === 'T' ? '' : 'good'}">${FX_STATUS[raw.fx.st] || raw.fx.st}</span> ` : ''; })()}${onRoster ? '<span class="badge accent">On roster</span>' : `<button class="btn sm primary" data-action="nba-add" data-nba="${p.nbaId}" data-dest="players">+ Roster</button>`}
-        ${onRoster ? '' : watching ? '<span class="badge">Watching</span>' : `<button class="btn sm ghost" data-action="nba-add" data-nba="${p.nbaId}" data-dest="pool">Watch</button>`}</td>
+      <td class="row-actions">${(() => { const raw = nbaById.get(p.nbaId); return raw && raw.fx && !onRoster ? `<span class="badge ${raw.fx.st === 'T' ? '' : 'good'}">${FX_STATUS[raw.fx.st] || raw.fx.st}</span> ` : ''; })()}${onRoster ? '<span class="badge accent">On roster</span>' : watching ? '<span class="badge">Watching</span>' : `<button class="btn sm ghost" data-action="nba-add" data-nba="${p.nbaId}">Watch</button>`}</td>
     </tr>`;
   }).join('');
   return `<div class="table-wrap"><table>
@@ -1631,7 +1452,7 @@ function viewPlayers() {
   return `
   <div class="page-head">
     <div><h1>NBA players ${infoBtn('projection')}</h1><p>${NBA.players.length} active players. ${BASIS_LABELS[state.basis]} stats (${NBA.season} / ${NBA.prevSeason}).</p><p>${dataLine()}</p></div>
-    <div class="actions"><button class="btn" data-action="refresh-data">Refresh stats</button></div>
+    ${LOCAL ? '<div class="actions"><button class="btn" data-action="refresh-data">Refresh stats</button></div>' : ''}
   </div>
   <div class="card">
     <div class="filters">
@@ -1675,7 +1496,7 @@ function showPlayerDetail(nbaId) {
     ${logs ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   $('#detailFoot').innerHTML = `
     <button type="button" class="btn ghost" data-action="close-detail">Close</button>
-    ${onRoster ? '<span class="badge accent">On your roster</span>' : `${watching ? '' : `<button type="button" class="btn" data-action="nba-add" data-nba="${raw.id}" data-dest="pool">Watch</button>`}<button type="button" class="btn primary" data-action="nba-add" data-nba="${raw.id}" data-dest="players">Add to roster</button>`}`;
+    ${onRoster ? '<span class="badge accent">On your roster</span>' : watching ? '<span class="badge">Watching</span>' : `<button type="button" class="btn primary" data-action="nba-add" data-nba="${raw.id}">Watch</button>`}`;
   const d = $('#detailDialog');
   if (!d.open) d.showModal();
 }
@@ -1867,7 +1688,7 @@ function playerName(p) {
   return p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}" title="${esc(p.name)}">${label}</button>` : `<span class="pname">${label}</span>`;
 }
 
-// ↑ Start / ↓ Bench hints on your players, start/bench/remove buttons on theirs
+// ↑ Start / ↓ Bench hints on your players
 function rowTags(p, ctx, side, starter) {
   if (side === 'me') {
     if (!ctx.bestIds) return '';
@@ -1875,8 +1696,7 @@ function rowTags(p, ctx, side, starter) {
     if (!starter && ctx.bestIds.has(p.id)) return '<span class="tag up">↑ Start</span>';
     return '';
   }
-  if (ui.viewing) return '';
-  return `<span class="bctrl">${ctx.weekly ? `<button class="icon-btn xs" data-action="opp-toggle" data-id="${p.id}" title="${starter ? 'Move to their bench' : 'Start this player'}" aria-label="${starter ? 'Bench' : 'Start'} ${esc(p.name)}">${starter ? '↓' : '↑'}</button>` : ''}<button class="icon-btn xs opp-x" data-action="opp-remove" data-id="${p.id}" title="Remove" aria-label="Remove ${esc(p.name)}">✕</button></span>`;
+  return '';
 }
 
 // Schedule view: one cell per player, slot-aligned with the opponent
@@ -1990,7 +1810,7 @@ function matchupBoard(ctx) {
     const irRows = ilPlayers().map(p => `<tr><th scope="row">${slotBadge('IL')}</th>${boardCell(p, ctx, 'me', false)}<td class="bcell"></td></tr>`).join('');
     body = `<div class="table-wrap"><table class="board">
         <colgroup><col class="c-slot"><col><col></colgroup>
-        <thead><tr><th></th><th>${esc(state.teamName)}</th><th>${esc(state.opp.name || 'Opponent')}${ctx.hasOpp ? '' : ' <button class="link-btn small" data-action="paste-roster" data-target="opp">Paste roster</button>'}</th></tr></thead>
+        <thead><tr><th></th><th>${esc(state.teamName)}</th><th>${esc(state.opp.name || 'Opponent')}</th></tr></thead>
         <tbody>${rows}
           <tr class="board-tot"><th scope="row"></th><td><b>${ctx.asSet.games}</b> starter games${ctx.bestIds && ctx.best.games !== ctx.asSet.games ? ` <span class="muted">(${ctx.best.games} suggested)</span>` : ''}</td><td>${ctx.hasOpp ? `<b>${ctx.them.games}</b> starter games` : ''}</td></tr>
           <tr class="board-sep"><td colspan="3">Bench</td></tr>${bench}${irRows}
@@ -2079,7 +1899,7 @@ function pickupIdeas(ctx) {
 function pickupsCard() {
   if (!NBA) return '';
   const ctx = weekContext();
-  if (!ctx.hasOpp) return `<div class="card"><div class="card-head"><h2>Pickup ideas for this week</h2></div><p class="muted small" style="margin:0">Enter this week's opponent on the <a href="#week">This week</a> tab to see which free agents would help most.</p></div>`;
+  if (!ctx.hasOpp) return `<div class="card"><div class="card-head"><h2>Pickup ideas for this week</h2></div><p class="muted small" style="margin:0">Load this week's opponent on the <a href="#week">This week</a> tab to see which free agents would help most.</p></div>`;
   const ideas = pickupIdeas(ctx).filter(x => x.score > 0.001);
   return `
     <div class="card">
@@ -2088,7 +1908,7 @@ function pickupsCard() {
         const better = x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
         return `<li class="alert"><span class="grow"><button class="link-btn pname" data-action="player-detail" data-nba="${x.p.nbaId}">${esc(x.p.name)}</button> <span class="muted small">${esc(x.p.team)} · ${posTags(x.p.pos)} · ${x.games} games${x.watch ? ' · watchlist' : ''}</span><br>
           <span class="small">For ${esc(x.drop.name)}: <b class="pos-good">+${fmt(x.gain, 2)}</b> cats, ${Math.round(x.win * 100)}% to win${better.length ? ` · helps ${better.join(', ')}` : ''}</span></span>
-          <button class="btn sm" data-action="nba-add" data-nba="${x.p.nbaId}" data-dest="pool">Watch</button></li>`;
+          <button class="btn sm" data-action="nba-add" data-nba="${x.p.nbaId}">Watch</button></li>`;
       }).join('')}</ul>` : '<p class="muted small" style="margin:0">No free agent clearly improves this matchup.</p>'}
     </div>`;
 }
@@ -2117,7 +1937,7 @@ function viewWeek() {
       <div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
       <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>
       ${changed ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, 1)}</b> cats · ${pctTxt(oSet.win)} to win · ${asSet.games} starter games</div></div>` : ''}
-    </div>` : `<div class="card"><div class="empty"><strong>Add your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from Fantrax</button>` : `Paste their roster from your league site.<br><br><button class="btn primary" data-action="paste-roster" data-target="opp">Paste their roster</button>`}</div></div>`;
+    </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from Fantrax</button>` : 'Fantrax has no matchup for you this week.'}</div></div>`;
 
   // Daily-lineup leagues keep the day-by-day swap list
   let dailyCards = '';
@@ -2131,7 +1951,7 @@ function viewWeek() {
       <div class="card-head"><h2>Daily bench swaps</h2><span class="muted small">${best.games - asSet.games > 0 ? `+${best.games - asSet.games} games over your lineup as set` : 'lineup as set'}</span></div>
       ${swaps.length ? `<ul class="alerts">${swaps.map(x => `<li class="alert ${x.past ? '' : 'good'}"><span class="dot"></span><span class="grow"><b>${fmtDay(x.d)}</b>${x.past ? ' <span class="muted small">(already played)</span>' : ''}<br>
         Start ${x.start.map(p => `<b>${esc(p.name)}</b>`).join(', ')}${x.sit.length ? `; sit ${x.sit.map(p => esc(p.name)).join(', ')}` : ''}</span></li>`).join('')}</ul>`
-        : `<p class="muted small" style="margin:0">${mine.length ? 'Your lineup as set already uses every game your bench could add.' : 'Add players to your roster first.'}</p>`}
+        : `<p class="muted small" style="margin:0">${mine.length ? 'Your lineup as set already uses every game your bench could add.' : 'Your roster is empty.'}</p>`}
       ${hasOpp ? `<h3 class="sub" style="margin-top:16px">Categories ${infoBtn('win')}</h3>${catCompareTable(ctx, changed)}` : ''}
     </div>`;
   }
@@ -2147,7 +1967,7 @@ function viewWeek() {
       <p>${range}</p>
     </div>
   </div>
-  ${staleOpp ? `<div class="sample-banner"><span>This opponent was entered for the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="opp-new-week">Start this week's opponent</button></div>` : ''}
+  ${staleOpp && fxOpponentFor(start) ? `<div class="sample-banner"><span>Showing your opponent from the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="fx-load-opp">Load this week's opponent</button></div>` : ''}
   <div class="week-stack">
     ${fxStrip(ctx)}
     ${scoreboard}
@@ -2301,8 +2121,8 @@ function viewDraft() {
 // ----- Saved leagues -----
 // Each league you add keeps its own team, roster, opponent, lineup settings, matchup log and
 // watchlist; switching stashes the current league's and restores the other's.
-const LEAGUE_FIELDS = ['fxTeam', 'players', 'il', 'lineup', 'opp', 'teamName', 'leagueName', 'slots', 'benchSize', 'ilSize',
-  'slotsSet', 'matchups', 'pool', 'sample', 'lineupMode', 'matchDays', 'scoringType'];
+const LEAGUE_FIELDS = ['fxTeam', 'players', 'il', 'lineup', 'opp', 'teamName', 'slots', 'benchSize', 'ilSize',
+  'slotsSet', 'pool', 'lineupMode', 'matchDays'];
 const emptyOpp = () => ({ name: '', week: null, players: [], starters: null, fxId: null });
 const currentLeagueId = () => state.fxLeagueId || (NBA && NBA.siteLeague && NBA.siteLeague.id) || null;
 
@@ -2333,7 +2153,6 @@ function applyLeagueRules(league) {
   const days = p ? (new Date(p.end) - new Date(p.start)) / 86400000 : 7;
   state.lineupMode = days >= 5 ? 'weekly' : 'daily';
   state.matchDays = [0, 1, 2, 3, 4, 5, 6];
-  state.scoringType = null; // read from the league
 }
 
 // Switch the whole app to a Fantrax league by ID. Throws a readable message.
@@ -2358,7 +2177,7 @@ async function switchLeague(id) {
     const saved = state.leagueStates && state.leagueStates[id];
     if (saved) Object.assign(state, JSON.parse(JSON.stringify(saved)));
     else {
-      Object.assign(state, { fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp(), teamName: res.league.name, matchups: [], pool: [], sample: false });
+      Object.assign(state, { fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp(), teamName: res.league.name, pool: [] });
       applyLeagueRules(res.league);
     }
   }
@@ -2377,8 +2196,6 @@ function adoptTeam(teamId) {
   state.il = side.il;
   state.lineup = side.lineup;
   state.teamName = side.name || state.teamName;
-  if (state.sample) state.pool = [];
-  state.sample = false;
   const opp = fxOpponentFor(weekStart());
   if (opp) {
     const o = fxTeamSide(opp.id);
@@ -2422,82 +2239,6 @@ function viewLanding() {
 }
 
 /* =========================================================
-   Player dialog
-   ========================================================= */
-function openPlayerDialog({ id, dest = 'players', tag = '' } = {}) {
-  const p = id ? byId(id) : null;
-  const form = $('#playerForm');
-  form.reset();
-  $('#formError').textContent = '';
-  const where = p ? (state.players.includes(p) ? 'players' : 'pool') : dest;
-  $('#playerDialogTitle').textContent = p ? `Edit ${p.name}` : where === 'pool' ? 'Track a player' : 'Add player to roster';
-  form.id.value = p ? p.id : '';
-  form.dest.value = where;
-  form.name.value = p ? p.name : '';
-  form.team.value = p ? p.team : '';
-  form.status.value = p ? p.status : 'Healthy';
-  form.tag.value = p ? p.tag : tag;
-  form.notes.value = p ? p.notes : '';
-  $('#tagField').hidden = where !== 'pool';
-  const linked = !!(p && p.nbaId && NBA);
-  $('#statSection').hidden = linked;
-  $('#statusField').hidden = linked;
-  $('#linkedNote').hidden = !linked;
-  $('#posChips').innerHTML = POSITIONS.map(x => `<label class="chip"><input type="checkbox" name="pos" value="${x}" ${p && p.pos.includes(x) ? 'checked' : ''}><span>${x}</span></label>`).join('');
-  $('#statInputs').innerHTML = STAT_FIELDS.map(([k, l]) => {
-    let v = p ? p[k] : (k === 'games' ? 3 : '');
-    if (p && (k === 'fgPct' || k === 'ftPct')) v = +(p[k] * 100).toFixed(1);
-    return `<label class="field">${l}<input type="number" step="any" min="0" name="${k}" value="${v}" ${k.endsWith('Pct') ? 'placeholder="e.g. 47.5"' : ''}></label>`;
-  }).join('');
-  $('#playerDialog').showModal();
-  form.name.focus();
-}
-
-function savePlayerForm(e) {
-  e.preventDefault();
-  const form = e.target;
-  const name = form.name.value.trim();
-  const pos = [...form.querySelectorAll('input[name=pos]:checked')].map(i => i.value);
-  if (!name) { $('#formError').textContent = 'Enter a player name.'; return; }
-  if (!pos.length) { $('#formError').textContent = 'Pick at least one position.'; return; }
-  const data = { name, team: form.team.value.trim().toUpperCase(), pos, status: form.status.value, notes: form.notes.value.trim(), tag: form.tag.value.trim() };
-  for (const [k] of STAT_FIELDS) {
-    let v = parseFloat(form[k].value);
-    if (!Number.isFinite(v) || v < 0) v = 0;
-    if (k === 'fgPct' || k === 'ftPct') v = v > 1 ? v / 100 : v;
-    data[k] = v;
-  }
-  const id = form.id.value;
-  if (id) {
-    const existing = byId(id);
-    if (existing.nbaId && NBA) { for (const [k] of STAT_FIELDS) delete data[k]; delete data.status; }
-    Object.assign(existing, data);
-    $('#playerDialog').close();
-    commit(`Updated ${name}`);
-  } else {
-    const p = { id: uid(), ...data };
-    if (form.dest.value === 'pool') {
-      state.pool.push(p);
-      $('#playerDialog').close();
-      commit(`Tracking ${name}`);
-    } else {
-      p.tag = '';
-      state.players.push(p);
-      fillOpenSlot(p);
-      $('#playerDialog').close();
-      commit(`Added ${name} to your roster`);
-    }
-  }
-}
-
-// Put a new player straight into an empty starting slot they're eligible for
-function fillOpenSlot(p) {
-  if (p.status === 'Out') return;
-  const i = state.slots.findIndex((s, idx) => !state.lineup[idx] && canPlay(p, s));
-  if (i !== -1) state.lineup[i] = p.id;
-}
-
-/* =========================================================
    Actions
    ========================================================= */
 const actions = {
@@ -2511,12 +2252,11 @@ const actions = {
   async 'fx-load-mine'() {
     const roster = fxRoster(state.fxTeam);
     if (!roster.length) return toast("Couldn't find your Fantrax roster");
-    if (state.players.length && !state.sample && !(await askConfirm('Reload your roster from Fantrax?', `Replaces your ${state.players.length} players with your ${roster.length}-player Fantrax roster and its current lineup.`, 'Reload roster'))) return;
-    const side = fxTeamSide(state.fxTeam, new Map(state.players.map(p => [p.nbaId, p.notes])));
+    if (state.players.length && !(await askConfirm('Reload your roster from Fantrax?', `Replaces your ${state.players.length} players with your ${roster.length}-player Fantrax roster and its current lineup.`, 'Reload roster'))) return;
+    const side = fxTeamSide(state.fxTeam);
     state.players = side.players;
     state.il = side.il;
     state.lineup = side.lineup;
-    state.sample = false;
     state.teamName = fxTeamName(state.fxTeam) || state.teamName;
     commit(`Loaded ${roster.length} players from Fantrax`);
   },
@@ -2623,96 +2363,15 @@ const actions = {
     state.lineup = fillSlots(chosen, state.slots);
     commit('Lineup updated for this week');
   },
-  'opp-toggle'(el) {
-    const ids = new Set(oppStarterIds(matchDates()));
-    const id = el.dataset.id;
-    if (ids.has(id)) ids.delete(id);
-    else {
-      ids.add(id);
-      if (ids.size > state.slots.length || !fitsSlots(ids, state.opp.players)) {
-        return toast(ids.size > state.slots.length ? `They already have ${state.slots.length} starters. Bench someone first.` : "That player doesn't fit an open slot. Bench someone at his position first.");
-      }
-    }
-    state.opp.starters = [...ids];
-    commit();
-  },
   'week-shift'(el) { ui.weekShift = Math.max(-4, Math.min(4, ui.weekShift + +el.dataset.step)); render(); },
-  'opp-remove'(el) {
-    state.opp.players = state.opp.players.filter(p => p.id !== el.dataset.id);
-    if (Array.isArray(state.opp.starters)) state.opp.starters = state.opp.starters.filter(id => id !== el.dataset.id);
-    commit();
-  },
-  async 'opp-new-week'() {
-    if (state.opp.players.length && !(await askConfirm('Clear this opponent?', 'Removes their players so you can enter this week\'s opponent.', 'Clear opponent'))) return;
-    state.opp = { name: '', week: weekStart(), players: [], starters: null, fxId: null };
-    commit('Ready for this week\'s opponent');
-  },
-  'paste-roster'(el) {
-    const target = el.dataset.target;
-    $('#pasteTitle').textContent = target === 'opp' ? "Paste your opponent's roster" : 'Paste your roster';
-    $('#pasteTarget').value = target;
-    $('#pasteReplace').checked = target === 'opp';
-    $('#pasteText').value = '';
-    $('#pasteResult').textContent = '';
-    $('#pasteDialog').showModal();
-    $('#pasteText').focus();
-  },
-  'paste-close'() { $('#pasteDialog').close(); },
-  'paste-apply'() {
-    if (!NBA) return toast('Player data is still loading');
-    const target = $('#pasteTarget').value;
-    const lines = $('#pasteText').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const found = [], missed = [], starterRaw = new Set();
-    let sawSlots = false;
-    for (const line of lines) {
-      const raw = matchLine(line);
-      const slot = slotPrefix(line);
-      if (slot) sawSlots = true;
-      if (raw && slot === 'start') starterRaw.add(raw.id);
-      if (raw) { if (!found.includes(raw)) found.push(raw); }
-      else if (/^[A-Za-zÀ-ž.'\- ]{5,40}$/.test(line) && line.trim().includes(' ')) missed.push(line);
-    }
-    if (!found.length) { $('#pasteResult').textContent = "Couldn't find any NBA player names in that text."; return; }
-    const replace = $('#pasteReplace').checked;
-    let added = 0;
-    if (target === 'opp') {
-      if (replace) state.opp.players = [];
-      if (!state.opp.players.length || replace) state.opp.week = weekStart();
-      const have = new Set(state.opp.players.map(p => p.nbaId));
-      for (const raw of found) if (!have.has(raw.id)) { state.opp.players.push(playerFromRaw(raw)); added++; }
-      state.opp.starters = sawSlots && starterRaw.size ? state.opp.players.filter(p => starterRaw.has(p.nbaId)).map(p => p.id) : (replace ? null : state.opp.starters);
-    } else {
-      if (replace) { state.players = []; state.il = []; state.lineup = []; state.sample = false; }
-      const have = new Set(state.players.map(p => p.nbaId));
-      for (const raw of found) if (!have.has(raw.id)) { state.players.push(playerFromRaw(raw)); added++; }
-      if (sawSlots && starterRaw.size) {
-        const chosen = state.players.filter(p => starterRaw.has(p.nbaId)).sort((a, b) => value(b) - value(a));
-        state.lineup = fillSlots(chosen, state.slots);
-      } else state.lineup = autoLineupIds();
-    }
-    $('#pasteDialog').close();
-    commit(`Added ${added} player${added === 1 ? '' : 's'}${missed.length ? ` · couldn't match: ${missed.slice(0, 3).join(', ')}${missed.length > 3 ? '…' : ''}` : ''}`);
-  },
   'player-detail'(el) { showPlayerDetail(+el.dataset.nba); },
   'close-detail'() { $('#detailDialog').close(); },
   'more-players'() { ui.pf.limit += 50; $('#playerResults').innerHTML = playerRows(); },
   'nba-add'(el) {
     const raw = nbaById.get(+el.dataset.nba);
-    if (!raw) return;
-    const dest = el.dataset.dest;
-    const existingPool = state.pool.find(p => p.nbaId === raw.id);
-    if (dest === 'players' && existingPool) state.pool = state.pool.filter(p => p !== existingPool);
-    const p = playerFromRaw(raw, { notes: existingPool ? existingPool.notes : '', tag: dest === 'pool' ? 'Watching' : '' });
-    let msg;
-    if (dest === 'pool') {
-      state.pool.push(p);
-      msg = `Watching ${raw.name}`;
-    } else {
-      state.players.push(p);
-      fillOpenSlot(p);
-      const over = activeCount() - rosterLimit();
-      msg = over > 0 ? `Added ${raw.name} — ${over} over the roster limit` : `Added ${raw.name} to your roster`;
-    }
+    if (!raw || state.pool.some(p => p.nbaId === raw.id)) return;
+    state.pool.push(playerFromRaw(raw, { tag: 'Watching' }));
+    const msg = `Watching ${raw.name}`;
     if (ui.tab === 'players') {
       // update just the list so search, filters and scroll stay put
       validateLineup();
@@ -2726,42 +2385,11 @@ const actions = {
     el.disabled = true;
     el.textContent = 'Refreshing…';
     let live = false;
-    try {
-      const r = await fetch('api/refresh', { method: 'POST' });
-      live = r.ok;
-    } catch (e) { /* hosted copy: no refresh endpoint */ }
+    try { live = (await fetch('api/refresh', { method: 'POST' })).ok; } catch (e) { /* server not running */ }
     const ok = await loadNba(true);
-    toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : `Showing the latest published data (updated ${ago(NBA.updated)})`);
-  },
-  'add-player'(el) { openPlayerDialog({ dest: el.dataset.dest, tag: el.dataset.tag || '' }); },
-  'edit-player'(el) { openPlayerDialog({ id: el.dataset.id }); },
-  'close-dialog'() { $('#playerDialog').close(); },
-  async 'drop-player'(el) {
-    const p = byId(el.dataset.id);
-    if (!(await askConfirm(`Drop ${p.name}?`, `They'll move to your watchlist as a free agent.`, 'Drop player'))) return;
-    state.players = state.players.filter(x => x.id !== p.id);
-    state.pool.push({ ...p, tag: 'FA' });
-    commit(`Dropped ${p.name}`);
-  },
-  'toggle-il'(el) {
-    const id = el.dataset.id;
-    const p = byId(id);
-    if (state.il.includes(id)) {
-      state.il = state.il.filter(x => x !== id);
-      fillOpenSlot(p);
-      commit(`${p.name} activated`);
-    } else {
-      if (state.il.length >= state.ilSize) toast(`IL is full (${state.ilSize} spots) — adding anyway`);
-      state.il.push(id);
-      state.lineup = state.lineup.map(x => (x === id ? null : x));
-      commit(`${p.name} moved to IL`);
-    }
-  },
-  'auto-lineup'() {
-    const before = lineupValue(state.lineup);
-    state.lineup = autoLineupIds();
-    const gain = lineupValue(state.lineup) - before;
-    commit(gain > 0.05 ? `Lineup optimized (${fmtValue(gain)})` : 'Lineup already optimal');
+    el.disabled = false;
+    el.textContent = 'Refresh stats';
+    toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : "Couldn't reach the local data server");
   },
   sort(el) {
     const s = el.dataset.scope === 'pool' ? ui.poolSort : ui.rosterSort;
@@ -2770,38 +2398,10 @@ const actions = {
     else { s.key = k; s.dir = ['name', 'slot', 'status', 'tag', 'to'].includes(k) ? 1 : -1; }
     render();
   },
-  'claim-player'(el) {
-    const p = byId(el.dataset.id);
-    state.pool = state.pool.filter(x => x.id !== p.id);
-    state.players.push({ ...p, tag: '' });
-    fillOpenSlot(p);
-    const over = activeCount() - rosterLimit();
-    commit(over > 0 ? `Added ${p.name} — you're ${over} over the roster limit` : `Added ${p.name} to your roster`);
-  },
   'remove-pool'(el) {
     const p = byId(el.dataset.id);
     state.pool = state.pool.filter(x => x.id !== p.id);
     commit(`Stopped tracking ${p.name}`);
-  },
-  'delete-matchup'(el) {
-    state.matchups = state.matchups.filter(m => m.id !== el.dataset.id);
-    commit('Result removed');
-  },
-  async 'execute-trade'() {
-    const give = [...ui.tradeGive].map(byId).filter(Boolean);
-    const get = [...ui.tradeGet].map(byId).filter(Boolean);
-    if (!give.length || !get.length) return;
-    if (!(await askConfirm('Accept this trade?', `You give ${give.map(p => p.name).join(', ')} and get ${get.map(p => p.name).join(', ')}.`, 'Accept trade'))) return;
-    const partner = get[0].tag && get[0].tag !== 'Trade target' && get[0].tag !== 'FA' ? get[0].tag : 'Traded';
-    state.players = state.players.filter(p => !ui.tradeGive.has(p.id));
-    state.pool = state.pool.filter(p => !ui.tradeGet.has(p.id));
-    state.il = state.il.filter(id => !ui.tradeGive.has(id));
-    state.pool.push(...give.map(p => ({ ...p, tag: partner })));
-    state.players.push(...get.map(p => ({ ...p, tag: '' })));
-    ui.tradeGive.clear(); ui.tradeGet.clear();
-    validateLineup();
-    state.lineup = autoLineupIds();
-    commit('Trade accepted — lineup re-optimized');
   },
   export() {
     const box = $('#backupText');
@@ -2849,15 +2449,6 @@ const forms = {
       btn.disabled = false; btn.textContent = 'Connect league';
     }
   },
-  matchup(f) {
-    const my = parseFloat(f.my.value), opp = parseFloat(f.opp.value);
-    if (!f.opponent.value.trim() || !Number.isFinite(my) || !Number.isFinite(opp)) return toast('Fill in opponent and both scores');
-    state.matchups.push({
-      id: uid(), week: parseInt(f.week.value, 10) || state.matchups.length + 1, opponent: f.opponent.value.trim(),
-      my, opp, ties: f.ties ? parseInt(f.ties.value, 10) || 0 : 0, notes: f.notes ? f.notes.value.trim() : '',
-    });
-    commit(my > opp ? 'Win logged 🏀' : my < opp ? 'Loss logged' : 'Tie logged');
-  },
 
 };
 
@@ -2886,18 +2477,10 @@ document.addEventListener('change', e => {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
   } else if (el.dataset.change === 'fx-team') {
-    state.fxTeam = el.value || null;
-    commit(state.fxTeam ? `Linked to ${fxTeamName(state.fxTeam)}` : '');
-  } else if (el.dataset.change === 'opp-start') {
-    const ids = new Set(oppStarterIds(matchDates()));
-    if (el.checked) ids.add(el.dataset.id); else ids.delete(el.dataset.id);
-    if (el.checked && (ids.size > state.slots.length || !fitsSlots(ids, state.opp.players))) {
-      el.checked = false;
-      toast(ids.size > state.slots.length ? `Only ${state.slots.length} starters — untick someone first` : "That player doesn't fit an open slot");
-      return;
-    }
-    state.opp.starters = [...ids];
-    commit();
+    if (!el.value) return;
+    adoptTeam(el.value);
+    state.demo = false;
+    commit(`Welcome, ${state.teamName}`);
   } else if (el.dataset.change === 'pf') {
     ui.pf[el.dataset.key] = el.value;
     ui.pf.limit = 50;
@@ -2920,7 +2503,6 @@ document.addEventListener('input', e => {
 
 document.addEventListener('submit', e => {
   const f = e.target;
-  if (f === $('#playerForm')) return savePlayerForm(e);
   if (f.dataset.form && forms[f.dataset.form]) {
     e.preventDefault();
     forms[f.dataset.form](f);
@@ -2941,7 +2523,7 @@ $('#importFile').addEventListener('change', async e => {
 function route() {
   let tab = location.hash.replace('#', '') || 'week';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
-  ui.tab = ['week', 'dashboard', 'roster', 'players', 'draft', 'matchups', 'trade', 'pool'].includes(tab) ? tab : 'week';
+  ui.tab = ['week', 'dashboard', 'roster', 'players', 'draft', 'standings', 'trade', 'pool'].includes(tab) ? tab : 'week';
   render();
   window.scrollTo(0, 0);
   // on phones the tab bar scrolls sideways; keep the current tab visible
@@ -2958,7 +2540,6 @@ window.addEventListener('hashchange', route);
   state = load();
   validateLineup();
   route();
-  cloud.init();
   nbaLoading = loadNba();
   loadImages();
 })();

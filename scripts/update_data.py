@@ -390,6 +390,10 @@ def fantrax(league_id, index, saved_league=None):
         draft = get_json(FX + 'getDraftResults', {'leagueId': league_id})
     except Exception:
         draft = {}
+    try:
+        standings = get_json(FX + 'getStandings', {'leagueId': league_id})
+    except Exception:
+        standings = []
 
     # match Fantrax players to NBA.com ids by name (team breaks ties)
     by_name = {}
@@ -423,6 +427,10 @@ def fantrax(league_id, index, saved_league=None):
         'matchups': {str(m['period']): [[x['away']['id'], x['home']['id']] for x in m.get('matchupList', [])
                                         if x.get('away', {}).get('id') and x.get('home', {}).get('id')] for m in info.get('matchups', [])},
         'rosterPeriod': rosters.get('period'),
+        # "points" is the W-L-T record
+        'standings': [dict(zip(('w', 'l', 't'), [int(x) if x.isdigit() else 0 for x in (str(r.get('points') or '0-0-0').split('-') + ['0', '0'])[:3]]),
+                           id=r['teamId'], name=r.get('teamName', ''), rank=r.get('rank'), gb=r.get('gamesBack') or 0)
+                      for r in (standings if isinstance(standings, list) else []) if r.get('teamId')],
         # [round, overall pick, fantasy team id, NBA.com player id, name] for every pick made
         'draft': {
             'date': (draft.get('draftDate') or '')[:10], 'type': draft.get('draftType', ''), 'state': draft.get('draftState', ''),
