@@ -370,6 +370,7 @@ function toast(msg) {
    Real NBA data (data/players.json, built by scripts/update_data.py)
    ========================================================= */
 let NBA = null;
+let nbaLoading = Promise.resolve(false);
 const nbaById = new Map();
 const nbaByName = new Map();
 let nbaCache = null; // player-like objects for the Players tab
@@ -1084,6 +1085,9 @@ function buildAlerts() {
    Rendering
    ========================================================= */
 function render() {
+  const landing = needsLanding();
+  document.body.classList.toggle('landing', landing);
+  if (landing) { $('#view').innerHTML = viewLanding(); return; }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
   const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), matchups: viewMatchups, trade: viewTrade, pool: viewPool, settings: viewSettings };
   // keep scroll position of inner lists (e.g. trade picker) across re-renders
@@ -2233,6 +2237,90 @@ function viewDraft() {
   </div>`;
 }
 
+// Connect a Fantrax league by ID (from Settings or the landing page). Throws a readable message.
+async function connectLeague(id) {
+  if (!/^[A-Za-z0-9]{6,32}$/.test(id || '')) throw new Error("That doesn't look like a Fantrax league ID. It's letters and numbers only.");
+  if (!NBA) await nbaLoading;
+  if (!NBA) throw new Error("Couldn't load NBA data. Check your connection and try again.");
+  let res;
+  try {
+    res = await fetchFantraxLeague(id);
+  } catch (e) {
+    throw new Error(`Fantrax didn't find that league (${e.message}). Check the ID in your league's address.`);
+  }
+  applyFantraxLeague(res);
+  const site = NBA.siteLeague && NBA.siteLeague.id === id;
+  const sameLeague = state.fxLeagueId === id || (!state.fxLeagueId && site && (state.leagueChosen || state.fxTeam));
+  state.fxLeagueId = site ? null : id;
+  state.demo = false;
+  if (!sameLeague) {
+    // a different league: start fresh with its roster settings, then pick your team
+    state.fxTeam = null;
+    state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
+    ui.viewA = null; ui.viewB = null;
+    const cfg = slotsFromLeague(res.league);
+    if (cfg) {
+      state.slots = cfg.slots;
+      if (cfg.bench != null) state.benchSize = cfg.bench;
+      if (cfg.ir != null) state.ilSize = cfg.ir;
+      state.slotsSet = true;
+    }
+    state.lineup = autoLineupIds();
+  }
+  syncLinked();
+  return { league: res.league, sameLeague };
+}
+
+// Make a league team "yours": load its roster and lineup, and this week's opponent
+function adoptTeam(teamId) {
+  const side = fxTeamSide(teamId);
+  state.fxTeam = teamId;
+  state.players = side.players;
+  state.il = side.il;
+  state.lineup = side.lineup;
+  state.teamName = side.name || state.teamName;
+  if (state.sample) state.pool = [];
+  state.sample = false;
+  const opp = fxOpponentFor(weekStart());
+  if (opp) {
+    const o = fxTeamSide(opp.id);
+    state.opp = { name: o.name, week: weekStart(), fxId: opp.id, players: o.players, starters: o.starters };
+  } else {
+    state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
+  }
+}
+
+/* ---------- Landing page: connect a league, then pick your team ---------- */
+const needsLanding = () => !state.fxTeam && !state.demo;
+
+function viewLanding() {
+  const chosen = state.leagueChosen && fxLeague();
+  const step2 = chosen ? `
+      <p class="land-step">Step 2 of 2</p>
+      <h1>Which team is yours?</h1>
+      <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. Pick your team to load your roster and this week's matchup.</p>
+      <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
+      <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button></p>` : '';
+  const step1 = chosen ? '' : `
+      <p class="land-step">Courtside Manager</p>
+      <h1>Plan your fantasy basketball week</h1>
+      <p class="muted">Connect your Fantrax league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up.</p>
+      <form class="land-form" data-form="land-league">
+        <label class="field" for="landLeague">Fantrax league ID
+          <input id="landLeague" name="leagueId" placeholder="e.g. abc123def456" autocomplete="off" spellcheck="false" autofocus>
+        </label>
+        <button class="btn primary" type="submit">Connect league</button>
+      </form>
+      <p class="form-error" id="landMsg" role="alert"></p>
+      <details class="land-help">
+        <summary>Where do I find my league ID?</summary>
+        <p>Open your league on fantrax.com. The ID is the part of the address right after <b>/league/</b>:<br>
+        <span class="land-url">fantrax.com/fantasy/league/<b>abc123def456</b>/home</span></p>
+      </details>
+      <p class="small muted land-foot">Built for head-to-head category leagues on Fantrax. ${NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
+  return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
+}
+
 /* ---------- Settings ---------- */
 function viewSettings() {
   const counts = Object.fromEntries(SLOT_TYPES.map(t => [t, state.slots.filter(s => s === t).length]));
@@ -2299,11 +2387,11 @@ function viewSettings() {
         <div class="card-head"><h2>Fantrax league</h2>${fxLeague() ? `<span class="muted small">${esc(fxLeague().name)}</span>` : ''}</div>
         <form class="fx-connect" data-form="fx-league">
           <label class="field" for="fxLeagueId">League ID
-            <input id="fxLeagueId" name="leagueId" value="${esc((fxLeague() && fxLeague().id) || '')}" placeholder="e.g. my19c8mwmoipvhon" autocomplete="off" spellcheck="false">
+            <input id="fxLeagueId" name="leagueId" value="${esc((fxLeague() && fxLeague().id) || '')}" placeholder="e.g. abc123def456" autocomplete="off" spellcheck="false">
           </label>
           <button class="btn primary" type="submit">Connect &amp; refresh</button>
         </form>
-        <p class="small muted" style="margin:6px 0 12px">Find it in your league's address on Fantrax: fantrax.com/fantasy/league/<b>league-id</b>/… Connecting loads your league's rosters, lineups, matchups, positions and draft straight from Fantrax. It's saved for you on this device; NBA stats come from the site's daily update.${state.fxLeagueId && NBA && NBA.siteLeague ? ` <button class="link-btn" data-action="fx-site-league">Switch back to ${esc(NBA.siteLeague.name)}</button>` : ''}</p>
+        <p class="small muted" style="margin:6px 0 12px">Find it in your league's address on Fantrax: fantrax.com/fantasy/league/<b>league-id</b>/… Connecting loads your league's rosters, lineups, matchups, positions and draft straight from Fantrax. It's saved for you on this device; NBA stats come from the site's daily update.${state.fxLeagueId && NBA && NBA.siteLeague ? ` <button class="link-btn" data-action="fx-site-league">Use the demo league (${esc(NBA.siteLeague.name)})</button>` : ''}</p>
         <p class="form-error" id="fxConnectMsg" role="status"></p>
         ${fxLeague() ? `<label class="field" for="fxTeamSel">Your team
           <select id="fxTeamSel" data-change="fx-team"><option value="">Not set</option>${fxPickable().map(t => `<option value="${esc(t.id)}" ${state.fxTeam === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
@@ -2463,6 +2551,19 @@ const actions = {
     ui.strBasis = el.dataset.basis;
     try { localStorage.setItem(STR_KEY, ui.strBasis); } catch (e) { /* ignore */ }
     render();
+  },
+  'land-team'(el) {
+    adoptTeam(el.dataset.id);
+    commit(`Welcome, ${state.teamName}`);
+    location.hash = '#week';
+  },
+  'land-back'() { state.leagueChosen = false; commit(); },
+  async 'land-demo'() {
+    state.demo = true;
+    state.leagueChosen = false;
+    if (state.fxLeagueId) await actions['fx-site-league']();
+    else commit();
+    location.hash = '#week';
   },
   async 'fx-site-league'() {
     state.fxLeagueId = null;
@@ -2706,35 +2807,28 @@ const forms = {
     const id = f.leagueId.value.trim();
     const msg = $('#fxConnectMsg');
     const btn = f.querySelector('button[type=submit]');
-    if (!/^[A-Za-z0-9]{6,32}$/.test(id)) { msg.textContent = "That doesn't look like a Fantrax league ID (letters and numbers only)."; return; }
-    if (!NBA) { msg.textContent = 'NBA data is still loading. Try again in a moment.'; return; }
     btn.disabled = true; btn.textContent = 'Connecting…'; msg.textContent = '';
     try {
-      const res = await fetchFantraxLeague(id);
-      applyFantraxLeague(res);
-      const site = NBA.siteLeague && NBA.siteLeague.id === id;
-      const sameLeague = state.fxLeagueId === id || (!state.fxLeagueId && site);
-      state.fxLeagueId = site ? null : id;
-      if (!sameLeague) {
-        // a different league: start fresh with its roster settings, then pick your team
-        state.fxTeam = null;
-        state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
-        ui.viewA = null; ui.viewB = null;
-        const cfg = slotsFromLeague(res.league);
-        if (cfg) {
-          state.slots = cfg.slots;
-          if (cfg.bench != null) state.benchSize = cfg.bench;
-          if (cfg.ir != null) state.ilSize = cfg.ir;
-          state.slotsSet = true;
-        }
-        state.lineup = autoLineupIds();
-      }
-      syncLinked();
-      commit(sameLeague ? `Reloaded ${res.league.name} from Fantrax` : `Connected to ${res.league.name}. Pick your team on This week.`);
+      const { league, sameLeague } = await connectLeague(id);
+      commit(sameLeague ? `Reloaded ${league.name} from Fantrax` : `Connected to ${league.name}. Pick your team on This week.`);
     } catch (e) {
-      msg.textContent = `Fantrax didn't return that league (${e.message}). Check the ID in your league's address.`;
+      msg.textContent = e.message;
     } finally {
       btn.disabled = false; btn.textContent = 'Connect & refresh';
+    }
+  },
+  async 'land-league'(f) {
+    const id = f.leagueId.value.trim();
+    const msg = $('#landMsg');
+    const btn = f.querySelector('button[type=submit]');
+    btn.disabled = true; btn.textContent = 'Connecting…'; msg.textContent = '';
+    try {
+      await connectLeague(id);
+      state.leagueChosen = true;
+      commit();
+    } catch (e) {
+      msg.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Connect league';
     }
   },
   matchup(f) {
@@ -2882,6 +2976,6 @@ window.addEventListener('hashchange', route);
   validateLineup();
   route();
   cloud.init();
-  loadNba();
+  nbaLoading = loadNba();
   loadImages();
 })();

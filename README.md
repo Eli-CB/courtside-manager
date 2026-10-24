@@ -31,6 +31,6 @@ Then open http://localhost:5173. The local server refreshes data when it's more 
 
 ## Leagues
 
-Anyone can use the site with their own Fantrax league: enter the league ID (from the league's address, `fantrax.com/fantasy/league/<id>/…`) in Settings. The browser loads that league's rosters, lineups, matchups, positions and draft straight from Fantrax, which allows requests from any site, and remembers it on that device. NBA stats, the schedule and injuries come from the shared daily data.
+First-time visitors land on a page that asks for their Fantrax league ID (from the league's address, `fantrax.com/fantasy/league/<id>/…`), then which team is theirs. They can change it later in Settings. The browser loads that league's rosters, lineups, matchups, positions and draft straight from Fantrax, which allows requests from any site, and remembers it on that device. NBA stats, the schedule and injuries come from the shared daily data.
 
-`league.json` sets the default league that first-time visitors see and that the daily data includes.
+`league.json` sets the league included in the daily data, which doubles as the demo league on the landing page.

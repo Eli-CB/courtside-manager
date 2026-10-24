@@ -559,6 +559,31 @@ tr.dr-mine td { background: color-mix(in srgb, var(--accent-soft) 60%, transpare
 .dr-board tr.dr-krow + tr:not(.dr-krow) th, .dr-board tr.dr-krow + tr:not(.dr-krow) td { border-top: 2px solid var(--border); }
 .dr-via { display: block; font-size: .64rem; color: var(--muted); font-style: italic; }
 
+/* ---------- Landing ---------- */
+body.landing .tabs { visibility: hidden; }
+.landing-wrap { min-height: calc(100vh - 140px); display: grid; place-items: center; padding-block: 24px; }
+.landing-card { width: min(560px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 28px; }
+.landing-card h1 { font-size: 1.7rem; letter-spacing: -.02em; text-wrap: balance; margin-bottom: 8px; }
+.landing-card > p { margin: 0 0 16px; max-width: 60ch; }
+.land-step { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 0 0 8px !important; }
+.land-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 4px; }
+.land-form .field { margin: 0; }
+.land-form input { font-size: 1rem; padding: 10px 12px; }
+.land-form .btn { padding: 11px 16px; }
+.land-help { margin: 4px 0 14px; font-size: .9rem; }
+.land-help summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.land-help p { margin: 8px 0 0; color: var(--muted); }
+.land-url { display: inline-block; margin-top: 4px; font-family: ui-monospace, Consolas, monospace; font-size: .85rem; color: var(--text); background: var(--surface-2); padding: 3px 8px; border-radius: 6px; word-break: break-all; }
+.land-foot { margin: 0 !important; padding-top: 14px; border-top: 1px solid var(--border); }
+.land-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.land-team { font: inherit; font-weight: 600; text-align: left; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+.land-team:hover, .land-team:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 640px) {
+  .landing-card { padding: 20px; }
+  .land-form { grid-template-columns: minmax(0, 1fr); }
+  .land-teams { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---------- Phone tidy-up ---------- */
 @media (max-width: 640px) {
   .page-head { margin-bottom: 12px; }
