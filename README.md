@@ -27,10 +27,10 @@ A GitHub Actions workflow (`.github/workflows/site.yml`) refreshes the data ever
 python serve.py
 ```
 
-Then open http://localhost:5173. The local server refreshes data when it's more than 6 hours old, and lets you switch leagues from Settings.
+Then open http://localhost:5173. The local server refreshes data when it's more than 6 hours old. Switch or add leagues from the league menu at the top.
 
 ## Leagues
 
-First-time visitors land on a page that asks for their Fantrax league ID (from the league's address, `fantrax.com/fantasy/league/<id>/…`), then which team is theirs. They can change it later in Settings. The browser loads that league's rosters, lineups, matchups, positions and draft straight from Fantrax, which allows requests from any site, and remembers it on that device. NBA stats, the schedule and injuries come from the shared daily data.
+First-time visitors land on a page that asks for their Fantrax league ID (from the league's address, `fantrax.com/fantasy/league/<id>/…`), then which team is theirs. They can add more leagues and switch between them from the league menu in the top bar. The browser loads that league's rosters, lineups, matchups, positions and draft straight from Fantrax, which allows requests from any site, and remembers it on that device. NBA stats, the schedule and injuries come from the shared daily data.
 
 `league.json` sets the league included in the daily data, which doubles as the demo league on the landing page.
