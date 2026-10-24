@@ -382,12 +382,6 @@ function nextGame(next) {
   return next ? `${fmtDay(next.date).split(',')[0]} ${next.home ? 'vs' : '@'} ${esc(next.opp)}` : '';
 }
 
-function dataLine() {
-  if (!NBA) return '<span class="muted small">NBA data is unavailable right now.</span>';
-  const w = NBA.week;
-  return `<span class="muted small">${esc((NBA.sources || []).map(x => x.replace(' (saved copy)', '')).join(', ') || 'NBA.com stats & schedule, ESPN injuries')}${NBA.league ? ', Fantrax league' : ''} ${infoBtn('data')} · updated ${ago(NBA.updated)}${w ? ` · Week ${w.num}: ${fmtDay(w.start)} – ${fmtDay(w.end)}` : ''}</span>`;
-}
-
 /* =========================================================
    Lineup logic
    ========================================================= */
@@ -866,10 +860,7 @@ function withViewedTeam(fn) {
 function fxStrip(ctx) {
   const L = fxLeague();
   if (!L) return '';
-  if (!state.fxTeam) {
-    return `<div class="fx-strip"><span><b>${esc(L.name)}</b> on Fantrax. Which team is yours?</span>
-      <select data-change="fx-team" aria-label="Your Fantrax team"><option value="">Pick your team</option>${fxPickable().map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></div>`;
-  }
+  if (!state.fxTeam) return `<div class="fx-strip"><span>Pick your team at the top to load your roster and matchup.</span></div>`;
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const opp = fxOpponentFor(ctx.start, leftId); // the left team's real opponent this week
   const stale = L.rosterPeriod && opp && opp.period !== L.rosterPeriod;
@@ -879,7 +870,7 @@ function fxStrip(ctx) {
   const back = ui.viewing ? 'fx-view-actual' : 'fx-load-opp';
   return `<div class="fx-strip">
     <span class="fx-vs">
-      <select class="fx-team-sel" data-change="fx-view" aria-label="Team to view">${teams.map(t => `<option value="${esc(t.id)}" ${t.id === leftId ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}</select>
+      <b>${esc(fxTeamName(leftId))}</b>
       <span class="muted">vs</span>
       <span class="fx-cycle">
         <button class="icon-btn xs" data-action="fx-cycle" data-step="-1" aria-label="Previous team" title="Previous team">‹</button>
@@ -889,9 +880,7 @@ function fxStrip(ctx) {
       ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
       ${stale ? `<span class="muted small">rosters as of week ${L.rosterPeriod}</span>` : ''}
     </span>
-    <span class="actions">${ui.viewing
-      ? `<span class="badge">Viewing only</span><button class="btn sm primary" data-action="fx-view-mine">Back to my team</button>`
-      : `${cur ? `<button class="btn sm" data-action="fx-reload-opp">Reload ${esc(state.opp.name)}</button>` : ''}<button class="btn sm" data-action="fx-load-mine">Reload my roster</button>`}</span></div>`;
+    ${ui.viewing ? '' : `<span class="actions">${cur ? `<button class="btn sm" data-action="fx-reload-opp">Reload ${esc(state.opp.name)}</button>` : ''}<button class="btn sm" data-action="fx-load-mine">Reload my roster</button></span>`}</div>`;
 }
 
 function validateLineup() {
@@ -977,10 +966,34 @@ function leagueMenu() {
   </details>`;
 }
 
+// Tabs that can show another team's version (read-only); the rest are league-wide or yours
+const VIEW_TABS = ['week', 'dashboard', 'roster'];
+
+// League and team bar shown above every tab
+function ctxBar() {
+  const bar = $('#ctxBar');
+  if (!bar) return;
+  const L = fxLeague();
+  bar.hidden = !L || needsLanding();
+  if (bar.hidden) return;
+  const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
+  const shown = viewing ? ui.viewA : state.fxTeam;
+  $('#ctxTeam').innerHTML = `<select class="ctx-team" data-change="${state.fxTeam ? 'fx-view' : 'fx-team'}" aria-label="${state.fxTeam ? 'Team to view' : 'Your team'}">
+      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
+    </select>${viewing ? '<span class="badge">Viewing only</span><button class="link-btn small" data-action="fx-view-mine">Back to my team</button>' : ''}`;
+  const w = NBA && NBA.week;
+  $('#ctxMeta').innerHTML = [
+    matchupScoring() === 'most' ? '9-cat H2H, one win per week' : '9-cat H2H, one win per category',
+    w ? `Week ${w.num}: ${fmtDay(w.start)} – ${fmtDay(w.end)}` : '',
+    NBA ? `stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable',
+  ].filter(Boolean).join(' · ');
+}
+
 function render() {
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
   leagueMenu();
+  ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
   const early = preDraft();
@@ -1015,8 +1028,7 @@ const isPointsLeague = (L = fxLeague()) => !!(L && /POINTS/.test(L.scoring || ''
 function viewPreDraft(L) {
   const when = draftWhen(L);
   const past = draftTime(L) && draftTime(L) < new Date();
-  return `<div class="page-head"><div><h1>${esc(L.name)}</h1><p>${esc(fxTeamName(state.fxTeam) || '')}</p></div></div>
-    <div class="card"><div class="empty"><strong>${past ? 'Waiting on the draft' : "This league hasn't drafted yet"}</strong>
+  return `<div class="card"><div class="empty"><strong>${past ? 'Waiting on the draft' : "This league hasn't drafted yet"}</strong>
       ${when ? `${past ? 'The draft was set for' : 'The draft is set for'} <b>${esc(when)}</b>. ` : ''}Rosters, matchups and the draft board fill in here once teams have players.
       In the meantime, the <a href="#players">Players</a> tab ranks every NBA player and you can star the ones you want on your Watchlist.</div></div>`;
 }
@@ -1039,17 +1051,6 @@ function teamCatAvg(players) {
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 
 // "Viewing" picker shown on Dashboard and Roster: look at any league team, read-only
-function teamViewBar() {
-  if (!fxLeague() || !state.fxTeam) return '';
-  const leftId = ui.viewing ? ui.viewA : state.fxTeam;
-  return `<div class="fx-strip view-bar">
-    <span class="fx-vs"><span class="muted">Viewing</span>
-      <select class="fx-team-sel" data-change="fx-view" aria-label="Team to view">${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === leftId ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}</select>
-    </span>
-    ${ui.viewing ? '<span class="actions"><span class="badge">Viewing only</span><button class="btn sm primary" data-action="fx-view-mine">Back to my team</button></span>' : ''}
-  </div>`;
-}
-
 // A team's real per-game numbers: counting stats per player, FG%/FT% from makes ÷ attempts
 function teamRaw(players) {
   const n = players.length || 1;
@@ -1143,10 +1144,6 @@ function viewDashboard() {
   const top = [...state.players].sort((a, b) => value(b) - value(a)).slice(0, 5);
 
   return `
-  <div class="page-head">
-    <div><h1>${esc(state.teamName)}</h1><p>${esc(fxLeague() ? fxLeague().name : 'Fantasy basketball')} · ${matchupScoring() === 'most' ? '9-category H2H, one win per week' : '9-category H2H, one win per category'}</p><p>${dataLine()}</p></div>
-  </div>
-  ${teamViewBar() ? `<div style="margin-bottom:16px">${teamViewBar()}</div>` : ''}
   <div class="kpis">
     ${r
       ? `<div class="card kpi"><div class="label">Record</div><div class="value">${r.w}-${r.l}${r.t ? '-' + r.t : ''}</div><div class="hint"><a href="#standings">${ordinal(r.rank)} of ${nTeams}</a>${r.gb ? ` · ${fmt(r.gb, 1)} back` : ''}</div></div>`
@@ -1266,10 +1263,9 @@ function viewRoster() {
   const ro = ui.viewing;
   return `
   <div class="page-head">
-    <div><h1>${ro ? esc(state.teamName) : 'Roster'} ${infoBtn('value')}</h1><p>${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR</p></div>
+    <div><h1>Roster ${infoBtn('value')}</h1><p>${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR</p></div>
   </div>
   <div class="week-stack">
-  ${teamViewBar()}
   ${list.length && !ro ? lineupEditor() : ''}
   <div class="card">
     ${list.length ? `<div class="table-wrap"><table>
@@ -1444,14 +1440,14 @@ function playerRows() {
 
 function viewPlayers() {
   if (!NBA) {
-    return `<div class="page-head"><div><h1>NBA players</h1><p>${dataLine()}</p></div></div>
+    return `<div class="page-head"><div><h1>NBA players</h1></div></div>
       <div class="card"><div class="empty"><strong>Loading player data…</strong>If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.</div></div>`;
   }
   const f = ui.pf;
   const teams = [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort();
   return `
   <div class="page-head">
-    <div><h1>NBA players ${infoBtn('projection')}</h1><p>${NBA.players.length} active players. ${BASIS_LABELS[state.basis]} stats (${NBA.season} / ${NBA.prevSeason}).</p><p>${dataLine()}</p></div>
+    <div><h1>NBA players ${infoBtn('projection')}</h1><p>${NBA.players.length} active players. ${BASIS_LABELS[state.basis]} stats (${NBA.season} / ${NBA.prevSeason}).</p></div>
     ${LOCAL ? '<div class="actions"><button class="btn" data-action="refresh-data">Refresh stats</button></div>' : ''}
   </div>
   <div class="card">
@@ -1915,7 +1911,7 @@ function pickupsCard() {
 
 function viewWeek() {
   if (!NBA) {
-    return `<div class="page-head"><div><h1>This week</h1><p>${dataLine()}</p></div></div>
+    return `<div class="page-head"><div><h1>This week</h1></div></div>
       <div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the NBA data file.</div></div>`;
   }
   const ctx = weekContext();
@@ -2041,7 +2037,7 @@ function draftList(title, list, mine, info) {
 function viewDraft() {
   const d = draftData();
   if (!d) {
-    return `<div class="page-head"><div><h1>Draft</h1><p>${dataLine()}</p></div></div>
+    return `<div class="page-head"><div><h1>Draft</h1></div></div>
       <div class="card"><div class="empty"><strong>No draft results</strong>Fantrax didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
   }
   const mine = state.fxTeam;
@@ -2472,7 +2468,8 @@ document.addEventListener('change', e => {
   } else if (el.dataset.change === 'fx-view') {
     ui.viewA = el.value && el.value !== state.fxTeam ? el.value : null;
     ui.viewB = null;
-    render();
+    if (ui.viewA && !VIEW_TABS.includes(ui.tab)) location.hash = '#dashboard';
+    else render();
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
@@ -2524,6 +2521,7 @@ function route() {
   let tab = location.hash.replace('#', '') || 'week';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
   ui.tab = ['week', 'dashboard', 'roster', 'players', 'draft', 'standings', 'trade', 'pool'].includes(tab) ? tab : 'week';
+  if (!VIEW_TABS.includes(ui.tab)) { ui.viewA = null; ui.viewB = null; }
   render();
   window.scrollTo(0, 0);
   // on phones the tab bar scrolls sideways; keep the current tab visible

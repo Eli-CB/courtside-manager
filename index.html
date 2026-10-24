@@ -21,10 +21,14 @@
         <a href="#trade" data-tab="trade">Trades</a>
         <a href="#pool" data-tab="pool">Watchlist</a>
       </nav>
-      <div class="top-right"><div id="leagueMenu"></div><button class="icon-btn" data-action="toggle-theme" aria-label="Toggle light/dark theme" title="Toggle theme">◐</button></div>
+      <div class="top-right"><button class="icon-btn" data-action="toggle-theme" aria-label="Toggle light/dark theme" title="Toggle theme">◐</button></div>
     </div>
   </header>
 
+  <div id="ctxBar" class="container ctx" hidden>
+    <div class="ctx-row"><div id="leagueMenu"></div><span class="ctx-sep" aria-hidden="true">/</span><span class="ctx-team-wrap" id="ctxTeam"></span></div>
+    <div class="ctx-meta" id="ctxMeta"></div>
+  </div>
   <main id="view" class="container" tabindex="-1"></main>
 
   <dialog id="detailDialog" class="modal modal-lg">

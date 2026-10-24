@@ -388,10 +388,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 /* ---------- Matchup board + lineup analysis ---------- */
 .fx-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: .9rem; }
 .fx-strip select { max-width: 100%; }
-.view-bar .fx-team-sel { max-width: 260px; }
 .fx-vs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .fx-cycle { display: inline-flex; align-items: center; gap: 4px; }
-.fx-cycle select, .fx-team-sel { padding: 4px 8px; font-weight: 600; max-width: 200px; }
+.fx-cycle select { padding: 4px 8px; font-weight: 600; max-width: 200px; }
 .week-stack { display: grid; gap: 16px; }
 .week-stack > .card + .card { margin-top: 0; }
 .board { table-layout: fixed; min-width: 340px; }
@@ -587,21 +586,37 @@ body.landing .tabs { visibility: hidden; }
 
 tr.me-row td { background: var(--accent-soft); }
 
-/* ---------- League menu ---------- */
+/* ---------- League and team bar ---------- */
+.ctx { padding-block: 16px 0; display: flex; flex-direction: column; gap: 4px; }
+.ctx + .container { padding-top: 14px; }
+.ctx[hidden] { display: none; }
+.ctx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ctx-sep { color: var(--border); font-size: 1.3rem; font-weight: 300; }
+.ctx-team-wrap { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.ctx-team { font: inherit; font-weight: 800; font-size: 1.15rem; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 4px 6px; max-width: 100%; cursor: pointer; }
+.ctx-team:hover, .ctx-team:focus-visible { border-color: var(--border); background: var(--surface); }
+.ctx-meta { color: var(--muted); font-size: .85rem; padding-left: 2px; }
 #leagueMenu { position: relative; }
-.lm summary { list-style: none; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; font-weight: 700; font-size: .85rem; max-width: 220px; }
+.lm summary { list-style: none; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 6px; border: 1px solid transparent; border-radius: 8px; font-weight: 600; font-size: 1.15rem; color: var(--muted); max-width: 320px; }
 .lm summary::-webkit-details-marker { display: none; }
-.lm summary:hover { background: var(--surface-2); }
+.lm summary:hover, .lm[open] summary { border-color: var(--border); background: var(--surface); color: var(--text); }
 .lm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lm-caret { color: var(--muted); font-size: .7rem; }
-.lm-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 270px; max-height: calc(100vh - 80px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); padding: 6px; }
+.lm-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: 270px; max-height: calc(100vh - 80px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); padding: 6px; }
 .lm-sec { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 10px 10px 4px; }
 .lm-row { display: flex; align-items: center; gap: 4px; }
 .lm-item { display: block; width: 100%; text-align: left; font: inherit; font-size: .9rem; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
 .lm-item:hover, .lm-item:focus-visible { background: var(--surface-2); }
 .lm-item.on { font-weight: 700; color: var(--accent); }
 .lm-item.danger { color: var(--bad); }
-@media (max-width: 640px) { .lm summary { max-width: 130px; } .lm-pop { width: min(270px, calc(100vw - 24px)); } }
+@media (max-width: 640px) {
+  .ctx { padding-top: 12px; }
+  .ctx-sep { display: none; }
+  .ctx-row { gap: 0 4px; }
+  .ctx-team, .lm summary { font-size: 1rem; }
+  .lm summary { max-width: 200px; }
+  .lm-pop { width: min(270px, calc(100vw - 32px)); }
+}
 
 /* ---------- Phone tidy-up ---------- */
 @media (max-width: 640px) {
@@ -612,7 +627,6 @@ tr.me-row td { background: var(--accent-soft); }
   /* Fantrax bar: team pickers fill the width */
   .fx-strip { padding: 10px 12px; }
   .fx-vs { width: 100%; }
-  .fx-team-sel { flex: 1 1 auto; max-width: none; }
   .fx-cycle { flex: 1 1 100%; }
   .fx-cycle select { flex: 1; max-width: none; }
   .fx-strip .actions { width: 100%; }
