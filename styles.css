@@ -600,6 +600,10 @@ tr.me-row td { background: var(--accent-soft); }
 .ctx-team { font: inherit; font-weight: 800; font-size: 1.05rem; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 4px 6px; max-width: 100%; cursor: pointer; }
 .ctx-team:hover, .ctx-team:focus-visible { border-color: var(--border); background: var(--surface-2); }
 .ctx-meta { color: var(--muted); font-size: .82rem; padding-left: 6px; }
+.ctx-season { font-weight: 600; color: var(--muted); }
+body.past .ctx-season { color: var(--accent); }
+.ctx-add { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ctx-add input { font: inherit; font-size: .9rem; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); width: 210px; max-width: 100%; }
 #leagueMenu { position: relative; }
 .lm summary { list-style: none; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 6px; border: 1px solid transparent; border-radius: 8px; font-weight: 600; font-size: 1.05rem; color: var(--muted); max-width: 320px; }
 .lm summary::-webkit-details-marker { display: none; }

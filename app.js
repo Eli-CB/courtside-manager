@@ -51,7 +51,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 function emptyState() {
   return {
     version: 2, teamName: 'My Team', basis: 'blend',
-    matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] }, savedLeagues: [], leagueStates: {},
+    matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] }, savedLeagues: [], leagueStates: {}, pastSeasons: {},
     slots: [...DEFAULT_SLOTS], benchSize: 5, ilSize: 1, slotsSet: true, lineupMode: 'weekly',
     players: [], pool: [], lineup: [], il: [],
   };
@@ -713,6 +713,7 @@ async function fetchFantraxLeague(id) {
   }
   const league = {
     id, name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
+    historyId: info.leagueHistoryId || null, year: info.seasonYear || null,
     teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
     periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10) })),
     matchups: Object.fromEntries((info.matchups || []).map(m => [String(m.period),
@@ -966,6 +967,94 @@ function leagueMenu() {
   </details>`;
 }
 
+// ----- Past seasons -----
+// Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
+// (keyed by Fantrax's league history id); a past season gets its own tabs.
+const TABS_NOW = [['week', 'This week'], ['dashboard', 'Dashboard'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['trade', 'Trades'], ['pool', 'Watchlist']];
+const TABS_PAST = [['standings', 'Standings'], ['draft', 'Draft'], ['rosters', 'Rosters']];
+const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
+const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
+const pastCache = {};
+let seasonCtx = null; // set while a past season renders: { basis, label }
+const pastSeason = () => (ui.season ? pastCache[ui.season] || null : null);
+
+function seasonsFor(L) {
+  const saved = state.pastSeasons || {};
+  const all = [...(L.pastSeasons || []), ...(saved[L.historyId] || []), ...(saved[L.id] || [])];
+  const seen = new Set();
+  return all.filter(x => x.id !== L.id && !seen.has(x.id) && seen.add(x.id)).sort((a, b) => (b.year || 0) - (a.year || 0));
+}
+
+async function loadSeason(id) {
+  if (pastCache[id]) return pastCache[id];
+  const { league } = await fetchFantraxLeague(id);
+  // end-of-season rosters can't tell keepers from waiver pickups, so past drafts show picks only
+  if (league.draft) league.draft.keepers = {};
+  // NBA stats go back one season, so only last season's draft can be graded
+  const prevStart = NBA && NBA.prevSeason ? +String(NBA.prevSeason).slice(0, 4) : null;
+  return (pastCache[id] = { league, basis: league.year && league.year === prevStart ? 'prev' : null, label: league.year ? seasonLabel(league.year) : 'Past season' });
+}
+
+async function switchSeason(id) {
+  ui.addingSeason = false; ui.pastTeam = null; ui.viewA = null; ui.viewB = null;
+  if (id) {
+    try {
+      await loadSeason(id);
+    } catch (e) {
+      toast(`Couldn't load that season (${e.message})`);
+      render();
+      return;
+    }
+  }
+  ui.season = id || null;
+  const tab = ui.tab === 'rosters' && !id ? 'roster' : ui.tab;
+  const want = '#' + (tabList().some(([k]) => k === tab) ? tab : id ? 'standings' : 'week');
+  if (location.hash !== want) location.hash = want; else route();
+}
+
+// Render a past season's tab with the app pointed at that season's league
+function withSeason(fn) {
+  const P = pastSeason();
+  if (!P) return fn();
+  const myName = fxTeamName(state.fxTeam);
+  const me = P.league.teams.find(t => t.name === myName);
+  const savedLeague = NBA.league, saved = state;
+  NBA.league = P.league;
+  state = { ...saved, fxTeam: me ? me.id : null };
+  seasonCtx = { basis: P.basis, label: P.label };
+  try { return fn(); } finally { NBA.league = savedLeague; state = saved; seasonCtx = null; }
+}
+
+function viewPastRosters() {
+  const L = fxLeague();
+  const teams = fxPickable();
+  const tid = ui.pastTeam && teams.some(t => t.id === ui.pastTeam) ? ui.pastTeam : state.fxTeam || (teams[0] && teams[0].id);
+  const r = standingOf(tid);
+  const slotOfItem = it => (it.st === 'INJURED_RESERVE' ? 'IL' : it.st === 'RESERVE' ? 'BN' : FX_SLOT_MAP[it.slot] || it.slot || 'BN');
+  const rows = (L.rosters[tid] || []).map(it => {
+    const raw = it.nba ? nbaById.get(it.nba) : null;
+    const s = raw && seasonCtx.basis ? nbaStats(raw, seasonCtx.basis) : null;
+    const gp = s ? Math.round(s.gp) : 0;
+    return { it, raw, name: raw ? raw.name : it.name, s: gp ? { ...s, pos: raw.pos } : null, gp, val: gp ? value({ ...s, pos: raw.pos }) : null };
+  }).sort((a, b) => (b.val ?? -99) - (a.val ?? -99));
+  const graded = !!seasonCtx.basis;
+  return `
+  <div class="page-head">
+    <div><h1>Final roster ${graded ? infoBtn('value') : ''}</h1><p>${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''}${graded ? ` · ${seasonCtx.label} per-game stats` : ''}</p></div>
+  </div>
+  <div class="card">
+    ${rows.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Player</th><th>Slot</th>${graded ? '<th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">Value</th>' : ''}</tr></thead>
+      <tbody>${rows.map(x => `<tr>
+        <td class="player"><div class="bplayer">${headshot({ nbaId: x.raw ? x.raw.id : null, name: x.name }, 28)}<div class="bmain"><div class="bname">${x.raw ? `<button class="link-btn pname" data-action="player-detail" data-nba="${x.raw.id}">${esc(x.name)}</button>` : esc(x.name)}</div></div></div></td>
+        <td>${slotBadge(slotOfItem(x.it))}</td>
+        ${graded ? `<td class="num">${x.gp || '—'}</td>${x.s ? statCells(x.s) : '<td class="num muted" colspan="11">No NBA stats that season</td>'}` : ''}
+      </tr>`).join('')}</tbody>
+    </table></div>` : `<div class="empty"><strong>No roster</strong>Fantrax didn't return a roster for this team.</div>`}
+  </div>
+  ${graded ? '' : `<p class="small muted">The site only keeps NBA stats back to ${esc(NBA.prevSeason)}, so this season's players show without stats.</p>`}`;
+}
+
 // Tabs that can show another team's version (read-only); the rest are league-wide or yours
 const VIEW_TABS = ['week', 'dashboard', 'roster'];
 
@@ -976,11 +1065,38 @@ function ctxBar() {
   const L = fxLeague();
   bar.hidden = !L || needsLanding();
   if (bar.hidden) return;
-  const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
-  const shown = viewing ? ui.viewA : state.fxTeam;
-  $('#ctxTeam').innerHTML = `<select class="ctx-team" data-change="${state.fxTeam ? 'fx-view' : 'fx-team'}" aria-label="${state.fxTeam ? 'Team to view' : 'Your team'}">
+  const P = pastSeason();
+  const seasons = seasonsFor(L);
+  const seasonSel = `<select class="ctx-team ctx-season" data-change="season" aria-label="Season">
+      <option value="">${esc(L.year ? seasonLabel(L.year) : NBA ? NBA.season : 'This season')}</option>${seasons.map(x => `<option value="${esc(x.id)}" ${x.id === ui.season ? 'selected' : ''}>${x.year ? seasonLabel(x.year) : 'Past season'}</option>`).join('')}
+      <option value="add">+ Add season…</option></select>`;
+  const addForm = ui.addingSeason ? `<form class="ctx-add" data-form="add-season">
+      <input name="sid" placeholder="Past season's league ID" autocomplete="off" spellcheck="false" aria-label="Past season's Fantrax league ID" title="Open that season on Fantrax; the ID is the part of the address after /league/">
+      <button class="btn sm primary" type="submit">Add</button><button class="btn sm ghost" type="button" data-action="season-cancel">Cancel</button></form>` : '';
+  let teamSel;
+  if (P) {
+    const myName = fxTeamName(state.fxTeam);
+    const teams = P.league.teams.filter(t => !/^BYE WEEK$/i.test(t.name));
+    const me = teams.find(t => t.name === myName);
+    const shownId = ui.pastTeam || (me ? me.id : '');
+    teamSel = `<select class="ctx-team" data-change="past-team" aria-label="Team">${shownId ? '' : '<option value="">Pick a team</option>'}${teams.map(t => `<option value="${esc(t.id)}" ${t.id === shownId ? 'selected' : ''}>${esc(t.name)}${me && t.id === me.id ? ' (you)' : ''}</option>`).join('')}</select>`;
+  } else {
+    const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
+    const shown = viewing ? ui.viewA : state.fxTeam;
+    teamSel = `<select class="ctx-team" data-change="${state.fxTeam ? 'fx-view' : 'fx-team'}" aria-label="${state.fxTeam ? 'Team to view' : 'Your team'}">
       ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
     </select>${viewing ? '<span class="badge">Viewing only</span><button class="link-btn small" data-action="fx-view-mine">Back to my team</button>' : ''}`;
+  }
+  $('#ctxTeam').innerHTML = `${seasonSel}<span class="ctx-sep" aria-hidden="true">/</span>${teamSel}${addForm}`;
+  document.body.classList.toggle('past', !!P);
+  if (P) {
+    $('#ctxMeta').innerHTML = [
+      '<span class="badge accent">Past season</span>',
+      /SINGLE_WIN/.test(P.league.scoring) ? '9-cat H2H, one win per week' : '9-cat H2H',
+      'final standings and rosters from Fantrax',
+    ].join(' · ');
+    return;
+  }
   const w = NBA && NBA.week;
   $('#ctxMeta').innerHTML = [
     matchupScoring() === 'most' ? '9-cat H2H, one win per week' : '9-cat H2H, one win per category',
@@ -995,7 +1111,18 @@ function render() {
   leagueMenu();
   ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
+  const nav = $('#tabs');
+  const mode = ui.season ? 'past' : 'now';
+  if (nav.dataset.mode !== mode) {
+    nav.innerHTML = tabList().map(([k, l]) => `<a href="#${k}" data-tab="${k}">${l}</a>`).join('');
+    nav.dataset.mode = mode;
+  }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
+  if (ui.season) {
+    const past = { standings: viewStandings, draft: viewDraft, rosters: viewPastRosters };
+    $('#view').innerHTML = pastSeason() ? withSeason(past[ui.tab] || viewStandings) : '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>';
+    return;
+  }
   const early = preDraft();
   if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
   const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, trade: viewTrade, pool: viewPool };
@@ -1294,7 +1421,7 @@ function viewStandings() {
   const name = id => esc(fxTeamName(id) || '');
   return `
   <div class="page-head">
-    <div><h1>Standings</h1><p>${esc(L ? L.name : '')} · from Fantrax</p></div>
+    <div><h1>Standings</h1><p>${esc(L ? L.name : '')} · ${seasonCtx ? `${seasonCtx.label} final standings` : 'from Fantrax'}</p></div>
   </div>
   <div class="card">
     ${rows.length ? `<div class="table-wrap"><table>
@@ -1980,9 +2107,11 @@ const KEEPER_SLOTS = [5, 15];
 function draftData() {
   const L = fxLeague();
   if (!L || !L.draft || !L.draft.picks.length) return null;
+  // this season so far, or the full season for a past draft (when the site has those stats)
+  const basis = seasonCtx ? seasonCtx.basis : 'cur';
   const picks = L.draft.picks.map(([round, pick, teamId, nba, name]) => {
     const raw = nba ? nbaById.get(nba) : null;
-    const s = raw ? nbaStats(raw, 'cur') : null;
+    const s = raw && basis ? nbaStats(raw, basis) : null;
     const gp = s ? Math.round(s.gp) : 0;
     const p = { round, pick, teamId, team: fxTeamName(teamId), raw, nbaId: nba, name: raw ? raw.name : name, gp, val: null, s };
     if (s && gp) p.val = value({ ...s, pos: raw.pos });
@@ -1999,7 +2128,7 @@ function draftData() {
   for (const [tid, ids] of Object.entries(L.draft.keepers || {})) {
     keepers[tid] = ids.map(nba => {
       const raw = nbaById.get(nba);
-      const s = raw ? nbaStats(raw, 'cur') : null;
+      const s = raw && basis ? nbaStats(raw, basis) : null;
       const gp = s ? Math.round(s.gp) : 0;
       const val = s && gp ? value({ ...s, pos: raw.pos }) : null;
       const like = val == null ? null : played.filter(p => p.val > val).length + 1;
@@ -2008,7 +2137,7 @@ function draftData() {
     // the better keeper (lower ADP) counts as the #5 pick, the other as #15
     keepers[tid].forEach((k, i) => { k.slot = KEEPER_SLOTS[i] || 25; k.gain = k.like == null ? null : k.slot - k.like; });
   }
-  return { picks, played: played.length, maxGp, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers };
+  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers };
 }
 
 function draftRow(p, mine) {
@@ -2071,8 +2200,8 @@ function viewDraft() {
   const grid = {};
   for (const p of d.picks) grid[`${p.round}|${colOf(p)}`] = p;
   const nameBtn = (nbaId, name) => nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${nbaId}"><span class="n-full">${esc(name)}</span><span class="n-short">${esc(shortName(name))}</span></button>` : esc(name);
-  const gainTag = (gain, gp) => `<span class="dr-gain ${gain > 0 ? 'pos-good' : gain < 0 ? 'pos-bad' : 'muted'}">${gp ? signed(gain, 0) : 'DNP'}</span>`;
-  const keeperRows = [0, 1].map(i => `<tr class="dr-krow"><th scope="row">K${i + 1}</th>${order.map(t => {
+  const gainTag = (gain, gp) => !d.graded ? '' : `<span class="dr-gain ${gain > 0 ? 'pos-good' : gain < 0 ? 'pos-bad' : 'muted'}">${gp ? signed(gain, 0) : 'DNP'}</span>`;
+  const keeperRows = !Object.values(d.keepers).some(k => k.length) ? '' : [0, 1].map(i => `<tr class="dr-krow"><th scope="row">K${i + 1}</th>${order.map(t => {
     const k = (d.keepers[t] || [])[i];
     if (!k) return '<td class="dr-cell dr-keeper"></td>';
     return `<td class="dr-cell dr-keeper" style="${k.gain != null ? shade(k.gain / 15) : ''}" title="${esc(k.name)} · keeper, graded as pick #${k.slot} · ${k.like ? `playing like #${k.like} (${signed(k.gain, 0)})` : "hasn't played"}">
@@ -2088,13 +2217,13 @@ function viewDraft() {
 
   return `
   <div class="page-head">
-    <div><h1>Draft ${infoBtn('draft')}</h1><p>${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)</p></div>
+    <div><h1>Draft ${infoBtn('draft')}</h1><p>${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? 'not graded: the site has no NBA stats for that season' : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`}</p></div>
   </div>
-  ${d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
-  <div class="trade-grid">
-    ${draftList('Best picks so far', best, mine, true)}
-    ${draftList('Worst picks so far', worst, mine, false)}
-  </div>
+  ${!seasonCtx && d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
+  ${d.graded ? `<div class="trade-grid">
+    ${draftList(seasonCtx ? 'Best picks' : 'Best picks so far', best, mine, true)}
+    ${draftList(seasonCtx ? 'Worst picks' : 'Worst picks so far', worst, mine, false)}
+  </div>` : ''}
   <div class="card" style="margin-top:16px">
     <div class="card-head"><h2>Team drafts</h2><span class="muted small">ranked by average +/− per pick</span></div>
     <div class="table-wrap"><table class="dr-teams">
@@ -2163,6 +2292,7 @@ async function switchLeague(id) {
     throw new Error(`Fantrax didn't find that league (${e.message}). Check the ID in your league's address.`);
   }
   const wasCurrent = currentLeagueId() === id;
+  ui.season = null; ui.addingSeason = false; ui.pastTeam = null;
   if (!wasCurrent) stashLeague();
   applyFantraxLeague(res);
   state.fxLeagueId = NBA.siteLeague && NBA.siteLeague.id === id ? null : id;
@@ -2302,6 +2432,7 @@ const actions = {
     commit(`Welcome, ${state.teamName}`);
     location.hash = '#week';
   },
+  'season-cancel'() { ui.addingSeason = false; render(); },
   'land-back'() { state.leagueChosen = false; ui.addingLeague = true; commit(); },
   async 'land-cancel'() {
     ui.addingLeague = false;
@@ -2431,6 +2562,31 @@ const actions = {
 };
 
 const forms = {
+  async 'add-season'(f) {
+    const id = f.sid.value.trim();
+    const L = fxLeague();
+    if (!/^[A-Za-z0-9]{6,32}$/.test(id)) return toast("That doesn't look like a Fantrax league ID. It's letters and numbers only.");
+    if (id === L.id) return toast("That's this season's league.");
+    const btn = f.querySelector('button[type=submit]');
+    btn.disabled = true; btn.textContent = 'Adding…';
+    try {
+      const P = await loadSeason(id);
+      if ((L.historyId && P.league.historyId !== L.historyId) || (L.year && P.league.year && P.league.year >= L.year)) {
+        delete pastCache[id];
+        throw new Error(`that league isn't an earlier season of ${L.name}`);
+      }
+      const key = L.historyId || L.id;
+      state.pastSeasons = state.pastSeasons || {};
+      const list = state.pastSeasons[key] = state.pastSeasons[key] || [];
+      if (!list.some(x => x.id === id)) list.push({ id, year: P.league.year });
+      save();
+      await switchSeason(id);
+      toast(`Added the ${P.label} season`);
+    } catch (e) {
+      toast(`Couldn't add that season: ${e.message}`);
+      btn.disabled = false; btn.textContent = 'Add';
+    }
+  },
   async 'land-league'(f) {
     const id = f.leagueId.value.trim();
     const msg = $('#landMsg');
@@ -2473,6 +2629,12 @@ document.addEventListener('change', e => {
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
+  } else if (el.dataset.change === 'season') {
+    if (el.value === 'add') { ui.addingSeason = true; render(); $('.ctx-add input')?.focus(); return; }
+    switchSeason(el.value);
+  } else if (el.dataset.change === 'past-team') {
+    ui.pastTeam = el.value || null;
+    if (ui.tab !== 'rosters') location.hash = '#rosters'; else render();
   } else if (el.dataset.change === 'fx-team') {
     if (!el.value) return;
     adoptTeam(el.value);
@@ -2520,7 +2682,8 @@ $('#importFile').addEventListener('change', async e => {
 function route() {
   let tab = location.hash.replace('#', '') || 'week';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
-  ui.tab = ['week', 'dashboard', 'roster', 'players', 'draft', 'standings', 'trade', 'pool'].includes(tab) ? tab : 'week';
+  if (tab === 'rosters' && !ui.season) tab = 'roster';
+  ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : 'week';
   if (!VIEW_TABS.includes(ui.tab)) { ui.viewA = null; ui.viewB = null; }
   render();
   window.scrollTo(0, 0);

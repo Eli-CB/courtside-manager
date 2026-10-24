@@ -421,6 +421,9 @@ def fantrax(league_id, index, saved_league=None):
         'id': league_id,
         'name': info.get('leagueName', ''),
         'scoring': (info.get('scoringSystem') or {}).get('type', ''),
+        # seasons of the same league share a history id; each season has its own league id
+        'historyId': info.get('leagueHistoryId'),
+        'year': info.get('seasonYear'),
         'teams': [{'id': k, 'name': v.get('name', '')} for k, v in info.get('teamInfo', {}).items()],
         'periods': [{'n': p['number'], 'start': p['startDate'][:10], 'end': p['endDate'][:10]} for p in info.get('scoringPeriods', [])],
         # playoff rounds list TBD pairings until they're set
@@ -525,12 +528,23 @@ def main():
         prev, pre_logs, prev_logs = {}, {}, {}
     inj = optional('Injury report (ESPN)', injuries, {})
     fx_players, league = {}, None
-    league_id = ''
+    league_id, past_ids = '', []
     if os.path.exists(LEAGUE_CFG):
         with open(LEAGUE_CFG, encoding='utf-8') as f:
-            league_id = (json.load(f).get('fantraxLeagueId') or '').strip()
+            cfg = json.load(f)
+        league_id = (cfg.get('fantraxLeagueId') or '').strip()
+        past_ids = [x.strip() for x in cfg.get('pastSeasons', []) if x.strip()]
     if league_id:
         fx_players, league = optional('Fantrax league', lambda: fantrax(league_id, index, saved.get('league')), ({}, None))
+    if league and past_ids:
+        def past_seasons():
+            out = []
+            for pid in past_ids:
+                info = get_json(FX + 'getLeagueInfo', {'leagueId': pid})
+                if not info.get('error'):
+                    out.append({'id': pid, 'year': info.get('seasonYear')})
+            return out
+        league['pastSeasons'] = optional('Fantrax past seasons', past_seasons, [])
 
     players = []
     matched_inj = 0
