@@ -638,7 +638,7 @@ const INFO = {
     <p><b>League avg.</b> The same number averaged across every team in your Fantrax league, using each team's current roster and lineup.</p>
     <p><b>Bar.</b> How far you are from that league average, measured in the typical gap between teams (one standard deviation across the league). The bar reaches the edge at two gaps above or below. Fewer turnovers counts as above average.</p>
     <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
-    <p><b>Drivers and drags.</b> The players who add the most to (or take the most from) that category compared with a typical rostered player.</p>
+    <p><b>Helped most and hurt most.</b> Each player's own per-game number in that category, compared with the league average in the same row. For FG% and FT% it's their percentage and attempts a game ("<b>.700</b> on 6.2 FTA"), ranked by makes above or below what the league average would give at that volume, so a poor shooter who takes a lot of shots hurts more than one who rarely shoots. Hover a name for the detail.</p>
     <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank. <b>Punt candidates</b> are bottom-three categories where you're also below the league average.</p>`],
   awards: ['How awards are decided', `
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
@@ -1342,10 +1342,19 @@ function strengthsCard() {
     const z = league ? gap(me.raw[c.key]) : me.avg[c.key];
     const ranked = [...teams].sort((a, b) => gap(b.raw[c.key]) - gap(a.raw[c.key]));
     const rank = ranked.indexOf(me) + 1;
-    const byZ = mine.map(p => ({ p, z: catZ(p)[c.key] })).sort((a, b) => b.z - a.z);
-    const drivers = byZ.filter(x => x.z > 0.3).slice(0, 2);
-    const drag = byZ.filter(x => x.z < -0.3).slice(-1);
-    const who = list => list.map(x => `${esc(lastName(x.p.name))} <span class="${x.z > 0 ? 'pos-good' : 'pos-bad'}">${signed(x.z, 1)}</span>`).join(', ') || '<span class="muted">—</span>';
+    // who helps or hurts: each player's own number against the league average shown in this row.
+    // For FG%/FT% that's makes above or below average at the player's volume.
+    const ref = league ? mean : BASE[c.key][0];
+    const att = c.key === 'fgPct' ? 'fga' : 'fta';
+    const impact = p => (c.pct ? (p[c.key] - ref) * p[att] : (c.neg ? -1 : 1) * (p[c.key] - ref));
+    const byImpact = mine.map(p => ({ p, d: impact(p) })).sort((a, b) => b.d - a.d);
+    const big = c.pct ? 0.1 : Math.max(0.1, ref * 0.1);
+    const drivers = byImpact.filter(x => x.d > big).slice(0, 2);
+    const drag = byImpact.filter(x => x.d < -big).slice(-1);
+    const tip = x => c.pct
+      ? `${x.p.name}: ${fmtPct(x.p[c.key])} on ${fmt(x.p[att], 1)} attempts a game, ${fmt(Math.abs(x.d), 1)} ${x.d > 0 ? 'more' : 'fewer'} makes a game than the ${league ? 'league' : 'typical'} average of ${fmtPct(ref)} would give`
+      : `${x.p.name}: ${fmt(x.p[c.key], 1)} ${c.label} a game vs the ${league ? 'league' : 'typical'} average of ${fmt(ref, 1)} per ${starterBasis ? 'starter' : 'player'}`;
+    const who = list => list.map(x => `<span title="${esc(tip(x))}">${esc(lastName(x.p.name))} <b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(x.p[c.key]) : fmt(x.p[c.key], 1)}</b>${c.pct ? `<span class="muted"> on ${fmt(x.p[att], 1)} ${att.toUpperCase()}</span>` : ''}</span>`).join(', ') || '<span class="muted">—</span>';
     const w = Math.min(Math.abs(z) / 2, 1) * 50; // bar edge = 2 spreads from the league average
     const pos = v => ((Math.max(-2.5, Math.min(2.5, gap(v))) + 2.5) / 5) * 100;
     return { c, z, rank, html: `<tr>
@@ -1369,7 +1378,7 @@ function strengthsCard() {
   return `<div class="card">
     ${head}
     <div class="table-wrap"><table class="cs-table">
-      <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team (you in orange)</th>' : ''}<th>Driven by</th><th>Biggest drag</th></tr></thead>
+      <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team (you in orange)</th>' : ''}<th>Helped most</th><th>Hurt most</th></tr></thead>
       <tbody>${rows.map(r => r.html).join('')}</tbody>
     </table></div>
     <div class="cs-summary">
