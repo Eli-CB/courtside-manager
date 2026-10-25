@@ -586,6 +586,21 @@ body.landing .tabs { visibility: hidden; }
 
 tr.me-row td { background: var(--accent-soft); }
 
+/* ---------- Awards ---------- */
+.awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.award { display: flex; flex-direction: column; gap: 4px; }
+.aw-title { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--accent); }
+.aw-win { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.aw-name { font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; }
+.aw-val { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aw-blurb { margin: 6px 0 8px; }
+.aw-list { margin: 0; padding: 8px 0 0 22px; border-top: 1px solid var(--border); font-size: .88rem; }
+.aw-list li { padding: 2px 0; }
+.aw-list li > span:first-child { display: inline-block; min-width: 0; }
+.aw-list li { display: list-item; }
+.aw-list li span + span { float: right; font-variant-numeric: tabular-nums; }
+.aw-list li.me, .aw-win.me .aw-name { color: var(--accent); }
+
 /* ---------- League and team bar ---------- */
 /* above the tabs: league / team on the left, week and data freshness on the right */
 .ctx { background: var(--surface); }

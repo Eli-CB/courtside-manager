@@ -640,6 +640,13 @@ const INFO = {
     <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
     <p><b>Drivers and drags.</b> The players who add the most to (or take the most from) that category compared with a typical rostered player.</p>
     <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank. <b>Punt candidates</b> are bottom-three categories where you're also below the league average.</p>`],
+  awards: ['How awards are decided', `
+    <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
+    <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
+    <li><b>Best manager:</b> actual wins (ties count half) minus expected wins. Expected wins: each team's typical week (its best 8 starters, each counted for the share of games he played) is matched against every other team with the same win-chance math as This week, and the average win chance × games played gives the expected record.</li>
+    <li><b>Most games lost to injury:</b> 82 minus games played, summed over the final roster.</li>
+    <li><b>Biggest punt</b> and <b>Even Steven:</b> each category of that typical week is compared with the league's other teams in team-to-team spreads. The punt is the lowest category; Even Steven has the smallest spread across its nine.</li>
+    <li><b>Oldest / youngest:</b> average age of the final roster on the last day of the season, from ESPN birth dates.</li></ul>`],
   draft: ['How draft picks are graded', `
     <p><b>Now.</b> Every drafted player is ranked by his value per game using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
     <p><b>+/−.</b> Draft slot minus current rank. A #40 pick who's playing like the #5 player is +35; a #3 pick playing like #50 is −47.</p>
@@ -972,7 +979,7 @@ function leagueMenu() {
 // Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
 // (keyed by Fantrax's league history id); a past season gets its own tabs.
 const TABS_NOW = [['week', 'This week'], ['dashboard', 'Dashboard'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['trade', 'Trades'], ['pool', 'Watchlist']];
-const TABS_PAST = [['standings', 'Standings'], ['draft', 'Draft'], ['rosters', 'Rosters']];
+const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
@@ -1056,6 +1063,110 @@ function viewPastRosters() {
   ${graded ? '' : `<p class="small muted">The site only keeps NBA stats back to ${esc(NBA.prevSeason)}, so this season's players show without stats.</p>`}`;
 }
 
+// ----- Season awards (past seasons) -----
+// Built from each team's end-of-season roster and that season's full per-game stats.
+const SEASON_GAMES = 82;
+
+// One team's season: roster players with stats, a typical week's category totals, age and games missed
+function seasonTeam(t, L, basis, endDate) {
+  const players = (L.rosters[t.id] || []).map(it => {
+    const raw = it.nba ? nbaById.get(it.nba) : null;
+    const s = raw ? nbaStats(raw, basis) : null;
+    const gp = s ? Math.round(s.gp) : 0;
+    const age = raw && raw.born ? (new Date(endDate) - new Date(raw.born)) / (365.25 * 864e5) : null;
+    return { raw, gp, age, p: gp ? { ...s, id: raw.id, nbaId: raw.id, pos: raw.pos, status: 'Healthy' } : null };
+  });
+  // a typical week: the best lineup by value, each starter counted for the share of games he played
+  const withStats = players.filter(x => x.p);
+  const avail = x => Math.min(1, x.gp / SEASON_GAMES);
+  const ranked = [...withStats].sort((a, b) => (value(b.p) + 4) * avail(b) - (value(a.p) + 4) * avail(a));
+  const ids = new Set(fillSlots(ranked.map(x => x.p), state.slots).filter(Boolean));
+  const tot = Object.fromEntries(COUNT_KEYS.map(k => [k, 0])), vr = Object.fromEntries(COUNT_KEYS.map(k => [k, 0]));
+  for (const x of ranked.filter(x => ids.has(x.p.id))) {
+    const g = perGame(x.p), n = WEEK_GAMES * avail(x);
+    for (const k of COUNT_KEYS) { tot[k] += g.m[k] * n; vr[k] += g.sd[k] ** 2 * n; }
+  }
+  const ages = players.map(x => x.age).filter(a => a != null);
+  // players on the books who played little or not at all that season
+  const missed = sum(players.filter(x => x.raw).map(x => Math.max(0, SEASON_GAMES - x.gp)));
+  return { id: t.id, name: t.name, week: { tot, vr }, age: ages.length ? sum(ages) / ages.length : null, ages: ages.length, missed };
+}
+
+function seasonAwards() {
+  const L = fxLeague();
+  const basis = seasonCtx.basis;
+  const end = (L.periods[L.periods.length - 1] || {}).end || `${L.year + 1}-04-15`;
+  const teams = fxPickable().map(t => seasonTeam(t, L, basis, end));
+  const each = matchupScoring() === 'each' || !/SINGLE_WIN/.test(L.scoring || '');
+  // expected record: average chance of beating every other team in a typical week
+  for (const T of teams) {
+    const vs = teams.filter(o => o !== T).map(o => matchOdds(compareCats(T.week, o.week)));
+    T.expPct = vs.length ? sum(vs.map(o => (each ? o.expected / o.n : o.win))) / vs.length : 0.5;
+    const r = standingOf(T.id);
+    if (r) {
+      const g = r.w + r.l + r.t;
+      T.record = `${r.w}-${r.l}${r.t ? '-' + r.t : ''}`;
+      T.expW = T.expPct * g;
+      T.luck = r.w + r.t / 2 - T.expW;
+    }
+  }
+  // category profile: each category vs the league's teams, in team-to-team spreads
+  const val = (T, c) => (c.pct ? (T.week.tot[c.key === 'fgPct' ? 'fga' : 'fta'] ? T.week.tot[c.key === 'fgPct' ? 'fgm' : 'ftm'] / T.week.tot[c.key === 'fgPct' ? 'fga' : 'fta'] : 0) : T.week.tot[c.key]);
+  for (const c of CATS) {
+    const xs = teams.map(T => val(T, c));
+    const m = sum(xs) / xs.length, sd = Math.sqrt(sum(xs.map(x => (x - m) ** 2)) / xs.length) || 1;
+    teams.forEach((T, i) => { (T.z = T.z || {})[c.key] = ((xs[i] - m) / sd) * (c.neg ? -1 : 1); });
+  }
+  for (const T of teams) {
+    const zs = CATS.map(c => T.z[c.key]);
+    const low = CATS.reduce((a, c) => (T.z[c.key] < T.z[a.key] ? c : a));
+    T.punt = { cat: low.label, z: T.z[low.key] };
+    const mz = sum(zs) / zs.length;
+    T.spread = Math.sqrt(sum(zs.map(z => (z - mz) ** 2)) / zs.length);
+  }
+  // drafting: average +/− per pick
+  const d = draftData();
+  if (d && d.graded) {
+    for (const T of teams) {
+      const ps = d.picks.filter(p => p.teamId === T.id);
+      T.draft = ps.length ? sum(ps.map(p => p.gain)) / ps.length : null;
+      T.draftBest = ps.length ? ps.reduce((a, b) => (b.gain > a.gain ? b : a)) : null;
+    }
+  }
+  const ranked = (key, dir, fmtFn, note) => teams.filter(T => T[key] != null).sort((a, b) => (b[key] - a[key]) * dir).map(T => ({ T, txt: fmtFn(T), note: note ? note(T) : '' }));
+  return [
+    { title: 'Best draft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
+    { title: 'Best manager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
+    { title: 'Most games lost to injury', blurb: 'Games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
+    { title: 'Biggest punt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
+    { title: 'Even Steven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) },
+    { title: 'Oldest team', blurb: 'Average age of the final roster at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
+    { title: 'Youngest team', blurb: 'Average age of the final roster at season’s end.', list: ranked('age', -1, T => `${fmt(T.age, 1)} yrs`) },
+  ].filter(a => a.list.length);
+}
+
+function viewAwards() {
+  if (!seasonCtx.basis) {
+    return `<div class="page-head"><div><h1>Awards</h1></div></div>
+      <div class="card"><div class="empty"><strong>No awards for this season</strong>The site only keeps NBA stats back to ${esc(NBA.prevSeason)}, and every award needs that season's numbers.</div></div>`;
+  }
+  const me = state.fxTeam;
+  return `
+  <div class="page-head">
+    <div><h1>Awards ${infoBtn('awards')}</h1><p>${esc(fxLeague().name)} · ${seasonCtx.label}</p></div>
+  </div>
+  <div class="awards">${seasonAwards().map(a => {
+    const [win, ...rest] = a.list;
+    return `<div class="card award">
+      <div class="aw-title">${a.title}</div>
+      <div class="aw-win${win.T.id === me ? ' me' : ''}"><span class="aw-name">${esc(win.T.name)}${win.T.id === me ? ' <span class="badge accent">you</span>' : ''}</span><span class="aw-val">${esc(win.txt)}</span></div>
+      ${win.note ? `<div class="small muted">${esc(win.note)}</div>` : ''}
+      <p class="small muted aw-blurb">${a.blurb}</p>
+      <ol class="aw-list" start="2">${rest.map(x => `<li class="${x.T.id === me ? 'me' : ''}" title="${esc(x.note)}"><span>${esc(x.T.name)}</span><span class="muted">${esc(x.txt)}</span></li>`).join('')}</ol>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 // Tabs that can show another team's version (read-only); the rest are league-wide or yours
 const VIEW_TABS = ['week', 'dashboard', 'roster'];
 
@@ -1120,7 +1231,7 @@ function render() {
   }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
   if (ui.season) {
-    const past = { standings: viewStandings, draft: viewDraft, rosters: viewPastRosters };
+    const past = { standings: viewStandings, awards: viewAwards, draft: viewDraft, rosters: viewPastRosters };
     $('#view').innerHTML = pastSeason() ? withSeason(past[ui.tab] || viewStandings) : '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>';
     return;
   }

@@ -158,6 +158,19 @@ def injuries():
     return out
 
 
+def birthdates():
+    """Birth dates from ESPN's team rosters (for team ages), keyed by normalized name."""
+    teams = get_json('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams')
+    out = {}
+    for t in teams['sports'][0]['leagues'][0]['teams']:
+        tid = t['team']['id']
+        roster = _try(get_json, f'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{tid}/roster') or {}
+        for a in roster.get('athletes', []):
+            if a.get('displayName') and a.get('dateOfBirth'):
+                out[norm_name(a['displayName'])] = a['dateOfBirth'][:10]
+    return out
+
+
 def nba_games():
     """Regular-season games from the NBA data server."""
     data = get_json(CDN + 'staticData/scheduleLeagueV2.json', timeout=60)
@@ -527,6 +540,7 @@ def main():
         log(f'- {prev_season} stats, preseason logs and spreads: keeping the saved copy')
         prev, pre_logs, prev_logs = {}, {}, {}
     inj = optional('Injury report (ESPN)', injuries, {})
+    born = optional('Birth dates (ESPN rosters)', birthdates, {})
     fx_players, league = {}, None
     league_id, past_ids = '', []
     if os.path.exists(LEAGUE_CFG):
@@ -580,6 +594,8 @@ def main():
         else:
             sd = was.get('sd') or stat_sds(logs.get(pid, []))
         if sd: p['sd'] = sd
+        b = born.get(norm_name(name)) or was.get('born')
+        if b: p['born'] = b
         i = inj.get(norm_name(name))
         if i:
             p['inj'] = i
