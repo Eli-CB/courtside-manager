@@ -425,7 +425,7 @@ def fantrax(league_id, index, saved_league=None):
         'historyId': info.get('leagueHistoryId'),
         'year': info.get('seasonYear'),
         'teams': [{'id': k, 'name': v.get('name', '')} for k, v in info.get('teamInfo', {}).items()],
-        'periods': [{'n': p['number'], 'start': p['startDate'][:10], 'end': p['endDate'][:10]} for p in info.get('scoringPeriods', [])],
+        'periods': [{'n': p['number'], 'start': p['startDate'][:10], 'end': p['endDate'][:10], 'lock': p['startDate']} for p in info.get('scoringPeriods', [])],
         # playoff rounds list TBD pairings until they're set
         'matchups': {str(m['period']): [[x['away']['id'], x['home']['id']] for x in m.get('matchupList', [])
                                         if x.get('away', {}).get('id') and x.get('home', {}).get('id')] for m in info.get('matchups', [])},

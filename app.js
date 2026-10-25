@@ -643,6 +643,7 @@ const INFO = {
   draft: ['How draft picks are graded', `
     <p><b>Now.</b> Every drafted player is ranked by his value per game using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
     <p><b>+/−.</b> Draft slot minus current rank. A #40 pick who's playing like the #5 player is +35; a #3 pick playing like #50 is −47.</p>
+    <p><b>Past seasons.</b> A past draft is graded the same way, but on that season's full per-game stats, so the rank is where each player finished.</p>
     <p><b>Team drafts.</b> The average +/− across all of a team's picks. Total value adds up the per-game value of every pick who has played.</p>
     <p><b>Colors.</b> Each pick and keeper is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
     <p><b>Keepers</b> fill the top two rows. The one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks.</p>
@@ -715,7 +716,7 @@ async function fetchFantraxLeague(id) {
     id, name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
     historyId: info.leagueHistoryId || null, year: info.seasonYear || null,
     teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
-    periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10) })),
+    periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10), lock: String(p.startDate) })),
     matchups: Object.fromEntries((info.matchups || []).map(m => [String(m.period),
       (m.matchupList || []).filter(x => x.away && x.away.id && x.home && x.home.id).map(x => [x.away.id, x.home.id])])),
     rosterPeriod: rosters.period,
@@ -931,7 +932,7 @@ function buildAlerts() {
   // lineup advice lives on This week, where it plays to the actual matchup
   if (NBA && state.opp.players.length && state.lineupMode === 'weekly') {
     const ctx = weekContext();
-    const better = [...ctx.bestIds].some(id => !ctx.setIds.has(id));
+    const better = ctx.bestIds && [...ctx.bestIds].some(id => !ctx.setIds.has(id));
     if (better) a.push({ lvl: 'warn', msg: `A better lineup for this week takes you from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> to win.`, action: 'go-week', label: 'See it' });
   }
   if (!a.length) a.push({ lvl: 'good', msg: 'Lineup is set and everyone starting is healthy.' });
@@ -1140,9 +1141,16 @@ function preDraft() {
 }
 
 // Fantrax sends "2026-10-25T19:00:00.0-0400"
-function draftTime(L) {
-  const dt = new Date(String(L.draftAt || '').replace(/\.\d+(?=[-+])/, '').replace(/([-+]\d\d)(\d\d)$/, '$1:$2'));
+function fxTime(str) {
+  const dt = new Date(String(str || '').replace(/\.\d+(?=[-+])/, '').replace(/([-+]\d\d)(\d\d)$/, '$1:$2'));
   return Number.isNaN(dt.getTime()) ? null : dt;
+}
+const draftTime = L => fxTime(L.draftAt);
+
+// Weekly lineups lock when the Fantrax scoring period starts (else at the start of the first matchup day)
+function lockTime(start) {
+  const p = fxPeriodFor(start);
+  return (p && fxTime(p.lock)) || new Date(matchDates(start)[0] + 'T00:00:00');
 }
 
 function draftWhen(L) {
@@ -1642,10 +1650,11 @@ function weekContext(start = weekStart()) {
   const oppIds = weekly ? oppStarterIds(dates) : null;
   const them = projectSide(opp, dates, oppIds);
   const asSet = projectSide(mine, dates, setIds);
-  const bestIds = weekly ? bestWeeklyIds(mine, dates, hasOpp ? them : null) : null;
-  const best = projectSide(mine, dates, bestIds);
+  const locked = weekly && new Date() >= lockTime(start);
+  const bestIds = weekly && !locked ? bestWeeklyIds(mine, dates, hasOpp ? them : null) : null;
+  const best = weekly && !bestIds ? asSet : projectSide(mine, dates, bestIds);
   const catsSet = compareCats(asSet, them), catsBest = compareCats(best, them);
-  return { start, dates, weekly, mine, opp, hasOpp, setIds, oppIds, them, asSet, bestIds, best, catsSet, catsBest, oSet: matchOdds(catsSet), oBest: matchOdds(catsBest) };
+  return { start, dates, weekly, locked, mine, opp, hasOpp, setIds, oppIds, them, asSet, bestIds, best, catsSet, catsBest, oSet: matchOdds(catsSet), oBest: matchOdds(catsBest) };
 }
 
 function catValue(proj, c) {
@@ -1970,6 +1979,11 @@ function catCompareTable(ctx, changed) {
 }
 
 function lineupSection(ctx) {
+  if (ctx.locked) {
+    const t = lockTime(ctx.start);
+    return `<div class="card"><div class="card-head"><h2>Lineups are locked</h2>${ui.weekShift < 4 ? '<button class="btn sm" data-action="week-shift" data-step="1">Plan next week →</button>' : ''}</div>
+      <p class="small muted" style="margin:0">Starters locked ${esc(t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))} at ${esc(t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))}, so this shows the lineups as set. Suggestions pick up again for next week.</p></div>`;
+  }
   const { steps, rest } = pairSwaps(ctx);
   const changed = steps.length > 0 || !!rest;
   const base = ctx.bestIds;
@@ -1985,7 +1999,7 @@ function lineupSection(ctx) {
     ? `<p class="small muted" style="margin:-6px 0 12px">${swing.length ? `Swing: <b>${swing.join(', ')}</b>` : 'No category is close'}${punt.length ? ` · Punt: <b>${punt.join(', ')}</b>` : ''}${locked.length ? ` · Locked: <b>${locked.join(', ')}</b>` : ''}</p>` : '';
   return `
     <div class="card">
-      <div class="card-head"><h2>${ui.viewing ? `Best lineup for ${esc(state.teamName)}` : 'Lineup for this week'} ${infoBtn('suggest')}</h2>${changed && !ui.viewing ? '<button class="btn sm primary" data-action="apply-best">Use suggested lineup</button>' : ''}</div>
+      <div class="card-head"><h2>${ui.viewing ? `Best lineup for ${esc(state.teamName)}` : ui.weekShift === 1 ? 'Lineup for next week' : ui.weekShift ? 'Lineup for that week' : 'Lineup for this week'} ${infoBtn('suggest')}</h2>${changed && !ui.viewing ? '<button class="btn sm primary" data-action="apply-best">Use suggested lineup</button>' : ''}</div>
       <p class="small" style="margin:0 0 12px">${intro}</p>
       ${how}
       ${changed ? `<h3 class="sub">Suggested changes</h3>${steps.map(ex => swapBlock(ex, ctx, 'suggested')).join('')}${rest ? swapBlock(rest, ctx, 'suggested') : ''}` : ''}
@@ -2157,7 +2171,7 @@ function draftList(title, list, mine, info) {
   return `<div class="card">
     <div class="card-head"><h2>${title} ${info ? infoBtn('draft') : ''}</h2></div>
     <div class="table-wrap"><table class="dr-table">
-      <thead><tr><th>Player</th><th class="num">Drafted</th><th class="num">Now</th><th class="num">+/−</th><th class="num hide-sm">GP</th><th class="num hide-sm">${valueLabel()}</th></tr></thead>
+      <thead><tr><th>Player</th><th class="num">Drafted</th><th class="num">${seasonCtx ? 'Finished' : 'Now'}</th><th class="num">+/−</th><th class="num hide-sm">GP</th><th class="num hide-sm">${valueLabel()}</th></tr></thead>
       <tbody>${list.map(p => draftRow(p, mine)).join('')}</tbody>
     </table></div>
   </div>`;
@@ -2204,14 +2218,14 @@ function viewDraft() {
   const keeperRows = !Object.values(d.keepers).some(k => k.length) ? '' : [0, 1].map(i => `<tr class="dr-krow"><th scope="row">K${i + 1}</th>${order.map(t => {
     const k = (d.keepers[t] || [])[i];
     if (!k) return '<td class="dr-cell dr-keeper"></td>';
-    return `<td class="dr-cell dr-keeper" style="${k.gain != null ? shade(k.gain / 15) : ''}" title="${esc(k.name)} · keeper, graded as pick #${k.slot} · ${k.like ? `playing like #${k.like} (${signed(k.gain, 0)})` : "hasn't played"}">
+    return `<td class="dr-cell dr-keeper" style="${k.gain != null ? shade(k.gain / 15) : ''}" title="${esc(k.name)} · keeper, graded as pick #${k.slot} · ${k.like ? `${seasonCtx ? 'finished as' : 'playing like'} #${k.like} (${signed(k.gain, 0)})` : "hasn't played"}">
       <span class="dr-pick">Keeper · as #${k.slot}</span> ${nameBtn(k.nbaId, k.name)} ${gainTag(k.gain, k.gp)}</td>`;
   }).join('')}</tr>`).join('');
   const board = keeperRows + Array.from({ length: rounds }, (_, r) => `<tr><th scope="row" class="num">R${r + 1}</th>${order.map((t, c) => {
     const p = grid[`${r + 1}|${c}`];
     if (!p) return '<td class="dr-cell"><span class="dr-pick">No pick</span></td>';
     const via = p.teamId !== t ? `<span class="dr-via">by ${esc(p.team)}</span>` : '';
-    return `<td class="dr-cell" style="${p.gp ? shade(p.gain / 15) : ''}" title="${esc(p.name)} · pick #${p.pick}${via ? ` (traded, made by ${esc(p.team)})` : ''} · ${p.gp ? `playing like #${p.rank} (${signed(p.gain, 0)})` : "hasn't played"}">
+    return `<td class="dr-cell" style="${p.gp ? shade(p.gain / 15) : ''}" title="${esc(p.name)} · pick #${p.pick}${via ? ` (traded, made by ${esc(p.team)})` : ''} · ${p.gp ? `${seasonCtx ? 'finished as' : 'playing like'} #${p.rank} (${signed(p.gain, 0)})` : "hasn't played"}">
       <span class="dr-pick">#${p.pick}</span> ${nameBtn(p.nbaId, p.name)} ${gainTag(p.gain, p.gp)}${via}</td>`;
   }).join('')}</tr>`).join('');
 
