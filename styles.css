@@ -241,7 +241,6 @@ select, input, textarea {
   border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; min-width: 0;
 }
 textarea { resize: vertical; width: 100%; }
-select.slot-select { width: 100%; max-width: 340px; }
 .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
 .proj { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
 .proj .k { font-size: .72rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
@@ -294,11 +293,6 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .delta-table td.num { font-weight: 600; }
 
 /* ---------- Lineup editor (Roster tab) ---------- */
-.lu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
-.lu-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 30px; align-items: center; gap: 8px; }
-.lu-row .slot-select { max-width: none; }
-.lu-g { font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
-@media (max-width: 640px) { .lu-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- Matchups ---------- */
 .margin-bar { height: 8px; border-radius: 4px; min-width: 2px; }
@@ -524,6 +518,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .cs-who { font-size: .85rem; display: flex; flex-wrap: wrap; gap: 6px 28px; padding-left: 1em; }
 .cs-rank { white-space: nowrap; }
 .cs-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
+.cs-summary.flat { margin-top: 0; padding-top: 0; border-top: 0; }
+.roster-table td.rc { font-variant-numeric: tabular-nums; }
+.roster-table tr.muted-row td { opacity: .55; }
 .fx-connect { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .fx-connect .field { margin: 0; }
 @media (max-width: 640px) { .cs-summary { grid-template-columns: 1fr; } .fx-connect { grid-template-columns: 1fr; } }

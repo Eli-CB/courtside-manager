@@ -2,9 +2,10 @@
 
 A weekly matchup optimizer for 9-category head-to-head fantasy basketball. It pulls your Fantrax league, real NBA stats, injuries and the schedule, then shows:
 
-- **Dashboard:** category strengths ranked against every team in the league
+- **Dashboard:** record, strengths and weaknesses at a glance, injuries and action items
 - **Matchups:** both lineups side by side, projected category totals, win chances, and which starters to use
-- **Roster, Players, Watchlist:** stats for every active NBA player, with your league's position eligibility and availability
+- **Roster:** what your team is good and bad at: each category ranked against every team in the league, and every player's stats shaded by how much they help or hurt
+- **Players, Watchlist:** stats for every active NBA player, with your league's position eligibility and availability
 
 It's a plain static site (`index.html`, `styles.css`, `app.js`) reading data files in `data/`.
 

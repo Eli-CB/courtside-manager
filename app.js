@@ -1122,18 +1122,6 @@ function validateLineup() {
   state.lineup = lu;
 }
 
-function assignSlot(slotIdx, playerId) {
-  const L = state.lineup;
-  const prev = L[slotIdx];
-  if (!playerId) { L[slotIdx] = null; return; }
-  const from = L.indexOf(playerId);
-  state.il = state.il.filter(id => id !== playerId);
-  L[slotIdx] = playerId;
-  if (from !== -1 && from !== slotIdx) {
-    L[from] = prev && canPlay(byId(prev), state.slots[from]) ? prev : null;
-  }
-}
-
 function rosterLimit() { return state.slots.length + state.benchSize; }
 function activeCount() { return state.players.length - state.il.length; }
 
@@ -1534,11 +1522,11 @@ function teamRaw(players) {
 
 const fmtRaw = (c, v) => (c.pct ? fmtPct(v) : fmt(v, 1));
 
-function strengthsCard() {
+function strengthsCard(compact) {
   const starterBasis = ui.strBasis === 'starters';
   const mine = starterBasis ? starters() : state.players.filter(p => !state.il.includes(p.id));
   const toggle = `<div class="seg seg-sm" role="group" aria-label="Players to include">${[['starters', 'Starters'], ['active', 'Active roster']].map(([k, l]) => `<button type="button" class="${ui.strBasis === k ? 'on' : ''}" data-action="str-basis" data-basis="${k}" aria-pressed="${ui.strBasis === k}">${l}</button>`).join('')}</div>`;
-  const head = `<div class="card-head"><h2>Category strengths ${infoBtn('strengths')}</h2>${toggle}</div>`;
+  const head = `<div class="card-head"><h2>Category strengths ${infoBtn('strengths')}</h2>${compact ? '<a href="#roster" class="small">Full breakdown →</a>' : toggle}</div>`;
   if (!mine.length) return `<div class="card">${head}<div class="empty"><strong>No players yet</strong>Load your roster to see your category profile.</div></div>`;
 
   const me = { name: state.teamName, raw: teamRaw(mine), avg: teamCatAvg(mine), mine: true };
@@ -1598,17 +1586,19 @@ function strengthsCard() {
   const punt = rows.filter(r => (league ? r.rank > n - 3 && r.z < 0 : r.z < -0.4));
   const label = r => `<b>${r.c.label}</b>${league ? ` (${ordinal(r.rank)})` : ''}`;
   const unit = starterBasis ? 'per starter' : 'per player';
+  const summary = `<div class="cs-summary${compact ? ' flat' : ''}">
+      <div><span class="muted small">Strengths</span><br>${strong.slice(0, 4).map(label).join(', ') || '—'}</div>
+      <div><span class="muted small">Weaknesses</span><br>${weak.slice(0, 4).map(label).join(', ') || '—'}</div>
+      <div><span class="muted small">Punt candidates</span><br>${punt.map(label).join(', ') || 'None. You’re competitive everywhere.'}</div>
+    </div>`;
+  if (compact) return `<div class="card">${head}${summary}</div>`;
   return `<div class="card">
     ${head}
     <div class="table-wrap"><table class="cs-table">
       <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team (you in orange)</th>' : ''}</tr></thead>
       <tbody>${rows.map(r => r.html).join('')}</tbody>
     </table></div>
-    <div class="cs-summary">
-      <div><span class="muted small">Strengths</span><br>${strong.slice(0, 4).map(label).join(', ') || '—'}</div>
-      <div><span class="muted small">Weaknesses</span><br>${weak.slice(0, 4).map(label).join(', ') || '—'}</div>
-      <div><span class="muted small">Punt candidates</span><br>${punt.map(label).join(', ') || 'None. You’re competitive everywhere.'}</div>
-    </div>
+    ${summary}
   </div>`;
 }
 
@@ -1630,7 +1620,7 @@ function viewDashboard() {
     <div class="card kpi"><div class="label">Roster</div><div class="value">${activeCount()}/${rosterLimit()}</div><div class="hint">${state.il.length}/${state.ilSize} on IL</div></div>
     <div class="card kpi"><div class="label">Injuries</div><div class="value">${injured}</div><div class="hint">${state.players.filter(p => p.status === 'DTD').length} day-to-day</div></div>
   </div>
-  ${strengthsCard()}
+  ${strengthsCard(true)}
   <div class="dash-grid" style="margin-top:16px">
     <div>
       <div class="card">
@@ -1687,15 +1677,11 @@ function poolMini() {
 }
 
 /* ---------- Roster ---------- */
-const ROSTER_COLS = [
-  ['name', 'Player'], ['status', 'Status'], ['slot', 'Slot'], ['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'],
-  ['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO'], ['fgPct', 'FG%'], ['ftPct', 'FT%'], ['value', ''],
-];
 
 function sortList(list, sortState) {
   const { key, dir } = sortState;
   const slotRank = p => { const s = slotOf(p); return s === 'IL' ? 99 : s === 'BN' ? 50 : state.lineup.indexOf(p.id); };
-  const get = p => key === 'value' ? value(p) : key === 'slot' ? slotRank(p) : key === 'name' ? p.name.toLowerCase() : key === 'status' ? STATUSES.indexOf(p.status) : key === 'tag' ? p.tag.toLowerCase() : p[key];
+  const get = p => key === 'value' ? value(p) : key === 'slot' ? slotRank(p) : key === 'name' ? p.name.toLowerCase() : key === 'status' ? STATUSES.indexOf(p.status) : key === 'tag' ? p.tag.toLowerCase() : key === 'fp' ? fantasyPoints(p) : statVal(p, key);
   return [...list].sort((a, b) => { const x = get(a), y = get(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
 }
 
@@ -1714,49 +1700,43 @@ function statCells(p) {
     <td class="num">${fmtPct(p.fgPct)}</td><td class="num">${fmtPct(p.ftPct)}</td><td class="num"><b>${fmtValue(value(p))}</b></td>`;
 }
 
-function lineupEditor() {
-  const avail = state.players.filter(p => !state.il.includes(p.id));
-  const dates = NBA ? matchDates(weekStart()) : null;
-  const games = p => (dates ? weekGames(p, dates) : p.games);
-  const rows = state.slots.map((slot, i) => {
-    const cur = byId(state.lineup[i]);
-    const opts = avail.filter(p => canPlay(p, slot))
-      .sort((a, b) => value(b) - value(a))
-      .map(p => `<option value="${p.id}" ${cur && cur.id === p.id ? 'selected' : ''}>${esc(p.name)} (${p.pos.join('/')})${p.status !== 'Healthy' ? ' — ' + p.status : ''}${slotOf(p) !== 'BN' && slotOf(p) !== slot ? ' · in ' + slotOf(p) : ''}</option>`).join('');
-    return `<div class="lu-row">${slotBadge(slot)}
-      <select class="slot-select" data-change="slot" data-idx="${i}" aria-label="${slot} slot"><option value="">— Empty —</option>${opts}</select>
-      <span class="lu-g">${cur ? `${games(cur)}G` : ''}</span></div>`;
-  }).join('');
-  return `
-  <div class="card">
-    <div class="card-head"><h2>Starting lineup</h2><span class="muted small">${starters().length}/${state.slots.length} filled · <a href="#week">best lineup for this week →</a></span></div>
-    <div class="lu-grid">${rows}</div>
-    <p class="small muted" style="margin:10px 0 0">Pick a player for each slot. Choosing someone who's already starting swaps the two. G = PG/SG, F = SF/PF, Flx = anyone.</p>
-  </div>`;
+// The roster as a team profile: minutes, then whatever the league scores, each cell shaded by how
+// much the player helps (green) or hurts (red) it next to an average rostered player
+function rosterCols() {
+  return [['name', 'Player'], ['status', 'Status'], ['slot', 'Slot'], ['min', 'MIN'], ...scoreCats().map(c => [c.key, c.label]), ...(isPoints() ? [] : [['value', '']])];
 }
 
 function viewRoster() {
   const list = sortList(state.players, ui.rosterSort);
-  const t = totals(state.players.filter(p => !state.il.includes(p.id)));
-  const ro = ui.viewing;
+  const act = state.players.filter(p => !state.il.includes(p.id));
+  const cats = scoreCats();
+  const fmtC = (c, v) => (c.pct ? fmtPct(v) : fmt(v, c.dec || 1));
+  const total = c => {
+    if (!c.pct) return sum(act.map(p => statOf(p, c)));
+    const a = c.key === 'fgPct' ? 'fga' : 'fta';
+    const att = sum(act.map(p => p[a]));
+    return att ? sum(act.map(p => p[c.key] * p[a])) / att : 0;
+  };
   return `
   <div class="page-head">
     <div><h1>Roster ${infoBtn('value')}</h1><p>${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR</p></div>
   </div>
   <div class="week-stack">
-  ${list.length && !ro ? lineupEditor() : ''}
+  ${strengthsCard()}
   <div class="card">
-    ${list.length ? `<div class="table-wrap"><table>
-      <thead><tr>${headerRow(ROSTER_COLS, ui.rosterSort, 'roster')}</tr></thead>
-      <tbody>${list.map(p => `<tr>
+    <div class="card-head"><h2>Players</h2><span class="muted small">per game · green helps, red hurts, vs an average rostered player</span></div>
+    ${list.length ? `<div class="table-wrap"><table class="roster-table">
+      <thead><tr>${headerRow(rosterCols(), ui.rosterSort, 'roster')}</tr></thead>
+      <tbody>${list.map(p => `<tr${state.il.includes(p.id) ? ' class="muted-row"' : ''}>
         <td class="player">${playerCell(p)}</td>
-        <td>${statusBadge(p)}</td><td>${slotBadge(slotOf(p))}</td>${statCells(p)}
+        <td>${statusBadge(p)}</td><td>${slotBadge(slotOf(p))}</td>
+        <td class="num">${fmt(p.min, 0)}</td>
+        ${cats.map(c => `<td class="num rc" style="${shade(contribZ(p, c.key, 1, false))}" title="${esc(statTip(p, c, 1, false))}">${fmtC(c, statOf(p, c))}</td>`).join('')}
+        ${isPoints() ? '' : `<td class="num"><b>${fmtValue(value(p))}</b></td>`}
         </tr>`).join('')}
       </tbody>
-      <tfoot><tr><td colspan="3"><b>Active totals</b> <span class="muted small">(per game)</span></td><td></td>
-        <td class="num"><b>${fmt(t.pts)}</b></td><td class="num"><b>${fmt(t.reb)}</b></td><td class="num"><b>${fmt(t.ast)}</b></td><td class="num"><b>${fmt(t.stl)}</b></td>
-        <td class="num"><b>${fmt(t.blk)}</b></td><td class="num"><b>${fmt(t.tpm)}</b></td><td class="num"><b>${fmt(t.to)}</b></td>
-        <td class="num"><b>${fmtPct(t.fgPct)}</b></td><td class="num"><b>${fmtPct(t.ftPct)}</b></td><td></td></tr></tfoot>
+      <tfoot><tr><td colspan="4"><b>Active totals</b></td>
+        ${cats.map(c => `<td class="num"><b>${fmtC(c, total(c))}</b></td>`).join('')}${isPoints() ? '' : '<td></td>'}</tr></tfoot>
     </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from Fantrax. Use ↻ Reload from Fantrax in the league menu to pull the latest.</div>`}
   </div>
   </div>`;
@@ -3021,10 +3001,7 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   const el = e.target;
-  if (el.dataset.change === 'slot') {
-    assignSlot(+el.dataset.idx, el.value || null);
-    commit();
-  } else if (el.dataset.change === 'fx-view') {
+  if (el.dataset.change === 'fx-view') {
     ui.viewA = el.value && el.value !== state.fxTeam ? el.value : null;
     ui.viewB = null;
     if (ui.viewA && !VIEW_TABS.includes(ui.tab)) location.hash = '#dashboard';
