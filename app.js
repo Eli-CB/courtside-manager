@@ -328,9 +328,14 @@ async function loadNba(fresh = false) {
     teamDates = new Map(Object.entries(NBA.teams || {}).map(([t, v]) => [t, new Set(v.dates || [])]));
     for (const raw of NBA.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
     NBA.siteLeague = NBA.league;
-    if (state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId)) {
+    // a reload from Fantrax since this morning's file beats the file
+    const fresher = NBA.league && !state.fxLeagueId ? cachedLeague(NBA.league.id) : null;
+    if (fresher) applyFantraxLeague(withSiteExtras(fresher));
+    const other = state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId);
+    if (other) {
+      // someone else's league: wait for it, since the file's league isn't theirs
       try {
-        applyFantraxLeague(await fetchFantraxLeague(state.fxLeagueId));
+        await refreshLeague();
       } catch (e) {
         toast(`Couldn't load your Fantrax league right now. Showing ${NBA.league ? NBA.league.name : 'the site league'}.`);
       }
@@ -837,6 +842,46 @@ function fxTeamSide(teamId) {
 }
 
 // Compare against any team in the league: their roster and current Fantrax lineup
+// For the site's own league, keep what only the daily file knows: keepers frozen at draft time
+// (live rosters can't tell them from pickups) and the past seasons listed in league.json
+function withSiteExtras(res) {
+  const site = NBA.siteLeague;
+  if (site && site.id === res.league.id) {
+    if (site.pastSeasons) res.league.pastSeasons = site.pastSeasons;
+    if (res.league.draft && site.draft && site.draft.date === res.league.draft.date && site.draft.keepers) res.league.draft.keepers = site.draft.keepers;
+  }
+  return res;
+}
+
+// A reloaded league is kept on this device and used until the daily data file is newer
+const FX_CACHE_KEY = 'courtside-fantrax-v1';
+function cachedLeague(id) {
+  try {
+    const c = JSON.parse(localStorage.getItem(FX_CACHE_KEY) || 'null');
+    return c && c.id === id && c.at > Date.parse(NBA.updated || 0) ? c.res : null;
+  } catch (e) { return null; }
+}
+
+// Pull the league fresh from Fantrax: matchups, rosters and lineups change during the week
+async function refreshLeague() {
+  const id = state.fxLeagueId || (NBA.siteLeague && NBA.siteLeague.id);
+  if (!id) return false;
+  const same = NBA.league && NBA.league.id === id;
+  const before = same && state.fxTeam ? fxOpponentFor(weekStart()) : null;
+  const res = await fetchFantraxLeague(id);
+  try { localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ id, at: Date.now(), res })); } catch (e) { /* storage full or blocked */ }
+  applyFantraxLeague(withSiteExtras(res));
+  if (!state.fxTeam || !NBA.league.teams.some(t => t.id === state.fxTeam)) return true;
+  // follow your real opponent (and their latest roster) unless you'd picked someone else to scout
+  const after = fxOpponentFor(weekStart());
+  const cur = state.opp.fxId;
+  if (after && (!cur || cur === after.id || (before && cur === before.id))) {
+    const o = fxTeamSide(after.id);
+    state.opp = { name: o.name, week: weekStart(), fxId: after.id, players: o.players, starters: o.starters };
+  }
+  return true;
+}
+
 function loadFxTeam(teamId) {
   const side = fxTeamSide(teamId);
   const name = side.name;
@@ -889,7 +934,7 @@ function fxStrip(ctx) {
       ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
       ${stale ? `<span class="muted small">rosters as of week ${L.rosterPeriod}</span>` : ''}
     </span>
-    ${ui.viewing ? '' : `<span class="actions">${cur ? `<button class="btn sm" data-action="fx-reload-opp">Reload ${esc(state.opp.name)}</button>` : ''}<button class="btn sm" data-action="fx-load-mine">Reload my roster</button></span>`}</div>`;
+    <span class="actions"><button class="btn sm" data-action="league-reload" title="Pull the latest matchups, rosters and lineups from Fantrax">↻ Reload from Fantrax</button></span></div>`;
 }
 
 function validateLineup() {
@@ -964,6 +1009,7 @@ function leagueMenu() {
       <div class="lm-sec">Leagues</div>
       ${saved.map(l => `<div class="lm-row"><button type="button" class="lm-item${l.id === cur ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${l.id === cur ? '✓ ' : ''}${esc(l.name)}</button>${l.id !== cur ? `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>` : ''}</div>`).join('')}
       ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)} <span class="muted">(demo)</span></span></div>` : ''}
+      <button type="button" class="lm-item" data-action="league-reload">↻ Reload from Fantrax</button>
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
       <div class="lm-sec">Stats used ${infoBtn('projection')}</div>
@@ -1534,7 +1580,7 @@ function viewRoster() {
         <td class="num"><b>${fmt(t.pts)}</b></td><td class="num"><b>${fmt(t.reb)}</b></td><td class="num"><b>${fmt(t.ast)}</b></td><td class="num"><b>${fmt(t.stl)}</b></td>
         <td class="num"><b>${fmt(t.blk)}</b></td><td class="num"><b>${fmt(t.tpm)}</b></td><td class="num"><b>${fmt(t.to)}</b></td>
         <td class="num"><b>${fmtPct(t.fgPct)}</b></td><td class="num"><b>${fmtPct(t.ftPct)}</b></td><td></td></tr></tfoot>
-    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from Fantrax. Use Reload my roster on the This week tab to pull the latest.</div>`}
+    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from Fantrax. Use ↻ Reload from Fantrax on the This week tab to pull the latest.</div>`}
   </div>
   </div>`;
 }
@@ -2428,7 +2474,7 @@ async function switchLeague(id) {
   const wasCurrent = currentLeagueId() === id;
   ui.season = null; ui.addingSeason = false; ui.pastTeam = null;
   if (!wasCurrent) stashLeague();
-  applyFantraxLeague(res);
+  applyFantraxLeague(withSiteExtras(res));
   state.fxLeagueId = NBA.siteLeague && NBA.siteLeague.id === id ? null : id;
   state.demo = false;
   state.leagueChosen = true;
@@ -2509,23 +2555,11 @@ const actions = {
     root.dataset.theme = next;
     try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
   },
-  async 'fx-load-mine'() {
-    const roster = fxRoster(state.fxTeam);
-    if (!roster.length) return toast("Couldn't find your Fantrax roster");
-    if (state.players.length && !(await askConfirm('Reload your roster from Fantrax?', `Replaces your ${state.players.length} players with your ${roster.length}-player Fantrax roster and its current lineup.`, 'Reload roster'))) return;
-    const side = fxTeamSide(state.fxTeam);
-    state.players = side.players;
-    state.il = side.il;
-    state.lineup = side.lineup;
-    state.teamName = fxTeamName(state.fxTeam) || state.teamName;
-    commit(`Loaded ${roster.length} players from Fantrax`);
-  },
   'fx-load-opp'() {
     const opp = fxOpponentFor(weekStart());
     if (!opp) return toast('No Fantrax matchup found for this week');
     loadFxTeam(opp.id);
   },
-  'fx-reload-opp'() { if (state.opp.fxId) loadFxTeam(state.opp.fxId); },
   'fx-cycle'(el) {
     const leftId = viewingOther() ? ui.viewA : state.fxTeam;
     const others = fxPickable().filter(t => t.id !== leftId);
@@ -2594,6 +2628,25 @@ const actions = {
       ui.addingLeague = false;
       commit(`Switched to ${league.name}`);
     } catch (e) { toast(e.message); }
+  },
+  async 'league-reload'(el) {
+    $('#leagueMenu details')?.removeAttribute('open');
+    if (el.disabled) return;
+    el.disabled = true;
+    const label = el.textContent;
+    el.textContent = 'Reloading…';
+    try {
+      await refreshLeague();
+      if (state.fxTeam && fxRoster(state.fxTeam).length) {
+        const side = fxTeamSide(state.fxTeam);
+        Object.assign(state, { players: side.players, il: side.il, lineup: side.lineup, teamName: side.name || state.teamName });
+      }
+      syncLinked();
+      commit(`Reloaded ${fxLeague().name} from Fantrax`);
+    } catch (e) {
+      toast(`Couldn't reach Fantrax (${e.message})`);
+      el.disabled = false; el.textContent = label;
+    }
   },
   'league-add'() {
     $('#leagueMenu details')?.removeAttribute('open');
