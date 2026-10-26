@@ -381,6 +381,7 @@ async function loadNba(fresh = false) {
     for (const raw of NBA.players) { nbaById.set(raw.id, raw); nbaByName.set(normName(raw.name), raw.id); }
     teamDates = new Map(Object.entries(NBA.teams || {}).map(([t, v]) => [t, new Set(v.dates || [])]));
     for (const raw of NBA.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
+    countNames();
     NBA.siteLeague = NBA.league;
     // a reload from Fantrax since this morning's file beats the file
     const fresher = NBA.league && !state.fxLeagueId ? cachedLeague(NBA.league.id) : null;
@@ -2158,16 +2159,30 @@ function boardModes() {
   return `<div class="seg seg-sm" role="group" aria-label="Lineup view">${opts.map(([k, l]) => `<button type="button" class="${ui.boardMode === k ? 'on' : ''}" data-action="board-mode" data-mode="${k}" aria-pressed="${ui.boardMode === k}">${l}</button>`).join('')}</div>`;
 }
 
-// Surname without suffixes: "Trey Murphy III" -> "Murphy"
-function lastName(name) {
+// How many active NBA players share each short form of a name, so short names never hide who's who
+const nameUses = new Map();
+function countNames() {
+  nameUses.clear();
+  const bump = k => nameUses.set(k, (nameUses.get(k) || 0) + 1);
+  for (const raw of NBA.players) { bump('s:' + normName(lastName(raw.name, true))); bump('i:' + normName(shortName(raw.name, true))); }
+}
+const clashes = (kind, short) => (nameUses.get(kind + normName(short)) || 0) > 1;
+
+// Surname without suffixes: "Trey Murphy III" -> "Murphy". Shared surnames get the initial
+// ("D. Murray", "J. Murray"), and the full name if that's shared too.
+function lastName(name, plain) {
   const parts = String(name).split(' ').filter(w => !/^(jr\.?|sr\.?|ii|iii|iv|v)$/i.test(w));
-  return parts[parts.length - 1] || String(name);
+  const last = parts[parts.length - 1] || String(name);
+  if (plain || !clashes('s:', last)) return last;
+  const init = parts.length > 1 ? `${parts[0][0]}. ${last}` : last;
+  return clashes('i:', shortName(name, true)) ? String(name) : init;
 }
 
-// "Jaime Jaquez Jr." -> "J. Jaquez Jr." for tight spaces on phones
-function shortName(name) {
+// "Jaime Jaquez Jr." -> "J. Jaquez Jr." for tight spaces on phones; the full name if another player shortens the same way
+function shortName(name, plain) {
   const parts = String(name).split(' ');
-  return parts.length > 1 ? `${parts[0][0]}. ${parts.slice(1).join(' ')}` : String(name);
+  const short = parts.length > 1 ? `${parts[0][0]}. ${parts.slice(1).join(' ')}` : String(name);
+  return plain || !clashes('i:', short) ? short : String(name);
 }
 
 function playerName(p) {
