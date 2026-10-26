@@ -174,11 +174,40 @@ function catZ(p) {
   return z;
 }
 
-function value(p) {
-  return sum(Object.values(catZ(p)));
+// Points leagues score fantasy points from the league's own values; category leagues the nine cats
+const leaguePoints = () => { const L = NBA && NBA.league; return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
+const isPoints = () => !!leaguePoints();
+const STAT_LABEL = { pts: 'PTS', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK', tpm: '3PM', to: 'TO', fgm: 'FGM', fga: 'FGA', ftm: 'FTM', fta: 'FTA' };
+const statVal = (p, k) => (k === 'fgm' ? p.fgPct * p.fga : k === 'ftm' ? p.ftPct * p.fta : p[k] || 0);
+
+function fantasyPoints(p, sc = leaguePoints()) {
+  return sc ? sum(Object.entries(sc).map(([k, v]) => statVal(p, k) * v)) : 0;
 }
-const valueLabel = () => 'Value';
-const fmtValue = v => signed(v, 1);
+
+// The columns a matchup is decided on: the nine cats, or each scored stat plus total fantasy points
+function scoreCats() {
+  const sc = leaguePoints();
+  if (!sc) return CATS;
+  return [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0 })), { key: 'fp', label: 'FP', fp: true }];
+}
+
+function value(p) {
+  return isPoints() ? fantasyPoints(p) : sum(Object.values(catZ(p)));
+}
+const valueLabel = () => (isPoints() ? 'FP/G' : 'Value');
+const fmtValue = v => (isPoints() ? fmt(v, 1) : signed(v, 1));
+const statOf = (p, c) => (c.fp ? fantasyPoints(p) : c.pct ? p[c.key] : statVal(p, c.key));
+
+// Typical fantasy points per game for a rostered player, for shading the FP column
+let fpBaseCache = null;
+function fpBase() {
+  const sc = leaguePoints();
+  if (fpBaseCache && fpBaseCache.sc === sc) return fpBaseCache.v;
+  const fps = NBA.players.map(raw => nbaStats(raw)).filter(x => x && x.gp >= 3).map(x => fantasyPoints(x, sc)).sort((a, b) => b - a).slice(0, 200);
+  const m = sum(fps) / (fps.length || 1), sd = Math.sqrt(sum(fps.map(x => (x - m) ** 2)) / (fps.length || 1)) || 1;
+  fpBaseCache = { sc, v: [m, sd] };
+  return fpBaseCache.v;
+}
 
 // Aggregate per-game totals for a group of players (counting stats summed, % weighted by attempts)
 function totals(list, mult = () => 1) {
@@ -191,6 +220,7 @@ function totals(list, mult = () => 1) {
   }
   t.fgPct = t.fga ? t.fgm / t.fga : 0;
   t.ftPct = t.fta ? t.ftm / t.fta : 0;
+  if (isPoints()) t.fp = sum(list.map(p => fantasyPoints(p) * mult(p)));
   return t;
 }
 
@@ -341,6 +371,7 @@ async function loadNba(fresh = false) {
       }
     }
     if (state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
+    if (state.fxTeam) syncLeagueRules();
     const migrate = state.fxTeam && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
     if (migrate) rememberLeague(NBA.league.id, NBA.league.name);
     if (syncLinked() || migrate) commit(); else render();
@@ -504,10 +535,24 @@ function phi(x) { // standard normal CDF
   return x > 0 ? 1 - p : p;
 }
 
+// A side's projected fantasy points, and their spread. Stats in one game move together (a big
+// scoring night brings rebounds and assists too), so spreads are combined with a 0.35 correlation.
+const FP_RHO = 0.35;
+function fpTotals(S) {
+  const sc = leaguePoints();
+  const a = sum(Object.entries(sc).map(([k, v]) => (S.tot[k] || 0) * v));
+  const parts = Object.entries(sc).map(([k, v]) => v * Math.sqrt(S.vr[k] || 0));
+  const vr = (1 - FP_RHO) * sum(parts.map(x => x * x)) + FP_RHO * sum(parts) ** 2;
+  return { a, vr };
+}
+
 function compareCats(A, B) {
-  return CATS.map(c => {
+  return scoreCats().map(c => {
     let a, b, sd;
-    if (c.pct) {
+    if (c.fp) {
+      const fa = fpTotals(A), fb = fpTotals(B);
+      a = fa.a; b = fb.a; sd = Math.sqrt(fa.vr + fb.vr);
+    } else if (c.pct) {
       const mk = c.key === 'fgPct' ? 'fgm' : 'ftm', at = c.key === 'fgPct' ? 'fga' : 'fta';
       a = A.tot[at] ? A.tot[mk] / A.tot[at] : 0;
       b = B.tot[at] ? B.tot[mk] / B.tot[at] : 0;
@@ -524,8 +569,10 @@ function compareCats(A, B) {
   });
 }
 
-// Odds of winning the week: chance of taking a majority of categories
+// Odds of winning the week. Points leagues: the chance of outscoring them (expected = your projected FP)
 function matchOdds(cats) {
+  const fp = cats.find(c => c.fp);
+  if (fp) return { win: fp.p, expected: fp.a, opp: fp.b, n: 1, points: true };
   let dist = [1];
   for (const c of cats) {
     const next = Array(dist.length + 1).fill(0);
@@ -550,6 +597,8 @@ function matchupScoring() {
 // curve, adding stats to a category that's already lost (or already won) barely moves
 // it, so those categories get effectively punted without any special rule.
 function objective(odds) {
+  // points: win chance first, then a bigger projected margin (also the goal with no opponent loaded)
+  if (odds.points) return odds.win + 1e-5 * (odds.expected - odds.opp);
   return matchupScoring() === 'most' ? odds.win + 0.01 * odds.expected / odds.n : odds.expected + 0.01 * odds.win;
 }
 
@@ -613,6 +662,7 @@ const INFO = {
     <p><b>Uncertainty.</b> Each player's game-to-game spread (standard deviation) comes from his NBA game logs: last season plus this season, games of 10+ minutes, at least 8 games. Spreads add up across every starter game, so a team's weekly total has a known range.</p>
     <p><b>Category win chance.</b> For counting stats: the chance your total beats theirs, using a bell curve with the gap divided by the combined spread. Turnovers are reversed (fewer wins). FG% and FT% use team makes ÷ attempts, with shot-making luck (binomial, widened 30%) as the spread.</p>
     <p><b>Lineups.</b> Both teams' starters as set on Fantrax. Projections use the stats chosen in the league menu (smart blend by default).</p>
+    <p><b>Points leagues.</b> Each side's projected fantasy points come from those totals × your league's points per stat. The spread combines every stat's spread, assuming stats in a game move together somewhat (correlation 0.35), and the win chance is the chance of outscoring them on that bell curve. The suggested lineup maximizes that chance, then projected points. Stats Fantrax scores that we can't project (like double-doubles) are left out.</p>
     <p><b>Winning the week.</b> Categories are treated as independent, and we add up the chances of every way to take 5 or more of the 9. The projected category score is the sum of the nine category win chances.</p>`],
   suggest: ['How lineup suggestions work', `
     <p><b>Starting point.</b> Starters are ranked by games this week × (player value + 4), then fitted into your slots (PG, SG, G, SF, PF, F, C, Flx) so every slot gets an eligible player.</p>
@@ -634,7 +684,8 @@ const INFO = {
     <p>The number on the right is games this week.</p>`],
   value: ['Player value', `
     <p>Value is the sum of a player's nine category contributions per game, each measured against an average rostered player (see Stat shading for the exact averages). +5 is an elite all-around player; around 0 is replacement level in a 12-team league.</p>
-    <p>FG% and FT% count shot volume, and turnovers count against.</p>`],
+    <p>FG% and FT% count shot volume, and turnovers count against.</p>
+    <p><b>Points leagues:</b> value is fantasy points per game (FP/G), using your league's points for each stat from Fantrax.</p>`],
   projection: ['Which stats are used', `
     <p><b>Smart blend (default):</b> this season's averages with 10 games of last season mixed in: (this season × games played + last season × 10) ÷ (games played + 10). Early on it leans on last season; after a month or two it's mostly this season.</p>
     <p>Switch to this season only, last season only, or the last 10 games from the league menu at the top.</p>`],
@@ -693,6 +744,23 @@ function parseStandings(rows) {
   });
 }
 
+// Points leagues: Fantrax's points per stat ("Default" position), mapped onto the stats we project
+const FX_PTS_KEYS = { PTS: 'pts', REB: 'reb', AST: 'ast', ST: 'stl', STL: 'stl', BLK: 'blk', TO: 'to', '3PTM': 'tpm', '3PM': 'tpm', FGM: 'fgm', FGA: 'fga', FTM: 'ftm', FTA: 'fta' };
+function fxPointsScoring(ss) {
+  if (!ss || !/POINTS/.test(ss.type || '')) return {};
+  const points = {}, other = [];
+  for (const cat of ss.scoringCategorySettings || []) {
+    for (const cfg of cat.configs || []) {
+      if (cfg.position && cfg.position.code !== 'DEFAULT') continue;
+      const short = cfg.scoringCategory && cfg.scoringCategory.shortName;
+      const key = FX_PTS_KEYS[short];
+      if (key) points[key] = (points[key] || 0) + (+cfg.points || 0);
+      else if (short && cfg.points) other.push(short);
+    }
+  }
+  return Object.keys(points).length ? { points, pointsOther: other } : {};
+}
+
 async function fetchFantraxLeague(id) {
   const q = encodeURIComponent(id);
   const [ids, info, rosters, draft, adpList, standings] = await Promise.all([
@@ -722,11 +790,15 @@ async function fetchFantraxLeague(id) {
     const nba = toNba[fid];
     if (!nba) continue;
     const elig = new Set((pi.eligiblePos || '').split(','));
+    // leagues with broad positions list G / F instead of PG,SG / SF,PF
+    if (elig.has('G') && !elig.has('PG') && !elig.has('SG')) { elig.add('PG'); elig.add('SG'); }
+    if (elig.has('F') && !elig.has('SF') && !elig.has('PF')) { elig.add('SF'); elig.add('PF'); }
     fxPlayers[nba] = { id: fid, st: pi.status || '', pos: POSITIONS.filter(x => elig.has(x)), adp: adp[fid] };
   }
   const league = {
     id, name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
     historyId: info.leagueHistoryId || null, year: info.seasonYear || null,
+    ...fxPointsScoring(info.scoringSystem),
     teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
     periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10), lock: String(p.startDate) })),
     matchups: Object.fromEntries((info.matchups || []).map(m => [String(m.period),
@@ -776,8 +848,13 @@ function slotsFromLeague(league) {
     }
   }
   if (!slots.length || (ri.maxTotalActivePlayers && slots.length !== ri.maxTotalActivePlayers)) return null;
-  const bench = ri.maxTotalReservePlayers ?? null;
-  const ir = ri.maxTotalPlayers && bench != null ? Math.max(0, ri.maxTotalPlayers - slots.length - bench) : null;
+  let bench = ri.maxTotalReservePlayers ?? null;
+  let ir = ri.maxTotalPlayers && bench != null ? Math.max(0, ri.maxTotalPlayers - slots.length - bench) : null;
+  if (bench == null && ri.maxTotalPlayers) {
+    // no reserve count: the rest of the roster is bench, and IR spots sit outside the limit
+    bench = Math.max(0, ri.maxTotalPlayers - slots.length);
+    ir = Math.max(1, ...Object.values(league.rosters || {}).map(r => r.filter(it => it.st === 'INJURED_RESERVE').length));
+  }
   return { slots, bench, ir };
 }
 
@@ -827,7 +904,8 @@ function fxTeamSide(teamId) {
   const leftover = [];
   roster.forEach((x, i) => {
     if (x.st !== 'ACTIVE') return;
-    const idx = state.slots.findIndex((s, j) => s === x.slot && !lineup[j]);
+    const slot = FX_SLOT_MAP[x.slot] || x.slot; // Fantrax "Flx" is our FLX
+    const idx = state.slots.findIndex((s, j) => s === slot && !lineup[j]);
     if (idx !== -1) lineup[idx] = players[i].id; else leftover.push(players[i]);
   });
   for (const p of leftover) {
@@ -851,6 +929,15 @@ function withSiteExtras(res) {
     if (res.league.draft && site.draft && site.draft.date === res.league.draft.date && site.draft.keepers) res.league.draft.keepers = site.draft.keepers;
   }
   return res;
+}
+
+// Roster slots, bench and IR from the league's settings (they're the league's, not yours to edit)
+function syncLeagueRules() {
+  const cfg = slotsFromLeague(fxLeague());
+  if (!cfg) return;
+  state.slots = cfg.slots;
+  if (cfg.bench != null) state.benchSize = cfg.bench;
+  if (cfg.ir != null) state.ilSize = cfg.ir;
 }
 
 // A reloaded league is kept on this device and used until the daily data file is newer
@@ -1158,12 +1245,12 @@ function seasonAwards() {
   }
   // category profile: each category vs the league's teams, in team-to-team spreads
   const val = (T, c) => (c.pct ? (T.week.tot[c.key === 'fgPct' ? 'fga' : 'fta'] ? T.week.tot[c.key === 'fgPct' ? 'fgm' : 'ftm'] / T.week.tot[c.key === 'fgPct' ? 'fga' : 'fta'] : 0) : T.week.tot[c.key]);
-  for (const c of CATS) {
+  for (const c of isPoints() ? [] : CATS) {
     const xs = teams.map(T => val(T, c));
     const m = sum(xs) / xs.length, sd = Math.sqrt(sum(xs.map(x => (x - m) ** 2)) / xs.length) || 1;
     teams.forEach((T, i) => { (T.z = T.z || {})[c.key] = ((xs[i] - m) / sd) * (c.neg ? -1 : 1); });
   }
-  for (const T of teams) {
+  for (const T of isPoints() ? [] : teams) {
     const zs = CATS.map(c => T.z[c.key]);
     const low = CATS.reduce((a, c) => (T.z[c.key] < T.z[a.key] ? c : a));
     T.punt = { cat: low.label, z: T.z[low.key] };
@@ -1184,8 +1271,8 @@ function seasonAwards() {
     { title: 'Best draft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
     { title: 'Best manager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
     { title: 'Most games lost to injury', blurb: 'Games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
-    { title: 'Biggest punt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
-    { title: 'Even Steven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) },
+    ...(isPoints() ? [] : [{ title: 'Biggest punt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
+    { title: 'Even Steven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
     { title: 'Oldest team', blurb: 'Average age of the final roster at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
     { title: 'Youngest team', blurb: 'Average age of the final roster at season’s end.', list: ranked('age', -1, T => `${fmt(T.age, 1)} yrs`) },
   ].filter(a => a.list.length);
@@ -1250,14 +1337,16 @@ function ctxBar() {
   if (P) {
     $('#ctxMeta').innerHTML = [
       '<span class="badge accent">Past season</span>',
-      /SINGLE_WIN/.test(P.league.scoring) ? '9-cat H2H, one win per week' : '9-cat H2H',
+      P.league.points ? 'H2H points' : /SINGLE_WIN/.test(P.league.scoring) ? '9-cat H2H, one win per week' : '9-cat H2H',
       'final standings and rosters from Fantrax',
     ].join(' · ');
     return;
   }
-  const w = NBA && NBA.week;
+  // the league's own week (its scoring period), else the data file's
+  const per = fxPeriodFor(weekStart());
+  const w = per ? { num: per.n, start: per.start, end: per.end } : NBA && NBA.week;
   $('#ctxMeta').innerHTML = [
-    matchupScoring() === 'most' ? '9-cat H2H, one win per week' : '9-cat H2H, one win per category',
+    isPoints() ? `H2H points${L.pointsOther && L.pointsOther.length ? ` <span title="Not projected: ${esc(L.pointsOther.join(', '))}">(some stats not projected)</span>` : ''}` : matchupScoring() === 'most' ? '9-cat H2H, one win per week' : '9-cat H2H, one win per category',
     w ? `Week ${w.num}: ${fmtDay(w.start)} – ${fmtDay(w.end)}` : '',
     NBA ? `stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable',
   ].filter(Boolean).join(' · ');
@@ -1315,7 +1404,6 @@ function draftWhen(L) {
   return dt ? `${dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : '';
 }
 
-const isPointsLeague = (L = fxLeague()) => !!(L && /POINTS/.test(L.scoring || ''));
 
 function viewPreDraft(L) {
   const when = draftWhen(L);
@@ -1337,7 +1425,7 @@ ui.strBasis = (() => { try { return localStorage.getItem(STR_KEY) || 'starters';
 
 function teamCatAvg(players) {
   const zs = players.map(catZ);
-  return Object.fromEntries(CATS.map(c => [c.key, zs.length ? sum(zs.map(z => z[c.key])) / zs.length : 0]));
+  return Object.fromEntries(scoreCats().map(c => [c.key, zs.length ? sum(zs.map(z => z[c.key] || 0)) / zs.length : 0]));
 }
 
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
@@ -1347,12 +1435,13 @@ const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', '
 function teamRaw(players) {
   const n = players.length || 1;
   const out = {};
-  for (const c of CATS) {
-    if (c.pct) {
+  for (const c of scoreCats()) {
+    if (c.fp) out.fp = sum(players.map(p => fantasyPoints(p))) / n;
+    else if (c.pct) {
       const a = c.key === 'fgPct' ? 'fga' : 'fta';
       const att = sum(players.map(p => p[a]));
       out[c.key] = att ? sum(players.map(p => p[c.key] * p[a])) / att : 0;
-    } else out[c.key] = sum(players.map(p => p[c.key])) / n;
+    } else out[c.key] = sum(players.map(p => statVal(p, c.key))) / n;
   }
   return out;
 }
@@ -1379,7 +1468,7 @@ function strengthsCard() {
   const league = teams.length > 1;
   const n = teams.length;
 
-  const rows = CATS.map(c => {
+  const rows = scoreCats().map(c => {
     const vals = teams.map(t => t.raw[c.key]);
     const mean = sum(vals) / n;
     const sd = Math.sqrt(sum(vals.map(v => (v - mean) ** 2)) / n) || 1e-9;
@@ -1390,17 +1479,17 @@ function strengthsCard() {
     const rank = ranked.indexOf(me) + 1;
     // who helps or hurts: each player's own number against the league average shown in this row.
     // For FG%/FT% that's makes above or below average at the player's volume.
-    const ref = league ? mean : BASE[c.key][0];
+    const ref = league ? mean : (BASE[c.key] || [0])[0];
     const att = c.key === 'fgPct' ? 'fga' : 'fta';
-    const impact = p => (c.pct ? (p[c.key] - ref) * p[att] : (c.neg ? -1 : 1) * (p[c.key] - ref));
+    const impact = p => (c.pct ? (p[c.key] - ref) * p[att] : (c.neg ? -1 : 1) * (statOf(p, c) - ref));
     const byImpact = mine.map(p => ({ p, d: impact(p) })).sort((a, b) => b.d - a.d);
     const big = c.pct ? 0.1 : Math.max(0.1, ref * 0.1);
     const drivers = byImpact.filter(x => x.d > big).slice(0, 2);
     const drag = byImpact.filter(x => x.d < -big).slice(-1);
     const tip = x => c.pct
       ? `${x.p.name}: ${fmtPct(x.p[c.key])} on ${fmt(x.p[att], 1)} attempts a game, ${fmt(Math.abs(x.d), 1)} ${x.d > 0 ? 'more' : 'fewer'} makes a game than the ${league ? 'league' : 'typical'} average of ${fmtPct(ref)} would give`
-      : `${x.p.name}: ${fmt(x.p[c.key], 1)} ${c.label} a game vs the ${league ? 'league' : 'typical'} average of ${fmt(ref, 1)} per ${starterBasis ? 'starter' : 'player'}`;
-    const who = list => list.map(x => `<span title="${esc(tip(x))}">${esc(lastName(x.p.name))} <b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(x.p[c.key]) : fmt(x.p[c.key], 1)}</b>${c.pct ? `<span class="muted"> on ${fmt(x.p[att], 1)} ${att.toUpperCase()}</span>` : ''}</span>`).join(', ') || '<span class="muted">—</span>';
+      : `${x.p.name}: ${fmt(statOf(x.p, c), 1)} ${c.label} a game vs the ${league ? 'league' : 'typical'} average of ${fmt(ref, 1)} per ${starterBasis ? 'starter' : 'player'}`;
+    const who = list => list.map(x => `<span title="${esc(tip(x))}">${esc(lastName(x.p.name))} <b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(x.p[c.key]) : fmt(statOf(x.p, c), 1)}</b>${c.pct ? `<span class="muted"> on ${fmt(x.p[att], 1)} ${att.toUpperCase()}</span>` : ''}</span>`).join(', ') || '<span class="muted">—</span>';
     const w = Math.min(Math.abs(z) / 2, 1) * 50; // bar edge = 2 spreads from the league average
     const pos = v => ((Math.max(-2.5, Math.min(2.5, gap(v))) + 2.5) / 5) * 100;
     return { c, z, rank, html: `<tr>
@@ -1449,7 +1538,7 @@ function viewDashboard() {
     ${r
       ? `<div class="card kpi"><div class="label">Record</div><div class="value">${r.w}-${r.l}${r.t ? '-' + r.t : ''}</div><div class="hint"><a href="#standings">${ordinal(r.rank)} of ${nTeams}</a>${r.gb ? ` · ${fmt(r.gb, 1)} back` : ''}</div></div>`
       : `<div class="card kpi"><div class="label">Games this week</div><div class="value">${sum(st.map(p => NBA ? weekGames(p, matchDates(weekStart())) : p.games))}</div><div class="hint">from ${st.length} starters</div></div>`}
-    <div class="card kpi"><div class="label">Starter value ${infoBtn('value')}</div><div class="value">${fmtValue(teamVal)}</div><div class="hint">${st.length} of ${state.slots.length} slots filled</div></div>
+    <div class="card kpi"><div class="label">${isPoints() ? 'Starter FP/G' : 'Starter value'} ${infoBtn('value')}</div><div class="value">${fmtValue(teamVal)}</div><div class="hint">${st.length} of ${state.slots.length} slots filled</div></div>
     <div class="card kpi"><div class="label">Roster</div><div class="value">${activeCount()}/${rosterLimit()}</div><div class="hint">${state.il.length}/${state.ilSize} on IL</div></div>
     <div class="card kpi"><div class="label">Injuries</div><div class="value">${injured}</div><div class="hint">${state.players.filter(p => p.status === 'DTD').length} day-to-day</div></div>
   </div>
@@ -1634,17 +1723,18 @@ function viewTrade() {
     const after = totals([...active.filter(p => !ui.tradeGive.has(p.id)), ...get]);
     const vGive = sum(give.map(value)), vGet = sum(get.map(value));
     const diff = vGet - vGive;
-    const rows = CATS.map(c => {
+    const tradeCats = scoreCats();
+    const rows = tradeCats.map(c => {
       const d = after[c.key] - before[c.key];
       const good = c.neg ? d < 0 : d > 0;
       const shown = c.pct ? signed(d * 100, 1) + '%' : signed(d, 1);
       return `<tr><td><b>${c.label}</b></td><td class="num">${c.pct ? fmtPct(before[c.key]) : fmt(before[c.key])}</td><td class="num">${c.pct ? fmtPct(after[c.key]) : fmt(after[c.key])}</td><td class="num ${Math.abs(d) < 1e-9 ? 'muted' : good ? 'pos-good' : 'pos-bad'}">${shown}</td></tr>`;
     }).join('');
     const rosterAfter = activeCount() - give.length + get.length;
-    const verdict = Math.abs(diff) < 0.5 ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'];
-    const won = CATS.filter(c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; }).length;
+    const verdict = Math.abs(diff) < (isPoints() ? 2 : 0.5) ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'];
+    const won = tradeCats.filter(c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; }).length;
     result = `
-      <div class="card-head"><div><div class="verdict ${verdict[1]}">${verdict[0]}</div><div class="muted small">${valueLabel()}: give ${fmtValue(vGive)} · get ${fmtValue(vGet)} · net <b>${fmtValue(diff)}</b> · improves ${won} of 9 cats</div></div></div>
+      <div class="card-head"><div><div class="verdict ${verdict[1]}">${verdict[0]}</div><div class="muted small">${valueLabel()}: give ${fmtValue(vGive)} · get ${fmtValue(vGet)} · net <b>${fmtValue(diff)}</b>${isPoints() ? '' : ` · improves ${won} of 9 cats`}</div></div></div>
       ${rosterAfter > rosterLimit() ? `<p class="alert warn small" style="margin:0 0 12px">This puts you at ${rosterAfter}/${rosterLimit()} — you'd need to drop ${rosterAfter - rosterLimit()}.</p>` : ''}
       <div class="table-wrap"><table class="delta-table">
         <thead><tr><th>Category</th><th class="num">Now</th><th class="num">After</th><th class="num">Change</th></tr></thead>
@@ -1824,12 +1914,15 @@ function weekContext(start = weekStart()) {
 }
 
 function catValue(proj, c) {
+  if (c.fp) return fpTotals(proj).a;
   if (!c.pct) return proj.tot[c.key];
   const [m, a] = c.key === 'fgPct' ? ['fgm', 'fga'] : ['ftm', 'fta'];
   return proj.tot[a] ? proj.tot[m] / proj.tot[a] : 0;
 }
 const fmtCatDelta = (c, d) => (c.pct ? (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(3).replace(/^0/, '') : signed(d, Math.abs(d) < 10 ? 1 : 0));
 const pctTxt = p => `${Math.round(p * 100)}%`;
+// a change in the matchup goal: categories won, or projected fantasy points
+const goalDelta = v => (isPoints() ? `${signed(v, 1)} FP` : `${signed(v, 2)} cats`);
 const weekGames = (p, dates) => (p.status === 'Out' ? 0 : gamesIn(p, dates));
 
 // What changes, category by category, when your starters go from fromIds to toIds
@@ -1837,7 +1930,7 @@ function explainChange(ctx, fromIds, toIds, outP, inP) {
   const a = projectSide(ctx.mine, ctx.dates, fromIds), b = projectSide(ctx.mine, ctx.dates, toIds);
   const ca = compareCats(a, ctx.them), cb = compareCats(b, ctx.them);
   const oa = matchOdds(ca), ob = matchOdds(cb);
-  const rows = CATS.map((c, i) => {
+  const rows = ca.map((c, i) => {
     const d = catValue(b, c) - catValue(a, c);
     return { c, d, good: c.neg ? d < 0 : d > 0, pA: ca[i].p, pB: cb[i].p };
   });
@@ -1900,7 +1993,10 @@ function whySentence(ex, ctx) {
   if (ex.inP && ex.outP) {
     parts.push(gi > go ? `${inN} plays ${gi} games to ${outN}'s ${go}.` : gi === go ? `Both play ${gi} games, so it comes down to fit.` : `${inN} plays fewer games (${gi} vs ${go}) but helps where this matchup is close.`);
   } else if (ex.inP) parts.push(`Fills an open slot with ${gi} more games.`);
-  if (ctx.hasOpp) {
+  if (ctx.hasOpp && isPoints()) {
+    const fp = ex.rows.find(r => r.c.fp);
+    if (fp) parts.push(`${signed(fp.d, 1)} projected points, ${pctTxt(fp.pA)}→${pctTxt(fp.pB)} to win.`);
+  } else if (ctx.hasOpp) {
     const lifts = ex.rows.filter(r => r.pB - r.pA > 0.015).sort((x, y) => (y.pB - y.pA) - (x.pB - x.pA)).slice(0, 3);
     const costs = ex.rows.filter(r => r.pA - r.pB > 0.015).sort((x, y) => (y.pA - y.pB) - (x.pA - x.pB)).slice(0, 2);
     if (lifts.length) parts.push(`Biggest lift: ${lifts.map(r => `${r.c.label} ${pctTxt(r.pA)}→${pctTxt(r.pB)}`).join(', ')}.`);
@@ -1912,7 +2008,8 @@ function whySentence(ex, ctx) {
 
 function catChips(ex) {
   return `<div class="cat-chips">${ex.rows.map(r => {
-    const moved = Math.abs(r.pB - r.pA) >= 0.01;
+    // in points leagues only total points decide the week, so only FP shows a win chance
+    const moved = Math.abs(r.pB - r.pA) >= 0.01 && (!isPoints() || r.c.fp);
     const cls = Math.abs(r.d) < 1e-6 ? '' : r.good ? 'good' : 'bad';
     return `<span class="cchip ${cls}"><b>${r.c.label}</b> ${fmtCatDelta(r.c, r.d)}${moved ? `<span class="cchip-p">${pctTxt(r.pA)}→${pctTxt(r.pB)}</span>` : ''}</span>`;
   }).join('')}</div>`;
@@ -1921,7 +2018,7 @@ function catChips(ex) {
 function swapBlock(ex, ctx, kind) {
   const g = p => `<span class="muted small">${posTags(p.pos)} · ${weekGames(p, ctx.dates)} G</span>`;
   const net = ctx.hasOpp
-    ? `<span class="swap-net ${ex.score >= 0 ? 'pos-good' : 'pos-bad'}">${matchupScoring() === 'most' ? `${signed(ex.dWin * 100, 1)}% win · ${signed(ex.dExp, 2)} cats` : `${signed(ex.dExp, 2)} cats · ${signed(ex.dWin * 100, 1)}% win`}</span>`
+    ? `<span class="swap-net ${ex.score >= 0 ? 'pos-good' : 'pos-bad'}">${isPoints() || matchupScoring() === 'most' ? `${signed(ex.dWin * 100, 1)}% win · ${goalDelta(ex.dExp)}` : `${signed(ex.dExp, 2)} cats · ${signed(ex.dWin * 100, 1)}% win`}</span>`
     : `<span class="swap-net ${ex.dGames >= 0 ? 'pos-good' : 'pos-bad'}">${signed(ex.dGames, 0)} games</span>`;
   const head = ex.inP
     ? `<span class="swap-in">↑ Start <b>${esc(ex.inP.name)}</b> ${g(ex.inP)}</span>${ex.outP ? `<span class="swap-out">↓ Bench <b>${esc(ex.outP.name)}</b> ${g(ex.outP)}</span>` : ''}`
@@ -1957,6 +2054,11 @@ const shadeProb = p => shade((p - 0.5) * 5); // 90% to win ≈ as strong as a +2
 // so the same weekly total always gets the same shade. FG%/FT% count shot volume.
 const WEEK_GAMES = 3.5;
 function contribZ(p, key, g, week) {
+  if (key === 'fp') {
+    const [m, sd] = fpBase();
+    return week ? (fantasyPoints(p) * g - m * WEEK_GAMES) / (sd * WEEK_GAMES) : (fantasyPoints(p) - m) / sd;
+  }
+  if (!BASE[key]) return 0;
   if (!week) return catZ(p)[key];
   if (key === 'fgPct') return p.fga ? (p.fgPct - BASE.fgPct[0]) * p.fga * g / (BASE.fgPct[1] * WEEK_GAMES) : 0;
   if (key === 'ftPct') return p.fta ? (p.ftPct - BASE.ftPct[0]) * p.fta * g / (BASE.ftPct[1] * WEEK_GAMES) : 0;
@@ -2033,7 +2135,8 @@ function statTip(p, c, g, week) {
     const k = week ? g : 1;
     return `${c.label}: ${(p[c.key] * 100).toFixed(1)}% · ${(m * k).toFixed(1)}/${(a * k).toFixed(1)} ${week ? `over ${games}` : 'per game'}`;
   }
-  return week ? `${c.label}: ${(p[c.key] * g).toFixed(1)} (${p[c.key].toFixed(2)} × ${games})` : `${c.label}: ${p[c.key].toFixed(2)} per game`;
+  const v = statOf(p, c);
+  return week ? `${c.label}: ${(v * g).toFixed(1)} (${v.toFixed(2)} × ${games})` : `${c.label}: ${v.toFixed(2)} per game`;
 }
 
 // Projected-week totals, unrounded, with the matching win chance
@@ -2046,9 +2149,9 @@ function stabCells(p, ctx) {
   const g = weekGames(p, ctx.dates);
   const week = ui.boardMode === 'week';
   const noStats = !p.min && !p.pts && !p.reb; // e.g. a player with no NBA stats on record
-  return CATS.map(c => {
+  return scoreCats().map(c => {
     const none = noStats || (week && !g);
-    const v = none ? '—' : c.pct ? fmtPct(p[c.key]) : fmt(p[c.key] * (week ? g : 1), week ? 0 : 1);
+    const v = none ? '—' : c.pct ? fmtPct(p[c.key]) : fmt(statOf(p, c) * (week ? g : 1), week ? 0 : 1);
     return `<td class="sc" style="${none ? '' : shade(contribZ(p, c.key, g, week))}" title="${none ? `${c.label}: no projection` : statTip(p, c, g, week)}">${v}</td>`;
   }).join('');
 }
@@ -2067,7 +2170,7 @@ function statTable(ctx, side, title, rows, { bench = false, totals = '', games =
     return `<th class="sortable ${cls} ${on ? 'sorted' : ''}" data-action="stat-sort" data-key="${key}" aria-sort="${on ? (s.dir > 0 ? 'ascending' : 'descending') : 'none'}">${label}${on && key !== 'slot' ? (s.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`;
   };
   return `<table class="stab">
-    <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num')}${CATS.map(c => th(c.key, c.label, 'sc')).join('')}</tr></thead>
+    <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num')}${scoreCats().map(c => th(c.key, c.label, 'sc')).join('')}</tr></thead>
     <tbody>${sortStatRows(rows, ctx).map(p => statRow(p, ctx, side, !bench)).join('') || `<tr><td colspan="11" class="muted small">${bench ? 'Nobody on the bench' : side === 'them' ? 'No opponent loaded' : 'No starters'}</td></tr>`}</tbody>
     ${totals ? `<tfoot><tr><td class="st-name"><b>Projected week</b></td><td class="num st-g"><b>${games}</b></td>${totals}</tr></tfoot>` : ''}
   </table>`;
@@ -2156,12 +2259,12 @@ function lineupSection(ctx) {
   const misses = nearMisses(ctx, base);
   const intro = !ctx.mine.length ? 'Add players to your roster first.'
     : !ctx.hasOpp ? 'Add your opponent to optimize for this matchup. Until then, suggestions just favor more games from better players.'
-    : changed ? `Making ${steps.length === 1 ? 'this change' : 'these changes'} moves your win chance from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> and your projected score from <b>${fmt(ctx.oSet.expected, 1)}</b> to <b>${fmt(ctx.oBest.expected, 1)}</b> categories.`
-    : `Your lineup as set is the best one we found for this matchup (${pctTxt(ctx.oSet.win)} to win, ${fmt(ctx.oSet.expected, 1)} projected categories).`;
+    : changed ? `Making ${steps.length === 1 ? 'this change' : 'these changes'} moves your win chance from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> and your projected score from <b>${fmt(ctx.oSet.expected, isPoints() ? 0 : 1)}</b> to <b>${fmt(ctx.oBest.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'fantasy points' : 'categories'}.`
+    : `Your lineup as set is the best one we found for this matchup (${pctTxt(ctx.oSet.win)} to win, ${fmt(ctx.oSet.expected, isPoints() ? 0 : 1)} projected ${isPoints() ? 'fantasy points' : 'categories'}).`;
   const swing = ctx.catsSet.filter(c => c.p > 0.1 && c.p < 0.9).map(c => c.label);
   const punt = ctx.catsSet.filter(c => c.p <= 0.1).map(c => c.label);
   const locked = ctx.catsSet.filter(c => c.p >= 0.9).map(c => c.label);
-  const how = ctx.hasOpp && (punt.length || locked.length)
+  const how = ctx.hasOpp && !isPoints() && (punt.length || locked.length)
     ? `<p class="small muted" style="margin:-6px 0 12px">${swing.length ? `Swing: <b>${swing.join(', ')}</b>` : 'No category is close'}${punt.length ? ` · Punt: <b>${punt.join(', ')}</b>` : ''}${locked.length ? ` · Locked: <b>${locked.join(', ')}</b>` : ''}</p>` : '';
   return `
     <div class="card">
@@ -2169,7 +2272,7 @@ function lineupSection(ctx) {
       <p class="small" style="margin:0 0 12px">${intro}</p>
       ${how}
       ${changed ? `<h3 class="sub">Suggested changes</h3>${steps.map(ex => swapBlock(ex, ctx, 'suggested')).join('')}${rest ? swapBlock(rest, ctx, 'suggested') : ''}` : ''}
-      ${ctx.hasOpp ? `<h3 class="sub" style="margin-top:16px">Categories ${infoBtn('win')}</h3>${catCompareTable(ctx, changed)}` : ''}
+      ${ctx.hasOpp && !isPoints() ? `<h3 class="sub" style="margin-top:16px">Categories ${infoBtn('win')}</h3>${catCompareTable(ctx, changed)}` : ''}
       ${misses.length ? `<h3 class="sub" style="margin-top:16px">Other swaps we checked</h3>${misses.map(ex => swapBlock(ex, ctx, 'miss')).join('')}` : ''}
     </div>`;
 }
@@ -2210,7 +2313,7 @@ function pickupsCard() {
       ${ideas.length ? `<ul class="alerts">${ideas.map(x => {
         const better = x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
         return `<li class="alert"><span class="grow"><button class="link-btn pname" data-action="player-detail" data-nba="${x.p.nbaId}">${esc(x.p.name)}</button> <span class="muted small">${esc(x.p.team)} · ${posTags(x.p.pos)} · ${x.games} games${x.watch ? ' · watchlist' : ''}</span><br>
-          <span class="small">For ${esc(x.drop.name)}: <b class="pos-good">+${fmt(x.gain, 2)}</b> cats, ${Math.round(x.win * 100)}% to win${better.length ? ` · helps ${better.join(', ')}` : ''}</span></span>
+          <span class="small">For ${esc(x.drop.name)}: <b class="pos-good">${goalDelta(x.gain)}</b>, ${Math.round(x.win * 100)}% to win${better.length ? ` · helps ${better.join(', ')}` : ''}</span></span>
           <button class="btn sm" data-action="nba-add" data-nba="${x.p.nbaId}">Watch</button></li>`;
       }).join('')}</ul>` : '<p class="muted small" style="margin:0">No free agent clearly improves this matchup.</p>'}
     </div>`;
@@ -2233,13 +2336,13 @@ function viewWeek() {
   const scoreboard = hasOpp ? `
     <div class="card scoreboard">
       <div class="sb-main">
-        <div class="sb-side"><div class="sb-label">${esc(state.teamName)}</div><div class="sb-score">${fmt(oBest.expected, 1)}</div></div>
-        <div class="sb-vs">projected<br>cats${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}</div>
-        <div class="sb-side right"><div class="sb-label">${esc(state.opp.name || 'Opponent')}</div><div class="sb-score">${fmt(oBest.n - oBest.expected, 1)}</div></div>
+        <div class="sb-side"><div class="sb-label">${esc(state.teamName)}</div><div class="sb-score">${fmt(oBest.expected, isPoints() ? 0 : 1)}</div></div>
+        <div class="sb-vs">projected<br>${isPoints() ? 'points' : 'cats'}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}</div>
+        <div class="sb-side right"><div class="sb-label">${esc(state.opp.name || 'Opponent')}</div><div class="sb-score">${isPoints() ? fmt(oBest.opp, 0) : fmt(oBest.n - oBest.expected, 1)}</div></div>
       </div>
       <div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
       <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>
-      ${changed ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, 1)}</b> cats · ${pctTxt(oSet.win)} to win · ${asSet.games} starter games</div></div>` : ''}
+      ${changed ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'points' : 'cats'} · ${pctTxt(oSet.win)} to win · ${asSet.games} starter games</div></div>` : ''}
     </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from Fantrax</button>` : 'Fantrax has no matchup for you this week.'}</div></div>`;
 
   // Daily-lineup leagues keep the day-by-day swap list
@@ -2255,7 +2358,7 @@ function viewWeek() {
       ${swaps.length ? `<ul class="alerts">${swaps.map(x => `<li class="alert ${x.past ? '' : 'good'}"><span class="dot"></span><span class="grow"><b>${fmtDay(x.d)}</b>${x.past ? ' <span class="muted small">(already played)</span>' : ''}<br>
         Start ${x.start.map(p => `<b>${esc(p.name)}</b>`).join(', ')}${x.sit.length ? `; sit ${x.sit.map(p => esc(p.name)).join(', ')}` : ''}</span></li>`).join('')}</ul>`
         : `<p class="muted small" style="margin:0">${mine.length ? 'Your lineup as set already uses every game your bench could add.' : 'Your roster is empty.'}</p>`}
-      ${hasOpp ? `<h3 class="sub" style="margin-top:16px">Categories ${infoBtn('win')}</h3>${catCompareTable(ctx, changed)}` : ''}
+      ${hasOpp && !isPoints() ? `<h3 class="sub" style="margin-top:16px">Categories ${infoBtn('win')}</h3>${catCompareTable(ctx, changed)}` : ''}
     </div>`;
   }
 
@@ -2487,7 +2590,7 @@ async function switchLeague(id) {
       applyLeagueRules(res.league);
     }
   }
-  if (state.fxTeam) rememberLeague(id, res.league.name);
+  if (state.fxTeam) { rememberLeague(id, res.league.name); syncLeagueRules(); }
   syncLinked();
   validateLineup();
   return res.league;
@@ -2521,7 +2624,6 @@ function viewLanding() {
       <h1>Which team is yours?</h1>
       <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. Pick your team to load your roster and this week's matchup.</p>
       ${preDraft() ? `<p class="land-note">This league hasn't drafted yet${draftWhen(fxLeague()) ? ` (draft: ${esc(draftWhen(fxLeague()))})` : ''}, so rosters are empty for now.</p>` : ''}
-      ${isPointsLeague() ? `<p class="land-note">This is a points league. Matchup odds and lineup tips here are built for category leagues, so treat them as a rough guide.</p>` : ''}
       <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const step1 = chosen ? '' : `

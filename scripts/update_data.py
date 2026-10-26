@@ -428,6 +428,11 @@ def fantrax(league_id, index, saved_league=None):
         if not nba:
             continue
         elig = set((pi.get('eligiblePos') or '').split(','))
+        # leagues with broad positions list G / F instead of PG,SG / SF,PF
+        if 'G' in elig and not elig & {'PG', 'SG'}:
+            elig |= {'PG', 'SG'}
+        if 'F' in elig and not elig & {'SF', 'PF'}:
+            elig |= {'SF', 'PF'}
         players[nba] = {'id': fid, 'st': pi.get('status') or '', 'pos': [x for x in BASE_POS if x in elig], 'adp': adp.get(fid)}
 
     league = {
