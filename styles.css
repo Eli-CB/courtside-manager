@@ -502,20 +502,26 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .prose li { margin-bottom: 4px; }
 
 /* ---------- Category strengths ---------- */
-.cs-table { min-width: 720px; }
-.cs-table th.cs-bar, .cs-table td.cs-bar { width: 22%; }
+.cs-table { min-width: 620px; }
+.cs-table th.cs-bar, .cs-table td.cs-bar { width: 18%; }
 .cs-bar .track { display: block; position: relative; height: 12px; background: var(--surface-2); border-radius: 4px; }
 .cs-bar .track::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); opacity: .5; }
 .cs-bar .fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
 .cs-bar .fill.up { left: 50%; background: var(--good); }
 .cs-bar .fill.down { right: 50%; background: var(--bad); }
-.cs-table td.cs-strip, .cs-table th.cs-strip { width: 20%; }
+.cs-table td.cs-strip, .cs-table th.cs-strip { width: 40%; }
 .strip { position: relative; height: 18px; }
 .strip::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--border); }
 .strip::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 1px; background: var(--muted); opacity: .45; }
 .sdot { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--muted); opacity: .55; }
 .sdot.me { width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--accent); opacity: 1; z-index: 1; box-shadow: 0 0 0 2px var(--surface); }
-.cs-who { font-size: .85rem; white-space: nowrap; }
+.cs-row { cursor: pointer; }
+.cs-row td:first-child { white-space: nowrap; }
+.cs-chev { display: inline-block; width: 1em; color: var(--muted); font-size: .75rem; transition: transform .15s; }
+.cs-row[aria-expanded="true"] .cs-chev { transform: rotate(90deg); }
+.cs-row[aria-expanded="true"] td { border-bottom-color: transparent; }
+.cs-detail td { padding-top: 0; }
+.cs-who { font-size: .85rem; display: flex; flex-wrap: wrap; gap: 6px 28px; padding-left: 1em; }
 .cs-rank { white-space: nowrap; }
 .cs-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
 .fx-connect { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
@@ -666,8 +672,11 @@ body.past .ctx-season { color: var(--accent); }
   .board .bctrl { gap: 2px; }
   .board .bctrl .icon-btn.xs { width: 22px; height: 22px; }
   .board .opp-x { display: none; }
-  /* category strengths: number, rank and league strip fit; drivers scroll */
-  .cs-table { min-width: 560px; }
+  /* category strengths: number, rank and league strip fit without scrolling */
+  .cs-table { min-width: 0; }
+  .cs-table th { white-space: normal; }
+  .cs-table th, .cs-table td { padding-left: 4px; padding-right: 4px; }
+  .cs-table td.cs-strip { min-width: 80px; }
   .cs-table .cs-bar { display: none; }
   /* settings */
   .count-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }

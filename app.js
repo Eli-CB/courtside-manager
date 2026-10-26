@@ -61,7 +61,7 @@ function emptyState() {
    State + persistence
    ========================================================= */
 let state = null;
-const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'all', sort: 'val', limit: 50 }, tab: 'dashboard', rosterSort: { key: 'value', dir: -1 }, poolSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set() };
+const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'all', sort: 'val', limit: 50 }, tab: 'dashboard', rosterSort: { key: 'value', dir: -1 }, poolSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), csOpen: new Set() };
 
 function load() {
   let s = null;
@@ -735,7 +735,7 @@ const INFO = {
     <p><b>League avg.</b> The same number averaged across every team in your Fantrax league, using each team's current roster and lineup.</p>
     <p><b>Bar.</b> How far you are from that league average, measured in the typical gap between teams (one standard deviation across the league). The bar reaches the edge at two gaps above or below. Fewer turnovers counts as above average.</p>
     <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
-    <p><b>Helped most and hurt most.</b> Each player's own per-game number in that category, compared with the league average in the same row. For FG% and FT% it's their percentage and attempts a game ("<b>.700</b> on 6.2 FTA"), ranked by makes above or below what the league average would give at that volume, so a poor shooter who takes a lot of shots hurts more than one who rarely shoots. Hover a name for the detail.</p>
+    <p><b>Helped most and hurt most.</b> Click a category's row to show them. Each player's own per-game number in that category, compared with the league average in the same row. For FG% and FT% it's their percentage and attempts a game ("<b>.700</b> on 6.2 FTA"), ranked by makes above or below what the league average would give at that volume, so a poor shooter who takes a lot of shots hurts more than one who rarely shoots. Hover a name for the detail.</p>
     <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank. <b>Punt candidates</b> are bottom-three categories where you're also below the league average.</p>`],
   awards: ['How awards are decided', `
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
@@ -1577,16 +1577,19 @@ function strengthsCard() {
     const who = list => list.map(x => `<span title="${esc(tip(x))}">${esc(lastName(x.p.name))} <b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(x.p[c.key]) : fmt(statOf(x.p, c), 1)}</b>${c.pct ? `<span class="muted"> on ${fmt(x.p[att], 1)} ${att.toUpperCase()}</span>` : ''}</span>`).join(', ') || '<span class="muted">—</span>';
     const w = Math.min(Math.abs(z) / 2, 1) * 50; // bar edge = 2 spreads from the league average
     const pos = v => ((Math.max(-2.5, Math.min(2.5, gap(v))) + 2.5) / 5) * 100;
-    return { c, z, rank, html: `<tr>
-      <td><b>${c.label}</b></td>
+    const open = ui.csOpen.has(c.key);
+    return { c, z, rank, html: `<tr class="cs-row" data-action="cs-toggle" data-cat="${c.key}" aria-expanded="${open}" title="Show who helped and hurt most">
+      <td><span class="cs-chev" aria-hidden="true">▸</span><b>${c.label}</b></td>
       <td class="num"><b>${fmtRaw(c, me.raw[c.key])}</b></td>
       ${league ? `<td class="num muted">${fmtRaw(c, mean)}</td>` : ''}
       <td class="cs-bar" title="${signed(z, 2)} spreads ${league ? 'from the league average' : 'from a typical player'}"><span class="track"><span class="fill ${z >= 0 ? 'up' : 'down'}" style="width:${w}%"></span></span></td>
       ${league ? `<td class="num cs-rank ${rank <= 3 ? 'pos-good' : rank > n - 3 ? 'pos-bad' : ''}"><b>${ordinal(rank)}</b> <span class="muted">/ ${n}</span></td>
       <td class="cs-strip"><div class="strip">${teams.map(t => `<span class="sdot${t.mine ? ' me' : ''}" style="left:${pos(t.raw[c.key]).toFixed(1)}%" title="${esc(t.name)}: ${fmtRaw(c, t.raw[c.key])}"></span>`).join('')}</div></td>` : ''}
-      <td class="cs-who">${who(drivers)}</td>
-      <td class="cs-who">${who(drag)}</td>
-    </tr>` };
+    </tr>
+    <tr class="cs-detail"${open ? '' : ' hidden'}><td colspan="${league ? 6 : 3}"><div class="cs-who">
+      <span><span class="muted">Helped most</span> ${who(drivers)}</span>
+      <span><span class="muted">Hurt most</span> ${who(drag)}</span>
+    </div></td></tr>` };
   });
 
   // with a league, strengths and weaknesses are about rank; without one, about the gap
@@ -1598,7 +1601,7 @@ function strengthsCard() {
   return `<div class="card">
     ${head}
     <div class="table-wrap"><table class="cs-table">
-      <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team (you in orange)</th>' : ''}<th>Helped most</th><th>Hurt most</th></tr></thead>
+      <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team (you in orange)</th>' : ''}</tr></thead>
       <tbody>${rows.map(r => r.html).join('')}</tbody>
     </table></div>
     <div class="cs-summary">
@@ -2782,6 +2785,12 @@ const actions = {
     if (!d.open) d.showModal();
   },
   'go-week'() { location.hash = '#week'; },
+  'cs-toggle'(el) {
+    const open = !ui.csOpen.delete(el.dataset.cat);
+    if (open) ui.csOpen.add(el.dataset.cat);
+    el.setAttribute('aria-expanded', open);
+    el.nextElementSibling.hidden = !open;
+  },
   'close-info'() { $('#infoDialog').close(); },
   'str-basis'(el) {
     ui.strBasis = el.dataset.basis;
