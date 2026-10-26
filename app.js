@@ -788,8 +788,10 @@ function fxPeriodFor(start) {
   return L.periods.find(p => p.start <= mid && mid <= p.end) || null;
 }
 
-// League teams minus Fantrax's "BYE WEEK" placeholder
-const fxPickable = () => (fxLeague() ? fxLeague().teams.filter(t => !/^bye week$/i.test(t.name.trim())) : []);
+// Every team in the league. Fantrax's "BYE WEEK" team is unmanaged but real: it drafts, has a
+// roster, plays matchups and has a record, so it counts everywhere except when picking your team.
+const fxPickable = () => (fxLeague() ? fxLeague().teams : []);
+const fxClaimable = () => fxPickable().filter(t => !/^bye week$/i.test(t.name.trim()));
 
 function fxTeamName(id) {
   const L = fxLeague();
@@ -1188,7 +1190,7 @@ function ctxBar() {
   let teamSel;
   if (P) {
     const myName = fxTeamName(state.fxTeam);
-    const teams = P.league.teams.filter(t => !/^BYE WEEK$/i.test(t.name));
+    const teams = P.league.teams;
     const me = teams.find(t => t.name === myName);
     const shownId = ui.pastTeam || (me ? me.id : '');
     teamSel = `<select class="ctx-team" data-change="past-team" aria-label="Team">${shownId ? '' : '<option value="">Pick a team</option>'}${teams.map(t => `<option value="${esc(t.id)}" ${t.id === shownId ? 'selected' : ''}>${esc(t.name)}${me && t.id === me.id ? ' (you)' : ''}</option>`).join('')}</select>`;
@@ -1196,7 +1198,7 @@ function ctxBar() {
     const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
     const shown = viewing ? ui.viewA : state.fxTeam;
     teamSel = `<select class="ctx-team" data-change="${state.fxTeam ? 'fx-view' : 'fx-team'}" aria-label="${state.fxTeam ? 'Team to view' : 'Your team'}">
-      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
+      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${(state.fxTeam ? fxPickable() : fxClaimable()).map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
     </select>${viewing ? '<span class="badge">Viewing only</span><button class="link-btn small" data-action="fx-view-mine">Back to my team</button>' : ''}`;
   }
   $('#ctxTeam').innerHTML = `${seasonSel}<span class="ctx-sep" aria-hidden="true">/</span>${teamSel}${addForm}`;
@@ -1554,7 +1556,7 @@ function viewStandings() {
   <div class="card">
     ${rows.length ? `<div class="table-wrap"><table>
       <thead><tr><th class="num">#</th><th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">GB</th></tr></thead>
-      <tbody>${rows.filter(r => !/^BYE WEEK$/i.test(r.name)).map(r => {
+      <tbody>${rows.map(r => {
         const g = r.w + r.l + r.t;
         return `<tr${r.id === state.fxTeam ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.id === state.fxTeam ? ' <span class="muted small">(you)</span>' : ''}</td>
           <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td></tr>`;
@@ -2476,7 +2478,7 @@ function viewLanding() {
       <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. Pick your team to load your roster and this week's matchup.</p>
       ${preDraft() ? `<p class="land-note">This league hasn't drafted yet${draftWhen(fxLeague()) ? ` (draft: ${esc(draftWhen(fxLeague()))})` : ''}, so rosters are empty for now.</p>` : ''}
       ${isPointsLeague() ? `<p class="land-note">This is a points league. Matchup odds and lineup tips here are built for category leagues, so treat them as a rough guide.</p>` : ''}
-      <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
+      <div class="land-teams">${fxClaimable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const step1 = chosen ? '' : `
       <p class="land-step">${ui.addingLeague && state.fxTeam ? 'Add a league' : 'Courtside Manager'}</p>
