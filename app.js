@@ -177,8 +177,30 @@ function catZ(p) {
 // Points leagues score fantasy points from the league's own values; category leagues the nine cats
 const leaguePoints = () => { const L = NBA && NBA.league; return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
 const isPoints = () => !!leaguePoints();
-const STAT_LABEL = { pts: 'PTS', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK', tpm: '3PM', to: 'TO', fgm: 'FGM', fga: 'FGA', ftm: 'FTM', fta: 'FTA' };
-const statVal = (p, k) => (k === 'fgm' ? p.fgPct * p.fga : k === 'ftm' ? p.ftPct * p.fta : p[k] || 0);
+const STAT_LABEL = { pts: 'PTS', reb: 'REB', oreb: 'OREB', dreb: 'DREB', ast: 'AST', stl: 'STL', blk: 'BLK', tpm: '3PM', tpa: '3PA', tpmi: '3P miss',
+  fg2m: '2PM', fg2a: '2PA', to: 'TO', fgm: 'FGM', fga: 'FGA', fgmi: 'FG miss', ftm: 'FTM', fta: 'FTA', ftmi: 'FT miss', dd: 'DD', td: 'TD',
+  pf: 'PF', pm: '+/−', min: 'MIN', gp1: 'GP' };
+// stats a league can score that are combinations of ones we project
+const DERIVED = { fgmi: { fga: 1, fgm: -1 }, ftmi: { fta: 1, ftm: -1 }, tpmi: { tpa: 1, tpm: -1 }, fg2m: { fgm: 1, tpm: -1 }, fg2a: { fga: 1, tpa: -1 } };
+function statVal(p, k) {
+  if (k === 'fgm') return p.fgPct * p.fga;
+  if (k === 'ftm') return p.ftPct * p.fta;
+  if (k === 'gp1') return p.min || p.pts ? 1 : 0;
+  if (DERIVED[k]) return sum(Object.entries(DERIVED[k]).map(([b, c]) => statVal(p, b) * c));
+  return p[k] || 0;
+}
+// a week's projected total (and spread) of any stat, derived ones included
+const totStat = (S, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (S.tot[b] || 0) * c)) : S.tot[k] || 0);
+const vrStat = (S, k) => (DERIVED[k] ? sum(Object.keys(DERIVED[k]).map(b => S.vr[b] || 0)) : S.vr[k] || 0);
+// a league's points per stat, with derived stats folded onto the ones we project
+function foldPoints(sc) {
+  const out = {};
+  for (const [k, v] of Object.entries(sc)) {
+    if (DERIVED[k]) for (const [b, c] of Object.entries(DERIVED[k])) out[b] = (out[b] || 0) + v * c;
+    else out[k] = (out[k] || 0) + v;
+  }
+  return out;
+}
 
 function fantasyPoints(p, sc = leaguePoints()) {
   return sc ? sum(Object.entries(sc).map(([k, v]) => statVal(p, k) * v)) : 0;
@@ -188,7 +210,7 @@ function fantasyPoints(p, sc = leaguePoints()) {
 function scoreCats() {
   const sc = leaguePoints();
   if (!sc) return CATS;
-  return [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0 })), { key: 'fp', label: 'FP', fp: true }];
+  return [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0, dec: k === 'dd' || k === 'td' ? 2 : null })), { key: 'fp', label: 'FP', fp: true }];
 }
 
 function value(p) {
@@ -214,12 +236,14 @@ function totals(list, mult = () => 1) {
   const t = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tpm: 0, to: 0, fgm: 0, fga: 0, ftm: 0, fta: 0 };
   for (const p of list) {
     const m = mult(p);
-    for (const k of ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fga', 'fta']) t[k] += p[k] * m;
+    for (const k of ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fga', 'fta', 'min', ...EXTRA_KEYS]) t[k] = (t[k] || 0) + (p[k] || 0) * m;
+    t.gp1 = (t.gp1 || 0) + m;
     t.fgm += p.fgPct * p.fga * m;
     t.ftm += p.ftPct * p.fta * m;
   }
   t.fgPct = t.fga ? t.fgm / t.fga : 0;
   t.ftPct = t.fta ? t.ftm / t.fta : 0;
+  for (const k of Object.keys(DERIVED)) t[k] = sum(Object.entries(DERIVED[k]).map(([b, c]) => (t[b] || 0) * c));
   if (isPoints()) t.fp = sum(list.map(p => fantasyPoints(p) * mult(p)));
   return t;
 }
@@ -292,7 +316,7 @@ const normName = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]
 function statObj(arr) {
   if (!arr) return null;
   const o = {};
-  NBA.statKeys.forEach((k, i) => { o[k] = +arr[i] || 0; });
+  NBA.statKeys.forEach((k, i) => { if (i < arr.length) o[k] = +arr[i] || 0; });
   return o;
 }
 
@@ -307,7 +331,7 @@ function nbaStats(raw, basis = state.basis) {
   else if (cur && cur.gp && prev && prev.gp) {
     const K = 10, w = cur.gp + K;
     s = {};
-    for (const k of NBA.statKeys) s[k] = (cur[k] * cur.gp + prev[k] * K) / w;
+    for (const k of NBA.statKeys) s[k] = prev[k] == null ? cur[k] : cur[k] == null ? prev[k] : (cur[k] * cur.gp + prev[k] * K) / w;
     s.gp = cur.gp;
   } else s = (cur && cur.gp) ? cur : prev;
   if (!s) return null;
@@ -322,7 +346,7 @@ function applyNba(p, raw) {
   p.team = raw.team;
   if (raw.fx && raw.pos && raw.pos.length) p.pos = [...raw.pos]; // your league's eligibility
   const s = nbaStats(raw);
-  for (const k of ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fga', 'fta', 'fgPct', 'ftPct']) p[k] = s ? +(+s[k]).toFixed(3) : 0;
+  for (const k of ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fga', 'fta', 'fgPct', 'ftPct', ...EXTRA_KEYS]) p[k] = s && s[k] != null ? +(+s[k]).toFixed(3) : 0;
   p.gp = s ? Math.round(s.gp) : 0;
   p.status = raw.inj ? raw.inj.status : 'Healthy';
   p.inj = raw.inj || null;
@@ -472,7 +496,10 @@ function fillSlots(cands, slots) {
 /* =========================================================
    Weekly matchup engine
    ========================================================= */
-const COUNT_KEYS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta'];
+// Per-game stats we project. The first 11 have spreads from game logs (raw.sd, same order); the rest are
+// for points leagues that score them (dd/td are per-game rates; gp1 is one per game played).
+const COUNT_KEYS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm', 'dd', 'td', 'min', 'gp1'];
+const EXTRA_KEYS = ['oreb', 'dreb', 'tpa', 'pf', 'pm', 'dd', 'td'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 let teamDates = new Map();
 
@@ -488,17 +515,31 @@ function weekStart() {
   const base = dayOffset(t) > Math.max(...state.matchDays) ? addDays(mondayOf(t), 7) : mondayOf(t);
   return addDays(base, 7 * ui.weekShift);
 }
-function matchDates(start = weekStart()) { return [...state.matchDays].sort((a, b) => a - b).map(o => addDays(start, o)); }
+function matchDates(start = weekStart()) {
+  const p = NBA && NBA.league && NBA.league.periods ? fxPeriodFor(start) : null;
+  if (p) {
+    // a period ending in the evening (Fantrax's usual 6:59 PM) leaves that day's games to the next one
+    const endHour = +(String(p.endAt || '').match(/T(\d\d)/) || [0, 23])[1];
+    const out = [];
+    for (let d = p.start; d < p.end || (d === p.end && endHour >= 21); d = addDays(d, 1)) out.push(d);
+    if (out.length) return out;
+  }
+  return [...state.matchDays].sort((a, b) => a - b).map(o => addDays(start, o));
+}
 const playsOn = (p, d) => !!(teamDates.get(p.team) && teamDates.get(p.team).has(d));
 const gamesIn = (p, dates) => dates.filter(d => playsOn(p, d)).length;
 
 // Per-game means and spreads. Spreads come from the player's real game logs when available.
 function perGame(p) {
-  const m = { pts: p.pts, reb: p.reb, ast: p.ast, stl: p.stl, blk: p.blk, tpm: p.tpm, to: p.to, fga: p.fga, fta: p.fta, fgm: p.fgPct * p.fga, ftm: p.ftPct * p.fta };
+  const m = Object.fromEntries(COUNT_KEYS.map(k => [k, statVal(p, k)]));
   const raw = p.nbaId ? nbaById.get(p.nbaId) : null;
   const sd = {};
   COUNT_KEYS.forEach((k, i) => {
-    sd[k] = raw && raw.sd ? raw.sd[i] : (k === 'pts' ? 0.3 * m.pts + 2.5 : 1.1 * Math.sqrt(Math.max(m[k], 0.1)));
+    sd[k] = raw && raw.sd && raw.sd[i] != null ? raw.sd[i]
+      : k === 'pts' ? 0.3 * m.pts + 2.5
+      : k === 'dd' || k === 'td' ? Math.sqrt(m[k] * (1 - m[k])) // happens or not, game to game
+      : k === 'pm' ? 9 : k === 'min' ? 4 : k === 'gp1' ? 0
+      : 1.1 * Math.sqrt(Math.max(m[k], 0.1));
   });
   return { m, sd };
 }
@@ -539,7 +580,7 @@ function phi(x) { // standard normal CDF
 // scoring night brings rebounds and assists too), so spreads are combined with a 0.35 correlation.
 const FP_RHO = 0.35;
 function fpTotals(S) {
-  const sc = leaguePoints();
+  const sc = foldPoints(leaguePoints());
   const a = sum(Object.entries(sc).map(([k, v]) => (S.tot[k] || 0) * v));
   const parts = Object.entries(sc).map(([k, v]) => v * Math.sqrt(S.vr[k] || 0));
   const vr = (1 - FP_RHO) * sum(parts.map(x => x * x)) + FP_RHO * sum(parts) ** 2;
@@ -560,8 +601,8 @@ function compareCats(A, B) {
       const va = A.tot[at] ? 1.3 * a * (1 - a) / A.tot[at] : 0, vb = B.tot[at] ? 1.3 * b * (1 - b) / B.tot[at] : 0;
       sd = Math.sqrt(va + vb);
     } else {
-      a = A.tot[c.key]; b = B.tot[c.key];
-      sd = Math.sqrt(A.vr[c.key] + B.vr[c.key]);
+      a = totStat(A, c.key); b = totStat(B, c.key);
+      sd = Math.sqrt(vrStat(A, c.key) + vrStat(B, c.key));
     }
     let p = sd > 0 ? phi((a - b) / sd) : (a > b ? 1 : a < b ? 0 : 0.5);
     if (c.neg) p = 1 - p;
@@ -662,7 +703,7 @@ const INFO = {
     <p><b>Uncertainty.</b> Each player's game-to-game spread (standard deviation) comes from his NBA game logs: last season plus this season, games of 10+ minutes, at least 8 games. Spreads add up across every starter game, so a team's weekly total has a known range.</p>
     <p><b>Category win chance.</b> For counting stats: the chance your total beats theirs, using a bell curve with the gap divided by the combined spread. Turnovers are reversed (fewer wins). FG% and FT% use team makes ÷ attempts, with shot-making luck (binomial, widened 30%) as the spread.</p>
     <p><b>Lineups.</b> Both teams' starters as set on Fantrax. Projections use the stats chosen in the league menu (smart blend by default).</p>
-    <p><b>Points leagues.</b> Each side's projected fantasy points come from those totals × your league's points per stat. The spread combines every stat's spread, assuming stats in a game move together somewhat (correlation 0.35), and the win chance is the chance of outscoring them on that bell curve. The suggested lineup maximizes that chance, then projected points. Stats Fantrax scores that we can't project (like double-doubles) are left out.</p>
+    <p><b>Points leagues.</b> Each side's projected fantasy points come from those totals × your league's points per stat. The spread combines every stat's spread, assuming stats in a game move together somewhat (correlation 0.35), and the win chance is the chance of outscoring them on that bell curve. The suggested lineup maximizes that chance, then projected points. We project points, rebounds (offensive and defensive too), assists, steals, blocks, turnovers, threes made and attempted, field goals and free throws made, attempted and missed, two-pointers, double-doubles and triple-doubles (as how often a player gets one), fouls, plus/minus, minutes and games played. Anything else your league scores, like technicals, percentages or position-specific points, is left out and listed in the top bar.</p>
     <p><b>Winning the week.</b> Categories are treated as independent, and we add up the chances of every way to take 5 or more of the 9. The projected category score is the sum of the nine category win chances.</p>`],
   suggest: ['How lineup suggestions work', `
     <p><b>Starting point.</b> Starters are ranked by games this week × (player value + 4), then fitted into your slots (PG, SG, G, SF, PF, F, C, Flx) so every slot gets an eligible player.</p>
@@ -740,25 +781,56 @@ const fxName = n => { const [last, first] = String(n).split(', '); return first 
 function parseStandings(rows) {
   return (Array.isArray(rows) ? rows : []).filter(r => r.teamId).map(r => {
     const [w, l, t] = String(r.points || '').split('-').map(n => +n || 0);
-    return { id: r.teamId, name: r.teamName || '', rank: r.rank, w, l, t, gb: +r.gamesBack || 0 };
+    return { id: r.teamId, name: r.teamName || '', rank: r.rank, w, l, t, gb: +r.gamesBack || 0, pf: r.totalPointsFor != null ? +r.totalPointsFor : null };
   });
 }
 
-// Points leagues: Fantrax's points per stat ("Default" position), mapped onto the stats we project
-const FX_PTS_KEYS = { PTS: 'pts', REB: 'reb', AST: 'ast', ST: 'stl', STL: 'stl', BLK: 'blk', TO: 'to', '3PTM': 'tpm', '3PM': 'tpm', FGM: 'fgm', FGA: 'fga', FTM: 'ftm', FTA: 'fta' };
+// Points leagues: Fantrax's points per stat, mapped onto stats we can project. Matched by short name
+// first, then by Fantrax's category code; anything else is listed as not projected.
+const FX_PTS_SHORT = { PTS: 'pts', REB: 'reb', OREB: 'oreb', DREB: 'dreb', AST: 'ast', ST: 'stl', STL: 'stl', BLK: 'blk', TO: 'to',
+  '3PTM': 'tpm', '3PM': 'tpm', '3PTA': 'tpa', '3PA': 'tpa', FGM: 'fgm', FGA: 'fga', FTM: 'ftm', FTA: 'fta', '2D': 'dd', DD: 'dd',
+  '3D': 'td', TD: 'td', PF: 'pf', MIN: 'min', '+/-': 'pm', GP: 'gp1' };
+const FX_PTS_CODES = [
+  [/PERCENT|PCT/, null], [/OFFENSIVE_REB/, 'oreb'], [/DEFENSIVE_REB/, 'dreb'], [/REBOUND/, 'reb'],
+  [/THREE.*MISS/, 'tpmi'], [/THREE.*ATTEMPT/, 'tpa'], [/THREE/, 'tpm'],
+  [/TWO_POINT.*ATTEMPT/, 'fg2a'], [/TWO_POINT/, 'fg2m'],
+  [/FREE_THROW.*MISS/, 'ftmi'], [/FREE_THROW.*ATTEMPT/, 'fta'], [/FREE_THROW/, 'ftm'],
+  [/FIELD_GOAL.*MISS/, 'fgmi'], [/FIELD_GOAL.*ATTEMPT/, 'fga'], [/FIELD_GOAL/, 'fgm'],
+  [/QUADRUPLE/, null], [/TRIPLE_DOUBLE/, 'td'], [/DOUBLE_DOUBLE/, 'dd'],
+  [/ASSIST/, 'ast'], [/STEAL/, 'stl'], [/BLOCK/, 'blk'], [/TURNOVER/, 'to'],
+  [/TECHNICAL|FLAGRANT|EJECT/, null], [/FOUL/, 'pf'], [/PLUS_MINUS/, 'pm'], [/MINUTE/, 'min'],
+  [/GAMES?_PLAYED/, 'gp1'], [/POINTS$/, 'pts'],
+];
+function fxStatKey(cat) {
+  const short = String(cat.shortName || '').toUpperCase();
+  if (FX_PTS_SHORT[short]) return FX_PTS_SHORT[short];
+  const code = String(cat.code || '').toUpperCase();
+  for (const [re, key] of FX_PTS_CODES) if (re.test(code)) return key;
+  return null;
+}
+
 function fxPointsScoring(ss) {
   if (!ss || !/POINTS/.test(ss.type || '')) return {};
   const points = {}, other = [];
+  let byPosition = false;
   for (const cat of ss.scoringCategorySettings || []) {
     for (const cfg of cat.configs || []) {
-      if (cfg.position && cfg.position.code !== 'DEFAULT') continue;
-      const short = cfg.scoringCategory && cfg.scoringCategory.shortName;
-      const key = FX_PTS_KEYS[short];
-      if (key) points[key] = (points[key] || 0) + (+cfg.points || 0);
-      else if (short && cfg.points) other.push(short);
+      const sc = cfg.scoringCategory || {};
+      if (cfg.position && cfg.position.code !== 'DEFAULT') { byPosition = true; continue; }
+      if (!+cfg.points) continue;
+      const key = fxStatKey(sc);
+      if (key) points[key] = (points[key] || 0) + +cfg.points;
+      else other.push(sc.shortName || sc.name || sc.code);
     }
   }
+  if (byPosition) other.push('position-specific points');
   return Object.keys(points).length ? { points, pointsOther: other } : {};
+}
+
+// Typical length in days of a league's lineup lock periods: about 1 for daily lineups, 7 for weekly
+function rosterPeriodDays(periods) {
+  const lens = periods.slice(0, 6).map(p => (fxTime(p.endDate) - fxTime(p.startDate)) / 864e5).filter(Number.isFinite).sort((a, b) => a - b);
+  return lens.length ? Math.round(lens[Math.floor(lens.length / 2)] * 100) / 100 : null;
 }
 
 async function fetchFantraxLeague(id) {
@@ -800,7 +872,8 @@ async function fetchFantraxLeague(id) {
     historyId: info.leagueHistoryId || null, year: info.seasonYear || null,
     ...fxPointsScoring(info.scoringSystem),
     teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
-    periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10), lock: String(p.startDate) })),
+    periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10), lock: String(p.startDate), endAt: String(p.endDate) })),
+    lockDays: rosterPeriodDays(info.rosterPeriods || []),
     matchups: Object.fromEntries((info.matchups || []).map(m => [String(m.period),
       (m.matchupList || []).filter(x => x.away && x.away.id && x.home && x.home.id).map(x => [x.away.id, x.home.id])])),
     rosterPeriod: rosters.period,
@@ -838,14 +911,25 @@ function applyFantraxLeague({ league, fxPlayers }) {
 }
 
 // Roster slots from the league's settings (8 starters, bench and IR sizes)
+// Our slot type for a Fantrax slot name; combo slots ("G/F", "F-C") are added on the fly
+function fxSlot(name) {
+  if (FX_SLOT_MAP[name]) return FX_SLOT_MAP[name];
+  const parts = String(name).toUpperCase().split(/[\/-]/).filter(Boolean);
+  const elig = [...new Set(parts.flatMap(x => ELIG[x] || []))];
+  if (!elig.length) return 'FLX';
+  if (parts.length === 1) return parts[0];
+  const type = parts.join('/');
+  if (!ELIG[type]) { ELIG[type] = POSITIONS.filter(x => elig.includes(x)); SLOT_TYPES.splice(SLOT_TYPES.indexOf('FLX'), 0, type); }
+  return type;
+}
+
 function slotsFromLeague(league) {
   const ri = league && league.rosterInfo;
   if (!ri || !ri.positionConstraints) return null;
   const slots = [];
+  const types = Object.entries(ri.positionConstraints).map(([k, v]) => [fxSlot(k), v.maxActive || 0]);
   for (const type of SLOT_TYPES) {
-    for (const [k, v] of Object.entries(ri.positionConstraints)) {
-      if (FX_SLOT_MAP[k] === type) for (let i = 0; i < (v.maxActive || 0); i++) slots.push(type);
-    }
+    for (const [t, n] of types) if (t === type) for (let i = 0; i < n; i++) slots.push(type);
   }
   if (!slots.length || (ri.maxTotalActivePlayers && slots.length !== ri.maxTotalActivePlayers)) return null;
   let bench = ri.maxTotalReservePlayers ?? null;
@@ -904,7 +988,7 @@ function fxTeamSide(teamId) {
   const leftover = [];
   roster.forEach((x, i) => {
     if (x.st !== 'ACTIVE') return;
-    const slot = FX_SLOT_MAP[x.slot] || x.slot; // Fantrax "Flx" is our FLX
+    const slot = fxSlot(x.slot); // e.g. Fantrax "Flx" is our FLX
     const idx = state.slots.findIndex((s, j) => s === slot && !lineup[j]);
     if (idx !== -1) lineup[idx] = players[i].id; else leftover.push(players[i]);
   });
@@ -933,6 +1017,7 @@ function withSiteExtras(res) {
 
 // Roster slots, bench and IR from the league's settings (they're the league's, not yours to edit)
 function syncLeagueRules() {
+  if (fxLeague()) state.lineupMode = leagueLineupMode(fxLeague());
   const cfg = slotsFromLeague(fxLeague());
   if (!cfg) return;
   state.slots = cfg.slots;
@@ -1688,11 +1773,11 @@ function viewStandings() {
   </div>
   <div class="card">
     ${rows.length ? `<div class="table-wrap"><table>
-      <thead><tr><th class="num">#</th><th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">GB</th></tr></thead>
+      <thead><tr><th class="num">#</th><th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">GB</th>${rows.some(r => r.pf != null) ? '<th class="num">Pts for</th>' : ''}</tr></thead>
       <tbody>${rows.map(r => {
         const g = r.w + r.l + r.t;
         return `<tr${r.id === state.fxTeam ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.id === state.fxTeam ? ' <span class="muted small">(you)</span>' : ''}</td>
-          <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td></tr>`;
+          <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td>${rows.some(x => x.pf != null) ? `<td class="num">${r.pf != null ? fmt(r.pf, 1) : '—'}</td>` : ''}</tr>`;
       }).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No standings yet</strong>Fantrax didn't return standings for this league.</div>`}
   </div>
@@ -1915,7 +2000,7 @@ function weekContext(start = weekStart()) {
 
 function catValue(proj, c) {
   if (c.fp) return fpTotals(proj).a;
-  if (!c.pct) return proj.tot[c.key];
+  if (!c.pct) return totStat(proj, c.key);
   const [m, a] = c.key === 'fgPct' ? ['fgm', 'fga'] : ['ftm', 'fta'];
   return proj.tot[a] ? proj.tot[m] / proj.tot[a] : 0;
 }
@@ -2151,7 +2236,7 @@ function stabCells(p, ctx) {
   const noStats = !p.min && !p.pts && !p.reb; // e.g. a player with no NBA stats on record
   return scoreCats().map(c => {
     const none = noStats || (week && !g);
-    const v = none ? '—' : c.pct ? fmtPct(p[c.key]) : fmt(statOf(p, c) * (week ? g : 1), week ? 0 : 1);
+    const v = none ? '—' : c.pct ? fmtPct(p[c.key]) : fmt(statOf(p, c) * (week ? g : 1), c.dec && !week ? c.dec : week ? (c.dec ? 1 : 0) : 1);
     return `<td class="sc" style="${none ? '' : shade(contribZ(p, c.key, g, week))}" title="${none ? `${c.label}: no projection` : statTip(p, c, g, week)}">${v}</td>`;
   }).join('');
 }
@@ -2557,10 +2642,16 @@ function applyLeagueRules(league) {
     if (cfg.ir != null) state.ilSize = cfg.ir;
     state.slotsSet = true;
   }
+  state.lineupMode = leagueLineupMode(league);
+  state.matchDays = [0, 1, 2, 3, 4, 5, 6];
+}
+
+// Daily or weekly lineups: from the league's lineup lock periods, else from its matchup length
+function leagueLineupMode(league) {
+  if (league.lockDays != null) return league.lockDays < 2 ? 'daily' : 'weekly';
   const p = (league.periods || [])[0];
   const days = p ? (new Date(p.end) - new Date(p.start)) / 86400000 : 7;
-  state.lineupMode = days >= 5 ? 'weekly' : 'daily';
-  state.matchDays = [0, 1, 2, 3, 4, 5, 6];
+  return days >= 5 ? 'weekly' : 'daily';
 }
 
 // Switch the whole app to a Fantrax league by ID. Throws a readable message.

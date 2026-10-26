@@ -43,7 +43,10 @@ HEADERS = {
     'Accept-Language': 'en-US,en;q=0.9',
 }
 
-STAT_KEYS = ['gp', 'min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta']
+# per-game averages; the stats after fta are for points leagues that score them (dd/td are per-game rates)
+STAT_KEYS = ['gp', 'min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta',
+             'oreb', 'dreb', 'tpa', 'pf', 'pm', 'dd', 'td']
+BOX_VERSION = 2  # box rows carry oreb, dreb, 3PA, fouls and +/- after fta
 # per-game standard deviations, used for weekly win odds
 SD_KEYS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta']
 LOG_KEYS = ['date', 'matchup', 'wl', 'min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'type']
@@ -102,9 +105,12 @@ def dash_stats(season, season_type='Regular Season', last_n=0):
     rows = result_rows(get_json('https://stats.nba.com/stats/leaguedashplayerstats', params))
     out = {}
     for r in rows:
+        gp = r['GP'] or 0
         out[r['PLAYER_ID']] = [
             r['GP'], r['MIN'], r['PTS'], r['REB'], r['AST'], r['STL'], r['BLK'], r['FG3M'], r['TOV'],
             r['FGM'], r['FGA'], r['FTM'], r['FTA'],
+            r.get('OREB') or 0, r.get('DREB') or 0, r.get('FG3A') or 0, r.get('PF') or 0, r.get('PLUS_MINUS') or 0,
+            round((r.get('DD2') or 0) / gp, 3) if gp else 0, round((r.get('TD3') or 0) / gp, 3) if gp else 0,
         ]
     return out
 
@@ -262,7 +268,9 @@ def box_score(game):
             rows.append([p['personId'], t['teamTricode'], round(mins, 1), st.get('points', 0), st.get('reboundsTotal', 0),
                          st.get('assists', 0), st.get('steals', 0), st.get('blocks', 0), st.get('threePointersMade', 0),
                          st.get('turnovers', 0), st.get('fieldGoalsMade', 0), st.get('fieldGoalsAttempted', 0),
-                         st.get('freeThrowsMade', 0), st.get('freeThrowsAttempted', 0)])
+                         st.get('freeThrowsMade', 0), st.get('freeThrowsAttempted', 0),
+                         st.get('reboundsOffensive', 0), st.get('reboundsDefensive', 0), st.get('threePointersAttempted', 0),
+                         st.get('foulsPersonal', 0), st.get('plusMinusPoints', 0)])
     return {'d': game['date'], 'home': g['homeTeam']['teamTricode'], 'away': g['awayTeam']['teamTricode'],
             'hs': g['homeTeam'].get('score', 0), 'as': g['awayTeam'].get('score', 0), 'rows': rows}
 
@@ -293,11 +301,12 @@ def espn_box(game, name_to_id):
             if mins <= 0 or not pid:
                 continue
             fgm, fga = split_made(v[i['fieldGoalsMade-fieldGoalsAttempted']])
-            tpm, _ = split_made(v[i['threePointFieldGoalsMade-threePointFieldGoalsAttempted']])
+            tpm, tpa = split_made(v[i['threePointFieldGoalsMade-threePointFieldGoalsAttempted']])
             ftm, fta = split_made(v[i['freeThrowsMade-freeThrowsAttempted']])
-            num = lambda k: int(float(v[i[k]] or 0))
+            num = lambda k: int(float(v[i[k]] or 0)) if k in i else 0
             rows.append([pid, tri, round(mins, 1), num('points'), num('rebounds'), num('assists'), num('steals'),
-                         num('blocks'), tpm, num('turnovers'), fgm, fga, ftm, fta])
+                         num('blocks'), tpm, num('turnovers'), fgm, fga, ftm, fta,
+                         num('offensiveRebounds'), num('defensiveRebounds'), tpa, num('fouls'), num('plusMinus')])
     return {'d': game['date'], 'home': game['home'], 'away': game['away'],
             'hs': scores.get(game['home'], 0), 'as': scores.get(game['away'], 0), 'rows': rows}
 
@@ -316,8 +325,9 @@ def box_scores(season, finals, name_to_id):
     if os.path.exists(BOX_CACHE):
         with open(BOX_CACHE, encoding='utf-8') as f:
             saved = json.load(f)
-        if saved.get('season') == season:
+        if saved.get('season') == season and saved.get('v') == BOX_VERSION:
             cache = saved
+    cache['v'] = BOX_VERSION
     todo = [g for g in finals if g['id'] not in cache['games']]
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         fetch = lambda g: _try(espn_box, g, name_to_id) if g['id'].startswith('espn:') else _try(box_score, g)
@@ -337,7 +347,7 @@ def season_from_boxes(games):
         key = (g['d'], g['home'], g['away'])
         if key not in unique or not gid.startswith('espn:'):
             unique[key] = g
-    per = {}
+    per, extra = {}, {}
     for g in sorted(unique.values(), key=lambda g: g['d'], reverse=True):
         for r in g['rows']:
             pid, team = r[0], r[1]
@@ -345,15 +355,18 @@ def season_from_boxes(games):
             opp = g['away'] if home else g['home']
             mine, theirs = (g['hs'], g['as']) if home else (g['as'], g['hs'])
             wl = 'W' if mine > theirs else 'L' if mine < theirs else ''
-            per.setdefault(pid, []).append([g['d'], f"{team} {'vs.' if home else '@'} {opp}", wl, *r[2:], 'REG'])
+            per.setdefault(pid, []).append([g['d'], f"{team} {'vs.' if home else '@'} {opp}", wl, *r[2:14], 'REG'])
+            tens = sum(1 for x in r[3:8] if x >= 10)  # pts, reb, ast, stl, blk in double figures
+            extra.setdefault(pid, []).append([*(r[14:19] + [0] * (19 - len(r))), int(tens >= 2), int(tens >= 3)])
 
-    def avg(rows):
+    def avg(rows, ex):
         n = len(rows)
         cols = [round(sum(x[i] for x in rows) / n, 1) for i in range(3, 15)]  # min .. fta in LOG_KEYS order
-        return [n] + cols
+        more = [round(sum(x[i] for x in ex) / n, 1) for i in range(5)] + [round(sum(x[i] for x in ex) / n, 3) for i in (5, 6)]
+        return [n] + cols + more
 
-    cur = {pid: avg(rows) for pid, rows in per.items()}
-    l10 = {pid: avg(rows[:10]) for pid, rows in per.items()}
+    cur = {pid: avg(rows, extra[pid]) for pid, rows in per.items()}
+    l10 = {pid: avg(rows[:10], extra[pid][:10]) for pid, rows in per.items()}
     return cur, l10, per
 
 
@@ -385,6 +398,20 @@ def fantrax_name(name):
     """Fantrax lists players as "Last, First"."""
     last, _, first = name.partition(', ')
     return f'{first} {last}'.strip() if first else name
+
+
+def roster_period_days(periods):
+    """Typical length in days of the league's lineup lock periods (None if unknown)."""
+    from datetime import datetime
+    lens = []
+    for p in periods[:6]:
+        try:
+            a = datetime.fromisoformat(p['startDate'][:19])
+            b = datetime.fromisoformat(p['endDate'][:19])
+            lens.append((b - a).total_seconds() / 86400)
+        except Exception:
+            pass
+    return round(sorted(lens)[len(lens) // 2], 2) if lens else None
 
 
 def fantrax(league_id, index, saved_league=None):
@@ -443,7 +470,10 @@ def fantrax(league_id, index, saved_league=None):
         'historyId': info.get('leagueHistoryId'),
         'year': info.get('seasonYear'),
         'teams': [{'id': k, 'name': v.get('name', '')} for k, v in info.get('teamInfo', {}).items()],
-        'periods': [{'n': p['number'], 'start': p['startDate'][:10], 'end': p['endDate'][:10], 'lock': p['startDate']} for p in info.get('scoringPeriods', [])],
+        'periods': [{'n': p['number'], 'start': p['startDate'][:10], 'end': p['endDate'][:10], 'lock': p['startDate'], 'endAt': p['endDate']}
+                    for p in info.get('scoringPeriods', [])],
+        # how long lineups stay locked: daily leagues have one roster period per day
+        'lockDays': roster_period_days(info.get('rosterPeriods') or []),
         # playoff rounds list TBD pairings until they're set
         'matchups': {str(m['period']): [[x['away']['id'], x['home']['id']] for x in m.get('matchupList', [])
                                         if x.get('away', {}).get('id') and x.get('home', {}).get('id')] for m in info.get('matchups', [])},
