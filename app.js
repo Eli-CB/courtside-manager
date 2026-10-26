@@ -740,7 +740,7 @@ const INFO = {
   awards: ['How awards are decided', `
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
     <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
-    <li><b>Best manager:</b> actual wins (ties count half) minus expected wins. Expected wins: each team's typical week (its best 8 starters, each counted for the share of games he played) is matched against every other team with the same win-chance math as This week, and the average win chance × games played gives the expected record.</li>
+    <li><b>Best manager:</b> actual wins (ties count half) minus expected wins. Expected wins: each team's typical week (its best 8 starters, each counted for the share of games he played) is matched against every other team with the same win-chance math as Matchups, and the average win chance × games played gives the expected record.</li>
     <li><b>Most games lost to injury:</b> 82 minus games played, summed over the final roster.</li>
     <li><b>Biggest punt</b> and <b>Even Steven:</b> each category of that typical week is compared with the league's other teams in team-to-team spreads. The punt is the lowest category; Even Steven has the smallest spread across its nine.</li>
     <li><b>Oldest / youngest:</b> average age of the final roster on the last day of the season, from ESPN birth dates.</li></ul>`],
@@ -1153,7 +1153,7 @@ function buildAlerts() {
   if (state.il.length > state.ilSize) a.push({ lvl: 'bad', msg: `IL has ${state.il.length} players but only ${state.ilSize} spots.` });
   const over = activeCount() - rosterLimit();
   if (over > 0) a.push({ lvl: 'bad', msg: `Roster is ${over} over the ${rosterLimit()}-player limit. Drop or IL someone.` });
-  // lineup advice lives on This week, where it plays to the actual matchup
+  // lineup advice lives on Matchups, where it plays to the actual matchup
   if (NBA && state.opp.players.length && state.lineupMode === 'weekly') {
     const ctx = weekContext();
     const better = ctx.bestIds && [...ctx.bestIds].some(id => !ctx.setIds.has(id));
@@ -1196,7 +1196,7 @@ function leagueMenu() {
 // ----- Past seasons -----
 // Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
 // (keyed by Fantrax's league history id); a past season gets its own tabs.
-const TABS_NOW = [['week', 'This week'], ['dashboard', 'Dashboard'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['trade', 'Trades'], ['pool', 'Watchlist']];
+const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['trade', 'Trades'], ['pool', 'Watchlist']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
@@ -1234,7 +1234,7 @@ async function switchSeason(id) {
   }
   ui.season = id || null;
   const tab = ui.tab === 'rosters' && !id ? 'roster' : ui.tab;
-  const want = '#' + (tabList().some(([k]) => k === tab) ? tab : id ? 'standings' : 'week');
+  const want = '#' + (tabList().some(([k]) => k === tab) ? tab : id ? 'standings' : 'dashboard');
   if (location.hash !== want) location.hash = want; else route();
 }
 
@@ -1754,7 +1754,7 @@ function viewRoster() {
         <td class="num"><b>${fmt(t.pts)}</b></td><td class="num"><b>${fmt(t.reb)}</b></td><td class="num"><b>${fmt(t.ast)}</b></td><td class="num"><b>${fmt(t.stl)}</b></td>
         <td class="num"><b>${fmt(t.blk)}</b></td><td class="num"><b>${fmt(t.tpm)}</b></td><td class="num"><b>${fmt(t.to)}</b></td>
         <td class="num"><b>${fmtPct(t.fgPct)}</b></td><td class="num"><b>${fmtPct(t.ftPct)}</b></td><td></td></tr></tfoot>
-    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from Fantrax. Use ↻ Reload from Fantrax on the This week tab to pull the latest.</div>`}
+    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from Fantrax. Use ↻ Reload from Fantrax in the league menu to pull the latest.</div>`}
   </div>
   </div>`;
 }
@@ -1973,7 +1973,7 @@ function showPlayerDetail(nbaId) {
   if (!d.open) d.showModal();
 }
 
-/* ---------- This week (matchup projector) ---------- */
+/* ---------- Matchups (matchup projector) ---------- */
 function oddsLabel(p) {
   return p >= 0.9 ? ['Locked', 'good'] : p >= 0.7 ? ['Likely win', 'good'] : p >= 0.55 ? ['Lean win', 'good'] : p > 0.45 ? ['Toss-up', ''] : p > 0.3 ? ['Lean loss', 'bad'] : p > 0.1 ? ['Likely loss', 'bad'] : ['Punt', 'bad'];
 }
@@ -2390,7 +2390,7 @@ function pickupIdeas(ctx) {
 function pickupsCard() {
   if (!NBA) return '';
   const ctx = weekContext();
-  if (!ctx.hasOpp) return `<div class="card"><div class="card-head"><h2>Pickup ideas for this week</h2></div><p class="muted small" style="margin:0">Load this week's opponent on the <a href="#week">This week</a> tab to see which free agents would help most.</p></div>`;
+  if (!ctx.hasOpp) return `<div class="card"><div class="card-head"><h2>Pickup ideas for this week</h2></div><p class="muted small" style="margin:0">Load this week's opponent on the <a href="#week">Matchups</a> tab to see which free agents would help most.</p></div>`;
   const ideas = pickupIdeas(ctx).filter(x => x.score > 0.001);
   return `
     <div class="card">
@@ -2406,7 +2406,7 @@ function pickupsCard() {
 
 function viewWeek() {
   if (!NBA) {
-    return `<div class="page-head"><div><h1>This week</h1></div></div>
+    return `<div class="page-head"><div><h1>Matchups</h1></div></div>
       <div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the NBA data file.</div></div>`;
   }
   const ctx = weekContext();
@@ -3060,10 +3060,10 @@ $('#importFile').addEventListener('change', async e => {
 });
 
 function route() {
-  let tab = location.hash.replace('#', '') || 'week';
+  let tab = location.hash.replace('#', '') || 'dashboard';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
   if (tab === 'rosters' && !ui.season) tab = 'roster';
-  ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : 'week';
+  ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : 'dashboard';
   if (!VIEW_TABS.includes(ui.tab)) { ui.viewA = null; ui.viewB = null; }
   render();
   window.scrollTo(0, 0);

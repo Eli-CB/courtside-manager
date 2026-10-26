@@ -351,7 +351,7 @@ button.link-btn.pname:hover { color: var(--accent); text-decoration: underline; 
 code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
 @media (max-width: 900px) { .filters { grid-template-columns: 1fr 1fr; } .filters .field.grow { grid-column: 1 / -1; } }
 
-/* ---------- This week ---------- */
+/* ---------- Matchups ---------- */
 .week-nav { display: flex; align-items: center; gap: 10px; }
 .week-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .week-main > .card + .card, .week-side > .card + .card { margin-top: 16px; }
