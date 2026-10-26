@@ -737,7 +737,7 @@ const INFO = {
     <p><b>Bar.</b> How far you are from that league average, measured in the typical gap between teams (one standard deviation across the league). The bar reaches the edge at two gaps above or below. Fewer turnovers counts as above average.</p>
     <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
     <p><b>Who helped and hurt.</b> Click a category's row to show the players who helped most (green) and hurt most (red). Each player's own per-game number in that category, compared with the league average in the same row. For FG% and FT% it's their percentage and attempts a game ("<b>.700</b> on 6.2 FTA"), ranked by makes above or below what the league average would give at that volume, so a poor shooter who takes a lot of shots hurts more than one who rarely shoots. Hover a name for the detail.</p>
-    <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank. <b>Punt candidates</b> are bottom-three categories where you're also below the league average.</p>`],
+    <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank.</p>`],
   awards: ['How awards are decided', `
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
     <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
@@ -1583,13 +1583,11 @@ function strengthsCard(compact) {
   // with a league, strengths and weaknesses are about rank; without one, about the gap
   const strong = rows.filter(r => (league ? r.rank <= 3 : r.z > 0.2)).sort((a, b) => (a.rank - b.rank) || (b.z - a.z));
   const weak = rows.filter(r => (league ? r.rank > n - 3 : r.z < 0)).sort((a, b) => (b.rank - a.rank) || (a.z - b.z));
-  const punt = rows.filter(r => (league ? r.rank > n - 3 && r.z < 0 : r.z < -0.4));
   const label = r => `<b>${r.c.label}</b>${league ? ` (${ordinal(r.rank)})` : ''}`;
   const unit = starterBasis ? 'per starter' : 'per player';
   const summary = `<div class="cs-summary${compact ? ' flat' : ''}">
       <div><span class="muted small">Strengths</span><br>${strong.slice(0, 4).map(label).join(', ') || '—'}</div>
       <div><span class="muted small">Weaknesses</span><br>${weak.slice(0, 4).map(label).join(', ') || '—'}</div>
-      <div><span class="muted small">Punt candidates</span><br>${punt.map(label).join(', ') || 'None. You’re competitive everywhere.'}</div>
     </div>`;
   if (compact) return `<div class="card">${head}${summary}</div>`;
   return `<div class="card">

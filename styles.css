@@ -517,7 +517,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .cs-detail td { padding-top: 0; }
 .cs-who { font-size: .85rem; display: flex; flex-wrap: wrap; gap: 6px 28px; padding-left: 1em; }
 .cs-rank { white-space: nowrap; }
-.cs-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
+.cs-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
 .cs-summary.flat { margin-top: 0; padding-top: 0; border-top: 0; }
 .roster-table td.rc { font-variant-numeric: tabular-nums; }
 .roster-table tr.muted-row td { opacity: .55; }
