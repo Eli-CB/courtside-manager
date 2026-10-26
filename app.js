@@ -788,10 +788,8 @@ function fxPeriodFor(start) {
   return L.periods.find(p => p.start <= mid && mid <= p.end) || null;
 }
 
-// Every team in the league. Fantrax's "BYE WEEK" team is unmanaged but real: it drafts, has a
-// roster, plays matchups and has a record, so it counts everywhere except when picking your team.
+// Every team in the league
 const fxPickable = () => (fxLeague() ? fxLeague().teams : []);
-const fxClaimable = () => fxPickable().filter(t => !/^bye week$/i.test(t.name.trim()));
 
 function fxTeamName(id) {
   const L = fxLeague();
@@ -1198,7 +1196,7 @@ function ctxBar() {
     const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
     const shown = viewing ? ui.viewA : state.fxTeam;
     teamSel = `<select class="ctx-team" data-change="${state.fxTeam ? 'fx-view' : 'fx-team'}" aria-label="${state.fxTeam ? 'Team to view' : 'Your team'}">
-      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${(state.fxTeam ? fxPickable() : fxClaimable()).map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
+      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
     </select>${viewing ? '<span class="badge">Viewing only</span><button class="link-btn small" data-action="fx-view-mine">Back to my team</button>' : ''}`;
   }
   $('#ctxTeam').innerHTML = `${seasonSel}<span class="ctx-sep" aria-hidden="true">/</span>${teamSel}${addForm}`;
@@ -2478,7 +2476,7 @@ function viewLanding() {
       <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. Pick your team to load your roster and this week's matchup.</p>
       ${preDraft() ? `<p class="land-note">This league hasn't drafted yet${draftWhen(fxLeague()) ? ` (draft: ${esc(draftWhen(fxLeague()))})` : ''}, so rosters are empty for now.</p>` : ''}
       ${isPointsLeague() ? `<p class="land-note">This is a points league. Matchup odds and lineup tips here are built for category leagues, so treat them as a rough guide.</p>` : ''}
-      <div class="land-teams">${fxClaimable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
+      <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const step1 = chosen ? '' : `
       <p class="land-step">${ui.addingLeague && state.fxTeam ? 'Add a league' : 'Courtside Manager'}</p>
