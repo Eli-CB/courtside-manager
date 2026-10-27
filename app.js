@@ -1495,12 +1495,19 @@ function startersAge(L) {
       if (!o.on) continue;
       const raw = nbaById.get(L.fidNba(f));
       if (!raw || !raw.born) continue;
-      const T = out[o.tid] = out[o.tid] || { total: 0, n: 0 };
-      T.total += (day - new Date(raw.born + 'T12:00:00')) / (365.25 * 864e5);
+      const T = out[o.tid] = out[o.tid] || { total: 0, n: 0, players: new Map() };
+      const age = (day - new Date(raw.born + 'T12:00:00')) / (365.25 * 864e5);
+      T.total += age;
       T.n++;
+      const P = T.players.get(raw.id) || { name: raw.name, age, weeks: 0 };
+      P.age = Math.max(P.age, age);
+      P.weeks++;
+      T.players.set(raw.id, P);
     }
   }
-  return Object.fromEntries(Object.entries(out).map(([tid, T]) => [tid, { age: T.total / T.n, n: T.n }]));
+  // the oldest player a team started regularly (3+ weeks)
+  const oldest = T => [...T.players.values()].filter(p => p.weeks >= 3).sort((a, b) => b.age - a.age)[0] || null;
+  return Object.fromEntries(Object.entries(out).map(([tid, T]) => [tid, { age: T.total / T.n, n: T.n, oldest: oldest(T) }]));
 }
 
 // Games lost to players sitting while in the starting lineup: each week, every game a starter's NBA team
@@ -1720,7 +1727,7 @@ function seasonAwards() {
   const impact = pickupImpact(L, G);
   const sat = startersMissed(L, G);
   const olds = startersAge(L);
-  if (olds) for (const T of teams) T.age = olds[T.id] ? olds[T.id].age : null;
+  if (olds) for (const T of teams) { T.age = olds[T.id] ? olds[T.id].age : null; T.oldest = olds[T.id] ? olds[T.id].oldest : null; }
   if (sat) {
     for (const T of teams) {
       const ps = sat[T.id] || [];
@@ -1744,19 +1751,19 @@ function seasonAwards() {
   };
   const ranked = (key, dir, fmtFn, note) => teams.filter(T => T[key] != null).sort((a, b) => (b[key] - a[key]) * dir).map(T => ({ T, txt: fmtFn(T), note: note ? note(T) : '' }));
   return [
-    { title: 'Best draft', info: 'awDraft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
-    { title: 'Best manager', info: 'awManager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
+    { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
+    { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
     impact
-      ? { title: 'Waiver Wire Wizard', info: 'awWaiver', blurb: 'The most production from free-agent and waiver pickups, counting only games they played while in the starting lineup (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }
-      : { title: 'Waiver Wire Wizard', info: 'awWaiver', blurb: 'The most production from free-agent and waiver pickups still on the final roster (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
+      ? { title: 'Waiver Wire Wizard', info: 'awWaiver', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }
+      : { title: 'Waiver Wire Wizard', info: 'awWaiver', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
     sat
-      ? { title: 'Street Clothes', info: 'awStreet', blurb: 'Most games missed by players while they were in the starting lineup (bench and IR don’t count).', list: ranked('missed', 1, T => `${T.missed} games`, T => (T.missedMost ? `most: ${T.missedMost.name} (${T.missedMost.games})` : '')) }
-      : { title: 'Street Clothes', info: 'awStreet', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
-    ...(isPoints() ? [] : [{ title: 'Biggest punt', info: 'awPunt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
-    { title: 'Even Steven', info: 'awSteven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
+      ? { title: 'Street Clothes', info: 'awStreet', list: ranked('missed', 1, T => `${T.missed} games`, T => (T.missedMost ? `most: ${T.missedMost.name} (${T.missedMost.games})` : '')) }
+      : { title: 'Street Clothes', info: 'awStreet', list: ranked('missed', 1, T => `${T.missed} games`) },
+    ...(isPoints() ? [] : [{ title: 'Biggest punt', info: 'awPunt', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
+    { title: 'Even Steven', info: 'awSteven', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`, T => { const order = [...cats].sort((a, b) => T.z[b.key] - T.z[a.key]); return `best: ${order[0].label} · worst: ${order[order.length - 1].label}`; }) }]),
     olds
-      ? { title: 'Unc Status', info: 'awUnc', blurb: 'The oldest starting lineups: average age of the players a team started, week by week.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) }
-      : { title: 'Unc Status', info: 'awUnc', blurb: 'The oldest roster: average age at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
+      ? { title: 'Unc Status', info: 'awUnc', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`, T => (T.oldest ? `oldest regular: ${T.oldest.name} (${Math.floor(T.oldest.age)}, ${T.oldest.weeks} wks)` : '')) }
+      : { title: 'Unc Status', info: 'awUnc', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
   ].filter(a => a.list.length);
 }
 
@@ -1778,7 +1785,6 @@ function viewAwards() {
       <div class="aw-title">${a.title} ${infoBtn(a.info)}</div>
       <div class="aw-win${win.T.id === me ? ' me' : ''}"><span class="aw-name">${esc(win.T.name)}${win.T.id === me ? ' <span class="badge accent">you</span>' : ''}</span><span class="aw-val">${esc(win.txt)}</span></div>
       ${win.note ? `<div class="small muted">${esc(win.note)}</div>` : ''}
-      <p class="small muted aw-blurb">${a.blurb}</p>
       <ol class="aw-list" start="2">${rest.map(x => `<li class="${x.T.id === me ? 'me' : ''}" title="${esc(x.note)}"><span>${esc(x.T.name)}</span><span class="muted">${esc(x.txt)}</span></li>`).join('')}</ol>
     </div>`;
   }).join('')}</div>`;
