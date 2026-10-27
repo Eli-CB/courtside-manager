@@ -12,6 +12,8 @@ const ELIG = {
   G: ['PG', 'SG'], F: ['SF', 'PF'], FLX: POSITIONS,
 };
 const STATUSES = ['Healthy', 'DTD', 'Out'];
+// this deploy's version (the commit), stamped in by the publish workflow; '__BUILD__' when run locally
+const BUILD = '__BUILD__';
 
 // The standard 9 categories, in the order most leagues display them (used when a league's own list is unknown).
 // Percentage categories name the makes and attempts they're built from.
@@ -1324,6 +1326,7 @@ function leagueMenu() {
       <div class="lm-sec">This device</div>
       <button type="button" class="lm-item" data-action="export">Backup &amp; restore</button>
       <button type="button" class="lm-item danger" data-action="start-fresh">Reset and start over</button>
+      <div class="lm-sec">Version ${BUILD.startsWith('__') ? 'local' : esc(BUILD)}</div>
     </div>
   </details>`;
 }
