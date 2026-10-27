@@ -2093,19 +2093,41 @@ function ctxBar() {
       '<span class="badge accent">Past season</span>',
       'standings and weekly lineups from Fantrax',
     ].join(' · ');
+    $('#ctxMeta').hidden = false;
     return;
   }
-  $('#ctxMeta').innerHTML = `<span>${[
-    NBA ? `stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable',
+  const notes = [
     isPoints() && L.pointsOther && L.pointsOther.length ? `<span title="Not projected: ${esc(L.pointsOther.join(', '))}">some scoring stats not projected</span>` : '',
     !isPoints() && L.catsOther && L.catsOther.length ? `<span title="Not projected: ${esc(L.catsOther.join(', '))}">${L.catsOther.length === 1 ? 'one category' : 'some categories'} not projected</span>` : '',
-  ].filter(Boolean).join(' · ')}</span>${state.demo ? '' : '<button type="button" class="btn sm" data-action="league-reload" title="Pull the latest rosters, matchups and standings">↻ Reload from Fantrax</button>'}`;
+  ].filter(Boolean);
+  $('#ctxMeta').innerHTML = notes.length ? `<span>${notes.join(' · ')}</span>` : '';
+  $('#ctxMeta').hidden = !notes.length;
+}
+
+// Settings (the gear at the right of the tab bar): data freshness, reloading from Fantrax, the theme
+function gearMenu() {
+  const el = $('#gearMenu');
+  if (!el) return;
+  const wasOpen = el.querySelector('details') && el.querySelector('details').open;
+  const dark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+  const league = fxLeague() && !needsLanding() && !state.demo;
+  el.innerHTML = `<details class="gear"${wasOpen ? ' open' : ''}>
+    <summary class="icon-btn" aria-label="Settings" title="Settings">⚙</summary>
+    <div class="gear-pop">
+      <div class="lm-sec">Data</div>
+      <div class="gear-row">${NBA ? `NBA stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable'}</div>
+      ${league ? '<button type="button" class="lm-item" data-action="league-reload">↻ Reload from Fantrax<span class="gear-sub">rosters, lineups, matchups and standings</span></button>' : ''}
+      <div class="lm-sec">Appearance</div>
+      <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
+    </div>
+  </details>`;
 }
 
 function render() {
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
   leagueMenu();
+  gearMenu();
   ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   if (ui.pendingSeason) { $('#view').innerHTML = '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>'; return; }
@@ -3708,6 +3730,7 @@ const actions = {
     const next = cur === 'dark' ? 'light' : 'dark';
     root.dataset.theme = next;
     try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+    gearMenu();
   },
   'fx-load-opp'() {
     const opp = fxOpponentFor(weekStart());
@@ -3975,6 +3998,8 @@ document.addEventListener('click', e => {
   if (document.body.classList.contains('nav-open') && !e.target.closest('.nav-btn') && (!e.target.closest('#tabs') || e.target.closest('#tabs a'))) setNav(false);
   const menu = $('#leagueMenu details');
   if (menu && menu.open && !e.target.closest('#leagueMenu')) menu.removeAttribute('open');
+  const gear = $('#gearMenu details');
+  if (gear && gear.open && !e.target.closest('#gearMenu') && !e.target.closest('#infoDialog')) gear.removeAttribute('open');
   const el = e.target.closest('[data-action]');
   if (!el || !actions[el.dataset.action]) return;
   e.preventDefault();
