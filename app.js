@@ -777,7 +777,7 @@ const INFO = {
   dots: ['Schedule dots', `
     <p>One dot per matchup day, from the NBA schedule. <b>Filled</b> dots are games already played; <b>rings</b> are games still to come.</p>
     <ul><li><b>Green:</b> a game that counts (a starter).</li><li><b>Grey:</b> a game on the bench, which doesn't count.</li>
-    <li><b>Yellow:</b> a regular (20+ minutes a game) played well under his usual minutes: under 70% of his average and at least 8 fewer. Hover it for his minutes and the likely reason: a blowout (decided by 20 or more), foul trouble (5 or more fouls), or neither, which can mean an injury during the game or a coach's decision.</li>
+    <li><b>Yellow:</b> a regular (20+ minutes a game) played well under his usual minutes: under 70% of his average and at least 8 fewer. Hover it for his minutes and the likely reason: an <b>injury</b> (he's been on the ESPN injury report since that game), a <b>blowout</b> (decided by 20 or more), <b>foul trouble</b> (5 or more fouls), or none of those, which usually means the coach's call.</li>
     <li><b>Light green ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
     <p>Hover any played game for his minutes and stat line. The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
@@ -2339,15 +2339,19 @@ function swapBlock(ex, ctx, kind) {
 // Either night of a back-to-back (the team also plays the day before or after)
 const isB2B = (p, d) => playsOn(p, d) && (playsOn(p, addDays(d, -1)) || playsOn(p, addDays(d, 1)));
 
-// A played game well under his usual minutes, and the likely reason: a blowout, foul trouble, or unknown
-// (often an injury during the game). Null for a normal game.
-function shortMinutes(p, line) {
+// A played game well under his usual minutes, and the likely reason: an injury (he's been on the injury
+// report since that game), a blowout, foul trouble, or unknown. Null for a normal game.
+function shortMinutes(p, line, d) {
   const usual = p.min || 0;
   if (usual < 20 || line.min > usual * 0.7 || usual - line.min < 8) return null;
   const why = [];
+  if (p.inj && p.inj.date && p.inj.date >= d) {
+    const note = p.inj.note ? `: ${p.inj.note.length > 90 ? p.inj.note.slice(0, 90) + '…' : p.inj.note}` : '';
+    why.push(`injury (listed ${p.inj.label} since ${fmtDay(p.inj.date)}${note})`);
+  }
   if (Math.abs(line.margin) >= 20) why.push(`blowout (${line.margin > 0 ? 'won' : 'lost'} by ${Math.abs(line.margin)})`);
   if (line.pf >= 5) why.push(`foul trouble (${line.pf} fouls)`);
-  return why.length ? why.join(' and ') : 'fewer minutes than usual, not from a blowout or foul trouble (maybe an injury or the coach)';
+  return why.length ? why.join(' and ') : "fewer minutes than usual, with no blowout, foul trouble or injury report (maybe the coach's call)";
 }
 
 function dayDots(p, ctx, counts) {
@@ -2358,7 +2362,7 @@ function dayDots(p, ctx, counts) {
     if (gameFinal(p, d)) {
       const line = actualLine(p, d);
       if (!line) return `<i class="dnp" title="${day}: didn't play"></i>`;
-      const short = shortMinutes(p, line);
+      const short = shortMinutes(p, line, d);
       const stats = `${line.pts} pts ${line.reb} reb ${line.ast} ast`;
       return `<i class="done${bench}${short ? ' short' : ''}" title="${day}${bench ? ' (bench)' : ''}: ${Math.round(line.min)} min${short ? ` (usually ${Math.round(p.min)}), ${short}` : ''} · ${stats}"></i>`;
     }
