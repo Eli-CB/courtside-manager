@@ -61,7 +61,7 @@ function emptyState() {
    State + persistence
    ========================================================= */
 let state = null;
-const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'fa', sort: 'val', limit: 50 }, tab: 'dashboard', rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, csOpen: new Set() };
+const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'fa', sort: 'val', limit: 50 }, tab: 'dashboard', rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set() };
 
 function load() {
   let s = null;
@@ -1763,8 +1763,13 @@ function loadBoxes() {
     if (!r.ok) throw new Error(`box scores ${r.status}`);
     return r.json();
   }).then(data => {
+    const unique = new Map();
+    for (const [gid, g] of Object.entries(data.games || {})) {
+      const key = `${g.d} ${g.home} ${g.away}`;
+      if (!unique.has(key) || !gid.startsWith('espn:')) unique.set(key, g);
+    }
     const byPlayer = new Map(); // NBA id -> [[date, stats]]
-    for (const g of Object.values(data.games || {})) {
+    for (const g of unique.values()) {
       for (const row of g.rows) {
         const st = Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0]));
         const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => st[k] >= 10).length;
@@ -1851,15 +1856,22 @@ function seasonTotalsCard(L, standings) {
     return { vals, z: v => (c.neg ? -1 : 1) * (v - m) / sd, rank: v => 1 + vals.filter(x => (c.neg ? x < v : x > v)).length };
   });
   const avgRank = i => sum(stats.map(st => st.rank(st.vals[i]))) / cols.length;
+  // sort by any column: best first (clicking again flips it); standings order until a column is picked
+  const so = ui.totSort;
+  const sortVal = i => (so.key === 'team' ? (fxTeamName(list[i].tid) || '').toLowerCase() : so.key === 'gp' ? list[i].T.gp
+    : so.key === 'rank' ? -avgRank(i) : (cols[so.key].neg ? -1 : 1) * stats[so.key].vals[i]);
+  const idx = list.map((x, i) => i);
+  if (so.key != null) idx.sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? 1 : x > y ? -1 : 0) * so.dir; });
+  const th = (key, label, cls = 'num', tip = '') => `<th class="sortable ${cls}${so.key === key ? ' sorted' : ''}" data-action="tot-sort" data-key="${key}"${tip ? ` title="${tip}"` : ''} aria-sort="${so.key === key ? (so.dir > 0 ? 'descending' : 'ascending') : 'none'}">${label}${so.key === key ? (so.dir > 0 ? ' ↓' : ' ↑') : ''}</th>`;
   return `<div class="card" style="margin-top:16px">
     ${head}
     <div class="table-wrap"><table class="season-tot">
-      <thead><tr><th>Team</th><th class="num" title="Player games counted from starting lineups">GP</th>${cols.map(c => `<th class="num">${c.label}</th>`).join('')}${sc ? '' : '<th class="num" title="Average rank across the categories">Avg rank</th>'}</tr></thead>
-      <tbody>${list.map((x, i) => `<tr${x.tid === state.fxTeam ? ' class="me-row"' : ''}><td><b>${esc(fxTeamName(x.tid) || '')}</b></td><td class="num muted">${x.T.gp}</td>
+      <thead><tr>${th('team', 'Team', '')}${th('gp', 'Player games', 'num', 'Games played by the players in each starting lineup, added up')}${cols.map((c, j) => th(j, c.label)).join('')}${sc ? '' : th('rank', 'Avg rank', 'num', 'Average rank across the categories')}</tr></thead>
+      <tbody>${idx.map(i => { const x = list[i]; return `<tr${x.tid === state.fxTeam ? ' class="me-row"' : ''}><td><b>${esc(fxTeamName(x.tid) || '')}</b></td><td class="num muted">${x.T.gp}</td>
         ${cols.map((c, j) => { const v = stats[j].vals[i]; return `<td class="num" style="${shade(stats[j].z(v))}" title="${c.label}: ${ordinal(stats[j].rank(v))} of ${list.length}">${c.fmt(v)}</td>`; }).join('')}
-        ${sc ? '' : `<td class="num"><b>${fmt(avgRank(i), 1)}</b></td>`}</tr>`).join('')}</tbody>
+        ${sc ? '' : `<td class="num"><b>${fmt(avgRank(i), 1)}</b></td>`}</tr>`; }).join('')}</tbody>
     </table></div>
-    <p class="small muted" style="margin:10px 0 0">A player's games count for the team that had him in its starting lineup that ${state.lineupMode === 'daily' ? 'day' : 'week'}. GP is the player games counted. Green is best in the league, red is worst; hover a number for its rank.</p>
+    <p class="small muted" style="margin:10px 0 0">A player's games count for the team that had him in its starting lineup that ${state.lineupMode === 'daily' ? 'day' : 'week'}. Player games adds up every starter's games (8 starters playing 3 games each is 24). Green is best in the league, red is worst; hover a number for its rank, click a column to sort.</p>
   </div>`;
 }
 
@@ -3032,6 +3044,14 @@ const actions = {
     el.disabled = false;
     el.textContent = 'Refresh stats';
     toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : "Couldn't reach the local data server");
+  },
+  'tot-sort'(el) {
+    const k = el.dataset.key;
+    const key = /^\d+$/.test(k) ? +k : k;
+    const so = ui.totSort;
+    if (so.key === key) so.dir *= -1;
+    else { so.key = key; so.dir = key === 'team' ? -1 : 1; }
+    render();
   },
   sort(el) {
     const s = ui.rosterSort;
