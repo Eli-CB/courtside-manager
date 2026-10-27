@@ -37,3 +37,13 @@ Then open http://localhost:5173. The local server refreshes data when it's more 
 First-time visitors land on a page that asks for their Fantrax league ID (from the league's address, `fantrax.com/fantasy/league/<id>/…`), then which team is theirs. They can add more leagues and switch between them from the league menu in the top bar. The browser loads that league's rosters, lineups, matchups, positions and draft straight from Fantrax, which allows requests from any site, and remembers it on that device. NBA stats, the schedule and injuries come from the shared daily data.
 
 `league.json` sets the league included in the daily data, which doubles as the demo league on the landing page.
+
+Scoring comes from each league's Fantrax settings: its own categories for category leagues (any counting stat, FG%, FT% and 3P%), or its point values for points leagues. Anything the site can't project, like an A/TO ratio category or technical fouls, is listed in the top bar. Head-to-head leagues are supported; rotisserie and season-total points leagues aren't yet.
+
+## Tests
+
+```
+node --test tests/app.test.js
+```
+
+The tests load `app.js` in Node against saved Fantrax and NBA responses in `tests/fixtures` (a 9-cat league, a weekly points league and a daily points league), with the date fixed at Oct 26, 2026. They cover reading league settings, category and points scoring, projections, season totals (which must reproduce the real week-1 results), short names, draft grading and recommended adds. They run on every push. `python tests/capture_fixtures.py` saves fresh fixtures, which may mean updating expected values.

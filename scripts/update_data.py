@@ -467,6 +467,7 @@ def fantrax(league_id, index, saved_league=None):
         'id': league_id,
         'name': info.get('leagueName', ''),
         'scoring': (info.get('scoringSystem') or {}).get('type', ''),
+        'scoringSystem': info.get('scoringSystem'),  # the site reads its categories or point values
         # seasons of the same league share a history id; each season has its own league id
         'historyId': info.get('leagueHistoryId'),
         'year': info.get('seasonYear'),
