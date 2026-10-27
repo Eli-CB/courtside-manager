@@ -1193,8 +1193,7 @@ function fxStrip(ctx) {
       </span>
       ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
       ${stale ? `<span class="muted small">rosters as of week ${L.rosterPeriod}</span>` : ''}
-    </span>
-    <span class="actions"><button class="btn sm" data-action="league-reload" title="Pull the latest matchups, rosters and lineups from Fantrax">↻ Reload from Fantrax</button></span></div>`;
+    </span></div>`;
 }
 
 function validateLineup() {
@@ -1517,6 +1516,8 @@ function render() {
     nav.dataset.mode = mode;
   }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
+  const cur = tabList().find(([k]) => k === ui.tab);
+  $('#navCurrent').textContent = cur ? cur[1] : 'Menu';
   if (ui.season) {
     const past = { standings: viewStandings, awards: viewAwards, draft: viewDraft, rosters: viewPastRosters };
     $('#view').innerHTML = pastSeason() ? withSeason(past[ui.tab] || viewStandings) : '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>';
@@ -1672,7 +1673,7 @@ function strengthsCard(compact) {
   return `<div class="card">
     ${head}
     <div class="table-wrap"><table class="cs-table">
-      <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team (you in orange)</th>' : ''}</tr></thead>
+      <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team<span class="hide-sm"> (you in orange)</span></th>' : ''}</tr></thead>
       <tbody>${rows.map(r => r.html).join('')}</tbody>
     </table></div>
     ${summary}
@@ -2964,6 +2965,7 @@ function viewLanding() {
    Actions
    ========================================================= */
 const actions = {
+  'nav-toggle'(el) { setNav(!document.body.classList.contains('nav-open')); },
   'toggle-theme'() {
     const root = document.documentElement;
     const cur = root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -3219,7 +3221,15 @@ const forms = {
 /* =========================================================
    Wiring
    ========================================================= */
+// phones: the sections menu opens under the top bar and closes on any choice or outside tap
+function setNav(open) {
+  document.body.classList.toggle('nav-open', open);
+  $('.nav-btn').setAttribute('aria-expanded', open);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('nav-open')) setNav(false); });
+
 document.addEventListener('click', e => {
+  if (document.body.classList.contains('nav-open') && !e.target.closest('.nav-btn') && (!e.target.closest('#tabs') || e.target.closest('#tabs a'))) setNav(false);
   const menu = $('#leagueMenu details');
   if (menu && menu.open && !e.target.closest('#leagueMenu')) menu.removeAttribute('open');
   const el = e.target.closest('[data-action]');
