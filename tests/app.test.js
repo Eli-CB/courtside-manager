@@ -263,3 +263,21 @@ test('Fantrax names written differently still match (Nicolas / Nic Claxton)', as
   const fid = Object.keys(ids).find(k => ids[k].name === 'Claxton, Nicolas');
   assert.equal(fxPlayers[nic.id] && fxPlayers[nic.id].id, fid);
 });
+
+test('weekly rosters tell trades from waiver pickups', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league;
+  assert.ok(L.arrivals, 'every week of the season loaded');
+  const team = L.teams.find(t => t.name === "Eli's SGAteam");
+  const how = name => { const it = L.rosters[team.id].find(x => x.name === name); return it && L.arrivals[team.id][it.fid]; };
+  assert.equal(how('Lauri Markkanen'), 'trade', 'Markkanen came over from mikeysak in week 17');
+  assert.equal(how('VJ Edgecombe'), 'trade');
+  const kinds = Object.values(L.arrivals[team.id]);
+  assert.ok(kinds.includes('pickup') && kinds.includes('start'));
+  // the award counts only pickups
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  let awards;
+  try { awards = app.withSeason(() => app.seasonAwards()); } finally { app.get('ui').season = null; }
+  const wizard = awards.find(a => a.title === 'Waiver Wire Wizard');
+  assert.ok(wizard && !/Markkanen|Edgecombe/.test(wizard.list.map(x => x.note).join(' ')), 'traded players are not pickups');
+});

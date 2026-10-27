@@ -20,7 +20,7 @@ LEAGUES = {
     'frapfs43mutrff0g': 'H2H points with double/triple-doubles, daily lineups',
     'czqgnyozmf2tbr93': 'last season of the 9-cat league (graded from its archive)',
 }
-PAST_PERIODS = {'my19c8mwmoipvhon': [1], 'czqgnyozmf2tbr93': [1]}  # finished lineup periods: season totals, opening rosters
+PAST_PERIODS = {'my19c8mwmoipvhon': [1], 'czqgnyozmf2tbr93': list(range(1, 22))}  # finished lineup periods: season totals; every week of last season (trades vs pickups)
 
 
 def get(path):

@@ -806,7 +806,7 @@ const INFO = {
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
     <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
     <li><b>Best manager:</b> actual wins (ties count half) minus expected wins. Expected wins: each team's typical week (its best 8 starters, each counted for the share of games he played) is matched against every other team with the same win-chance math as Matchups, and the average win chance × games played gives the expected record.</li>
-    <li><b>Waiver Wire Wizard:</b> players on the final roster who weren't on the team's opening-week roster, so they were picked up (or traded for) during the season; drafted players and keepers don't count. Their per-game values added up, or fantasy points per game in points leagues.</li>
+    <li><b>Waiver Wire Wizard:</b> free-agent and waiver pickups on the final roster, added up by per-game value (fantasy points per game in points leagues). Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a trade, which doesn't count; on nobody's roster means a pickup. (A player dropped and claimed by another team in the same week looks like a trade.)</li>
     <li><b>Street Clothes:</b> 82 minus games played, summed over the final roster.</li>
     <li><b>Biggest punt</b> and <b>Even Steven:</b> each category of that typical week is compared with the league's other teams in team-to-team spreads. The punt is the lowest category; Even Steven has the smallest spread across its categories.</li>
     <li><b>Unc Status:</b> the oldest final roster, by average age on the last day of the season, from ESPN birth dates.</li></ul>`],
@@ -1004,7 +1004,7 @@ async function fetchFantraxLeague(id, opts = {}) {
     rosterPeriod: rosters.period,
     rosterPeriods: (info.rosterPeriods || []).map(p => [p.number, String(p.startDate), String(p.endDate)]),
     rosters: Object.fromEntries(Object.entries(rosters.rosters || {}).map(([tid, r]) => [tid,
-      (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
+      (r.rosterItems || []).map(it => ({ fid: it.id, nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
     openingRosters: opening ? Object.fromEntries(Object.entries(opening.rosters || {}).map(([tid, r]) => [tid,
       (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '' }))])) : null,
     rosterInfo: info.rosterInfo || null,
@@ -1341,9 +1341,52 @@ async function loadSeason(id) {
   const season = league.year ? seasonOf(league.year) : null;
   const A = season ? await loadArchive(season) : null;
   if (A) matchInactive(league, A);
+  league.arrivals = await loadArrivals(league).catch(() => null);
   const prevStart = NBA && NBA.prevSeason ? +String(NBA.prevSeason).slice(0, 4) : null;
   const basis = A ? 'arch:' + season : league.year && league.year === prevStart ? 'prev' : null;
   return (pastCache[id] = { league, basis, label: league.year ? seasonLabel(league.year) : 'Past season' });
+}
+
+// ----- How each player on a past season's final roster got there -----
+// Fantrax shares every lineup period's rosters but no transaction log. Walking a player's stint on his
+// final team back to its first week: there from week 1 = drafted or kept; the week before on another
+// team's roster = a trade; on nobody's roster = a free-agent or waiver pickup. Finished seasons never
+// change, so the weekly rosters are fetched once and kept on this device.
+const ROSTER_HISTORY_KEY = 'courtside-roster-history-v1';
+async function loadArrivals(L) {
+  let all = {};
+  try { all = JSON.parse(localStorage.getItem(ROSTER_HISTORY_KEY)) || {}; } catch (e) { /* none saved */ }
+  const have = all[L.id] || {};
+  const today = todayIso();
+  const periods = rosterPeriodsOf(L).filter(p => p.start.slice(0, 10) <= today).map(p => p.n);
+  if (!periods.length) return null;
+  const want = periods.filter(n => !have[n]);
+  let next = 0;
+  const worker = async () => {
+    while (next < want.length) {
+      const n = want[next++];
+      const d = await fxGet(`getTeamRosters?leagueId=${encodeURIComponent(L.id)}&period=${n}`);
+      have[n] = Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) => [tid, (r.rosterItems || []).map(it => it.id)]));
+    }
+  };
+  try { await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker)); } finally {
+    all[L.id] = have;
+    try { localStorage.setItem(ROSTER_HISTORY_KEY, JSON.stringify(all)); } catch (e) { /* storage full or blocked */ }
+  }
+  const owner = periods.filter(n => have[n]).map(n => {
+    const m = new Map();
+    for (const [tid, fids] of Object.entries(have[n])) for (const f of fids) m.set(f, tid);
+    return m;
+  });
+  if (owner.length < 2) return null;
+  const out = {}; // team id -> fid -> 'start' | 'trade' | 'pickup'
+  const last = owner.length - 1;
+  for (const [f, tid] of owner[last]) {
+    let k = last;
+    while (k > 0 && owner[k - 1].get(f) === tid) k--;
+    (out[tid] = out[tid] || {})[f] = k === 0 ? 'start' : owner[k - 1].has(f) ? 'trade' : 'pickup';
+  }
+  return out;
 }
 
 // ----- Archived seasons: data/seasons/<season>.json, saved once by scripts/archive_season.py -----
@@ -1468,9 +1511,13 @@ function seasonTeam(t, L, basis, endDate) {
   const ages = players.map(x => x.age).filter(a => a != null);
   // players on the books who played little or not at all that season
   const missed = sum(players.filter(x => x.raw).map(x => Math.max(0, SEASON_GAMES - x.gp)));
-  // pickups: on the final roster but not the opening week's (so drafted players and keepers don't count)
+  // pickups: from the weekly rosters, players who came off free agency or waivers (not trades, drafts or keepers);
+  // without them, anyone on the final roster but not the opening week's
   let pickups = null;
-  if (L.openingRosters) {
+  const how = L.arrivals ? L.arrivals[t.id] || {} : null;
+  if (how) {
+    pickups = players.filter((x, i) => x.p && how[L.rosters[t.id][i].fid] === 'pickup').map(x => ({ name: x.raw.name, v: value(x.p) }));
+  } else if (L.openingRosters) {
     const start = new Set((L.openingRosters[t.id] || []).map(x => x.nba || x.name));
     pickups = players.filter((x, i) => x.p && !start.has(L.rosters[t.id][i].nba || L.rosters[t.id][i].name)).map(x => ({ name: x.raw.name, v: value(x.p) }));
   }
@@ -1525,7 +1572,7 @@ function seasonAwards() {
   return [
     { title: 'Best draft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
     { title: 'Best manager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
-    { title: 'Waiver Wire Wizard', blurb: 'The most production from players picked up during the season (on the final roster, but not on opening night’s).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
+    { title: 'Waiver Wire Wizard', blurb: 'The most production from free-agent and waiver pickups still on the final roster (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
     { title: 'Street Clothes', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
     ...(isPoints() ? [] : [{ title: 'Biggest punt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
     { title: 'Even Steven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
