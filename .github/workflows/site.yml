@@ -54,7 +54,12 @@ jobs:
             echo "Data unchanged"
           else
             git commit -m "Refresh NBA and league data"
-            git push
+            # a code push can land while this job runs: replay the data on top of it and retry
+            for i in 1 2 3; do
+              git push && exit 0
+              git pull --rebase -X theirs origin main
+            done
+            exit 1
           fi
 
   deploy:
