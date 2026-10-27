@@ -822,7 +822,8 @@ const INFO = {
   awSteven: ['Even Steven', `
     <p>Each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster), compared with the league's other teams category by category, in team-to-team spreads. The most balanced team has the smallest spread between its best and worst categories.</p>`],
   awUnc: ['Unc Status', `
-    <p>The oldest final roster: average age on the last day of the season, from ESPN birth dates. Players without a birth date on record are left out.</p>`],
+    <p>The oldest <b>starting lineups</b>. Every week, Fantrax's rosters say who each team started; each starter's age that week is averaged over all of the team's starter-weeks, so a player who started 20 weeks counts 20 times as much as one who started once. Bench and IR players don't count.</p>
+    <p>Ages come from ESPN birth dates. Players without one on record (mostly those no longer in the NBA) are left out.</p>`],
   draft: ['How draft picks are graded', `
     <p><b>Now.</b> Every drafted player is ranked using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
     <p><b>Per game or season totals.</b> The toggle at the top re-ranks the whole tab. <b>Per game</b> ranks by value per game, so a player who's missed time isn't held against his pick. <b>Season totals</b> also counts games played: in points leagues it's total fantasy points; in category leagues it's value above a replacement-level starter (the last player who'd start in your league) times games played, so playing more only helps players worth starting.</p>
@@ -1479,6 +1480,26 @@ function pickupImpact(L, G) {
   return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()]]));
 }
 
+// How old each team's starters were: every week, each starter's age that week, averaged over all of a
+// team's starter-weeks (so a player who started 20 weeks counts 20 times as much as one who started one).
+// Players without a birth date on record are left out. Team id -> { age, n }
+function startersAge(L) {
+  if (!L.weeks) return null;
+  const out = {};
+  for (const w of L.weeks) {
+    const day = new Date(w.start.slice(0, 10) + 'T12:00:00');
+    for (const [f, o] of w.owner) {
+      if (!o.on) continue;
+      const raw = nbaById.get(L.fidNba(f));
+      if (!raw || !raw.born) continue;
+      const T = out[o.tid] = out[o.tid] || { total: 0, n: 0 };
+      T.total += (day - new Date(raw.born + 'T12:00:00')) / (365.25 * 864e5);
+      T.n++;
+    }
+  }
+  return Object.fromEntries(Object.entries(out).map(([tid, T]) => [tid, { age: T.total / T.n, n: T.n }]));
+}
+
 // Games lost to players sitting while in the starting lineup: each week, every game a starter's NBA team
 // played without him. Bench and IR don't count, and neither do games before or after he was on the team.
 // A player with no games all season is placed on his current team. Team id -> [{ nba, name, games }]
@@ -1695,6 +1716,8 @@ function seasonAwards() {
   const G = L.season ? gameLogs[L.season] : null;
   const impact = pickupImpact(L, G);
   const sat = startersMissed(L, G);
+  const olds = startersAge(L);
+  if (olds) for (const T of teams) T.age = olds[T.id] ? olds[T.id].age : null;
   if (sat) {
     for (const T of teams) {
       const ps = sat[T.id] || [];
@@ -1728,7 +1751,9 @@ function seasonAwards() {
       : { title: 'Street Clothes', info: 'awStreet', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
     ...(isPoints() ? [] : [{ title: 'Biggest punt', info: 'awPunt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
     { title: 'Even Steven', info: 'awSteven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
-    { title: 'Unc Status', info: 'awUnc', blurb: 'The oldest roster: average age at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
+    olds
+      ? { title: 'Unc Status', info: 'awUnc', blurb: 'The oldest starting lineups: average age of the players a team started, week by week.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) }
+      : { title: 'Unc Status', info: 'awUnc', blurb: 'The oldest roster: average age at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
   ].filter(a => a.list.length);
 }
 

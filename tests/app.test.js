@@ -320,3 +320,14 @@ test('Street Clothes counts only games starters missed while starting', async ()
   }
   assert.equal(pick.games, n, `${pick.name}: ${pick.games} games`);
 });
+
+test('Unc Status averages the ages of the players each team started', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const ages = app.startersAge(P.league);
+  const teams = Object.values(ages);
+  assert.equal(teams.length, P.league.teams.length);
+  for (const T of teams) {
+    assert.ok(T.age > 21 && T.age < 34, `average age ${T.age}`);
+    assert.ok(T.n > P.league.weeks.length * 4, `${T.n} starter-weeks with a birth date`);
+  }
+});
