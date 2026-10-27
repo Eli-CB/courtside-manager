@@ -402,3 +402,12 @@ test('a past season shows its keepers without grading them', async () => {
   assert.ok(ks.every(k => k.past && k.gain === undefined && k.slot === undefined), 'listed, not graded');
   assert.ok(!d.picks.some(p => names.includes(p.name)), 'keepers are not draft picks');
 });
+
+test('past Rosters mark keepers', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league, G = await app.loadGameLog('2025-26');
+  const team = L.teams.find(t => t.name === "Eli's SGAteam");
+  const st = [...app.activeStints(L, G, team.id).values()];
+  assert.deepEqual(st.filter(p => p.how === 'keeper').map(p => p.name).sort(), ['Karl-Anthony Towns', 'Shai Gilgeous-Alexander']);
+  assert.ok(st.some(p => p.how === 'start') && st.some(p => p.how === 'pickup') && st.some(p => p.how === 'trade'));
+});

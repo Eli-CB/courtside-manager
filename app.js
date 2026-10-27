@@ -807,7 +807,7 @@ const INFO = {
     <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
   pastRoster: ['Past rosters', `
     <p>Everyone the team had in its <b>starting lineup</b> for at least one week, from Fantrax's weekly rosters. Players who only sat on the bench or IR aren't listed.</p>
-    <ul><li><b>How:</b> drafted (or kept), a pickup, or a trade, for how he joined the team the first time he started for it.</li>
+    <ul><li><b>How:</b> kept, drafted, picked up or traded for, by how he joined the team the first time he started for it. Keepers are players on the team's opening-week roster that it didn't draft.</li>
     <li><b>Wks:</b> weeks in the starting lineup.</li>
     <li><b>GP:</b> games played in those weeks; every stat comes from just these games.</li>
     <li><b>Missed:</b> games his NBA team played in those weeks without him (injury, rest or a coach's decision).</li>
@@ -1664,9 +1664,10 @@ function withSeason(fn) {
 
 // Everyone a team started at some point in a past season, with what he did while starting: weeks in the
 // lineup, games played and missed (his NBA team played without him), stat totals and game value.
-// NBA id -> { nba, name, how ('start' | 'trade' | 'pickup'), weeks, gp, missed, s, v }
+// NBA id -> { nba, name, how ('start' | 'keeper' | 'trade' | 'pickup'), weeks, gp, missed, s, v }
 function activeStints(L, G, tid) {
   const out = new Map();
+  const kept = new Set(((L.draft && L.draft.keepers) || {})[tid] || []);
   L.weeks.forEach((w, k) => {
     const wd = periodDays(G, w);
     for (const [f, o] of w.owner) {
@@ -1674,7 +1675,8 @@ function activeStints(L, G, tid) {
       const nba = L.fidNba(f);
       if (!nba) continue;
       const rows = G.players.get(nba) || [];
-      const P = out.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', how: arrivalAt(L.weeks, k, f), weeks: 0, gp: 0, missed: 0, s: {}, v: 0 };
+      const came = arrivalAt(L.weeks, k, f);
+      const P = out.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', how: came === 'start' && kept.has(nba) ? 'keeper' : came, weeks: 0, gp: 0, missed: 0, s: {}, v: 0 };
       P.weeks++;
       const played = new Set();
       for (const r of rows) {
@@ -1736,11 +1738,11 @@ function viewPastRosters() {
 
 function pastStarters(L, G, tid, r, teams) {
   const total = ui.pastRosterMode === 'total';
-  const how = { start: ['Drafted', ''], trade: ['Trade', 'warn'], pickup: ['Pickup', 'good'] };
+  const how = { start: ['Drafted', ''], keeper: ['Keeper', 'accent'], trade: ['Trade', 'warn'], pickup: ['Pickup', 'good'] };
   const per = (P, k) => (total ? P.s[k] || 0 : P.gp ? (P.s[k] || 0) / P.gp : 0);
   // any column sorts, following the Totals / Per game choice
   const so = ui.pastRosterSort;
-  const sortVal = P => (so.key === 'name' ? P.name.toLowerCase() : so.key === 'how' ? ['start', 'pickup', 'trade'].indexOf(P.how)
+  const sortVal = P => (so.key === 'name' ? P.name.toLowerCase() : so.key === 'how' ? ['keeper', 'start', 'pickup', 'trade'].indexOf(P.how)
     : so.key === 'weeks' || so.key === 'gp' || so.key === 'missed' ? P[so.key]
     : so.key === 'fgPct' ? (P.s.fga ? P.s.fgm / P.s.fga : -1) : so.key === 'ftPct' ? (P.s.fta ? P.s.ftm / P.s.fta : -1)
     : so.key === 'value' ? (total ? P.v : P.gp ? P.v / P.gp : -1e9) : per(P, so.key));
