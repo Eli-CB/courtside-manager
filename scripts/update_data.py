@@ -561,11 +561,18 @@ def fantrax(league_id, index, saved_league=None):
             for tid, r in rosters.get('rosters', {}).items()
         },
     }
-    # Keepers: players each team rostered without drafting them. Saved the first time and kept
-    # after that, so later waiver pickups aren't mistaken for keepers.
+    # Keepers: players each team rostered without drafting them, but only in leagues whose draft gives
+    # each team fewer picks than roster spots (starters plus bench). Saved the first time and kept after
+    # that, so later waiver pickups aren't mistaken for keepers.
     if league['draft']:
         prev = (saved_league or {}).get('draft') or {}
-        if prev.get('date') == league['draft']['date'] and prev.get('keepers'):
+        ri = info.get('rosterInfo') or {}
+        spots = (ri.get('maxTotalActivePlayers') or 0) + (ri.get('maxTotalReservePlayers') or 0)
+        from collections import Counter
+        per_team = Counter(p.get('teamId') for p in (draft.get('draftPicks') or []))
+        if not spots or max(per_team.values(), default=0) >= spots:
+            league['draft']['keepers'] = {}
+        elif prev.get('date') == league['draft']['date'] and prev.get('keepers'):
             league['draft']['keepers'] = prev['keepers']
         else:
             drafted = {p[3] for p in league['draft']['picks']}

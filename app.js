@@ -874,6 +874,25 @@ async function fxGet(path) {
   return JSON.parse(await r.text()); // served as text/plain
 }
 
+// Keepers: only in leagues whose draft gives each team fewer picks than it has roster spots (starters
+// plus bench; IR isn't filled at the draft). Then they're the players on a team's opening-week roster it
+// didn't draft (before week 1 is over, its current roster). Team id -> [NBA ids]
+function keepersOf(league) {
+  const cfg = slotsFromLeague(league) || {};
+  const ri = league.rosterInfo || {};
+  const spots = ri.maxTotalActivePlayers != null && ri.maxTotalReservePlayers != null
+    ? ri.maxTotalActivePlayers + ri.maxTotalReservePlayers : (cfg.slots || []).length + (cfg.bench || 0);
+  if (!spots || !league.draft.rounds || league.draft.rounds >= spots) return {};
+  const start = league.openingRosters || league.rosters;
+  const out = {};
+  for (const [tid, items] of Object.entries(start)) {
+    const drafted = new Set(league.draft.picks.filter(p => p[2] === tid).map(p => p[3]));
+    const kept = items.map(x => x.nba).filter(n => n && !drafted.has(n));
+    if (kept.length) out[tid] = kept;
+  }
+  return out;
+}
+
 // Second pass for names written differently ("Cameron Thomas" on Fantrax, "Cam Thomas" on NBA.com):
 // same last name, first initial and team. How Fantrax abbreviates teams (GS for GSW, say) is learned
 // from the players that matched exactly. A player two Fantrax entries point to is left unmatched.
@@ -988,7 +1007,8 @@ async function fetchFantraxLeague(id, opts = {}) {
     fxGet(`getStandings?leagueId=${q}`).catch(() => []),
   ]);
   if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
-  const opening = opts.opening ? await fxGet(`getTeamRosters?leagueId=${q}&period=1`).catch(() => null) : null;
+  // the opening week's rosters: past seasons use them for keepers and pickups, and so does this season once week 1 is over
+  const opening = opts.opening || (rosters.period || 1) > 1 ? await fxGet(`getTeamRosters?leagueId=${q}&period=1`).catch(() => null) : null;
 
   // match Fantrax players to NBA.com players by name (team breaks ties)
   const byName = new Map();
@@ -1039,14 +1059,14 @@ async function fetchFantraxLeague(id, opts = {}) {
   };
   const picks = (draft.draftPicks || []).filter(d => d.playerId);
   if (picks.length) {
-    const drafted = new Set(picks.map(d => toNba[d.playerId]).filter(Boolean));
     league.draft = {
       date: String(draft.draftDate || '').slice(0, 10), type: draft.draftType || '', state: draft.draftState || '',
       perRound: Math.max(...draft.draftPicks.map(d => d.pickInRound || 0)),
       picks: picks.map(d => [d.round, d.pick, d.teamId, toNba[d.playerId] || null, names[d.playerId] || '']),
-      // keepers: rostered players who weren't drafted (later pickups show up here too)
-      keepers: Object.fromEntries(Object.entries(league.rosters).map(([tid, items]) => [tid, items.map(it => it.nba).filter(n => n && !drafted.has(n))])),
+      // pick slots per team, unused ones included
+      rounds: Math.max(0, ...Object.values((draft.draftPicks || []).reduce((n, d) => { n[d.teamId] = (n[d.teamId] || 0) + 1; return n; }, {}))),
     };
+    league.draft.keepers = keepersOf(league);
   }
   return { league, fxPlayers, idMap: { toNba, names } };
 }
@@ -1361,20 +1381,13 @@ function seasonsFor(L) {
 async function loadSeason(id) {
   if (pastCache[id]) return pastCache[id];
   const { league, idMap } = await fetchFantraxLeague(id, { opening: true });
-  if (league.draft) league.draft.keepers = {};
   // that season's NBA stats, if saved, grade its draft, awards and rosters
   const season = league.year ? seasonOf(league.year) : null;
   const A = season ? await loadArchive(season) : null;
   const findOld = A ? matchInactive(league, A) : () => null;
   league.fidNba = fid => idMap.toNba[fid] || (idMap.names[fid] ? findOld(idMap.names[fid]) : null);
-  // keepers: on a team's opening-week roster but not among its draft picks (shown on the board, not graded)
-  if (league.draft && league.openingRosters) {
-    for (const [tid, items] of Object.entries(league.openingRosters)) {
-      const drafted = new Set(league.draft.picks.filter(p => p[2] === tid).map(p => p[3]));
-      const kept = items.map(x => x.nba).filter(nba => nba && !drafted.has(nba));
-      if (kept.length) league.draft.keepers[tid] = kept;
-    }
-  }
+  // keepers again, now that players no longer in the NBA are matched (shown on the board, not graded)
+  if (league.draft) league.draft.keepers = keepersOf(league);
   league.weeks = await loadRosterWeeks(league).catch(() => null);
   league.arrivals = league.weeks ? arrivalsOf(league.weeks) : null;
   league.season = season; // its game log loads when Awards opens

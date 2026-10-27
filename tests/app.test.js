@@ -411,3 +411,14 @@ test('past Rosters mark keepers', async () => {
   assert.deepEqual(st.filter(p => p.how === 'keeper').map(p => p.name).sort(), ['Karl-Anthony Towns', 'Shai Gilgeous-Alexander']);
   assert.ok(st.some(p => p.how === 'start') && st.some(p => p.how === 'pickup') && st.some(p => p.how === 'trade'));
 });
+
+test('keepers only in leagues whose draft leaves roster spots open', async () => {
+  const pts = await app.useLeague(POINTS); // 14 rounds for 14 spots
+  assert.equal(pts.draft.rounds, 14);
+  assert.deepEqual({ ...pts.draft.keepers }, {}, 'a full-roster draft has no keepers, so pickups are not mistaken for them');
+  const cats = await app.useLeague(CATS9); // 12 rounds for 13 spots
+  assert.ok(cats.draft.rounds < 13);
+  const counts = Object.values(cats.draft.keepers).map(k => k.length);
+  assert.equal(counts.length, cats.teams.length);
+  assert.ok(counts.every(n => n === 2), `keepers per team: ${counts}`);
+});
