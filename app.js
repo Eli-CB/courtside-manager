@@ -428,6 +428,7 @@ async function loadNba(fresh = false) {
     const migrate = state.fxTeam && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
     if (migrate) rememberLeague(NBA.league.id, NBA.league.name);
     if (syncLinked() || migrate) commit(); else render();
+    if (ui.pendingSeason) route(); // a refresh on a past season waited for this data
     return true;
   } catch (e) {
     render();
@@ -1619,20 +1620,25 @@ function matchInactive(league, A) {
   return find;
 }
 
-async function switchSeason(id) {
+// The address names a past season as #<tab>/<that season's league id>, so a refresh stays on it
+const seasonHash = (tab, id) => `#${tab}${id ? '/' + id : ''}`;
+async function switchSeason(id, wantTab) {
   ui.addingSeason = false; ui.pastTeam = null; ui.viewA = null; ui.viewB = null;
   if (id) {
     try {
       await loadSeason(id);
     } catch (e) {
       toast(`Couldn't load that season (${e.message})`);
+      ui.season = null;
+      location.hash = seasonHash(wantTab && tabList().some(([k]) => k === wantTab) ? wantTab : 'dashboard');
       render();
       return;
     }
   }
   ui.season = id || null;
-  const tab = ui.tab === 'rosters' && !id ? 'roster' : ui.tab;
-  const want = '#' + (tabList().some(([k]) => k === tab) ? tab : id ? 'standings' : 'dashboard');
+  const pick = wantTab || ui.tab;
+  const tab = pick === 'rosters' && !id ? 'roster' : pick;
+  const want = seasonHash(tabList().some(([k]) => k === tab) ? tab : id ? 'standings' : 'dashboard', id);
   if (location.hash !== want) location.hash = want; else route();
 }
 
@@ -1975,10 +1981,11 @@ function render() {
   leagueMenu();
   ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
+  if (ui.pendingSeason) { $('#view').innerHTML = '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>'; return; }
   const nav = $('#tabs');
-  const mode = ui.season ? 'past' : 'now';
+  const mode = ui.season ? 'past:' + ui.season : 'now';
   if (nav.dataset.mode !== mode) {
-    nav.innerHTML = tabList().map(([k, l]) => `<a href="#${k}" data-tab="${k}">${l}</a>`).join('');
+    nav.innerHTML = tabList().map(([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${l}</a>`).join('');
     nav.dataset.mode = mode;
   }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
@@ -3900,7 +3907,16 @@ $('#importFile').addEventListener('change', async e => {
 });
 
 function route() {
-  let tab = location.hash.replace('#', '') || 'dashboard';
+  const [hashTab, sid] = location.hash.replace('#', '').split('/');
+  // a past season in the address (after a refresh, or a shared link): load it, once the NBA data it needs is in
+  if (sid && sid !== ui.season) {
+    if (!NBA) { ui.pendingSeason = sid; render(); return; }
+    ui.pendingSeason = null;
+    switchSeason(sid, hashTab);
+    return;
+  }
+  if (!sid && ui.season) { ui.season = null; ui.pastTeam = null; }
+  let tab = hashTab || 'dashboard';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
   if (tab === 'rosters' && !ui.season) tab = 'roster';
   ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : 'dashboard';
