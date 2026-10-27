@@ -19,6 +19,7 @@
   --pos-pg: #bf4b0c; --pos-sg: #bd123d; --pos-g: #e65d0e; --pos-sf: #064a97; --pos-pf: #7d29c5;
   --pos-f: #913ae2; --pos-c: #049466; --pos-flx: #0f7a72; --pos-bn: #0651a6;
   --b2b: #eab308;
+  --b2b-ring: #86efac; /* back-to-back nights: a lighter green ring */
   color-scheme: light;
 }
 
@@ -43,6 +44,7 @@
     --pos-pg: #f57118; --pos-sg: #eb4664; --pos-g: #e65d0e; --pos-sf: #0b7ff3; --pos-pf: #aa61f9;
     --pos-f: #913ae2; --pos-c: #049466; --pos-flx: #11b4a3; --pos-bn: #0b7ff3;
     --b2b: #facc15;
+    --b2b-ring: #15803d;
     color-scheme: dark;
   }
 }
@@ -51,6 +53,7 @@
   --pos-pg: #f57118; --pos-sg: #eb4664; --pos-g: #e65d0e; --pos-sf: #0b7ff3; --pos-pf: #aa61f9;
   --pos-f: #913ae2; --pos-c: #049466; --pos-flx: #11b4a3; --pos-bn: #0b7ff3;
   --b2b: #facc15;
+  --b2b-ring: #15803d;
 
   --bg: #0f1218;
   --surface: #171b23;
@@ -418,7 +421,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .dots i.done.bench { background: var(--muted); opacity: .55; }
 .dots i.up { box-shadow: inset 0 0 0 1.5px var(--good); }
 .dots i.up.bench { box-shadow: inset 0 0 0 1.5px var(--muted); opacity: .7; }
-.dots i.up.b2b { box-shadow: inset 0 0 0 1.5px var(--b2b); }
+.dots i.done.short { background: var(--b2b); opacity: 1; }
+.dots i.up.b2b { box-shadow: inset 0 0 0 1.5px var(--b2b-ring); }
 .dots i.dnp { background: var(--bad); opacity: .75; }
 .dots i.out { box-shadow: inset 0 0 0 1.5px var(--bad); }
 .dots i.none { background: var(--border); }

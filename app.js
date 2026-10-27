@@ -777,9 +777,10 @@ const INFO = {
   dots: ['Schedule dots', `
     <p>One dot per matchup day, from the NBA schedule. <b>Filled</b> dots are games already played; <b>rings</b> are games still to come.</p>
     <ul><li><b>Green:</b> a game that counts (a starter).</li><li><b>Grey:</b> a game on the bench, which doesn't count.</li>
-    <li><b>Yellow ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
+    <li><b>Yellow:</b> a regular (20+ minutes a game) played well under his usual minutes: under 70% of his average and at least 8 fewer. Hover it for his minutes and the likely reason: a blowout (decided by 20 or more), foul trouble (5 or more fouls), or neither, which can mean an injury during the game or a coach's decision.</li>
+    <li><b>Light green ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
-    <p>The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
+    <p>Hover any played game for his minutes and stat line. The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
   value: ['Player value', `
     <p>Value is the sum of a player's contributions per game in each of your league's categories, each measured against an average rostered player (see Stat shading for the exact averages). +5 is an elite all-around player; around 0 is replacement level in a 12-team league.</p>
     <p>FG% and FT% count shot volume, and turnovers count against.</p>
@@ -1859,11 +1860,12 @@ function loadBoxes() {
         const st = Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0]));
         const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => st[k] >= 10).length;
         Object.assign(st, { dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 });
+        const margin = row[1] === g.home ? g.hs - g.as : g.as - g.hs;
         if (!byPlayer.has(row[0])) byPlayer.set(row[0], []);
-        byPlayer.get(row[0]).push([g.d, st]);
+        byPlayer.get(row[0]).push([g.d, st, margin]);
       }
     }
-    BOX = { byPlayer, finals, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games)])) };
+    BOX = { byPlayer, finals, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };
     return BOX;
   }).catch(e => { boxLoad = null; throw e; });
   return boxLoad;
@@ -2337,6 +2339,17 @@ function swapBlock(ex, ctx, kind) {
 // Either night of a back-to-back (the team also plays the day before or after)
 const isB2B = (p, d) => playsOn(p, d) && (playsOn(p, addDays(d, -1)) || playsOn(p, addDays(d, 1)));
 
+// A played game well under his usual minutes, and the likely reason: a blowout, foul trouble, or unknown
+// (often an injury during the game). Null for a normal game.
+function shortMinutes(p, line) {
+  const usual = p.min || 0;
+  if (usual < 20 || line.min > usual * 0.7 || usual - line.min < 8) return null;
+  const why = [];
+  if (Math.abs(line.margin) >= 20) why.push(`blowout (${line.margin > 0 ? 'won' : 'lost'} by ${Math.abs(line.margin)})`);
+  if (line.pf >= 5) why.push(`foul trouble (${line.pf} fouls)`);
+  return why.length ? why.join(' and ') : 'fewer minutes than usual, not from a blowout or foul trouble (maybe an injury or the coach)';
+}
+
 function dayDots(p, ctx, counts) {
   return `<span class="dots" aria-hidden="true">${ctx.dates.map(d => {
     const day = DAY_LABELS[dayOffset(d)];
@@ -2344,8 +2357,10 @@ function dayDots(p, ctx, counts) {
     const bench = counts ? '' : ' bench';
     if (gameFinal(p, d)) {
       const line = actualLine(p, d);
-      return line ? `<i class="done${bench}" title="${day}: played${bench ? ' (bench)' : ''}, ${line.pts} pts ${line.reb} reb ${line.ast} ast"></i>`
-        : `<i class="dnp" title="${day}: didn't play"></i>`;
+      if (!line) return `<i class="dnp" title="${day}: didn't play"></i>`;
+      const short = shortMinutes(p, line);
+      const stats = `${line.pts} pts ${line.reb} reb ${line.ast} ast`;
+      return `<i class="done${bench}${short ? ' short' : ''}" title="${day}${bench ? ' (bench)' : ''}: ${Math.round(line.min)} min${short ? ` (usually ${Math.round(p.min)}), ${short}` : ''} · ${stats}"></i>`;
     }
     if (p.status === 'Out') return `<i class="out" title="${day}: listed Out"></i>`;
     const b2b = isB2B(p, d);
