@@ -804,6 +804,13 @@ const INFO = {
     <p><b>Totals.</b> Counting stats are added up from this season's box scores (a past season uses its saved NBA game logs, back to 2016-17). FG% and FT% are total makes ÷ total attempts.</p>
     <p><b>Colors.</b> Each column is shaded from best in the league (green) to worst (red); fewer turnovers counts as better. Hover a number for its rank. <b>Avg rank</b> is a team's average rank across the categories.</p>
     <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
+  pastRoster: ['Past rosters', `
+    <p>Everyone the team had in its <b>starting lineup</b> for at least one week, from Fantrax's weekly rosters. Players who only sat on the bench or IR aren't listed.</p>
+    <ul><li><b>How:</b> drafted (or kept), a pickup, or a trade, for how he joined the team the first time he started for it.</li>
+    <li><b>Wks:</b> weeks in the starting lineup.</li>
+    <li><b>GP:</b> games played in those weeks; every stat comes from just these games.</li>
+    <li><b>Missed:</b> games his NBA team played in those weeks without him (injury, rest or a coach's decision).</li>
+    <li><b>Value:</b> each game valued against an average rostered player's game (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
   awDraft: ['Best draft', `
     <p>Everything a team's draft picks produced over the season: every game each pick played from the draft until he was first <b>dropped</b> to free agency, whether he was starting or on the bench. A pick who's <b>traded</b> keeps counting for the team that drafted him; one who's dropped stops counting (if someone picks him up later, that's their Waiver Wire Wizard).</p>
     <p>In category leagues each game is valued against a <b>replacement-level starter</b> (the per-game value of the last player who'd start in your league), so every game by a player worth starting adds to the total and staying healthy pays. Points leagues add up fantasy points.</p>
@@ -1642,11 +1649,54 @@ function withSeason(fn) {
   try { return fn(); } finally { NBA.league = savedLeague; state = saved; seasonCtx = null; }
 }
 
+// Everyone a team started at some point in a past season, with what he did while starting: weeks in the
+// lineup, games played and missed (his NBA team played without him), stat totals and game value.
+// NBA id -> { nba, name, how ('start' | 'trade' | 'pickup'), weeks, gp, missed, s, v }
+function activeStints(L, G, tid) {
+  const out = new Map();
+  L.weeks.forEach((w, k) => {
+    const wd = periodDays(G, w);
+    for (const [f, o] of w.owner) {
+      if (!o.on || o.tid !== tid) continue;
+      const nba = L.fidNba(f);
+      if (!nba) continue;
+      const rows = G.players.get(nba) || [];
+      const P = out.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', how: arrivalAt(L.weeks, k, f), weeks: 0, gp: 0, missed: 0, s: {}, v: 0 };
+      P.weeks++;
+      const played = new Set();
+      for (const r of rows) {
+        if (!wd.has(r[0])) continue;
+        played.add(r[0]);
+        const line = gameLine(G, r);
+        P.gp++;
+        P.v += lineValue(line);
+        for (const [key, val] of Object.entries(line)) P.s[key] = (P.s[key] || 0) + val;
+      }
+      const now = (nbaById.get(nba) || {}).team;
+      for (const day of wd) {
+        const team = teamOn(G, rows, day) || now;
+        if (!played.has(day) && team && G.days.has(team) && G.days.get(team).has(day)) P.missed++;
+      }
+      out.set(nba, P);
+    }
+  });
+  return out;
+}
+
+ui.pastRosterMode = 'total';
 function viewPastRosters() {
   const L = fxLeague();
   const teams = fxPickable();
   const tid = ui.pastTeam && teams.some(t => t.id === ui.pastTeam) ? ui.pastTeam : state.fxTeam || (teams[0] && teams[0].id);
   const r = standingOf(tid);
+  // with the weekly lineups and the season's game log: everyone the team started, and what he did while starting
+  if (L.weeks && L.season && seasonCtx.basis) {
+    if (!(L.season in gameLogs)) {
+      loadGameLog(L.season).then(() => { if (ui.tab === 'rosters' && ui.season) render(); });
+      return '<div class="card"><div class="empty"><strong>Loading the season’s games…</strong></div></div>';
+    }
+    if (gameLogs[L.season]) return pastStarters(L, gameLogs[L.season], tid, r, teams);
+  }
   const slotOfItem = it => (it.st === 'INJURED_RESERVE' ? 'IL' : it.st === 'RESERVE' ? 'BN' : FX_SLOT_MAP[it.slot] || it.slot || 'BN');
   const rows = (L.rosters[tid] || []).map(it => {
     const raw = it.nba ? nbaById.get(it.nba) : null;
@@ -1668,6 +1718,36 @@ function viewPastRosters() {
     </table></div>` : `<div class="empty"><strong>No roster</strong>Fantrax didn't return a roster for this team.</div>`}
   </div>
   ${graded ? '' : `<p class="small muted">No NBA stats are saved for this season (the site has 2016-17 on), so players show without stats.</p>`}`;
+}
+
+function pastStarters(L, G, tid, r, teams) {
+  const total = ui.pastRosterMode === 'total';
+  const list = [...activeStints(L, G, tid).values()].sort((a, b) => b.v - a.v);
+  const how = { start: ['Drafted', ''], trade: ['Trade', 'warn'], pickup: ['Pickup', 'good'] };
+  const per = (P, k) => (total ? P.s[k] || 0 : P.gp ? (P.s[k] || 0) / P.gp : 0);
+  const num = (P, k) => (P.gp ? (total ? Math.round(per(P, k)) : fmt(per(P, k), 1)) : '—');
+  const pct = (P, m, a) => (P.s[a] ? fmtPct(P.s[m] / P.s[a]) : '—');
+  const val = P => (!P.gp ? '—' : isPoints() ? fmt(total ? P.v : P.v / P.gp, total ? 0 : 1) : signed(total ? P.v : P.v / P.gp, 1));
+  const seg = `<div class="seg seg-sm" role="group" aria-label="Show stats as">${[['total', 'Totals'], ['game', 'Per game']].map(([k, l]) => `<button type="button" class="${ui.pastRosterMode === k ? 'on' : ''}" data-action="past-roster-mode" data-mode="${k}" aria-pressed="${ui.pastRosterMode === k}">${l}</button>`).join('')}</div>`;
+  const STATS = [['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO']];
+  return `
+  <div class="page-sub-row">${seg}<p class="page-sub">${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''} · everyone who started, and what he did while starting ${infoBtn('pastRoster')}</p></div>
+  <div class="card">
+    ${list.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Player</th><th>How</th><th class="num" title="Weeks in the starting lineup">Wks</th><th class="num" title="Games played while starting">GP</th><th class="num" title="Games his NBA team played without him while he was starting">Missed</th>${STATS.map(([, l]) => `<th class="num">${l}</th>`).join('')}<th class="num">FG%</th><th class="num">FT%</th><th class="num">${isPoints() ? (total ? 'FP' : 'FP/G') : 'Value'}</th></tr></thead>
+      <tbody>${list.map(P => {
+        const raw = nbaById.get(P.nba);
+        const [label, cls] = how[P.how];
+        return `<tr>
+        <td class="player"><div class="bplayer">${headshot({ nbaId: P.nba, name: P.name }, 28)}<div class="bmain"><div class="bname">${raw && !raw.inactive ? `<button class="link-btn pname" data-action="player-detail" data-nba="${P.nba}">${esc(P.name)}</button>` : esc(P.name)}</div></div></div></td>
+        <td><span class="badge ${cls}">${label}</span></td>
+        <td class="num">${P.weeks}</td><td class="num"><b>${P.gp}</b></td><td class="num ${P.missed ? 'pos-bad' : 'muted'}">${P.missed}</td>
+        ${STATS.map(([k]) => `<td class="num">${num(P, k)}</td>`).join('')}
+        <td class="num">${pct(P, 'fgm', 'fga')}</td><td class="num">${pct(P, 'ftm', 'fta')}</td><td class="num"><b>${val(P)}</b></td>
+      </tr>`;
+      }).join('')}</tbody>
+    </table></div>` : `<div class="empty"><strong>No starters</strong>Fantrax's weekly rosters show nobody starting for this team.</div>`}
+  </div>`;
 }
 
 // ----- Season awards (past seasons) -----
@@ -1870,7 +1950,7 @@ function ctxBar() {
   if (P) {
     $('#ctxMeta').innerHTML = [
       '<span class="badge accent">Past season</span>',
-      'final standings and rosters from Fantrax',
+      'standings and weekly lineups from Fantrax',
     ].join(' · ');
     return;
   }
@@ -3516,6 +3596,7 @@ const actions = {
     el.nextElementSibling.hidden = !open;
   },
   'close-info'() { $('#infoDialog').close(); },
+  'past-roster-mode'(el) { ui.pastRosterMode = el.dataset.mode; render(); },
   'draft-mode'(el) {
     ui.draftMode = el.dataset.mode;
     try { localStorage.setItem(DRAFT_MODE_KEY, ui.draftMode); } catch (e) { /* ignore */ }

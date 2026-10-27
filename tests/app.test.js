@@ -376,3 +376,14 @@ test('a past season\'s weekly totals replay its final standings', async () => {
   // 89 of 90 regular-season matchups agree with Fantrax (one week 17 matchup was decided by 4 points)
   assert.ok(exact >= 8, `${exact} of ${L.standings.length} records match Fantrax exactly`);
 });
+
+test('past Rosters list only starters, with games and misses that match the awards', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league, G = await app.loadGameLog('2025-26');
+  const sat = app.startersMissed(L, G);
+  for (const t of L.teams) {
+    const st = [...app.activeStints(L, G, t.id).values()];
+    assert.ok(st.length >= 8 && st.every(p => p.weeks > 0));
+    assert.equal(app.sum(st.map(p => p.missed)), app.sum((sat[t.id] || []).map(p => p.games)), `${t.name}: missed games agree with Street Clothes`);
+  }
+});
