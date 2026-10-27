@@ -805,8 +805,9 @@ const INFO = {
     <p><b>Colors.</b> Each column is shaded from best in the league (green) to worst (red); fewer turnovers counts as better. Hover a number for its rank. <b>Avg rank</b> is a team's average rank across the categories.</p>
     <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
   awDraft: ['Best draft', `
-    <p>Every drafted player is ranked by how he played that season (value per game from that season's full stats). A pick's <b>+/−</b> is his draft slot minus where he finished: a #40 pick who finished as the #5 player is +35.</p>
-    <p>The award goes to the best <b>average +/− per pick</b>. The Draft tab has every pick.</p>`],
+    <p>Everything a team's draft picks produced over the season: every game each pick played from the draft until he was first <b>dropped</b> to free agency, whether he was starting or on the bench. A pick who's <b>traded</b> keeps counting for the team that drafted him; one who's dropped stops counting (if someone picks him up later, that's their Waiver Wire Wizard).</p>
+    <p>In category leagues each game is valued against a <b>replacement-level starter</b> (the per-game value of the last player who'd start in your league), so every game by a player worth starting adds to the total and staying healthy pays. Points leagues add up fantasy points.</p>
+    <p>Totals don't adjust for draft slot, so a great first-round pick usually out-produces a late-round steal. The Draft tab grades each pick against its slot (+/−).</p>`],
   awManager: ['Best manager', `
     <p>Wins above what the roster should have produced: <b>actual wins</b> (ties count half) minus <b>expected wins</b>.</p>
     <p>Expected wins: each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster) is matched against every other team's with the same win-chance math as Matchups. The average win chance × games played is the expected record.</p>
@@ -1510,6 +1511,37 @@ function startersAge(L) {
   return Object.fromEntries(Object.entries(out).map(([tid, T]) => [tid, { age: T.total / T.n, n: T.n, oldest: oldest(T) }]));
 }
 
+// What each team's draft produced: every game a drafted player played from the draft until he was first
+// dropped to free agency, starting or on the bench, and through any trades (the drafting team keeps the
+// credit). Category leagues value each game above a replacement-level starter (the per-game value of the
+// last player who'd start in this league), so every game by a player worth starting adds; points leagues
+// use fantasy points. Team id -> [{ nba, name, v, games }]
+function draftImpact(L, G, picks) {
+  if (!L.weeks || !G || !picks.length) return null;
+  const fidOf = new Map();
+  for (const w of L.weeks) for (const f of w.owner.keys()) { const nba = L.fidNba(f); if (nba && !fidOf.has(nba)) fidOf.set(nba, f); }
+  let repl = 0;
+  if (!isPoints()) {
+    const A = archives[L.season];
+    const vals = A ? [...A.players.keys()].map(pid => archivedStats({ id: pid }, L.season)).filter(x => x && x.gp >= 10).map(x => value(x)).sort((a, b) => b - a) : [];
+    repl = vals.length ? vals[Math.min(vals.length, fxPickable().length * state.slots.length) - 1] : 0;
+  }
+  const weekDays = L.weeks.map(w => periodDays(G, w));
+  const out = {};
+  for (const p of picks) {
+    const f = p.nbaId && fidOf.get(p.nbaId);
+    const P = { nba: p.nbaId, name: p.name, v: 0, games: 0 };
+    if (f) {
+      const rows = G.players.get(p.nbaId) || [];
+      for (let k = 0; k < L.weeks.length && L.weeks[k].owner.has(f); k++) {
+        for (const r of rows) if (weekDays[k].has(r[0])) { P.v += lineValue(gameLine(G, r)) - repl; P.games++; }
+      }
+    }
+    (out[p.teamId] = out[p.teamId] || []).push(P);
+  }
+  return out;
+}
+
 // Games lost to players sitting while in the starting lineup: each week, every game a starter's NBA team
 // played without him. Bench and IR don't count, and neither do games before or after he was on the team.
 // A player with no games all season is placed on his current team. Team id -> [{ nba, name, games }]
@@ -1712,15 +1744,24 @@ function seasonAwards() {
     const mz = sum(zs) / zs.length;
     T.spread = Math.sqrt(sum(zs.map(z => (z - mz) ** 2)) / zs.length);
   }
-  // drafting: average +/− per pick
+  // drafting: what the picks produced over the season (or, without the weekly rosters and game log, average +/− per pick)
   const d = draftData();
-  if (d && d.graded) {
+  const GL = L.season ? gameLogs[L.season] : null;
+  const drafted = d && d.graded ? draftImpact(L, GL, d.picks) : null;
+  if (drafted) {
+    for (const T of teams) {
+      const ps = drafted[T.id] || [];
+      T.draft = ps.length ? sum(ps.map(p => p.v)) : null;
+      T.draftBest = ps.length ? ps.reduce((a, b) => (b.v > a.v ? b : a)) : null;
+    }
+  } else if (d && d.graded) {
     for (const T of teams) {
       const ps = d.picks.filter(p => p.teamId === T.id);
       T.draft = ps.length ? sum(ps.map(p => p.gain)) / ps.length : null;
       T.draftBest = ps.length ? ps.reduce((a, b) => (b.gain > a.gain ? b : a)) : null;
     }
   }
+  const total = v => (isPoints() ? `${Math.round(v).toLocaleString()} FP` : `${v >= 0 ? '+' : '−'}${Math.round(Math.abs(v)).toLocaleString()} value`);
   // Waiver Wire Wizard and Street Clothes come from the weekly lineups and the season's game log
   // (the final-roster estimates in seasonTeam are the fallback)
   const G = L.season ? gameLogs[L.season] : null;
@@ -1751,7 +1792,9 @@ function seasonAwards() {
   };
   const ranked = (key, dir, fmtFn, note) => teams.filter(T => T[key] != null).sort((a, b) => (b[key] - a[key]) * dir).map(T => ({ T, txt: fmtFn(T), note: note ? note(T) : '' }));
   return [
-    { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
+    drafted
+      ? { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => total(T.draft), T => (T.draftBest ? `best: ${T.draftBest.name} (${total(T.draftBest.v)} over ${T.draftBest.games} games)` : '')) }
+      : { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
     { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
     impact
       ? { title: 'Waiver Wire Wizard', info: 'awWaiver', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }

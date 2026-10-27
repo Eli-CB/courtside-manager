@@ -331,3 +331,24 @@ test('Unc Status averages the ages of the players each team started', async () =
     assert.ok(T.n > P.league.weeks.length * 4, `${T.n} starter-weeks with a birth date`);
   }
 });
+
+test('Best draft credits picks until first dropped, through trades', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league, G = await app.loadGameLog('2025-26');
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  let imp, picks;
+  try {
+    app.withSeason(() => { picks = app.draftData().picks; imp = app.draftImpact(L, G, picks); });
+  } finally { app.get('ui').season = null; }
+  const team = L.teams.find(t => t.name === "Eli's SGAteam");
+  const daniels = imp[team.id].find(p => p.name === 'Dyson Daniels');
+  // traded to mikeysak in week 17: his later games still count for the team that drafted him
+  const f = [...L.weeks[0].owner.keys()].find(k => L.fidNba(k) === daniels.nba);
+  const lastOnTeam = L.weeks.reduce((k, w, i) => ((w.owner.get(f) || {}).tid === team.id ? i : k), -1);
+  const rows = G.players.get(daniels.nba) || [];
+  const gamesWhileMine = L.weeks.slice(0, lastOnTeam + 1).reduce((n, w) => n + rows.filter(r => app.periodDays(G, w).has(r[0])).length, 0);
+  assert.ok(lastOnTeam < L.weeks.length - 1, 'he was traded away before the end');
+  assert.ok(daniels.games > gamesWhileMine, `${daniels.games} games counted, ${gamesWhileMine} before the trade`);
+  // every team's picks are all accounted for
+  assert.equal(Object.values(imp).flat().length, picks.length);
+});
