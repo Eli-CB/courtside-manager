@@ -119,20 +119,12 @@ test('which game days belong to a lineup period', () => {
 
 test('season totals reproduce every week-1 result on Fantrax', async () => {
   const L = await app.useLeague(CATS9);
-  const boxes = await app.loadBoxes();
-  const lineups = await app.loadLineups(L);
-  const p1 = app.rosterPeriodsOf(L).find(p => p.n === 1);
-  const tot = {}, games = {};
-  for (const [tid, ids] of Object.entries(lineups[1])) {
-    const s = {}; games[tid] = 0;
-    for (const id of ids) for (const [d, st] of boxes.byPlayer.get(id) || []) {
-      if (!app.periodHas(p1, d)) continue;
-      games[tid]++;
-      for (const [k, v] of Object.entries(st)) s[k] = (s[k] || 0) + v;
-    }
-    tot[tid] = s;
-  }
-  for (const n of Object.values(games)) assert.ok(between(n, 15, 32), `${n} player games: each game counted once`);
+  const weeks = await app.loadRosterWeeks(L);
+  const G = await app.loadGameLog('cur');
+  const w1 = weeks.find(w => w.n === 1);
+  const totals = app.pastSeasonTotals({ ...L, weeks: [w1], fidNba: app.currentFidNba() }, G);
+  const tot = Object.fromEntries(Object.entries(totals).map(([tid, T]) => [tid, T.s]));
+  for (const T of Object.values(totals)) assert.ok(between(T.gp, 15, 32), `${T.gp} player games: each game counted once`);
   const val = (s, c) => (c.pct ? s[c.made] / s[c.att] : s[c.key]);
   for (const [a, b] of L.matchups['1']) {
     let wa = 0, wb = 0;
@@ -213,7 +205,10 @@ test('recommended adds beat the player they replace', async () => {
 test('a finished week projects exactly what happened', async () => {
   const L = await app.useLeague(CATS9);
   await app.loadBoxes();
-  const lineups = await app.loadLineups(L);
+  const weeks = await app.loadRosterWeeks(L);
+  const w1 = weeks.find(w => w.n === 1), toNba = app.currentFidNba();
+  const lineups = { 1: {} };
+  for (const [f, o] of w1.owner) if (o.on && toNba(f)) (lineups[1][o.tid] = lineups[1][o.tid] || []).push(toNba(f));
   const p1 = L.periods.find(p => p.n === 1);
   const dates = app.matchDates(p1.start);
   assert.ok(dates.length >= 6 && !dates.includes('2026-10-26'), 'week 1 ends before Monday night');
@@ -437,4 +432,32 @@ test('Best manager compares actual wins with an all-play record', async () => {
   for (const t of teams) assert.ok(t.pct >= 0 && t.pct <= 1);
   const bm = awards.find(a => a.title === 'Best manager');
   assert.match(bm.list[0].note, /all-play \d+%/);
+});
+
+test('Fantrax: leagues are reused from the device, shared lists fetched once, failures retried', async () => {
+  const calls = [];
+  const realFetch = app.fetch;
+  app.fetch = url => { calls.push(String(url)); return realFetch(url); };
+  try {
+    app.localStorage.removeItem('courtside-fantrax-shared-v1');
+    app.set('fxShared', null);
+    await app.getLeague(POINTS, true);
+    await app.getLeague(CATS9, true);
+    assert.equal(calls.filter(u => u.includes('getPlayerIds')).length, 1, 'player list once for both leagues');
+    assert.equal(calls.filter(u => u.includes('getAdp')).length, 1);
+    calls.length = 0;
+    await app.getLeague(POINTS);
+    assert.equal(calls.length, 0, 'a fresh saved league needs no requests');
+  } finally { app.fetch = realFetch; }
+  // a server error is retried, then the request succeeds
+  let n = 0;
+  app.fetch = url => (++n === 1 ? Promise.resolve({ ok: false, status: 503, headers: { get: () => '0' } }) : realFetch(url));
+  try {
+    const info = await app.fxGet(`getLeagueInfo?leagueId=${POINTS}`);
+    assert.ok(info.teamInfo && n === 2, 'one retry after a 503');
+  } finally { app.fetch = realFetch; }
+  // a "not found" isn't retried
+  n = 0;
+  app.fetch = () => { n++; return Promise.resolve({ ok: false, status: 404, headers: { get: () => null } }); };
+  try { await assert.rejects(app.fxGet('getLeagueInfo?leagueId=nope')); assert.equal(n, 1); } finally { app.fetch = realFetch; }
 });

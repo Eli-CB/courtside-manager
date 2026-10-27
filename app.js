@@ -416,9 +416,9 @@ async function loadNba(fresh = false) {
     if (fresher) applyFantraxLeague(withSiteExtras(fresher));
     const other = state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId);
     if (other) {
-      // someone else's league: wait for it, since the file's league isn't theirs
+      // someone else's league: from this device if it's fresh, else from Fantrax
       try {
-        await refreshLeague();
+        await refreshLeague(false);
       } catch (e) {
         toast(`Couldn't load your Fantrax league right now. Showing ${NBA.league ? NBA.league.name : 'the site league'}.`);
       }
@@ -869,10 +869,31 @@ const FX_API = 'https://www.fantrax.com/fxea/general/';
 const NBA_POS_MAP = { G: ['PG', 'SG'], F: ['SF', 'PF'], C: ['C'], 'G-F': ['SG', 'SF'], 'F-G': ['SG', 'SF'], 'F-C': ['PF', 'C'], 'C-F': ['PF', 'C'] };
 const FX_SLOT_MAP = { PG: 'PG', SG: 'SG', G: 'G', SF: 'SF', PF: 'PF', F: 'F', C: 'C', Flx: 'FLX', Util: 'FLX', UT: 'FLX' };
 
-async function fxGet(path) {
-  const r = await fetch(FX_API + path);
-  if (!r.ok) throw new Error(`Fantrax answered ${r.status}`);
-  return JSON.parse(await r.text()); // served as text/plain
+// One Fantrax request. "Too many requests", server errors and dropped connections are retried after a
+// growing wait (Fantrax's Retry-After when it sends one); anything else fails straight away.
+const pause = ms => new Promise(res => setTimeout(res, ms));
+async function fxGet(path, tries = 3) {
+  for (let i = 0; ; i++) {
+    let r = null;
+    try { r = await fetch(FX_API + path); } catch (e) { if (i >= tries - 1) throw new Error("couldn't reach Fantrax"); }
+    if (r && r.ok) return JSON.parse(await r.text()); // served as text/plain
+    if (r && r.status !== 429 && r.status < 500) throw new Error(`Fantrax answered ${r.status}`);
+    if (i >= tries - 1) throw new Error(`Fantrax answered ${r ? r.status : 'nothing'}`);
+    const after = r && r.headers && +r.headers.get('Retry-After');
+    await pause(Math.min(after ? after * 1000 : 600 * 3 ** i, 10000));
+  }
+}
+// Many requests at once (weekly rosters): a few at a time, and stop as soon as one fails for good
+async function fxGetAll(paths, each, width = 4) {
+  let next = 0, failed = null;
+  const worker = async () => {
+    while (next < paths.length && !failed) {
+      const path = paths[next++];
+      try { each(path, await fxGet(path)); } catch (e) { failed = failed || e; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, paths.length) }, worker));
+  if (failed) throw failed;
 }
 
 // Keepers: only in leagues whose draft gives each team fewer picks than it has roster spots (starters
@@ -1000,12 +1021,24 @@ function rosterPeriodDays(periods) {
   return lens.length ? Math.round(lens[Math.floor(lens.length / 2)] * 100) / 100 : null;
 }
 
+// Fantrax's player list (about 200 KB) and ADP are the same for every league and barely change:
+// fetched at most once a day and kept on this device
+const FX_SHARED_KEY = 'courtside-fantrax-shared-v1';
+let fxShared = null;
+async function fxPlayerLists() {
+  if (!fxShared) { try { fxShared = JSON.parse(localStorage.getItem(FX_SHARED_KEY)); } catch (e) { fxShared = null; } }
+  if (fxShared && Date.now() - fxShared.at < 864e5 && fxShared.ids) return fxShared;
+  const [ids, adp] = await Promise.all([fxGet('getPlayerIds?sport=NBA'), fxGet('getAdp?sport=NBA').catch(() => [])]);
+  fxShared = { at: Date.now(), ids, adp };
+  try { localStorage.setItem(FX_SHARED_KEY, JSON.stringify(fxShared)); } catch (e) { /* storage full or blocked */ }
+  return fxShared;
+}
+
 async function fetchFantraxLeague(id, opts = {}) {
   const q = encodeURIComponent(id);
-  const [ids, info, rosters, draft, adpList, standings] = await Promise.all([
-    fxGet('getPlayerIds?sport=NBA'), fxGet(`getLeagueInfo?leagueId=${q}`), fxGet(`getTeamRosters?leagueId=${q}`),
-    fxGet(`getDraftResults?leagueId=${q}`).catch(() => ({})), fxGet('getAdp?sport=NBA').catch(() => []),
-    fxGet(`getStandings?leagueId=${q}`).catch(() => []),
+  const [{ ids, adp: adpList }, info, rosters, draft, standings] = await Promise.all([
+    fxPlayerLists(), fxGet(`getLeagueInfo?leagueId=${q}`), fxGet(`getTeamRosters?leagueId=${q}`),
+    fxGet(`getDraftResults?leagueId=${q}`).catch(() => ({})), fxGet(`getStandings?leagueId=${q}`).catch(() => []),
   ]);
   if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
   // the opening week's rosters: past seasons use them for keepers and pickups, and so does this season once week 1 is over
@@ -1052,7 +1085,7 @@ async function fetchFantraxLeague(id, opts = {}) {
     rosters: Object.fromEntries(Object.entries(rosters.rosters || {}).map(([tid, r]) => [tid,
       (r.rosterItems || []).map(it => ({ fid: it.id, nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
     openingRosters: opening ? Object.fromEntries(Object.entries(opening.rosters || {}).map(([tid, r]) => [tid,
-      (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '' }))])) : null,
+      (r.rosterItems || []).map(it => ({ fid: it.id, nba: toNba[it.id] || null, name: names[it.id] || '', st: it.status || '' }))])) : null,
     rosterInfo: info.rosterInfo || null,
     draft: null,
     draftAt: draft.draftDate || null,
@@ -1199,23 +1232,41 @@ function syncLeagueRules() {
   if (cfg.ir != null) state.ilSize = cfg.ir;
 }
 
-// A reloaded league is kept on this device and used until the daily data file is newer
-const FX_CACHE_KEY = 'courtside-fantrax-v1';
+// Every league loaded from Fantrax is kept on this device (the five most recent). The site's own league
+// uses it until the daily data file is newer; any other league for 6 hours, or until ↻ Reload.
+const FX_CACHE_KEY = 'courtside-fantrax-v2';
+const LEAGUE_FRESH_MS = 6 * 36e5;
+try { localStorage.removeItem('courtside-fantrax-v1'); } catch (e) { /* the old one-league copy */ }
+const readLeagueCache = () => { try { return JSON.parse(localStorage.getItem(FX_CACHE_KEY)) || {}; } catch (e) { return {}; } };
 function cachedLeague(id) {
-  try {
-    const c = JSON.parse(localStorage.getItem(FX_CACHE_KEY) || 'null');
-    return c && c.id === id && c.at > Date.parse(NBA.updated || 0) ? c.res : null;
-  } catch (e) { return null; }
+  const c = readLeagueCache()[id];
+  if (!c) return null;
+  const site = NBA && NBA.siteLeague && NBA.siteLeague.id === id;
+  return (site ? c.at > Date.parse(NBA.updated || 0) : Date.now() - c.at < LEAGUE_FRESH_MS) ? c.res : null;
+}
+function saveLeague(id, res) {
+  const all = readLeagueCache();
+  all[id] = { at: Date.now(), res: { league: res.league, fxPlayers: res.fxPlayers } };
+  const keep = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, 5);
+  try { localStorage.setItem(FX_CACHE_KEY, JSON.stringify(Object.fromEntries(keep))); } catch (e) { /* storage full or blocked */ }
+}
+// A league from this device if it's fresh enough, else from Fantrax (force: always from Fantrax)
+async function getLeague(id, force) {
+  const kept = force ? null : cachedLeague(id);
+  if (kept) return kept;
+  const res = await fetchFantraxLeague(id);
+  saveLeague(id, res);
+  delete rosterWeeksLoad[id]; // the current period's lineups may have changed
+  return res;
 }
 
 // Pull the league fresh from Fantrax: matchups, rosters and lineups change during the week
-async function refreshLeague() {
+async function refreshLeague(force = true) {
   const id = state.fxLeagueId || (NBA.siteLeague && NBA.siteLeague.id);
   if (!id) return false;
   const same = NBA.league && NBA.league.id === id;
   const before = same && state.fxTeam ? fxOpponentFor(weekStart()) : null;
-  const res = await fetchFantraxLeague(id);
-  try { localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ id, at: Date.now(), res })); } catch (e) { /* storage full or blocked */ }
+  const res = await getLeague(id, force);
   applyFantraxLeague(withSiteExtras(res));
   if (!state.fxTeam || !NBA.league.teams.some(t => t.id === state.fxTeam)) return true;
   // follow your real opponent (and their latest roster) unless you'd picked someone else to scout
@@ -1404,23 +1455,33 @@ async function loadSeason(id) {
 // change, so the weekly rosters are fetched once and kept on this device.
 const ROSTER_WEEKS_KEY = 'courtside-roster-weeks-v1';
 try { localStorage.removeItem('courtside-roster-history-v1'); } catch (e) { /* older format, no statuses */ }
-async function loadRosterWeeks(L) {
+// one load per league at a time, shared by Season totals and Awards
+const rosterWeeksLoad = {};
+function loadRosterWeeks(L) {
+  if (!rosterWeeksLoad[L.id]) rosterWeeksLoad[L.id] = fetchRosterWeeks(L).catch(e => { delete rosterWeeksLoad[L.id]; throw e; });
+  return rosterWeeksLoad[L.id];
+}
+async function fetchRosterWeeks(L) {
   let all = {};
   try { all = JSON.parse(localStorage.getItem(ROSTER_WEEKS_KEY)) || {}; } catch (e) { /* none saved */ }
   const have = all[L.id] || {};
   const today = todayIso();
   const periods = rosterPeriodsOf(L).filter(p => p.start.slice(0, 10) <= today);
+  // the period underway comes with the league (when its roster entries carry Fantrax ids)
+  const cur = L.rosterPeriod && Object.values(L.rosters || {}).flat().every(x => x.fid) ? L.rosterPeriod : null;
+  if (cur && periods.some(p => p.n === cur)) {
+    have[cur] = Object.fromEntries(Object.entries(L.rosters).map(([tid, items]) => [tid, items.map(x => [x.fid, x.st === 'ACTIVE' ? 1 : 0])]));
+  }
+  // and the opening week was fetched with the league too
+  const open = L.openingRosters && Object.values(L.openingRosters).flat();
+  if (!have[1] && open && open.length && open.every(x => x.fid && x.st)) {
+    have[1] = Object.fromEntries(Object.entries(L.openingRosters).map(([tid, items]) => [tid, items.map(x => [x.fid, x.st === 'ACTIVE' ? 1 : 0])]));
+  }
   const want = periods.map(p => p.n).filter(n => !have[n]);
-  let next = 0;
-  const worker = async () => {
-    while (next < want.length) {
-      const n = want[next++];
-      const d = await fxGet(`getTeamRosters?leagueId=${encodeURIComponent(L.id)}&period=${n}`);
-      // [Fantrax id, 1 if in the starting lineup]
-      have[n] = Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) => [tid, (r.rosterItems || []).map(it => [it.id, it.status === 'ACTIVE' ? 1 : 0])]));
-    }
-  };
-  try { await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker)); } finally {
+  // [Fantrax id, 1 if in the starting lineup]
+  const parse = d => Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) => [tid, (r.rosterItems || []).map(it => [it.id, it.status === 'ACTIVE' ? 1 : 0])]));
+  const q = encodeURIComponent(L.id);
+  try { await fxGetAll(want.map(n => `getTeamRosters?leagueId=${q}&period=${n}`), (path, d) => { have[+path.split('period=')[1]] = parse(d); }); } finally {
     // a period still underway can change, so only finished ones are kept
     const now = Date.now();
     all[L.id] = Object.fromEntries(Object.entries(have).filter(([n]) => { const p = periods.find(x => String(x.n) === n); return p && fxTime(p.end) < now; }));
@@ -1431,7 +1492,7 @@ async function loadRosterWeeks(L) {
     for (const [tid, items] of Object.entries(have[p.n])) for (const [f, on] of items) owner.set(f, { tid, on: !!on });
     return { ...p, owner };
   });
-  return weeks.length > 1 ? weeks : null;
+  return weeks.length ? weeks : null;
 }
 
 // How a player came to be on a team in week k: 'start', 'trade' or 'pickup'
@@ -2014,9 +2075,8 @@ function viewAwardsSoFar() {
   const C = curAwards[L.id];
   if (!C) {
     curAwards[L.id] = { loading: true };
-    const toNba = new Map(NBA.players.filter(r => r.fx).map(r => [r.fx.id, r.id]));
     Promise.all([loadRosterWeeks(L).catch(() => null), loadGameLog('cur')]).then(([weeks]) => {
-      curAwards[L.id] = { weeks, fidNba: f => toNba.get(f) || null };
+      curAwards[L.id] = { weeks, fidNba: currentFidNba() };
     }).finally(() => { if (ui.tab === 'awards' && !ui.season) render(); });
   }
   if (!C || C.loading) return '<div class="card"><div class="empty"><strong>Loading this season’s lineups and games…</strong></div></div>';
@@ -2460,7 +2520,6 @@ function viewStandings() {
 // ----- Season totals: what each team's starters actually produced -----
 // Fantrax returns every lineup period's rosters. A player's games count for a team only in periods he
 // was ACTIVE there, using this season's box scores (data/boxscores.json, loaded when Standings opens).
-const LINEUP_CACHE_KEY = 'courtside-lineups-v1';
 const BOX_COLS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'];
 let boxLoad = null;
 let BOX = null; // { byPlayer, finals } once data/boxscores.json has loaded
@@ -2502,50 +2561,17 @@ function loadBoxes() {
   return boxLoad;
 }
 
-// completed periods never change, so their lineups are fetched once and kept on this device
-async function loadLineups(L) {
-  let all = {};
-  try { all = JSON.parse(localStorage.getItem(LINEUP_CACHE_KEY)) || {}; } catch (e) { /* none saved */ }
-  const have = all[L.id] || {};
-  const toNba = new Map(NBA.players.filter(r => r.fx).map(r => [r.fx.id, r.id]));
-  const want = rosterPeriodsOf(L).filter(p => p.n < L.rosterPeriod && !have[p.n]).map(p => p.n);
-  let next = 0;
-  const worker = async () => {
-    while (next < want.length) {
-      const n = want[next++];
-      const d = await fxGet(`getTeamRosters?leagueId=${encodeURIComponent(L.id)}&period=${n}`);
-      have[n] = Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) =>
-        [tid, (r.rosterItems || []).filter(it => it.status === 'ACTIVE').map(it => toNba.get(it.id)).filter(Boolean)]));
-    }
-  };
-  try { await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker)); } finally {
-    all[L.id] = have;
-    try { localStorage.setItem(LINEUP_CACHE_KEY, JSON.stringify(all)); } catch (e) { /* storage full or blocked */ }
-  }
-  // the current period comes with the league
-  return { ...have, [L.rosterPeriod]: Object.fromEntries(Object.entries(L.rosters || {}).map(([tid, r]) => [tid, r.filter(x => x.st === 'ACTIVE' && x.nba).map(x => x.nba)])) };
-}
-
+// This season's Season totals and Awards: the shared weekly rosters (Fantrax ids) mapped to NBA players
+const currentFidNba = () => { const m = new Map(NBA.players.filter(r => r.fx).map(r => [r.fx.id, r.id])); return f => m.get(f) || null; };
+try { localStorage.removeItem('courtside-lineups-v1'); } catch (e) { /* replaced by the shared weekly rosters */ }
 async function buildSeasonTotals(L) {
-  const [boxes, lineups] = await Promise.all([loadBoxes(), loadLineups(L)]);
-  const teams = {};
-  for (const p of rosterPeriodsOf(L)) {
-    for (const [tid, ids] of Object.entries(lineups[p.n] || {})) {
-      const T = teams[tid] || (teams[tid] = { gp: 0, s: {} });
-      for (const id of ids) {
-        for (const [d, st] of boxes.byPlayer.get(id) || []) {
-          if (!periodHas(p, d)) continue;
-          T.gp++;
-          for (const [k, v] of Object.entries(st)) T.s[k] = (T.s[k] || 0) + v;
-        }
-      }
-    }
-  }
-  return teams;
+  const [weeks, G] = await Promise.all([loadRosterWeeks(L), loadGameLog('cur')]);
+  if (!weeks || !G) return {};
+  return pastSeasonTotals({ ...L, weeks, fidNba: currentFidNba() }, G);
 }
 
-// A past season's totals: every game each starter played in a week he was in the lineup, from the
-// weekly rosters (kept on this device) and that season's archived game log. Same shape as buildSeasonTotals.
+// A season's totals: every game each starter played in a week he was in the lineup, from the weekly
+// rosters (kept on this device) and that season's game log (archived, or this season's box scores)
 function pastSeasonTotals(L, G) {
   const teams = {};
   for (const w of L.weeks) {
@@ -3643,7 +3669,7 @@ async function switchLeague(id) {
   if (!NBA) throw new Error("Couldn't load NBA data. Check your connection and try again.");
   let res;
   try {
-    res = await fetchFantraxLeague(id);
+    res = await getLeague(id);
   } catch (e) {
     throw new Error(`Fantrax didn't find that league (${e.message}). Check the ID in your league's address.`);
   }
@@ -3838,6 +3864,8 @@ const actions = {
       }
       syncLinked();
       delete seasonTot[fxLeague().id];
+      delete curAwards[fxLeague().id];
+      if (gameLogs.cur) delete gameLogs.cur;
       commit(`Reloaded ${fxLeague().name} from Fantrax`);
     } catch (e) {
       toast(`Couldn't reach Fantrax (${e.message})`);
