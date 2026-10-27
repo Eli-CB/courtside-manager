@@ -742,6 +742,12 @@ const INFO = {
     <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
     <p><b>Who helped and hurt.</b> Click a category's row to show the players who helped most (green) and hurt most (red). Each player's own per-game number in that category, compared with the league average in the same row. For FG% and FT% it's their percentage and attempts a game ("<b>.700</b> on 6.2 FTA"), ranked by makes above or below what the league average would give at that volume, so a poor shooter who takes a lot of shots hurts more than one who rarely shoots. Hover a name for the detail.</p>
     <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank.</p>`],
+  totals: ['Season totals', `
+    <p><b>Who counts.</b> Fantrax keeps every team's lineup for each lineup period (a week, or a day in daily leagues). A player's games count for the team that had him <b>starting</b> in that period. Bench and IR games don't count, and a player who changed teams counts for whoever was starting him at the time.</p>
+    <p><b>Player games.</b> Every starter's games added up, so it depends on how many starters your league has and how often their NBA teams played. A team with more player games has had more chances to pile up counting stats.</p>
+    <p><b>Totals.</b> Counting stats are added up from this season's box scores. FG% and FT% are total makes ÷ total attempts.</p>
+    <p><b>Colors.</b> Each column is shaded from best in the league (green) to worst (red); fewer turnovers counts as better. Hover a number for its rank. <b>Avg rank</b> is a team's average rank across the categories.</p>
+    <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
   awards: ['How awards are decided', `
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
     <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
@@ -1834,7 +1840,7 @@ function seasonTotalsCard(L, standings) {
       .catch(e => { seasonTot[id] = { state: 'error', msg: e.message }; })
       .finally(() => { if (ui.tab === 'standings' && !ui.season) render(); });
   }
-  const head = `<div class="card-head"><h2>Season totals</h2><span class="muted small">from each ${state.lineupMode === 'daily' ? "day's" : "week's"} starting lineups</span></div>`;
+  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${state.lineupMode === 'daily' ? "day's" : "week's"} starting lineups</span></div>`;
   if (!S || S.state === 'loading') return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">Loading every lineup from Fantrax…</p></div>`;
   if (S.state === 'error') return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">Couldn't load season totals (${esc(S.msg)}).</p></div>`;
 
@@ -1871,7 +1877,6 @@ function seasonTotalsCard(L, standings) {
         ${cols.map((c, j) => { const v = stats[j].vals[i]; return `<td class="num" style="${shade(stats[j].z(v))}" title="${c.label}: ${ordinal(stats[j].rank(v))} of ${list.length}">${c.fmt(v)}</td>`; }).join('')}
         ${sc ? '' : `<td class="num"><b>${fmt(avgRank(i), 1)}</b></td>`}</tr>`; }).join('')}</tbody>
     </table></div>
-    <p class="small muted" style="margin:10px 0 0">A player's games count for the team that had him in its starting lineup that ${state.lineupMode === 'daily' ? 'day' : 'week'}. Player games adds up every starter's games (8 starters playing 3 games each is 24). Green is best in the league, red is worst; hover a number for its rank, click a column to sort.</p>
   </div>`;
 }
 
