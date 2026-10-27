@@ -3040,7 +3040,15 @@ const actions = {
     state.lineup = fillSlots(chosen, state.slots);
     commit('Lineup updated for this week');
   },
-  'week-shift'(el) { ui.weekShift = Math.max(-4, Math.min(4, ui.weekShift + +el.dataset.step)); render(); },
+  'week-shift'(el) {
+    ui.weekShift = Math.max(-4, Math.min(4, ui.weekShift + +el.dataset.step));
+    // a new week brings its real opponent: a hypothetical belongs to the week it was set up in
+    if (viewingOther()) { ui.viewB = null; render(); return; }
+    const opp = fxOpponentFor(weekStart());
+    if (!opp) render();
+    else if (opp.id !== state.opp.fxId) loadFxTeam(opp.id);
+    else { state.opp.week = weekStart(); commit(); }
+  },
   'player-detail'(el) { showPlayerDetail(+el.dataset.nba); },
   'close-detail'() { $('#detailDialog').close(); },
   'more-players'() { ui.pf.limit += 50; $('#playerResults').innerHTML = playerRows(); },
