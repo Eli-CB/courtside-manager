@@ -2361,23 +2361,51 @@ function shortMinutes(p, line, d) {
   return why.length ? why.join(' and ') : "fewer minutes than usual, with no blowout, foul trouble or injury report (maybe the coach's call)";
 }
 
+// A played game's box score for the tooltip: minutes, the stat line, shooting, and fantasy points in points leagues
+function gameTip(p, line, d, bench) {
+  const v = k => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
+  const sc = leaguePoints();
+  const short = shortMinutes(p, line, d);
+  return `<div class="tip-head">${Math.round(line.min)} min${bench ? ' <span class="tip-tag">bench, didn\'t count</span>' : ''}</div>
+    <div>${line.pts} PTS · ${line.reb} REB · ${line.ast} AST</div>
+    <div>${line.stl} STL · ${line.blk} BLK · ${line.tpm} 3PM · ${line.to} TO</div>
+    <div class="tip-dim">${line.fgm}-${line.fga} FG · ${line.ftm}-${line.fta} FT</div>
+    ${sc ? `<div class="tip-head">${fmt(sum(Object.entries(sc).map(([k, x]) => v(k) * x)), 1)} FP</div>` : ''}
+    ${short ? `<div class="tip-warn">Usually ${Math.round(p.min)} min: ${esc(short)}</div>` : ''}`;
+}
+
 function dayDots(p, ctx, counts) {
-  return `<span class="dots" aria-hidden="true">${ctx.dates.map(d => {
-    const day = DAY_LABELS[dayOffset(d)];
-    if (!playsOn(p, d)) return `<i class="none" title="${day}: no game"></i>`;
+  const dot = (cls, tip) => `<i class="${cls}" data-tip="${esc(tip)}"></i>`;
+  return `<span class="dots">${ctx.dates.map(d => {
+    if (!playsOn(p, d)) return dot('none', 'No game');
     const bench = counts ? '' : ' bench';
     if (gameFinal(p, d)) {
       const line = actualLine(p, d);
-      if (!line) return `<i class="dnp" title="${day}: didn't play"></i>`;
-      const short = shortMinutes(p, line, d);
-      const stats = `${line.pts} pts ${line.reb} reb ${line.ast} ast`;
-      return `<i class="done${bench}${short ? ' short' : ''}" title="${day}${bench ? ' (bench)' : ''}: ${Math.round(line.min)} min${short ? ` (usually ${Math.round(p.min)}), ${short}` : ''} · ${stats}"></i>`;
+      if (!line) return dot('dnp', "His team played, but he didn't");
+      return dot(`done${bench}${shortMinutes(p, line, d) ? ' short' : ''}`, gameTip(p, line, d, bench));
     }
-    if (p.status === 'Out') return `<i class="out" title="${day}: listed Out"></i>`;
+    if (p.status === 'Out') return dot('out', `Upcoming, but he's listed Out${p.inj && p.inj.note ? `<div class="tip-dim">${esc(p.inj.note)}</div>` : ''}`);
     const b2b = isB2B(p, d);
-    return `<i class="up${bench}${b2b ? ' b2b' : ''}" title="${day}: upcoming${bench ? ' (bench)' : ''}${b2b ? ', back-to-back' : ''}"></i>`;
+    return dot(`up${bench}${b2b ? ' b2b' : ''}`, `Upcoming game${b2b ? ', on a back-to-back' : ''}${bench ? '<div class="tip-dim">On the bench, so it won\'t count</div>' : ''}`);
   }).join('')}</span>`;
 }
+
+// ----- Tooltips: any element with data-tip (trusted HTML) shows a readable box on hover, focus or tap -----
+const tipEl = $('#tip');
+function showTip(el) {
+  tipEl.innerHTML = el.dataset.tip;
+  tipEl.hidden = false;
+  const r = el.getBoundingClientRect(), t = tipEl.getBoundingClientRect();
+  const left = Math.max(8, Math.min(window.innerWidth - t.width - 8, r.left + r.width / 2 - t.width / 2));
+  const above = r.top - t.height - 8;
+  tipEl.style.left = `${left}px`;
+  tipEl.style.top = `${above >= 8 ? above : r.bottom + 8}px`;
+}
+const hideTip = () => { tipEl.hidden = true; };
+document.addEventListener('mouseover', e => { const el = e.target.closest('[data-tip]'); if (el) showTip(el); else if (!tipEl.hidden) hideTip(); });
+document.addEventListener('focusin', e => { const el = e.target.closest('[data-tip]'); if (el) showTip(el); });
+document.addEventListener('click', e => { const el = e.target.closest('[data-tip]'); if (el) showTip(el); else hideTip(); }, true);
+window.addEventListener('scroll', hideTip, { passive: true });
 
 // ----- Lineups board views: schedule dots, or category stats shaded by contribution -----
 const BOARD_KEY = 'courtside-board';
@@ -2460,7 +2488,7 @@ function boardCell(p, ctx, side, starter) {
   if (!p) return `<td class="bcell"><span class="muted small">${side === 'them' && !ctx.hasOpp ? '' : 'Empty'}</span></td>`;
   const tags = rowTags(p, ctx, side, starter);
   return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, matchMedia('(max-width: 640px)').matches ? 22 : 28)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>
-    <div class="bmeta"><span class="bmeta-info">${teamLogo(p.team)} ${posTags(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g" title="${gamesLeftTip(p, ctx.dates)}">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
+    <div class="bmeta"><span class="bmeta-info">${teamLogo(p.team)} ${posTags(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g" data-tip="${esc(gamesLeftTip(p, ctx.dates))}">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
 }
 
 // ----- Per game / Week total: two sortable stat tables side by side -----
