@@ -591,15 +591,22 @@ function perGame(p) {
   return { m, sd };
 }
 
+// Finished games: whether a player's team has played that day, and his real line (null: he didn't play)
+const gameFinal = (p, d) => !!(BOX && p.team && BOX.finals.has(`${d} ${p.team}`));
+const actualLine = (p, d) => (BOX && p.nbaId ? (BOX.day.get(p.nbaId) || new Map()).get(d) || null : null);
+
 // Project one side's week. fixedIds = that lineup as set; null = best lineup every day.
+// Days whose games are over count the real box score (or nothing, for a player who sat).
 function projectSide(players, dates, fixedIds) {
   const tot = Object.fromEntries(COUNT_KEYS.map(k => [k, 0]));
   const vr = Object.fromEntries(COUNT_KEYS.map(k => [k, 0]));
+  const left = Object.fromEntries(COUNT_KEYS.map(k => [k, 0])); // the part still to be played
   const ranked = [...players].sort((a, b) => value(b) - value(a));
   const days = [];
   let games = 0;
   for (const d of dates) {
-    const avail = ranked.filter(p => p.status !== 'Out' && playsOn(p, d));
+    // a finished game: available means he played; otherwise anyone not ruled Out whose team plays
+    const avail = ranked.filter(p => playsOn(p, d) && (gameFinal(p, d) ? !!actualLine(p, d) : p.status !== 'Out'));
     let active;
     if (fixedIds) active = avail.filter(p => fixedIds.has(p.id));
     else {
@@ -607,13 +614,15 @@ function projectSide(players, dates, fixedIds) {
       active = avail.filter(p => ids.has(p.id));
     }
     for (const p of active) {
+      const line = gameFinal(p, d) ? actualLine(p, d) : null;
+      if (line) { for (const k of COUNT_KEYS) tot[k] += line[k] || 0; continue; }
       const g = perGame(p);
-      for (const k of COUNT_KEYS) { tot[k] += g.m[k]; vr[k] += g.sd[k] ** 2; }
+      for (const k of COUNT_KEYS) { tot[k] += g.m[k]; vr[k] += g.sd[k] ** 2; left[k] += g.m[k]; }
     }
     games += active.length;
     days.push({ date: d, active: new Set(active.map(p => p.id)), avail: new Set(avail.map(p => p.id)) });
   }
-  return { tot, vr, games, days };
+  return { tot, vr, left, games, days };
 }
 
 function phi(x) { // standard normal CDF
@@ -644,8 +653,9 @@ function compareCats(A, B) {
       const mk = c.made, at = c.att;
       a = A.tot[at] ? A.tot[mk] / A.tot[at] : 0;
       b = B.tot[at] ? B.tot[mk] / B.tot[at] : 0;
-      // shot-making noise, a bit wider than pure binomial
-      const va = A.tot[at] ? 1.3 * a * (1 - a) / A.tot[at] : 0, vb = B.tot[at] ? 1.3 * b * (1 - b) / B.tot[at] : 0;
+      // shot-making noise on the attempts still to come, a bit wider than pure binomial
+      const noise = (S, x) => (S.tot[at] ? 1.3 * x * (1 - x) * (S.left ? S.left[at] : S.tot[at]) / S.tot[at] ** 2 : 0);
+      const va = noise(A, a), vb = noise(B, b);
       sd = Math.sqrt(va + vb);
     } else {
       a = totStat(A, c.key); b = totStat(B, c.key);
@@ -765,11 +775,11 @@ const INFO = {
     <p><b>Week total.</b> The player's weekly number is compared with an average starter's week of about 3.5 games: (weekly total − average × 3.5) ÷ (spread × 3.5). The same weekly total always gets the same shade.</p>
     <p><b>Colors.</b> Green helps the category, red hurts it, getting stronger up to ±2.5 spreads. The Projected week row is shaded by your chance to win each category instead. Hover any number for the exact value.</p>`],
   dots: ['Schedule dots', `
-    <p>One dot per matchup day, Monday to Sunday, from the NBA schedule.</p>
-    <ul><li><b>Green dot:</b> a game that counts for a starter.</li><li><b>Green ring:</b> a game on your bench, which doesn't count.</li>
-    <li><b>Yellow:</b> either night of a back-to-back (the team also plays the day before or after, even outside this week). Players sometimes rest one of those nights.</li>
-    <li><b>Red:</b> the player is listed Out.</li></ul>
-    <p>The number on the right is games this week.</p>`],
+    <p>One dot per matchup day, from the NBA schedule. <b>Filled</b> dots are games already played; <b>rings</b> are games still to come.</p>
+    <ul><li><b>Green:</b> a game that counts (a starter).</li><li><b>Grey:</b> a game on the bench, which doesn't count.</li>
+    <li><b>Yellow ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
+    <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
+    <p>The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
   value: ['Player value', `
     <p>Value is the sum of a player's contributions per game in each of your league's categories, each measured against an average rostered player (see Stat shading for the exact averages). +5 is an elite all-around player; around 0 is replacement level in a 12-team league.</p>
     <p>FG% and FT% count shot volume, and turnovers count against.</p>
@@ -1821,6 +1831,7 @@ function viewStandings() {
 const LINEUP_CACHE_KEY = 'courtside-lineups-v1';
 const BOX_COLS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'];
 let boxLoad = null;
+let BOX = null; // { byPlayer, finals } once data/boxscores.json has loaded
 const seasonTot = {}; // league id -> { state: 'loading' | 'ready' | 'error', teams, msg }
 
 function rosterPeriodsOf(L) {
@@ -1841,7 +1852,9 @@ function loadBoxes() {
       if (!unique.has(key) || !gid.startsWith('espn:')) unique.set(key, g);
     }
     const byPlayer = new Map(); // NBA id -> [[date, stats]]
+    const finals = new Set(); // "date team" for every finished game
     for (const g of unique.values()) {
+      finals.add(`${g.d} ${g.home}`).add(`${g.d} ${g.away}`);
       for (const row of g.rows) {
         const st = Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0]));
         const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => st[k] >= 10).length;
@@ -1850,7 +1863,8 @@ function loadBoxes() {
         byPlayer.get(row[0]).push([g.d, st]);
       }
     }
-    return byPlayer;
+    BOX = { byPlayer, finals, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games)])) };
+    return BOX;
   }).catch(e => { boxLoad = null; throw e; });
   return boxLoad;
 }
@@ -1886,7 +1900,7 @@ async function buildSeasonTotals(L) {
     for (const [tid, ids] of Object.entries(lineups[p.n] || {})) {
       const T = teams[tid] || (teams[tid] = { gp: 0, s: {} });
       for (const id of ids) {
-        for (const [d, st] of boxes.get(id) || []) {
+        for (const [d, st] of boxes.byPlayer.get(id) || []) {
           if (!periodHas(p, d)) continue;
           T.gp++;
           for (const [k, v] of Object.entries(st)) T.s[k] = (T.s[k] || 0) + v;
@@ -2213,6 +2227,11 @@ const pctTxt = p => `${Math.round(p * 100)}%`;
 // a change in the matchup goal: categories won, or projected fantasy points
 const goalDelta = v => (isPoints() ? `${signed(v, 1)} FP` : `${signed(v, 2)} cats`);
 const weekGames = (p, dates) => (p.status === 'Out' ? 0 : gamesIn(p, dates));
+function gamesLeftTip(p, dates) {
+  const played = dates.filter(d => playsOn(p, d) && gameFinal(p, d) && actualLine(p, d)).length;
+  const left = dates.filter(d => playsOn(p, d) && !gameFinal(p, d)).length;
+  return `${played} played, ${p.status === 'Out' ? 0 : left} left this week`;
+}
 
 // What changes, category by category, when your starters go from fromIds to toIds
 function explainChange(ctx, fromIds, toIds, outP, inP) {
@@ -2320,9 +2339,17 @@ const isB2B = (p, d) => playsOn(p, d) && (playsOn(p, addDays(d, -1)) || playsOn(
 
 function dayDots(p, ctx, counts) {
   return `<span class="dots" aria-hidden="true">${ctx.dates.map(d => {
+    const day = DAY_LABELS[dayOffset(d)];
+    if (!playsOn(p, d)) return `<i class="none" title="${day}: no game"></i>`;
+    const bench = counts ? '' : ' bench';
+    if (gameFinal(p, d)) {
+      const line = actualLine(p, d);
+      return line ? `<i class="done${bench}" title="${day}: played${bench ? ' (bench)' : ''}, ${line.pts} pts ${line.reb} reb ${line.ast} ast"></i>`
+        : `<i class="dnp" title="${day}: didn't play"></i>`;
+    }
+    if (p.status === 'Out') return `<i class="out" title="${day}: listed Out"></i>`;
     const b2b = isB2B(p, d);
-    const cls = !playsOn(p, d) ? 'none' : p.status === 'Out' ? 'out' : (counts ? 'on' : 'off') + (b2b ? ' b2b' : '');
-    return `<i class="${cls}" title="${DAY_LABELS[dayOffset(d)]}${b2b ? ' (back-to-back)' : ''}"></i>`;
+    return `<i class="up${bench}${b2b ? ' b2b' : ''}" title="${day}: upcoming${bench ? ' (bench)' : ''}${b2b ? ', back-to-back' : ''}"></i>`;
   }).join('')}</span>`;
 }
 
@@ -2407,7 +2434,7 @@ function boardCell(p, ctx, side, starter) {
   if (!p) return `<td class="bcell"><span class="muted small">${side === 'them' && !ctx.hasOpp ? '' : 'Empty'}</span></td>`;
   const tags = rowTags(p, ctx, side, starter);
   return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, matchMedia('(max-width: 640px)').matches ? 22 : 28)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>
-    <div class="bmeta"><span class="bmeta-info">${teamLogo(p.team)} ${posTags(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
+    <div class="bmeta"><span class="bmeta-info">${teamLogo(p.team)} ${posTags(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g" title="${gamesLeftTip(p, ctx.dates)}">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
 }
 
 // ----- Per game / Week total: two sortable stat tables side by side -----
@@ -2624,6 +2651,8 @@ function viewWeek() {
   if (!NBA) {
     return `<div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the NBA data file.</div></div>`;
   }
+  // once the week has started, finished games count their real box scores (loaded on first need)
+  if (!BOX && matchDates()[0] <= todayIso()) loadBoxes().then(() => { if (ui.tab === 'week') render(); }).catch(() => {});
   const ctx = weekContext();
   const { start, dates, weekly, hasOpp, asSet, best, oSet, oBest, mine } = ctx;
   ui.bestIds = ctx.bestIds ? [...ctx.bestIds] : null;

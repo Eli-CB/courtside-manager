@@ -125,7 +125,7 @@ test('season totals reproduce every week-1 result on Fantrax', async () => {
   const tot = {}, games = {};
   for (const [tid, ids] of Object.entries(lineups[1])) {
     const s = {}; games[tid] = 0;
-    for (const id of ids) for (const [d, st] of boxes.get(id) || []) {
+    for (const id of ids) for (const [d, st] of boxes.byPlayer.get(id) || []) {
       if (!app.periodHas(p1, d)) continue;
       games[tid]++;
       for (const [k, v] of Object.entries(st)) s[k] = (s[k] || 0) + v;
@@ -207,5 +207,26 @@ test('recommended adds beat the player they replace', async () => {
     assert.ok(x.gain > 0);
     assert.notEqual(x.p.status, 'Out');
     assert.ok(!app.get('state').players.some(p => p.nbaId === x.p.nbaId), `${x.p.name} isn't already on the team`);
+  }
+});
+
+test('a finished week projects exactly what happened', async () => {
+  const L = await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const lineups = await app.loadLineups(L);
+  const p1 = L.periods.find(p => p.n === 1);
+  const dates = app.matchDates(p1.start);
+  assert.ok(dates.length >= 6 && !dates.includes('2026-10-26'), 'week 1 ends before Monday night');
+  // each team's week-1 starters, projected over week 1: every game is final, so nothing is left to chance
+  const side = tid => {
+    const players = lineups[1][tid].map(id => app.playerFromRaw(app.nbaById.get(id)));
+    return app.projectSide(players, dates, new Set(players.map(p => p.id)));
+  };
+  for (const [a, b] of L.matchups['1']) {
+    const cats = app.compareCats(side(a), side(b));
+    for (const c of cats) assert.ok([0, 0.5, 1].includes(c.p), `${c.label} is settled (${c.p})`);
+    const won = cats.filter(c => c.p === 1).length, lost = cats.filter(c => c.p === 0).length;
+    const ra = L.standings.find(r => r.id === a);
+    assert.equal(won > lost ? 'win' : won < lost ? 'loss' : 'tie', ra.w ? 'win' : ra.l ? 'loss' : 'tie', `${app.fxTeamName(a)} ${won}-${lost}`);
   }
 });

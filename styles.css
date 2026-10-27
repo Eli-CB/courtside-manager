@@ -412,12 +412,15 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .bmeta-g { text-align: right; }
 .bmeta b { color: var(--text); font-variant-numeric: tabular-nums; }
 .dots { display: inline-flex; gap: 2px; vertical-align: middle; }
-.dots i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-.dots i.on { background: var(--good); }
-.dots i.off { box-shadow: inset 0 0 0 1.5px var(--good); }
-.dots i.on.b2b { background: var(--b2b); }
-.dots i.off.b2b { box-shadow: inset 0 0 0 1.5px var(--b2b); }
-.dots i.out { background: var(--bad); opacity: .6; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+/* filled: played; ring: still to come; grey: bench; red: missed or ruled out */
+.dots i.done { background: var(--good); }
+.dots i.done.bench { background: var(--muted); opacity: .55; }
+.dots i.up { box-shadow: inset 0 0 0 1.5px var(--good); }
+.dots i.up.bench { box-shadow: inset 0 0 0 1.5px var(--muted); opacity: .7; }
+.dots i.up.b2b { box-shadow: inset 0 0 0 1.5px var(--b2b); }
+.dots i.dnp { background: var(--bad); opacity: .75; }
+.dots i.out { box-shadow: inset 0 0 0 1.5px var(--bad); }
 .dots i.none { background: var(--border); }
 .dots-legend { display: inline-flex; align-items: center; gap: 4px; }
 .tag { font-size: .7rem; font-weight: 800; padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
