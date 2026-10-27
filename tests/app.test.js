@@ -352,3 +352,27 @@ test('Best draft credits picks until first dropped, through trades', async () =>
   // every team's picks are all accounted for
   assert.equal(Object.values(imp).flat().length, picks.length);
 });
+
+test('a past season\'s weekly totals replay its final standings', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league, G = await app.loadGameLog('2025-26');
+  const rec = {};
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  try {
+    app.withSeason(() => {
+      const cats = app.scoreCats();
+      const val = (T, c) => (!T ? 0 : c.pct ? (T.s[c.att] ? T.s[c.made] / T.s[c.att] : 0) : T.s[c.key] || 0);
+      for (const w of L.weeks.filter(x => x.n < L.playoffPeriod)) {
+        const one = app.pastSeasonTotals({ ...L, weeks: [w] }, G);
+        for (const [a, b] of L.matchups[String(w.n)] || []) {
+          let wa = 0, wb = 0;
+          for (const c of cats) { const x = val(one[a], c), y = val(one[b], c); if (Math.abs(x - y) < 1e-9) continue; if (c.neg ? x < y : x > y) wa++; else wb++; }
+          for (const [t, r] of [[a, Math.sign(wa - wb)], [b, Math.sign(wb - wa)]]) { rec[t] = rec[t] || { w: 0, l: 0, t: 0 }; rec[t][r > 0 ? 'w' : r < 0 ? 'l' : 't']++; }
+        }
+      }
+    });
+  } finally { app.get('ui').season = null; }
+  const exact = L.standings.filter(s => rec[s.id] && rec[s.id].w === s.w && rec[s.id].l === s.l && rec[s.id].t === s.t).length;
+  // 89 of 90 regular-season matchups agree with Fantrax (one week 17 matchup was decided by 4 points)
+  assert.ok(exact >= 8, `${exact} of ${L.standings.length} records match Fantrax exactly`);
+});

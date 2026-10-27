@@ -801,7 +801,7 @@ const INFO = {
   totals: ['Season totals', `
     <p><b>Who counts.</b> Fantrax keeps every team's lineup for each lineup period (a week, or a day in daily leagues). A player's games count for the team that had him <b>starting</b> in that period. Bench and IR games don't count, and a player who changed teams counts for whoever was starting him at the time.</p>
     <p><b>Player games.</b> Every starter's games added up, so it depends on how many starters your league has and how often their NBA teams played. A team with more player games has had more chances to pile up counting stats.</p>
-    <p><b>Totals.</b> Counting stats are added up from this season's box scores. FG% and FT% are total makes ÷ total attempts.</p>
+    <p><b>Totals.</b> Counting stats are added up from this season's box scores (a past season uses its saved NBA game logs, back to 2016-17). FG% and FT% are total makes ÷ total attempts.</p>
     <p><b>Colors.</b> Each column is shaded from best in the league (green) to worst (red); fewer turnovers counts as better. Hover a number for its rank. <b>Avg rank</b> is a team's average rank across the categories.</p>
     <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
   awDraft: ['Best draft', `
@@ -2210,7 +2210,7 @@ function viewStandings() {
       }).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No standings yet</strong>Fantrax didn't return standings for this league.</div>`}
   </div>
-  ${seasonCtx || !L ? '' : seasonTotalsCard(L, rows)}`;
+  ${L ? seasonTotalsCard(L, rows) : ''}`;
 }
 
 // ----- Season totals: what each team's starters actually produced -----
@@ -2300,18 +2300,52 @@ async function buildSeasonTotals(L) {
   return teams;
 }
 
-function seasonTotalsCard(L, standings) {
-  const id = L.id;
-  const S = seasonTot[id];
-  if (!S) {
-    seasonTot[id] = { state: 'loading' };
-    buildSeasonTotals(L).then(teams => { seasonTot[id] = { state: 'ready', teams }; })
-      .catch(e => { seasonTot[id] = { state: 'error', msg: e.message }; })
-      .finally(() => { if (ui.tab === 'standings' && !ui.season) render(); });
+// A past season's totals: every game each starter played in a week he was in the lineup, from the
+// weekly rosters (kept on this device) and that season's archived game log. Same shape as buildSeasonTotals.
+function pastSeasonTotals(L, G) {
+  const teams = {};
+  for (const w of L.weeks) {
+    const wd = periodDays(G, w);
+    for (const [f, o] of w.owner) {
+      if (!o.on) continue;
+      const T = teams[o.tid] = teams[o.tid] || { gp: 0, s: {} };
+      const nba = L.fidNba(f);
+      for (const r of (nba && G.players.get(nba)) || []) {
+        if (!wd.has(r[0])) continue;
+        T.gp++;
+        for (const [k, v] of Object.entries(gameLine(G, r))) T.s[k] = (T.s[k] || 0) + v;
+      }
+    }
   }
-  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${state.lineupMode === 'daily' ? "day's" : "week's"} starting lineups</span></div>`;
-  if (!S || S.state === 'loading') return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">Loading every lineup from Fantrax…</p></div>`;
-  if (S.state === 'error') return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">Couldn't load season totals (${esc(S.msg)}).</p></div>`;
+  return teams;
+}
+
+function seasonTotalsCard(L, standings) {
+  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${leagueLineupMode(L) === 'daily' ? "day's" : "week's"} starting lineups</span></div>`;
+  const note = msg => `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
+  let teams;
+  if (seasonCtx) {
+    // a past season: its weekly lineups and its game log (loaded the first time it's needed)
+    if (!L.weeks) return note("Fantrax didn't return this season's weekly rosters.");
+    if (!L.season || !(L.season in gameLogs)) {
+      if (L.season) loadGameLog(L.season).then(() => { if (ui.tab === 'standings' && ui.season) render(); });
+      return L.season ? note('Loading the season’s games…') : note('No NBA game logs are saved for this season.');
+    }
+    if (!gameLogs[L.season]) return note('No NBA game logs are saved for this season (the site has 2016-17 on).');
+    teams = pastSeasonTotals(L, gameLogs[L.season]);
+  } else {
+    const id = L.id;
+    const S = seasonTot[id];
+    if (!S) {
+      seasonTot[id] = { state: 'loading' };
+      buildSeasonTotals(L).then(t => { seasonTot[id] = { state: 'ready', teams: t }; })
+        .catch(e => { seasonTot[id] = { state: 'error', msg: e.message }; })
+        .finally(() => { if (ui.tab === 'standings' && !ui.season) render(); });
+    }
+    if (!S || S.state === 'loading') return note('Loading every lineup from Fantrax…');
+    if (S.state === 'error') return note(`Couldn't load season totals (${esc(S.msg)}).`);
+    teams = S.teams;
+  }
 
   // totals of any scored stat, derived ones included
   const tot = (T, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (T.s[b] || 0) * c)) : T.s[k] || 0);
@@ -2323,7 +2357,7 @@ function seasonTotalsCard(L, standings) {
       val: c.pct ? (T => (tot(T, c.att) ? tot(T, c.made) / tot(T, c.att) : 0)) : T => tot(T, c.key),
       fmt: c.pct ? fmtPct : v => fmt(v, c.dec ? 1 : 0) }));
   const order = standings.length ? standings.map(r => r.id) : fxPickable().map(t => t.id);
-  const list = order.map(tid => ({ tid, T: S.teams[tid] || { gp: 0, s: {} } }));
+  const list = order.map(tid => ({ tid, T: teams[tid] || { gp: 0, s: {} } }));
   const stats = cols.map(c => {
     const vals = list.map(x => c.val(x.T));
     const m = sum(vals) / vals.length;
