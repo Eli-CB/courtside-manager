@@ -806,7 +806,7 @@ const INFO = {
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
     <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
     <li><b>Best manager:</b> actual wins (ties count half) minus expected wins. Expected wins: each team's typical week (its best 8 starters, each counted for the share of games he played) is matched against every other team with the same win-chance math as Matchups, and the average win chance × games played gives the expected record.</li>
-    <li><b>Waiver Wire Wizard:</b> free-agent and waiver pickups on the final roster, added up by per-game value (fantasy points per game in points leagues). Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a trade, which doesn't count; on nobody's roster means a pickup. (A player dropped and claimed by another team in the same week looks like a trade.)</li>
+    <li><b>Waiver Wire Wizard:</b> what free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's starting lineup, each valued like a single game on the Dashboard (fantasy points in points leagues), added up. A pickup who started one week counts for that week only, and he counts even if he was dropped later. Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a trade, which doesn't count; on nobody's roster means a pickup. (A player dropped and claimed by another team in the same week looks like a trade.)</li>
     <li><b>Street Clothes:</b> 82 minus games played, summed over the final roster.</li>
     <li><b>Biggest punt</b> and <b>Even Steven:</b> each category of that typical week is compared with the league's other teams in team-to-team spreads. The punt is the lowest category; Even Steven has the smallest spread across its categories.</li>
     <li><b>Unc Status:</b> the oldest final roster, by average age on the last day of the season, from ESPN birth dates.</li></ul>`],
@@ -1023,7 +1023,7 @@ async function fetchFantraxLeague(id, opts = {}) {
       keepers: Object.fromEntries(Object.entries(league.rosters).map(([tid, items]) => [tid, items.map(it => it.nba).filter(n => n && !drafted.has(n))])),
     };
   }
-  return { league, fxPlayers };
+  return { league, fxPlayers, idMap: { toNba, names } };
 }
 
 // Swap the league the whole app works from; NBA stats stay as they are
@@ -1334,59 +1334,112 @@ function seasonsFor(L) {
 
 async function loadSeason(id) {
   if (pastCache[id]) return pastCache[id];
-  const { league } = await fetchFantraxLeague(id, { opening: true });
+  const { league, idMap } = await fetchFantraxLeague(id, { opening: true });
   // end-of-season rosters can't tell keepers from waiver pickups, so past drafts show picks only
   if (league.draft) league.draft.keepers = {};
   // that season's NBA stats, if saved, grade its draft, awards and rosters
   const season = league.year ? seasonOf(league.year) : null;
   const A = season ? await loadArchive(season) : null;
-  if (A) matchInactive(league, A);
-  league.arrivals = await loadArrivals(league).catch(() => null);
+  const findOld = A ? matchInactive(league, A) : () => null;
+  league.fidNba = fid => idMap.toNba[fid] || (idMap.names[fid] ? findOld(idMap.names[fid]) : null);
+  league.weeks = await loadRosterWeeks(league).catch(() => null);
+  league.arrivals = league.weeks ? arrivalsOf(league.weeks) : null;
+  league.gameLog = league.weeks && season ? await loadGameLog(season) : null;
   const prevStart = NBA && NBA.prevSeason ? +String(NBA.prevSeason).slice(0, 4) : null;
   const basis = A ? 'arch:' + season : league.year && league.year === prevStart ? 'prev' : null;
   return (pastCache[id] = { league, basis, label: league.year ? seasonLabel(league.year) : 'Past season' });
 }
 
-// ----- How each player on a past season's final roster got there -----
-// Fantrax shares every lineup period's rosters but no transaction log. Walking a player's stint on his
-// final team back to its first week: there from week 1 = drafted or kept; the week before on another
+// ----- A past season week by week: who each team had, who started, and how they got them -----
+// Fantrax shares every lineup period's rosters but no transaction log. A player's stint on a team,
+// walked back to its first week: there from week 1 = drafted or kept; the week before on another
 // team's roster = a trade; on nobody's roster = a free-agent or waiver pickup. Finished seasons never
 // change, so the weekly rosters are fetched once and kept on this device.
-const ROSTER_HISTORY_KEY = 'courtside-roster-history-v1';
-async function loadArrivals(L) {
+const ROSTER_WEEKS_KEY = 'courtside-roster-weeks-v1';
+try { localStorage.removeItem('courtside-roster-history-v1'); } catch (e) { /* older format, no statuses */ }
+async function loadRosterWeeks(L) {
   let all = {};
-  try { all = JSON.parse(localStorage.getItem(ROSTER_HISTORY_KEY)) || {}; } catch (e) { /* none saved */ }
+  try { all = JSON.parse(localStorage.getItem(ROSTER_WEEKS_KEY)) || {}; } catch (e) { /* none saved */ }
   const have = all[L.id] || {};
   const today = todayIso();
-  const periods = rosterPeriodsOf(L).filter(p => p.start.slice(0, 10) <= today).map(p => p.n);
-  if (!periods.length) return null;
-  const want = periods.filter(n => !have[n]);
+  const periods = rosterPeriodsOf(L).filter(p => p.start.slice(0, 10) <= today);
+  const want = periods.map(p => p.n).filter(n => !have[n]);
   let next = 0;
   const worker = async () => {
     while (next < want.length) {
       const n = want[next++];
       const d = await fxGet(`getTeamRosters?leagueId=${encodeURIComponent(L.id)}&period=${n}`);
-      have[n] = Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) => [tid, (r.rosterItems || []).map(it => it.id)]));
+      // [Fantrax id, 1 if in the starting lineup]
+      have[n] = Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) => [tid, (r.rosterItems || []).map(it => [it.id, it.status === 'ACTIVE' ? 1 : 0])]));
     }
   };
   try { await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker)); } finally {
     all[L.id] = have;
-    try { localStorage.setItem(ROSTER_HISTORY_KEY, JSON.stringify(all)); } catch (e) { /* storage full or blocked */ }
+    try { localStorage.setItem(ROSTER_WEEKS_KEY, JSON.stringify(all)); } catch (e) { /* storage full or blocked */ }
   }
-  const owner = periods.filter(n => have[n]).map(n => {
-    const m = new Map();
-    for (const [tid, fids] of Object.entries(have[n])) for (const f of fids) m.set(f, tid);
-    return m;
+  const weeks = periods.filter(p => have[p.n]).map(p => {
+    const owner = new Map();
+    for (const [tid, items] of Object.entries(have[p.n])) for (const [f, on] of items) owner.set(f, { tid, on: !!on });
+    return { ...p, owner };
   });
-  if (owner.length < 2) return null;
-  const out = {}; // team id -> fid -> 'start' | 'trade' | 'pickup'
-  const last = owner.length - 1;
-  for (const [f, tid] of owner[last]) {
-    let k = last;
-    while (k > 0 && owner[k - 1].get(f) === tid) k--;
-    (out[tid] = out[tid] || {})[f] = k === 0 ? 'start' : owner[k - 1].has(f) ? 'trade' : 'pickup';
-  }
+  return weeks.length > 1 ? weeks : null;
+}
+
+// How a player came to be on a team in week k: 'start', 'trade' or 'pickup'
+function arrivalAt(weeks, k, f) {
+  const tid = weeks[k].owner.get(f).tid;
+  let j = k;
+  while (j > 0 && (weeks[j - 1].owner.get(f) || {}).tid === tid) j--;
+  return j === 0 ? 'start' : weeks[j - 1].owner.has(f) ? 'trade' : 'pickup';
+}
+// for the final rosters: team id -> Fantrax id -> how he got there
+function arrivalsOf(weeks) {
+  const out = {}, k = weeks.length - 1;
+  for (const [f, o] of weeks[k].owner) (out[o.tid] = out[o.tid] || {})[f] = arrivalAt(weeks, k, f);
   return out;
+}
+
+// What each team's pickups did for it: every game a picked-up player played in a week he was in that
+// team's starting lineup, valued like a single game on the Dashboard. Team id -> [{ nba, name, v, weeks, games }]
+function pickupImpact(L) {
+  if (!L.weeks || !L.gameLog) return null;
+  const out = {};
+  L.weeks.forEach((w, k) => {
+    for (const [f, o] of w.owner) {
+      if (!o.on || arrivalAt(L.weeks, k, f) !== 'pickup') continue;
+      const nba = L.fidNba(f);
+      if (!nba) continue;
+      const games = (L.gameLog.get(nba) || []).filter(([d]) => periodHas(w, d));
+      const team = out[o.tid] = out[o.tid] || new Map();
+      const P = team.get(f) || { nba, name: (nbaById.get(nba) || {}).name || '', v: 0, weeks: 0, games: 0 };
+      P.v += sum(games.map(([, line]) => lineValue(line)));
+      P.weeks++;
+      P.games += games.length;
+      team.set(f, P);
+    }
+  });
+  return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()]]));
+}
+
+// A past season's game lines (data/seasons/<season>-games.json): NBA id -> [[date, line]]
+const gameLogs = {};
+async function loadGameLog(season) {
+  if (season in gameLogs) return gameLogs[season];
+  try {
+    const r = await fetch(`data/seasons/${season}-games.json`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const log = new Map();
+    for (const [pid, rows] of Object.entries(d.players)) {
+      log.set(+pid, rows.map(([day, ...v]) => {
+        const line = Object.fromEntries(d.keys.map((k, i) => [k, v[i]]));
+        const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => line[k] >= 10).length;
+        return [addDays(d.start, day), { ...line, dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 }];
+      }));
+    }
+    gameLogs[season] = log;
+  } catch (e) { gameLogs[season] = null; }
+  return gameLogs[season];
 }
 
 // ----- Archived seasons: data/seasons/<season>.json, saved once by scripts/archive_season.py -----
@@ -1425,6 +1478,7 @@ function matchInactive(league, A) {
   };
   for (const pick of (league.draft && league.draft.picks) || []) if (!pick[3] && pick[4]) pick[3] = find(pick[4]);
   for (const r of [...Object.values(league.rosters || {}), ...Object.values(league.openingRosters || {})]) for (const x of r) if (!x.nba && x.name) x.nba = find(x.name);
+  return find;
 }
 
 async function switchSeason(id) {
@@ -1568,11 +1622,29 @@ function seasonAwards() {
       T.draftBest = ps.length ? ps.reduce((a, b) => (b.gain > a.gain ? b : a)) : null;
     }
   }
+  // Waiver Wire Wizard: what pickups did while starting (the final-roster estimate in seasonTeam is the fallback)
+  const impact = pickupImpact(L);
+  if (impact) {
+    for (const T of teams) {
+      const ps = impact[T.id] || [];
+      T.waiver = sum(ps.map(p => p.v));
+      T.waiverN = ps.length;
+      T.waiverBest = ps.length ? ps.reduce((a, b) => (b.v > a.v ? b : a)) : null;
+    }
+  }
+  const pickupNote = T => {
+    if (!T.waiverBest) return 'no pickups';
+    const b = T.waiverBest;
+    const amount = isPoints() ? `${fmt(b.v, 0)} FP` : signed(b.v, 1);
+    return `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${b.name} (${amount}${b.weeks ? ` in ${b.weeks} wk${b.weeks === 1 ? '' : 's'}` : ''})`;
+  };
   const ranked = (key, dir, fmtFn, note) => teams.filter(T => T[key] != null).sort((a, b) => (b[key] - a[key]) * dir).map(T => ({ T, txt: fmtFn(T), note: note ? note(T) : '' }));
   return [
     { title: 'Best draft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
     { title: 'Best manager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
-    { title: 'Waiver Wire Wizard', blurb: 'The most production from free-agent and waiver pickups still on the final roster (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
+    impact
+      ? { title: 'Waiver Wire Wizard', blurb: 'The most production from free-agent and waiver pickups, counting only games they played while in the starting lineup (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }
+      : { title: 'Waiver Wire Wizard', blurb: 'The most production from free-agent and waiver pickups still on the final roster (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
     { title: 'Street Clothes', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
     ...(isPoints() ? [] : [{ title: 'Biggest punt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
     { title: 'Even Steven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),

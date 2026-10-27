@@ -11,6 +11,10 @@ last season's file for projections.
 Each player: "n" name, "s" per-game stats in STAT_KEYS order (as in data/players.json), and
 "g" game-to-game totals over games of 10+ minutes: [games, sum of each SD_KEYS stat..., sum of
 squares...], so the daily job can combine them with this season's games for spreads.
+
+Alongside it, data/seasons/<season>-games.json holds every regular-season game line (day number
+from "start", then GAME_KEYS), which the site loads for Awards: what each pickup did in the weeks
+he was in a lineup.
 """
 import json
 import os
@@ -56,8 +60,33 @@ def archive(season):
     print(f'{season}: {len(players)} players, {os.path.getsize(path) // 1024} KB')
 
 
+GAME_KEYS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm']
+GAME_COLS = ['MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'FG3M', 'TOV', 'FGM', 'FGA', 'FTM', 'FTA', 'OREB', 'DREB', 'FG3A', 'PF', 'PLUS_MINUS']
+
+
+def archive_games(season):
+    from datetime import date
+    path = os.path.join(OUT, f'{season}-games.json')
+    if os.path.exists(path):
+        print(f'{season} games: already saved')
+        return
+    params = {'LeagueID': '00', 'Season': season, 'SeasonType': 'Regular Season', 'PlayerOrTeam': 'P',
+              'Counter': 0, 'Sorter': 'DATE', 'Direction': 'ASC'}
+    rows = result_rows(get_json('https://stats.nba.com/stats/leaguegamelog', params, timeout=90))
+    start = min(r['GAME_DATE'] for r in rows)
+    d0 = date.fromisoformat(start)
+    players = {}
+    for r in rows:
+        day = (date.fromisoformat(r['GAME_DATE']) - d0).days
+        line = [round(r[c] or 0, 1) if c == 'MIN' else int(r[c] or 0) for c in GAME_COLS]
+        players.setdefault(str(r['PLAYER_ID']), []).append([day] + line)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump({'season': season, 'start': start, 'keys': GAME_KEYS, 'players': players}, f, separators=(',', ':'))
+    print(f'{season} games: {len(rows)} lines, {os.path.getsize(path) // 1024} KB')
+
+
 def write_index():
-    seasons = sorted(f[:-5] for f in os.listdir(OUT) if f.endswith('.json') and f != 'index.json')
+    seasons = sorted(f[:-5] for f in os.listdir(OUT) if f.endswith('.json') and f != 'index.json' and not f.endswith('-games.json'))
     with open(os.path.join(OUT, 'index.json'), 'w', encoding='utf-8') as f:
         json.dump(seasons, f)
     print('index:', ', '.join(seasons))
@@ -70,6 +99,7 @@ def main():
     first, last = int(args[0][:4]), int(args[-1][:4])
     for y in range(first, last + 1):
         archive(season_str(y))
+        archive_games(season_str(y))
     write_index()
 
 

@@ -45,7 +45,7 @@ def main():
             save(f'fantrax/{lid}/{ep}.json', get(f'{ep}?leagueId={lid}'))
         for n in PAST_PERIODS.get(lid, []):
             save(f'fantrax/{lid}/getTeamRosters-{n}.json', get(f'getTeamRosters?leagueId={lid}&period={n}'))
-    for name in ('players.json', 'boxscores.json', 'seasons/2025-26.json'):
+    for name in ('players.json', 'boxscores.json', 'seasons/2025-26.json', 'seasons/2025-26-games.json'):
         os.makedirs(os.path.dirname(os.path.join(OUT, name)), exist_ok=True)
         shutil.copy(os.path.join(ROOT, 'data', name), os.path.join(OUT, name))
         print(f'{name}: copied from data/')

@@ -280,4 +280,14 @@ test('weekly rosters tell trades from waiver pickups', async () => {
   try { awards = app.withSeason(() => app.seasonAwards()); } finally { app.get('ui').season = null; }
   const wizard = awards.find(a => a.title === 'Waiver Wire Wizard');
   assert.ok(wizard && !/Markkanen|Edgecombe/.test(wizard.list.map(x => x.note).join(' ')), 'traded players are not pickups');
+  // impact counts only the weeks a pickup started for that team, dropped players included
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  let impact;
+  try { impact = app.withSeason(() => app.pickupImpact(L)); } finally { app.get('ui').season = null; }
+  const mine = impact[team.id];
+  assert.ok(!mine.some(p => /Markkanen|Edgecombe/.test(p.name)));
+  const kpj = mine.find(p => p.name === 'Kevin Porter Jr.');
+  assert.ok(kpj && kpj.weeks < L.weeks.length && kpj.games > 0, `KPJ counted for ${kpj && kpj.weeks} weeks`);
+  const finalIds = new Set(Object.values(L.rosters).flat().map(x => x.nba));
+  assert.ok(Object.values(impact).flat().some(p => !finalIds.has(p.nba)), 'a pickup dropped before the end still counts');
 });
