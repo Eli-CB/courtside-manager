@@ -5,7 +5,7 @@ A weekly matchup optimizer for 9-category head-to-head fantasy basketball. It pu
 - **Dashboard:** record, strengths and weaknesses at a glance, injuries and action items
 - **Matchups:** both lineups side by side, projected category totals, win chances, and which starters to use
 - **Roster:** what your team is good and bad at: each category ranked against every team in the league, and every player's stats shaded by how much they help or hurt
-- **Players:** stats for every active NBA player, with your league's position eligibility and availability
+- **Free Agents:** recommended adds for your team (plus an injured player to stash when you have an open IR spot), then every free agent and waiver player, or every NBA player, with your league's position eligibility
 - **Trades:** what a deal with another team in your league does to your per-game production
 
 It's a plain static site (`index.html`, `styles.css`, `app.js`) reading data files in `data/`.

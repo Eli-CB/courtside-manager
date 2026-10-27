@@ -61,7 +61,7 @@ function emptyState() {
    State + persistence
    ========================================================= */
 let state = null;
-const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'all', sort: 'val', limit: 50 }, tab: 'dashboard', rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, csOpen: new Set() };
+const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'fa', sort: 'val', limit: 50 }, tab: 'dashboard', rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, csOpen: new Set() };
 
 function load() {
   let s = null;
@@ -284,7 +284,7 @@ function teamLogo(team, px = 16) {
 // Position labels in Fantrax's colors
 const posTags = pos => pos.map(x => `<span class="pt pt-${esc(x)}">${esc(x)}</span>`).join(',');
 
-// a player's name and team line, with their photo unless the list is too long for them (the Players tab)
+// a player's name and team line, with their photo unless the list is too long for them (the Free Agents tab)
 function playerCell(p, link = true, photo = true) {
   const name = link && p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`;
   const next = p.next ? ` · ${nextGame(p.next)}` : '';
@@ -311,7 +311,7 @@ let NBA = null;
 let nbaLoading = Promise.resolve(false);
 const nbaById = new Map();
 const nbaByName = new Map();
-let nbaCache = null; // player-like objects for the Players tab
+let nbaCache = null; // player-like objects for the Free Agents tab
 const BASIS_LABELS = { blend: 'Smart blend', cur: 'This season', prev: 'Last season', l10: 'Last 10 games' };
 
 const normName = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -879,6 +879,7 @@ async function fetchFantraxLeague(id) {
     teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
     periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10), lock: String(p.startDate), endAt: String(p.endDate) })),
     lockDays: rosterPeriodDays(info.rosterPeriods || []),
+    playoffPeriod: info.playoffs && info.playoffs.used ? info.playoffs.firstPlayoffPeriod : null,
     matchups: Object.fromEntries((info.matchups || []).map(m => [String(m.period),
       (m.matchupList || []).filter(x => x.away && x.away.id && x.home && x.home.id).map(x => [x.away.id, x.home.id])])),
     rosterPeriod: rosters.period,
@@ -1174,7 +1175,6 @@ function leagueMenu() {
       <div class="lm-sec">Leagues</div>
       ${saved.map(l => `<div class="lm-row"><button type="button" class="lm-item${l.id === cur ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${l.id === cur ? '✓ ' : ''}${esc(l.name)}</button>${l.id !== cur ? `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>` : ''}</div>`).join('')}
       ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)} <span class="muted">(demo)</span></span></div>` : ''}
-      <button type="button" class="lm-item" data-action="league-reload">↻ Reload from Fantrax</button>
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
       <div class="lm-sec">Stats used ${infoBtn('projection')}</div>
@@ -1189,7 +1189,7 @@ function leagueMenu() {
 // ----- Past seasons -----
 // Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
 // (keyed by Fantrax's league history id); a past season gets its own tabs.
-const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['trade', 'Trades']];
+const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
@@ -1415,18 +1415,14 @@ function ctxBar() {
   if (P) {
     $('#ctxMeta').innerHTML = [
       '<span class="badge accent">Past season</span>',
-      P.league.points ? 'H2H points' : /SINGLE_WIN/.test(P.league.scoring) ? '9-cat H2H, one win per week' : '9-cat H2H',
       'final standings and rosters from Fantrax',
     ].join(' · ');
     return;
   }
-  // the league's own week (its scoring period), else the data file's
-  const per = fxPeriodFor(weekStart());
-  const w = per ? { num: per.n, start: per.start, end: per.end } : NBA && NBA.week;
   $('#ctxMeta').innerHTML = [
-    isPoints() ? `H2H points${L.pointsOther && L.pointsOther.length ? ` <span title="Not projected: ${esc(L.pointsOther.join(', '))}">(some stats not projected)</span>` : ''}` : matchupScoring() === 'most' ? '9-cat H2H, one win per week' : '9-cat H2H, one win per category',
-    w ? `Week ${w.num}: ${fmtDay(w.start)} – ${fmtDay(w.end)}` : '',
     NBA ? `stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable',
+    state.demo ? '' : '<button type="button" class="link-btn small" data-action="league-reload" title="Pull the latest rosters, matchups and standings">↻ Reload from Fantrax</button>',
+    isPoints() && L.pointsOther && L.pointsOther.length ? `<span title="Not projected: ${esc(L.pointsOther.join(', '))}">some scoring stats not projected</span>` : '',
   ].filter(Boolean).join(' · ');
 }
 
@@ -1488,7 +1484,7 @@ function viewPreDraft(L) {
   const past = draftTime(L) && draftTime(L) < new Date();
   return `<div class="card"><div class="empty"><strong>${past ? 'Waiting on the draft' : "This league hasn't drafted yet"}</strong>
       ${when ? `${past ? 'The draft was set for' : 'The draft is set for'} <b>${esc(when)}</b>. ` : ''}Rosters, matchups and the draft board fill in here once teams have players.
-      In the meantime, the <a href="#players">Players</a> tab ranks every NBA player.</div></div>`;
+      In the meantime, the <a href="#players">Free Agents</a> tab ranks every NBA player (set Show to Every NBA player).</div></div>`;
 }
 
 function standingOf(teamId) {
@@ -1824,7 +1820,7 @@ function filteredPlayers() {
     (!f.pos || p.pos.includes(f.pos)) &&
     (!f.team || p.team === f.team) &&
     (f.show !== 'available' || !owned.roster.has(p.nbaId)) &&
-    (f.show !== 'fa' || fxAvailable(nbaById.get(p.nbaId))) &&
+    (f.show !== 'fa' || (fxLeague() ? fxAvailable(nbaById.get(p.nbaId)) : !owned.roster.has(p.nbaId))) &&
     (f.show !== 'injured' || p.inj) &&
     (f.show !== 'healthy' || !p.inj));
   const k = f.sort;
@@ -1856,25 +1852,103 @@ function playerRows() {
 
 function viewPlayers() {
   if (!NBA) {
-    return `<div class="page-head"><div><h1>NBA players</h1></div></div>
+    return `<div class="page-head"><div><h1>Free agents</h1></div></div>
       <div class="card"><div class="empty"><strong>Loading player data…</strong>If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.</div></div>`;
   }
   const f = ui.pf;
   const teams = [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort();
   return `
   <div class="page-head">
-    <div><h1>NBA players ${infoBtn('projection')}</h1><p>${NBA.players.length} active players. ${BASIS_LABELS[state.basis]} stats (${NBA.season} / ${NBA.prevSeason}).</p></div>
+    <div><h1>Free agents ${infoBtn('projection')}</h1><p>Free agents and waivers${fxLeague() ? ` in ${esc(fxLeague().name)}` : ''}, or switch Show to see every NBA player. ${BASIS_LABELS[state.basis]} stats (${NBA.season} / ${NBA.prevSeason}).</p></div>
     ${LOCAL ? '<div class="actions"><button class="btn" data-action="refresh-data">Refresh stats</button></div>' : ''}
   </div>
+  ${ui.viewing ? '' : recommendedCard()}
   <div class="card">
     <div class="filters">
       <label class="field grow" for="pfQ">Search<input id="pfQ" type="search" placeholder="Player name" value="${esc(f.q)}" data-input="pf" data-key="q" autocomplete="off"></label>
       <label class="field" for="pfPos">Position<select id="pfPos" data-change="pf" data-key="pos"><option value="">All</option>${POSITIONS.map(x => `<option ${f.pos === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
       <label class="field" for="pfTeam">Team<select id="pfTeam" data-change="pf" data-key="team"><option value="">All</option>${teams.map(t => `<option ${f.team === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label class="field" for="pfShow">Show<select id="pfShow" data-change="pf" data-key="show">${[['all', 'Everyone'], ...(fxLeague() ? [['fa', 'Available in my league']] : []), ['available', 'Not on my roster'], ['healthy', 'Healthy only'], ['injured', 'Injured only']].map(([v, l]) => `<option value="${v}" ${f.show === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="field" for="pfShow">Show<select id="pfShow" data-change="pf" data-key="show">${[['fa', 'Available'], ['all', 'Every NBA player'], ['available', 'Not on my roster'], ['healthy', 'Healthy only'], ['injured', 'Injured only']].map(([v, l]) => `<option value="${v}" ${f.show === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="field" for="pfSort">Sort by<select id="pfSort" data-change="pf" data-key="sort">${Object.entries(PF_SORTS).map(([v, l]) => `<option value="${v}" ${f.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
     <div id="playerResults">${playerRows()}</div>
+  </div>`;
+}
+
+// ----- Recommended adds -----
+// How far your team is from the league average in each category, in team-to-team spreads (+ is good)
+function catGaps() {
+  const raws = [teamRaw(state.players.filter(p => !state.il.includes(p.id)))];
+  for (const t of fxPickable()) {
+    if (t.id === state.fxTeam) continue;
+    const side = fxTeamSide(t.id);
+    const ps = side.players.filter(p => !side.il.includes(p.id));
+    if (ps.length) raws.push(teamRaw(ps));
+  }
+  const out = {};
+  for (const c of CATS) {
+    const vals = raws.map(r => r[c.key]);
+    const m = sum(vals) / vals.length;
+    const sd = Math.sqrt(sum(vals.map(v => (v - m) ** 2)) / vals.length) || 1e-9;
+    out[c.key] = (c.neg ? -1 : 1) * (vals[0] - m) / sd;
+  }
+  return out;
+}
+
+// When the league's playoffs start (Fantrax's first playoff period), else the last few weeks of the season
+function playoffStart(L = fxLeague()) {
+  const per = (L && L.periods) || [];
+  const p = L && L.playoffPeriod ? per.find(x => x.n === L.playoffPeriod) : per[per.length - 3];
+  return p ? p.start : null;
+}
+
+// Up to three free agents worth adding, each against the player they'd replace (none with an open spot).
+// Points leagues go by fantasy points per game; in cats, your weak categories count extra and strong ones less.
+// With an open IR spot and nobody to put there, also the best injured free agent due back before the playoffs.
+function recommendedAdds() {
+  if (!NBA || !state.players.length) return null;
+  const act = state.players.filter(p => !state.il.includes(p.id));
+  const w = isPoints() ? null : Object.fromEntries(Object.entries(catGaps()).map(([k, g]) => [k, Math.max(0.5, Math.min(1.5, 1 - 0.25 * g))]));
+  const worth = p => (w ? sum(CATS.map(c => (catZ(p)[c.key] || 0) * w[c.key])) : fantasyPoints(p));
+  const open = activeCount() < rosterLimit();
+  const drop = open || !act.length ? null : act.reduce((a, b) => (worth(a) <= worth(b) ? a : b));
+  const base = drop ? worth(drop) : -Infinity;
+  const pool = nbaPlayers()
+    .filter(x => x.gp && (fxLeague() ? fxAvailable(nbaById.get(x.nbaId)) : !state.players.some(p => p.nbaId === x.nbaId)))
+    .sort((a, b) => b.val - a.val).slice(0, 120)
+    .map(x => playerFromRaw(nbaById.get(x.nbaId)));
+  const helps = p => (w && drop ? CATS.filter(c => (catZ(p)[c.key] || 0) - (catZ(drop)[c.key] || 0) > 0.5).map(c => c.label) : []);
+  const adds = pool.filter(p => p.status !== 'Out')
+    .map(p => ({ p, gain: worth(p) - base, helps: helps(p) }))
+    .filter(x => x.gain > 0).sort((a, b) => b.gain - a.gain).slice(0, 3);
+
+  let stash = null;
+  const ends = playoffStart(), today = todayIso();
+  if (state.il.length < state.ilSize && !act.some(p => p.status === 'Out') && ends) {
+    const best = pool.filter(p => p.status === 'Out' && p.inj && p.inj.back && p.inj.back > today && p.inj.back < ends && worth(p) > base)
+      .sort((a, b) => worth(b) - worth(a))[0];
+    if (best) stash = { p: best, back: best.inj.back, ends };
+  }
+  return { adds, drop, stash };
+}
+
+function recommendedCard() {
+  const r = recommendedAdds();
+  if (!r) return '';
+  const fx = p => { const raw = nbaById.get(p.nbaId); return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || raw.fx.st}</span>` : ''; };
+  const gainTxt = g => (isPoints() ? `${signed(g, 1)} FP/G` : `${signed(g, 1)} value`);
+  const rows = r.adds.map(x => `<li class="rec">
+      <div class="rec-who">${playerCell(x.p)}</div>
+      <div class="rec-why">${fx(x.p)} ${r.drop ? `<span>for ${inlinePlayer(r.drop, esc(r.drop.name))}</span> <b class="pos-good">${gainTxt(x.gain)}</b>` : '<span>open roster spot</span>'}${x.helps.length ? `<div class="muted small">helps ${x.helps.join(', ')}</div>` : ''}</div>
+    </li>`);
+  if (r.stash) rows.push(`<li class="rec">
+      <div class="rec-who">${playerCell(r.stash.p)}</div>
+      <div class="rec-why">${fx(r.stash.p)} <span class="badge">IR stash</span> <span>back about <b>${fmtDay(r.stash.back)}</b></span>
+        <div class="muted small">For your open IR spot, no drop needed. Expected back before the playoffs (${fmtDay(r.stash.ends)}), per ESPN.</div></div>
+    </li>`);
+  return `<div class="card">
+    <div class="card-head"><h2>Recommended adds</h2><span class="muted small">${isPoints() ? 'by fantasy points per game' : 'weighted toward your weaker categories'}</span></div>
+    ${rows.length ? `<ul class="recs">${rows.join('')}</ul>` : `<p class="muted small" style="margin:0">No free agent is better than ${r.drop ? esc(r.drop.name) + ', your weakest player' : 'anyone on your roster'}.</p>`}
   </div>`;
 }
 

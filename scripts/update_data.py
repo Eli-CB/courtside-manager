@@ -160,6 +160,7 @@ def injuries():
                 'label': raw or status,
                 'note': i.get('shortComment') or '',
                 'date': (i.get('date') or '')[:10],
+                'back': ((i.get('details') or {}).get('returnDate') or '')[:10],  # ESPN's expected return
             }
     return out
 
@@ -474,6 +475,7 @@ def fantrax(league_id, index, saved_league=None):
                     for p in info.get('scoringPeriods', [])],
         # how long lineups stay locked: daily leagues have one roster period per day
         'lockDays': roster_period_days(info.get('rosterPeriods') or []),
+        'playoffPeriod': (info.get('playoffs') or {}).get('firstPlayoffPeriod') if (info.get('playoffs') or {}).get('used') else None,
         # playoff rounds list TBD pairings until they're set
         'matchups': {str(m['period']): [[x['away']['id'], x['home']['id']] for x in m.get('matchupList', [])
                                         if x.get('away', {}).get('id') and x.get('home', {}).get('id')] for m in info.get('matchups', [])},

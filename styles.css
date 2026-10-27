@@ -457,6 +457,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .tlogo { display: inline-block; vertical-align: -3px; object-fit: contain; }
 .bplayer { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bmain { flex: 1; min-width: 0; }
+.recs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rec { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 6px 16px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: .9rem; }
+@media (max-width: 640px) { .rec { grid-template-columns: minmax(0, 1fr); } }
 .inl-p { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
 .alert > .hs { margin-top: 1px; }
 .detail-id { display: flex; align-items: center; gap: 12px; }
