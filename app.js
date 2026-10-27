@@ -763,6 +763,13 @@ const INFO = {
     <p><b>Colors.</b> Each pick and keeper is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
     <p><b>Keepers</b> fill the top two rows. The one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks.</p>
     <p><b>Board.</b> One row per round, one column per draft slot. Traded picks stay in their original slot, marked with the team that made the pick. "No pick" means the slot went unused.</p>`],
+  board: ['Reading the draft board', `
+    <p><b>Each cell</b> is one pick: the pick number, the player, and his <b>+/−</b>.</p>
+    <p><b>How a pick is ranked.</b> Every drafted player is ranked against the others by his value per game (fantasy points per game in points leagues), using this season's stats so far, or that season's full stats for a past draft. #1 is the best player of the whole draft class. Players who haven't played rank below everyone who has.</p>
+    <p><b>+/−</b> is the pick number minus that rank. A #40 pick playing like the #5 player is <b>+35</b>; a #3 pick playing like #50 is <b>−47</b>. "DNP" means he hasn't played.</p>
+    <p><b>Colors.</b> Green is outplaying the slot, red is underplaying it, getting stronger the bigger the gap. Hover a cell for the player's rank.</p>
+    <p><b>Layout.</b> One row per round, one column per draft slot. A traded pick stays in its original slot, marked "by" the team that made it. "No pick" means the slot went unused.</p>
+    <p><b>Keepers</b> fill the K rows at the top. The one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick.</p>`],
   data: ['Where the data comes from', `
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
@@ -2740,7 +2747,7 @@ function viewDraft() {
     </table></div>
   </div>
   <div class="card" style="margin-top:16px">
-    <div class="card-head"><h2>Draft board</h2></div>
+    <div class="card-head"><h2>Draft board ${infoBtn('board')}</h2></div>
     <div class="table-wrap"><table class="dr-board">
       <thead><tr><th></th>${order.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${esc(fxTeamName(t))}</th>`).join('')}</tr></thead>
       <tbody>${board}</tbody>
