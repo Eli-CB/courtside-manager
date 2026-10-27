@@ -802,14 +802,25 @@ const INFO = {
     <p><b>Totals.</b> Counting stats are added up from this season's box scores. FG% and FT% are total makes ÷ total attempts.</p>
     <p><b>Colors.</b> Each column is shaded from best in the league (green) to worst (red); fewer turnovers counts as better. Hover a number for its rank. <b>Avg rank</b> is a team's average rank across the categories.</p>
     <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
-  awards: ['How awards are decided', `
-    <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
-    <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
-    <li><b>Best manager:</b> actual wins (ties count half) minus expected wins. Expected wins: each team's typical week (its best 8 starters, each counted for the share of games he played) is matched against every other team with the same win-chance math as Matchups, and the average win chance × games played gives the expected record.</li>
-    <li><b>Waiver Wire Wizard:</b> what free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's starting lineup, each valued like a single game on the Dashboard (fantasy points in points leagues), added up. A pickup who started one week counts for that week only, and he counts even if he was dropped later. Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a trade, which doesn't count; on nobody's roster means a pickup. (A player dropped and claimed by another team in the same week looks like a trade.)</li>
-    <li><b>Street Clothes:</b> 82 minus games played, summed over the final roster.</li>
-    <li><b>Biggest punt</b> and <b>Even Steven:</b> each category of that typical week is compared with the league's other teams in team-to-team spreads. The punt is the lowest category; Even Steven has the smallest spread across its categories.</li>
-    <li><b>Unc Status:</b> the oldest final roster, by average age on the last day of the season, from ESPN birth dates.</li></ul>`],
+  awDraft: ['Best draft', `
+    <p>Every drafted player is ranked by how he played that season (value per game from that season's full stats). A pick's <b>+/−</b> is his draft slot minus where he finished: a #40 pick who finished as the #5 player is +35.</p>
+    <p>The award goes to the best <b>average +/− per pick</b>. The Draft tab has every pick.</p>`],
+  awManager: ['Best manager', `
+    <p>Wins above what the roster should have produced: <b>actual wins</b> (ties count half) minus <b>expected wins</b>.</p>
+    <p>Expected wins: each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster) is matched against every other team's with the same win-chance math as Matchups. The average win chance × games played is the expected record.</p>
+    <p>Fantrax's public data has no weekly scores, so this is an estimate from rosters, not actual week-by-week luck.</p>`],
+  awWaiver: ['Waiver Wire Wizard', `
+    <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Dashboard (fantasy points in points leagues), added up.</p>
+    <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. A pickup who played below an average rostered player lowers the total.</p>
+    <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>`],
+  awStreet: ['Street Clothes', `
+    <p>Games missed by everyone on the final roster: 82 minus each player's games played that season, added up. It counts every game a player missed, including ones before he joined the team.</p>`],
+  awPunt: ['Biggest punt', `
+    <p>Each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster), compared with the league's other teams category by category, in team-to-team spreads. The award goes to the single category furthest below the league average.</p>`],
+  awSteven: ['Even Steven', `
+    <p>Each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster), compared with the league's other teams category by category, in team-to-team spreads. The most balanced team has the smallest spread between its best and worst categories.</p>`],
+  awUnc: ['Unc Status', `
+    <p>The oldest final roster: average age on the last day of the season, from ESPN birth dates. Players without a birth date on record are left out.</p>`],
   draft: ['How draft picks are graded', `
     <p><b>Now.</b> Every drafted player is ranked using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
     <p><b>Per game or season totals.</b> The toggle at the top re-ranks the whole tab. <b>Per game</b> ranks by value per game, so a player who's missed time isn't held against his pick. <b>Season totals</b> also counts games played: in points leagues it's total fantasy points; in category leagues it's value above a replacement-level starter (the last player who'd start in your league) times games played, so playing more only helps players worth starting.</p>
@@ -1640,15 +1651,15 @@ function seasonAwards() {
   };
   const ranked = (key, dir, fmtFn, note) => teams.filter(T => T[key] != null).sort((a, b) => (b[key] - a[key]) * dir).map(T => ({ T, txt: fmtFn(T), note: note ? note(T) : '' }));
   return [
-    { title: 'Best draft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
-    { title: 'Best manager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
+    { title: 'Best draft', info: 'awDraft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
+    { title: 'Best manager', info: 'awManager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
     impact
-      ? { title: 'Waiver Wire Wizard', blurb: 'The most production from free-agent and waiver pickups, counting only games they played while in the starting lineup (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }
-      : { title: 'Waiver Wire Wizard', blurb: 'The most production from free-agent and waiver pickups still on the final roster (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
-    { title: 'Street Clothes', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
-    ...(isPoints() ? [] : [{ title: 'Biggest punt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
-    { title: 'Even Steven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
-    { title: 'Unc Status', blurb: 'The oldest roster: average age at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
+      ? { title: 'Waiver Wire Wizard', info: 'awWaiver', blurb: 'The most production from free-agent and waiver pickups, counting only games they played while in the starting lineup (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }
+      : { title: 'Waiver Wire Wizard', info: 'awWaiver', blurb: 'The most production from free-agent and waiver pickups still on the final roster (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
+    { title: 'Street Clothes', info: 'awStreet', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
+    ...(isPoints() ? [] : [{ title: 'Biggest punt', info: 'awPunt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
+    { title: 'Even Steven', info: 'awSteven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
+    { title: 'Unc Status', info: 'awUnc', blurb: 'The oldest roster: average age at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
   ].filter(a => a.list.length);
 }
 
@@ -1658,11 +1669,10 @@ function viewAwards() {
   }
   const me = state.fxTeam;
   return `
-  <p class="page-sub">${seasonCtx.label} · how awards are decided ${infoBtn('awards')}</p>
   <div class="awards">${seasonAwards().map(a => {
     const [win, ...rest] = a.list;
     return `<div class="card award">
-      <div class="aw-title">${a.title}</div>
+      <div class="aw-title">${a.title} ${infoBtn(a.info)}</div>
       <div class="aw-win${win.T.id === me ? ' me' : ''}"><span class="aw-name">${esc(win.T.name)}${win.T.id === me ? ' <span class="badge accent">you</span>' : ''}</span><span class="aw-val">${esc(win.txt)}</span></div>
       ${win.note ? `<div class="small muted">${esc(win.note)}</div>` : ''}
       <p class="small muted aw-blurb">${a.blurb}</p>
