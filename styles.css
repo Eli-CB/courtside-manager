@@ -332,6 +332,7 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
   border: 1px solid var(--border); border-radius: 14px; padding: 0;
   background: var(--surface); color: var(--text);
   width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px); /* the visible screen, not counting phone browser toolbars */
 }
 .modal::backdrop { background: rgba(10, 12, 16, .55); }
 .modal form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
@@ -557,6 +558,15 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .info-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--muted); }
 .info-btn:active { transform: translateY(1px); }
 .info-modal { width: min(560px, calc(100vw - 24px)); }
+/* the header (and its close button) stays put; only the explanation scrolls */
+.info-modal[open] { display: flex; flex-direction: column; }
+.info-modal .modal-body { flex: 1; min-height: 0; overflow-y: auto; }
+@media (max-width: 640px) {
+  .modal, .info-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .info-modal .modal-head { padding: 10px 12px 10px 14px; }
+  .info-modal .modal-head h2 { font-size: 1.05rem; }
+  .info-modal .modal-body { padding: 12px 14px 16px; font-size: .92rem; }
+}
 .prose { font-size: .92rem; line-height: 1.55; }
 .prose p { margin: 0 0 10px; }
 .prose ul { margin: 0 0 10px; padding-left: 20px; }
