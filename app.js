@@ -1430,11 +1430,10 @@ function ctxBar() {
     ].join(' · ');
     return;
   }
-  $('#ctxMeta').innerHTML = [
+  $('#ctxMeta').innerHTML = `<span>${[
     NBA ? `stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable',
-    state.demo ? '' : '<button type="button" class="link-btn small" data-action="league-reload" title="Pull the latest rosters, matchups and standings">↻ Reload from Fantrax</button>',
     isPoints() && L.pointsOther && L.pointsOther.length ? `<span title="Not projected: ${esc(L.pointsOther.join(', '))}">some scoring stats not projected</span>` : '',
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(' · ')}</span>${state.demo ? '' : '<button type="button" class="btn sm" data-action="league-reload" title="Pull the latest rosters, matchups and standings">↻ Reload from Fantrax</button>'}`;
 }
 
 function render() {
