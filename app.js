@@ -1620,11 +1620,11 @@ function teamRaw(players) {
 
 const fmtRaw = (c, v) => (c.pct ? fmtPct(v) : fmt(v, 1));
 
-function strengthsCard(compact) {
+function strengthsCard() {
   const starterBasis = ui.strBasis === 'starters';
   const mine = starterBasis ? starters() : state.players.filter(p => !state.il.includes(p.id));
   const toggle = `<div class="seg seg-sm" role="group" aria-label="Players to include">${[['starters', 'Starters'], ['active', 'Active roster']].map(([k, l]) => `<button type="button" class="${ui.strBasis === k ? 'on' : ''}" data-action="str-basis" data-basis="${k}" aria-pressed="${ui.strBasis === k}">${l}</button>`).join('')}</div>`;
-  const head = `<div class="card-head"><h2>Category strengths ${infoBtn('strengths')}</h2>${compact ? '<a href="#roster" class="small">Full breakdown →</a>' : toggle}</div>`;
+  const head = `<div class="card-head"><h2>Category strengths ${infoBtn('strengths')}</h2>${toggle}</div>`;
   if (!mine.length) return `<div class="card">${head}<div class="empty"><strong>No players yet</strong>Load your roster to see your category profile.</div></div>`;
 
   const me = { name: state.teamName, raw: teamRaw(mine), avg: teamCatAvg(mine), mine: true };
@@ -1683,11 +1683,10 @@ function strengthsCard(compact) {
   const weak = rows.filter(r => (league ? r.rank > n - 3 : r.z < 0)).sort((a, b) => (b.rank - a.rank) || (a.z - b.z));
   const label = r => `<b>${r.c.label}</b>${league ? ` (${ordinal(r.rank)})` : ''}`;
   const unit = starterBasis ? 'per starter' : 'per player';
-  const summary = `<div class="cs-summary${compact ? ' flat' : ''}">
+  const summary = `<div class="cs-summary">
       <div><span class="muted small">Strengths</span><br>${strong.slice(0, 4).map(label).join(', ') || '—'}</div>
       <div><span class="muted small">Weaknesses</span><br>${weak.slice(0, 4).map(label).join(', ') || '—'}</div>
     </div>`;
-  if (compact) return `<div class="card">${head}${summary}</div>`;
   return `<div class="card">
     ${head}
     <div class="table-wrap"><table class="cs-table">
@@ -1700,34 +1699,12 @@ function strengthsCard(compact) {
 
 /* ---------- Dashboard ---------- */
 function viewDashboard() {
-  const st = starters();
-  const r = standingOf(ui.viewing ? ui.viewA : state.fxTeam);
-  const nTeams = fxPickable().length;
-  const injured = state.players.filter(p => p.status !== 'Healthy').length;
-  const teamVal = sum(st.map(value));
-  const top = [...state.players].sort((a, b) => value(b) - value(a)).slice(0, 5);
-
+  // the latest games come from the box scores, loaded on first need
+  if (!BOX && NBA) loadBoxes().then(() => { if (ui.tab === 'dashboard') render(); }).catch(() => {});
   return `
-  <div class="kpis">
-    ${r
-      ? `<div class="card kpi"><div class="label">Record</div><div class="value">${r.w}-${r.l}${r.t ? '-' + r.t : ''}</div><div class="hint"><a href="#standings">${ordinal(r.rank)} of ${nTeams}</a>${r.gb ? ` · ${fmt(r.gb, 1)} back` : ''}</div></div>`
-      : `<div class="card kpi"><div class="label">Games this week</div><div class="value">${sum(st.map(p => NBA ? weekGames(p, matchDates(weekStart())) : p.games))}</div><div class="hint">from ${st.length} starters</div></div>`}
-    <div class="card kpi"><div class="label">${isPoints() ? 'Starter FP/G' : 'Starter value'} ${infoBtn('value')}</div><div class="value">${fmtValue(teamVal)}</div><div class="hint">${st.length} of ${state.slots.length} slots filled</div></div>
-    <div class="card kpi"><div class="label">Roster</div><div class="value">${activeCount()}/${rosterLimit()}</div><div class="hint">${state.il.length}/${state.ilSize} on IL</div></div>
-    <div class="card kpi"><div class="label">Injuries</div><div class="value">${injured}</div><div class="hint">${state.players.filter(p => p.status === 'DTD').length} day-to-day</div></div>
-  </div>
-  ${strengthsCard(true)}
-  <div class="dash-grid" style="margin-top:16px">
-    <div>
-      <div class="card">
-        <div class="card-head"><h2>Top performers</h2><a href="#roster" class="small">Full roster →</a></div>
-        ${top.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Player</th><th>Slot</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">${valueLabel()}</th></tr></thead>
-          <tbody>${top.map(p => `<tr><td class="player">${playerCell(p)}</td><td>${slotBadge(slotOf(p))}</td><td class="num">${fmt(p.pts)}</td><td class="num">${fmt(p.reb)}</td><td class="num">${fmt(p.ast)}</td><td class="num"><b>${fmtValue(value(p))}</b></td></tr>`).join('')}</tbody>
-        </table></div>` : `<div class="empty"><strong>Empty roster</strong>Add your first player to get started.</div>`}
-      </div>
-    </div>
-    <div>
+  <div class="dash-grid">
+    <div>${topPerformancesCard()}</div>
+    <div class="dash-side">
       <div class="card">
         <div class="card-head"><h2>Action items</h2></div>
         <ul class="alerts">
@@ -1737,6 +1714,47 @@ function viewDashboard() {
       ${newsCard()}
     </div>
   </div>`;
+}
+
+// ----- Top performances: the best single games across the NBA on the latest game days -----
+// Ranked like player value but for one game (each category against an average rostered player's game),
+// or by fantasy points in points leagues. Each shows who has him in your league.
+const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
+const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
+const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 }))));
+
+function topPerformancesCard() {
+  const head = '<div class="card-head"><h2>Top performances</h2><span class="muted small">every NBA player</span></div>';
+  if (!BOX) return `<div class="card">${head}<p class="muted small" style="margin:0">Loading the latest box scores…</p></div>`;
+  const today = todayIso(), yesterday = addDays(today, -1);
+  const days = [...new Set([...BOX.finals].map(x => x.slice(0, 10)))].filter(d => d <= today).sort().slice(-2).reverse();
+  if (!days.length) return `<div class="card">${head}<p class="muted small" style="margin:0">No games have been played yet.</p></div>`;
+  const owner = new Map();
+  const L = fxLeague();
+  for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
+  const mine = ui.viewing ? ui.viewA : state.fxTeam;
+  const label = d => (d === today ? 'Today' : d === yesterday ? 'Last night' : fmtDay(d));
+  const who = id => {
+    const tid = owner.get(id);
+    if (tid) return tid === mine ? '<span class="badge accent">Your team</span>' : `<span class="perf-owner">${esc(fxTeamName(tid))}</span>`;
+    const raw = nbaById.get(id);
+    return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
+  };
+  const statLine = l => [`${l.pts} PTS`, `${l.reb} REB`, `${l.ast} AST`, ...[['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM']].filter(([k]) => l[k] >= 2).map(([k, n]) => `${l[k]} ${n}`)].map(x => `<span>${x}</span>`).join(' · ');
+  const section = d => {
+    const games = [];
+    for (const [id, m] of BOX.day) { const line = m.get(d); if (line && nbaById.has(id)) games.push({ raw: nbaById.get(id), line, v: lineValue(line) }); }
+    games.sort((a, b) => b.v - a.v);
+    return `<h3 class="sub">${label(d)}${label(d) !== fmtDay(d) ? ` <span class="muted small">${fmtDay(d)}</span>` : ''}</h3>
+      <ul class="perf">${games.slice(0, 6).map(({ raw, line, v }) => `<li>
+        ${headshot({ nbaId: raw.id, name: raw.name }, 40)}
+        <div class="perf-main"><div><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
+          <div class="perf-line">${statLine(line)}</div>
+          <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min · ${line.fgm}-${line.fga} FG · ${who(raw.id)}</div></div>
+        <div class="perf-val" data-tip="${esc(isPoints() ? 'Fantasy points in your league' : "Value for the game: each of your league's categories against an average rostered player's game")}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
+      </li>`).join('')}</ul>`;
+  };
+  return `<div class="card">${head}${days.map(section).join('')}</div>`;
 }
 
 function newsCard() {
@@ -2363,14 +2381,12 @@ function shortMinutes(p, line, d) {
 
 // A played game's box score for the tooltip: minutes, the stat line, shooting, and fantasy points in points leagues
 function gameTip(p, line, d, bench) {
-  const v = k => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
-  const sc = leaguePoints();
   const short = shortMinutes(p, line, d);
   return `<div class="tip-head">${Math.round(line.min)} min${bench ? ' <span class="tip-tag">bench, didn\'t count</span>' : ''}</div>
     <div>${line.pts} PTS · ${line.reb} REB · ${line.ast} AST</div>
     <div>${line.stl} STL · ${line.blk} BLK · ${line.tpm} 3PM · ${line.to} TO</div>
     <div class="tip-dim">${line.fgm}-${line.fga} FG · ${line.ftm}-${line.fta} FT</div>
-    ${sc ? `<div class="tip-head">${fmt(sum(Object.entries(sc).map(([k, x]) => v(k) * x)), 1)} FP</div>` : ''}
+    ${isPoints() ? `<div class="tip-head">${fmt(lineFp(line), 1)} FP</div>` : ''}
     ${short ? `<div class="tip-warn">Usually ${Math.round(p.min)} min: ${esc(short)}</div>` : ''}`;
 }
 

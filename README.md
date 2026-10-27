@@ -2,7 +2,7 @@
 
 A weekly matchup optimizer for 9-category head-to-head fantasy basketball. It pulls your Fantrax league, real NBA stats, injuries and the schedule, then shows:
 
-- **Dashboard:** record, strengths and weaknesses at a glance, injuries and action items
+- **Dashboard:** the day's essentials: action items, injury news for your players, and the best single games across the NBA from the latest game days, with who has each player in your league
 - **Matchups:** both lineups side by side, projected category totals, win chances, and which starters to use
 - **Roster:** what your team is good and bad at: each category ranked against every team in the league, and every player's stats shaded by how much they help or hurt
 - **Free Agents:** recommended adds for your team (plus an injured player to stash when you have an open IR spot), then every free agent and waiver player, or every NBA player, with your league's position eligibility
