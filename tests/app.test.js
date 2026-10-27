@@ -422,3 +422,19 @@ test('keepers only in leagues whose draft leaves roster spots open', async () =>
   assert.equal(counts.length, cats.teams.length);
   assert.ok(counts.every(n => n === 2), `keepers per team: ${counts}`);
 });
+
+test('Best manager compares actual wins with an all-play record', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league, G = await app.loadGameLog('2025-26');
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  let ap, awards;
+  try { app.withSeason(() => { ap = app.allPlayRecords(L, G, false); awards = app.seasonAwards(); }); } finally { app.get('ui').season = null; }
+  const teams = Object.values(ap);
+  const weeks = teams[0].weeks;
+  assert.equal(weeks, L.weeks.filter(w => w.n < L.playoffPeriod).length, 'every regular-season week');
+  // each pairing splits one win, so a week's expected wins add up to half the teams
+  assert.ok(Math.abs(app.sum(teams.map(t => t.exp)) - weeks * teams.length / 2) < 1e-6);
+  for (const t of teams) assert.ok(t.pct >= 0 && t.pct <= 1);
+  const bm = awards.find(a => a.title === 'Best manager');
+  assert.match(bm.list[0].note, /all-play \d+%/);
+});

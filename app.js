@@ -817,9 +817,10 @@ const INFO = {
     <p>In category leagues each game is valued against a <b>replacement-level starter</b> (the per-game value of the last player who'd start in your league), so every game by a player worth starting adds to the total and staying healthy pays. Points leagues add up fantasy points.</p>
     <p>Totals don't adjust for draft slot, so a great first-round pick usually out-produces a late-round steal. The Draft tab grades each pick against its slot (+/−).</p>`],
   awManager: ['Best manager', `
-    <p>Wins above what the roster should have produced: <b>actual wins</b> (ties count half) minus <b>expected wins</b>.</p>
-    <p>Expected wins: each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster) is matched against every other team's with the same win-chance math as Matchups. The average win chance × games played is the expected record.</p>
-    <p>Fantrax's public data has no weekly scores, so this is an estimate from rosters, not actual week-by-week luck.</p>`],
+    <p>Who won more than their team's play deserved: <b>actual wins</b> (from Fantrax's standings, ties counting half) minus <b>expected wins</b> from an <b>all-play record</b>.</p>
+    <p><b>All-play.</b> Each finished regular-season week, a team's real totals (every game its starters played that week, from Fantrax's weekly lineups and the NBA box scores) are matched against <b>every</b> other team's, not just that week's opponent. A team that would have beaten 8 of 9 teams gets 0.89 of a win for the week; one that would have beaten 2 of 9 gets 0.22. Ties count half.</p>
+    <p><b>Expected wins</b> are those weekly shares added up. Winning more than that means drawing weak opponents in good weeks and avoiding strong ones in bad weeks, mostly schedule luck. In leagues where every category counts, it's the same with categories: the share of categories won against every team.</p>
+    <p>The week still underway doesn't count, and neither do playoff weeks. The totals come from box scores, which can differ slightly from Fantrax's (stat corrections, the odd game counted in a different week), so expect small gaps.</p>`],
   awWaiver: ['Waiver Wire Wizard', `
     <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Dashboard (fantasy points in points leagues), added up.</p>
     <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. A pickup who played below an average rostered player lowers the total.</p>
@@ -829,9 +830,9 @@ const INFO = {
     <p>Bench and IR players don't count, and neither do games before a player joined the team or after he left it, so a player traded or dropped mid-season counts only for the weeks a team started him. Injuries, rest and coach's decisions all count the same: the game logs can't tell them apart.</p>
     <p>A team's schedule comes from that season's NBA game logs (every day any of its players played). A player who didn't play at all that season is placed on his current team.</p>`],
   awPunt: ['Biggest punt', `
-    <p>Each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster), compared with the league's other teams category by category, in team-to-team spreads. The award goes to the single category furthest below the league average.</p>`],
+    <p>Each team's season totals (every game its starters played, week by week, the same numbers as the Standings tab's Season totals), compared with the league's other teams category by category, in team-to-team spreads. The award goes to the single category furthest below the league average.</p>`],
   awSteven: ['Even Steven', `
-    <p>Each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster), compared with the league's other teams category by category, in team-to-team spreads. The most balanced team has the smallest spread between its best and worst categories.</p>`],
+    <p>Each team's season totals (every game its starters played, week by week, the same numbers as the Standings tab's Season totals), compared with the league's other teams category by category, in team-to-team spreads. The most balanced team has the smallest spread between its best and worst categories.</p>`],
   awUnc: ['Unc Status', `
     <p>The oldest <b>starting lineups</b>. Every week, Fantrax's rosters say who each team started; each starter's age that week is averaged over all of the team's starter-weeks, so a player who started 20 weeks counts 20 times as much as one who started once. Bench and IR players don't count.</p>
     <p>Ages come from ESPN birth dates. Players without one on record (mostly those no longer in the NBA) are left out.</p>`],
@@ -1363,7 +1364,7 @@ function leagueMenu() {
 // ----- Past seasons -----
 // Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
 // (keyed by Fantrax's league history id); a past season gets its own tabs.
-const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['trade', 'Trades']];
+const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
@@ -1420,7 +1421,9 @@ async function loadRosterWeeks(L) {
     }
   };
   try { await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker)); } finally {
-    all[L.id] = have;
+    // a period still underway can change, so only finished ones are kept
+    const now = Date.now();
+    all[L.id] = Object.fromEntries(Object.entries(have).filter(([n]) => { const p = periods.find(x => String(x.n) === n); return p && fxTime(p.end) < now; }));
     try { localStorage.setItem(ROSTER_WEEKS_KEY, JSON.stringify(all)); } catch (e) { /* storage full or blocked */ }
   }
   const weeks = periods.filter(p => have[p.n]).map(p => {
@@ -1445,11 +1448,33 @@ function arrivalsOf(weeks) {
   return out;
 }
 
+// This season's box scores in the same shape as a past season's game log, so the awards run on either
+const BOX_KEYS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'];
+function boxGameLog(B) {
+  const dates = [...B.finals].map(x => x.slice(0, 10)).sort();
+  const start = dates[0] || todayIso();
+  const d0 = new Date(start + 'T12:00:00');
+  const dayOf = d => Math.round((new Date(d + 'T12:00:00') - d0) / 864e5);
+  const teams = [...new Set([...B.finals].map(x => x.slice(11)))].sort();
+  const ix = new Map(teams.map((t, i) => [t, i]));
+  const days = new Map(teams.map(t => [t, new Set()]));
+  for (const x of B.finals) days.get(x.slice(11)).add(dayOf(x.slice(0, 10)));
+  const players = new Map();
+  for (const [pid, games] of B.byPlayer) {
+    players.set(pid, games.filter(g => ix.has(g[3])).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, st, , team]) => [dayOf(d), ix.get(team), ...BOX_KEYS.map(k => st[k] || 0)]));
+  }
+  return { start, teams, keys: BOX_KEYS, players, days };
+}
+
 // A past season's game lines (data/seasons/<season>-games.json), kept as the plain number arrays they
 // arrive in ([day, team, ...stats], oldest first). A team's schedule is every day any of its players played.
 const gameLogs = {};
 async function loadGameLog(season) {
   if (season in gameLogs) return gameLogs[season];
+  if (season === 'cur') { // this season: the daily box scores
+    try { gameLogs.cur = boxGameLog(await loadBoxes()); } catch (e) { gameLogs.cur = null; }
+    return gameLogs.cur;
+  }
   try {
     const r = await fetch(`data/seasons/${season}-games.json`);
     if (!r.ok) throw new Error(r.status);
@@ -1550,8 +1575,11 @@ function draftImpact(L, G, picks) {
   for (const w of L.weeks) for (const f of w.owner.keys()) { const nba = L.fidNba(f); if (nba && !fidOf.has(nba)) fidOf.set(nba, f); }
   let repl = 0;
   if (!isPoints()) {
+    // that season's per-game numbers: this season's so far, or a past season's archive
     const A = archives[L.season];
-    const vals = A ? [...A.players.keys()].map(pid => archivedStats({ id: pid }, L.season)).filter(x => x && x.gp >= 10).map(x => value(x)).sort((a, b) => b - a) : [];
+    const stats = L.season === 'cur' ? NBA.players.map(r => nbaStats(r, 'cur')) : A ? [...A.players.keys()].map(pid => archivedStats({ id: pid }, L.season)) : [];
+    const minGp = L.season === 'cur' ? 2 : 10;
+    const vals = stats.filter(x => x && x.gp >= minGp).map(x => value(x)).sort((a, b) => b - a);
     repl = vals.length ? vals[Math.min(vals.length, fxPickable().length * state.slots.length) - 1] : 0;
   }
   const weekDays = L.weeks.map(w => periodDays(G, w));
@@ -1567,6 +1595,42 @@ function draftImpact(L, G, picks) {
     }
     (out[p.teamId] = out[p.teamId] || []).push(P);
   }
+  return out;
+}
+
+// All-play record: every finished regular-season week, each team's real totals (its starters' games)
+// against every other team's, as if it had played them all. Expected wins = the weekly share of those
+// matchups won (ties half), added up; in leagues where each category counts, the share of categories.
+// Team id -> { exp, pct, weeks }
+function allPlayRecords(L, G, each) {
+  if (!L.weeks || !G) return null;
+  const now = Date.now();
+  const weeks = L.weeks.filter(w => (!L.playoffPeriod || w.n < L.playoffPeriod) && fxTime(w.end) < now && (L.matchups[String(w.n)] || []).length);
+  if (!weeks.length) return null;
+  const cats = scoreCats();
+  const sc = leaguePoints();
+  const val = (R, c) => (!R ? 0 : c.fp ? sum(Object.entries(sc).map(([k, v]) => lineStat(R.s, k) * v)) : c.pct ? (R.s[c.att] ? R.s[c.made] / R.s[c.att] : 0) : lineStat(R.s, c.key));
+  const ids = fxPickable().map(t => t.id);
+  const out = Object.fromEntries(ids.map(id => [id, { exp: 0, won: 0, games: 0, weeks: weeks.length }]));
+  for (const w of weeks) {
+    const tot = pastSeasonTotals({ ...L, weeks: [w] }, G);
+    for (const a of ids) {
+      let share = 0;
+      const opp = ids.filter(b => b !== a);
+      for (const b of opp) {
+        let wa = 0, wb = 0, n = 0;
+        for (const c of sc ? [{ fp: true }] : cats) {
+          const x = val(tot[a], c), y = val(tot[b], c);
+          n++;
+          if (Math.abs(x - y) < 1e-9) { wa += 0.5; wb += 0.5; } else if (c.neg ? x < y : x > y) wa++; else wb++;
+        }
+        share += each && !sc ? wa : wa > wb ? 1 : wa < wb ? 0 : 0.5;
+      }
+      out[a].exp += share / opp.length;
+      out[a].won += share; out[a].games += opp.length * (each && !sc ? cats.length : 1);
+    }
+  }
+  for (const A of Object.values(out)) A.pct = A.games ? A.won / A.games : 0;
   return out;
 }
 
@@ -1829,12 +1893,14 @@ function seasonTeam(t, L, basis, endDate) {
 
 function seasonAwards() {
   const L = fxLeague();
-  const basis = seasonCtx.basis;
-  const end = (L.periods[L.periods.length - 1] || {}).end || `${L.year + 1}-04-15`;
+  const basis = seasonCtx ? seasonCtx.basis : 'cur';
+  const end = seasonCtx ? (L.periods[L.periods.length - 1] || {}).end || `${L.year + 1}-04-15` : todayIso();
   const teams = fxPickable().map(t => seasonTeam(t, L, basis, end));
   const each = matchupScoring() === 'each' || !/SINGLE_WIN/.test(L.scoring || '');
-  // expected record: average chance of beating every other team in a typical week
-  for (const T of teams) {
+  const GL0 = L.season ? gameLogs[L.season] : null;
+  const allPlay = allPlayRecords(L, GL0, each);
+  // expected record (fallback without weekly data): average chance of beating every other team in a typical week
+  for (const T of allPlay ? [] : teams) {
     const vs = teams.filter(o => o !== T).map(o => matchOdds(compareCats(T.week, o.week)));
     T.expPct = vs.length ? sum(vs.map(o => (each ? o.expected / o.n : o.win))) / vs.length : 0.5;
     const r = standingOf(T.id);
@@ -1845,8 +1911,22 @@ function seasonAwards() {
       T.luck = r.w + r.t / 2 - T.expW;
     }
   }
-  // category profile: each category vs the league's teams, in team-to-team spreads
-  const val = (T, c) => catValue(T.week, c);
+  if (allPlay) {
+    for (const T of teams) {
+      const A = allPlay[T.id], r = standingOf(T.id);
+      if (!A || !r) continue;
+      T.record = `${r.w}-${r.l}${r.t ? '-' + r.t : ''}`;
+      T.expW = A.exp;
+      T.allPct = A.pct;
+      T.luck = r.w + r.t / 2 - A.exp;
+    }
+  }
+  // category profile: each category vs the league's teams, in team-to-team spreads; from real season
+  // totals when the weekly lineups and games are known, else from each team's typical week
+  const real = L.weeks && GL0 ? pastSeasonTotals(L, GL0) : null;
+  const val = real
+    ? (T, c) => { const R = real[T.id] || { s: {} }; return c.pct ? (R.s[c.att] ? R.s[c.made] / R.s[c.att] : 0) : lineStat(R.s, c.key); }
+    : (T, c) => catValue(T.week, c);
   const cats = isPoints() ? [] : scoreCats();
   for (const c of cats) {
     const xs = teams.map(T => val(T, c));
@@ -1911,7 +1991,7 @@ function seasonAwards() {
     drafted
       ? { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => total(T.draft), T => (T.draftBest ? `best: ${T.draftBest.name} (${total(T.draftBest.v)} over ${T.draftBest.games} games)` : '')) }
       : { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
-    { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
+    { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} ${each ? 'cats' : 'wins'}`, T => (T.allPct != null ? `${T.record}, all-play ${Math.round(T.allPct * 100)}% (${fmt(T.expW, 1)} expected)` : `${T.record} vs ${fmt(T.expW, 1)} expected`)) },
     impact
       ? { title: 'Waiver Wire Wizard', info: 'awWaiver', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }
       : { title: 'Waiver Wire Wizard', info: 'awWaiver', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
@@ -1926,14 +2006,39 @@ function seasonAwards() {
   ].filter(a => a.list.length);
 }
 
+// The season underway: the same awards, from this season's weekly lineups and box scores so far
+const curAwards = {}; // league id -> { weeks, fidNba } once loaded
+function viewAwardsSoFar() {
+  const L = fxLeague();
+  if (!L || !NBA) return '';
+  const C = curAwards[L.id];
+  if (!C) {
+    curAwards[L.id] = { loading: true };
+    const toNba = new Map(NBA.players.filter(r => r.fx).map(r => [r.fx.id, r.id]));
+    Promise.all([loadRosterWeeks(L).catch(() => null), loadGameLog('cur')]).then(([weeks]) => {
+      curAwards[L.id] = { weeks, fidNba: f => toNba.get(f) || null };
+    }).finally(() => { if (ui.tab === 'awards' && !ui.season) render(); });
+  }
+  if (!C || C.loading) return '<div class="card"><div class="empty"><strong>Loading this season’s lineups and games…</strong></div></div>';
+  if (!C.weeks || !gameLogs.cur) return '<div class="card"><div class="empty"><strong>No awards yet</strong>They start once the season’s first week of lineups and games is in.</div></div>';
+  // run the awards on a copy of the league that carries this season's weeks
+  const L2 = { ...L, weeks: C.weeks, arrivals: arrivalsOf(C.weeks), season: 'cur', fidNba: C.fidNba };
+  const done = C.weeks.filter(w => fxTime(w.end) < Date.now()).length;
+  const saved = NBA.league;
+  NBA.league = L2;
+  try {
+    return `<p class="page-sub">So far: ${done} finished week${done === 1 ? '' : 's'}${done < 3 ? ', so these will move a lot' : ''} (the week underway counts toward everything but Best manager)</p>${viewAwards()}`;
+  } finally { NBA.league = saved; }
+}
+
 function viewAwards() {
-  if (!seasonCtx.basis) {
+  if (seasonCtx && !seasonCtx.basis) {
     return `<div class="card"><div class="empty"><strong>No awards for this season</strong>No NBA stats are saved for this season (the site has 2016-17 on), and every award needs that season's numbers.</div></div>`;
   }
   // the season's game log (about 350 KB) loads the first time Awards opens
   const L = fxLeague();
   if (L.weeks && L.season && !(L.season in gameLogs)) {
-    loadGameLog(L.season).then(() => { if (ui.tab === 'awards' && ui.season) render(); });
+    loadGameLog(L.season).then(() => { if (ui.tab === 'awards') render(); });
     return '<div class="card"><div class="empty"><strong>Loading the season’s games…</strong></div></div>';
   }
   const me = state.fxTeam;
@@ -2020,7 +2125,7 @@ function render() {
   }
   const early = preDraft();
   if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
-  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, trade: viewTrade };
+  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade };
   // keep scroll position of inner lists (e.g. trade picker) across re-renders
   const scrolls = [...document.querySelectorAll('.pick-list')].map(el => el.scrollTop);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
@@ -2366,7 +2471,7 @@ function loadBoxes() {
         Object.assign(st, { dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 });
         const margin = row[1] === g.home ? g.hs - g.as : g.as - g.hs;
         if (!byPlayer.has(row[0])) byPlayer.set(row[0], []);
-        byPlayer.get(row[0]).push([g.d, st, margin]);
+        byPlayer.get(row[0]).push([g.d, st, margin, row[1]]);
       }
     }
     BOX = { byPlayer, finals, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };

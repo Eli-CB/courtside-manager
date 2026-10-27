@@ -7,6 +7,7 @@ A weekly matchup optimizer for 9-category head-to-head fantasy basketball. It pu
 - **Roster:** what your team is good and bad at: each category ranked against every team in the league, and every player's stats shaded by how much they help or hurt
 - **Free Agents:** recommended adds for your team (plus an injured player to stash when you have an open IR spot), then every free agent and waiver player, or every NBA player, with your league's position eligibility
 - **Standings:** the Fantrax standings, plus every team's season totals in each category from the players it actually started each week
+- **Awards:** this season's awards so far (and each past season's): best draft, best manager (actual wins vs an all-play record), Waiver Wire Wizard, Street Clothes, biggest punt, Even Steven and Unc Status, all from each week's starting lineups
 - **Trades:** what a deal with another team in your league does to your per-game production
 
 It's a plain static site (`index.html`, `styles.css`, `app.js`) reading data files in `data/`.
