@@ -814,7 +814,9 @@ const INFO = {
     <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. A pickup who played below an average rostered player lowers the total.</p>
     <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>`],
   awStreet: ['Street Clothes', `
-    <p>Games missed by everyone on the final roster: 82 minus each player's games played that season, added up. It counts every game a player missed, including ones before he joined the team.</p>`],
+    <p>Games a team lost to players sitting while they were in its <b>starting lineup</b>. For each week, Fantrax's rosters say who started; for each starter, every game his NBA team played that week without him counts one.</p>
+    <p>Bench and IR players don't count, and neither do games before a player joined the team or after he left it, so a player traded or dropped mid-season counts only for the weeks a team started him. Injuries, rest and coach's decisions all count the same: the game logs can't tell them apart.</p>
+    <p>A team's schedule comes from that season's NBA game logs (every day any of its players played). A player who didn't play at all that season is placed on his current team.</p>`],
   awPunt: ['Biggest punt', `
     <p>Each team's typical week (its best lineup by per-game value, each starter counted for the share of the season's games he played, using that season's full per-game stats and the team's final roster), compared with the league's other teams category by category, in team-to-team spreads. The award goes to the single category furthest below the league average.</p>`],
   awSteven: ['Even Steven', `
@@ -1355,7 +1357,7 @@ async function loadSeason(id) {
   league.fidNba = fid => idMap.toNba[fid] || (idMap.names[fid] ? findOld(idMap.names[fid]) : null);
   league.weeks = await loadRosterWeeks(league).catch(() => null);
   league.arrivals = league.weeks ? arrivalsOf(league.weeks) : null;
-  league.gameLog = league.weeks && season ? await loadGameLog(season) : null;
+  league.season = season; // its game log loads when Awards opens
   const prevStart = NBA && NBA.prevSeason ? +String(NBA.prevSeason).slice(0, 4) : null;
   const basis = A ? 'arch:' + season : league.year && league.year === prevStart ? 'prev' : null;
   return (pastCache[id] = { league, basis, label: league.year ? seasonLabel(league.year) : 'Past season' });
@@ -1410,20 +1412,65 @@ function arrivalsOf(weeks) {
   return out;
 }
 
+// A past season's game lines (data/seasons/<season>-games.json), kept as the plain number arrays they
+// arrive in ([day, team, ...stats], oldest first). A team's schedule is every day any of its players played.
+const gameLogs = {};
+async function loadGameLog(season) {
+  if (season in gameLogs) return gameLogs[season];
+  try {
+    const r = await fetch(`data/seasons/${season}-games.json`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const players = new Map(Object.entries(d.players).map(([pid, rows]) => [+pid, rows]));
+    const days = new Map();
+    for (const rows of players.values()) {
+      for (const [day, t] of rows) {
+        if (!days.has(d.teams[t])) days.set(d.teams[t], new Set());
+        days.get(d.teams[t]).add(day);
+      }
+    }
+    gameLogs[season] = { start: d.start, teams: d.teams, keys: d.keys, players, days };
+  } catch (e) { gameLogs[season] = null; }
+  return gameLogs[season];
+}
+// one game row as a stat line (for valuing it)
+function gameLine(G, row) {
+  const line = Object.fromEntries(G.keys.map((k, i) => [k, row[i + 2]]));
+  const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => line[k] >= 10).length;
+  return { ...line, dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 };
+}
+// the season's day numbers a lineup period covers
+function periodDays(G, w) {
+  const d0 = new Date(G.start + 'T12:00:00');
+  const out = new Set();
+  for (let d = w.start.slice(0, 10); d <= w.end.slice(0, 10); d = addDays(d, 1)) {
+    if (periodHas(w, d)) out.add(Math.round((new Date(d + 'T12:00:00') - d0) / 864e5));
+  }
+  return out;
+}
+// the team a player was on that day: his latest game on or before it, else his first game
+function teamOn(G, rows, day) {
+  if (!rows.length) return null;
+  let r = rows[0];
+  for (const x of rows) { if (x[0] > day) break; r = x; }
+  return G.teams[r[1]];
+}
+
 // What each team's pickups did for it: every game a picked-up player played in a week he was in that
 // team's starting lineup, valued like a single game on the Dashboard. Team id -> [{ nba, name, v, weeks, games }]
-function pickupImpact(L) {
-  if (!L.weeks || !L.gameLog) return null;
+function pickupImpact(L, G) {
+  if (!L.weeks || !G) return null;
   const out = {};
   L.weeks.forEach((w, k) => {
+    const wd = periodDays(G, w);
     for (const [f, o] of w.owner) {
       if (!o.on || arrivalAt(L.weeks, k, f) !== 'pickup') continue;
       const nba = L.fidNba(f);
       if (!nba) continue;
-      const games = (L.gameLog.get(nba) || []).filter(([d]) => periodHas(w, d));
+      const games = (G.players.get(nba) || []).filter(r => wd.has(r[0]));
       const team = out[o.tid] = out[o.tid] || new Map();
       const P = team.get(f) || { nba, name: (nbaById.get(nba) || {}).name || '', v: 0, weeks: 0, games: 0 };
-      P.v += sum(games.map(([, line]) => lineValue(line)));
+      P.v += sum(games.map(r => lineValue(gameLine(G, r))));
       P.weeks++;
       P.games += games.length;
       team.set(f, P);
@@ -1432,25 +1479,35 @@ function pickupImpact(L) {
   return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()]]));
 }
 
-// A past season's game lines (data/seasons/<season>-games.json): NBA id -> [[date, line]]
-const gameLogs = {};
-async function loadGameLog(season) {
-  if (season in gameLogs) return gameLogs[season];
-  try {
-    const r = await fetch(`data/seasons/${season}-games.json`);
-    if (!r.ok) throw new Error(r.status);
-    const d = await r.json();
-    const log = new Map();
-    for (const [pid, rows] of Object.entries(d.players)) {
-      log.set(+pid, rows.map(([day, ...v]) => {
-        const line = Object.fromEntries(d.keys.map((k, i) => [k, v[i]]));
-        const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => line[k] >= 10).length;
-        return [addDays(d.start, day), { ...line, dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 }];
-      }));
+// Games lost to players sitting while in the starting lineup: each week, every game a starter's NBA team
+// played without him. Bench and IR don't count, and neither do games before or after he was on the team.
+// A player with no games all season is placed on his current team. Team id -> [{ nba, name, games }]
+function startersMissed(L, G) {
+  if (!L.weeks || !G) return null;
+  const out = {};
+  for (const w of L.weeks) {
+    const wd = periodDays(G, w);
+    for (const [f, o] of w.owner) {
+      if (!o.on) continue;
+      const nba = L.fidNba(f);
+      if (!nba) continue;
+      const rows = G.players.get(nba) || [];
+      const played = new Set(rows.map(r => r[0]));
+      const now = (nbaById.get(nba) || {}).team;
+      let n = 0;
+      for (const day of wd) {
+        if (played.has(day)) continue;
+        const team = teamOn(G, rows, day) || now;
+        if (team && G.days.has(team) && G.days.get(team).has(day)) n++;
+      }
+      if (!n) continue;
+      const team = out[o.tid] = out[o.tid] || new Map();
+      const P = team.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', games: 0 };
+      P.games += n;
+      team.set(nba, P);
     }
-    gameLogs[season] = log;
-  } catch (e) { gameLogs[season] = null; }
-  return gameLogs[season];
+  }
+  return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()]]));
 }
 
 // ----- Archived seasons: data/seasons/<season>.json, saved once by scripts/archive_season.py -----
@@ -1633,8 +1690,18 @@ function seasonAwards() {
       T.draftBest = ps.length ? ps.reduce((a, b) => (b.gain > a.gain ? b : a)) : null;
     }
   }
-  // Waiver Wire Wizard: what pickups did while starting (the final-roster estimate in seasonTeam is the fallback)
-  const impact = pickupImpact(L);
+  // Waiver Wire Wizard and Street Clothes come from the weekly lineups and the season's game log
+  // (the final-roster estimates in seasonTeam are the fallback)
+  const G = L.season ? gameLogs[L.season] : null;
+  const impact = pickupImpact(L, G);
+  const sat = startersMissed(L, G);
+  if (sat) {
+    for (const T of teams) {
+      const ps = sat[T.id] || [];
+      T.missed = sum(ps.map(p => p.games));
+      T.missedMost = ps.length ? ps.reduce((a, b) => (b.games > a.games ? b : a)) : null;
+    }
+  }
   if (impact) {
     for (const T of teams) {
       const ps = impact[T.id] || [];
@@ -1656,7 +1723,9 @@ function seasonAwards() {
     impact
       ? { title: 'Waiver Wire Wizard', info: 'awWaiver', blurb: 'The most production from free-agent and waiver pickups, counting only games they played while in the starting lineup (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) }
       : { title: 'Waiver Wire Wizard', info: 'awWaiver', blurb: 'The most production from free-agent and waiver pickups still on the final roster (trades don’t count).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
-    { title: 'Street Clothes', info: 'awStreet', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
+    sat
+      ? { title: 'Street Clothes', info: 'awStreet', blurb: 'Most games missed by players while they were in the starting lineup (bench and IR don’t count).', list: ranked('missed', 1, T => `${T.missed} games`, T => (T.missedMost ? `most: ${T.missedMost.name} (${T.missedMost.games})` : '')) }
+      : { title: 'Street Clothes', info: 'awStreet', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
     ...(isPoints() ? [] : [{ title: 'Biggest punt', info: 'awPunt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
     { title: 'Even Steven', info: 'awSteven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
     { title: 'Unc Status', info: 'awUnc', blurb: 'The oldest roster: average age at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
@@ -1666,6 +1735,12 @@ function seasonAwards() {
 function viewAwards() {
   if (!seasonCtx.basis) {
     return `<div class="card"><div class="empty"><strong>No awards for this season</strong>No NBA stats are saved for this season (the site has 2016-17 on), and every award needs that season's numbers.</div></div>`;
+  }
+  // the season's game log (about 350 KB) loads the first time Awards opens
+  const L = fxLeague();
+  if (L.weeks && L.season && !(L.season in gameLogs)) {
+    loadGameLog(L.season).then(() => { if (ui.tab === 'awards' && ui.season) render(); });
+    return '<div class="card"><div class="empty"><strong>Loading the season’s games…</strong></div></div>';
   }
   const me = state.fxTeam;
   return `

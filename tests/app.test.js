@@ -275,6 +275,8 @@ test('weekly rosters tell trades from waiver pickups', async () => {
   const kinds = Object.values(L.arrivals[team.id]);
   assert.ok(kinds.includes('pickup') && kinds.includes('start'));
   // the award counts only pickups
+  const G = await app.loadGameLog('2025-26');
+  assert.ok(G && G.days.size === 30, 'game log with every team');
   app.get('ui').season = 'czqgnyozmf2tbr93';
   let awards;
   try { awards = app.withSeason(() => app.seasonAwards()); } finally { app.get('ui').season = null; }
@@ -283,11 +285,38 @@ test('weekly rosters tell trades from waiver pickups', async () => {
   // impact counts only the weeks a pickup started for that team, dropped players included
   app.get('ui').season = 'czqgnyozmf2tbr93';
   let impact;
-  try { impact = app.withSeason(() => app.pickupImpact(L)); } finally { app.get('ui').season = null; }
+  try { impact = app.withSeason(() => app.pickupImpact(L, G)); } finally { app.get('ui').season = null; }
   const mine = impact[team.id];
   assert.ok(!mine.some(p => /Markkanen|Edgecombe/.test(p.name)));
   const kpj = mine.find(p => p.name === 'Kevin Porter Jr.');
   assert.ok(kpj && kpj.weeks < L.weeks.length && kpj.games > 0, `KPJ counted for ${kpj && kpj.weeks} weeks`);
   const finalIds = new Set(Object.values(L.rosters).flat().map(x => x.nba));
   assert.ok(Object.values(impact).flat().some(p => !finalIds.has(p.nba)), 'a pickup dropped before the end still counts');
+});
+
+test('Street Clothes counts only games starters missed while starting', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league, G = await app.loadGameLog('2025-26');
+  const sat = app.startersMissed(L, G);
+  const all = Object.values(sat).flat();
+  assert.ok(all.length > 0 && all.every(p => p.games > 0));
+  // a team's starters can't miss more games than they had lineup weeks with games
+  for (const [tid, ps] of Object.entries(sat)) {
+    const total = app.sum(ps.map(p => p.games));
+    assert.ok(total < L.weeks.length * 8 * 4, `${app.fxTeamName(tid)}: ${total} games`);
+  }
+  // nobody counts for a team in weeks he wasn't starting there: recount one player by hand
+  const team = L.teams.find(t => t.name === "Eli's SGAteam");
+  const pick = sat[team.id][0];
+  const rows = G.players.get(pick.nba) || [];
+  let n = 0;
+  for (const w of L.weeks) {
+    const o = [...w.owner].find(([f, x]) => x.tid === team.id && x.on && L.fidNba(f) === pick.nba);
+    if (!o) continue;
+    for (const day of app.periodDays(G, w)) {
+      const t = app.teamOn(G, rows, day) || (app.nbaById.get(pick.nba) || {}).team;
+      if (!rows.some(r => r[0] === day) && G.days.get(t) && G.days.get(t).has(day)) n++;
+    }
+  }
+  assert.equal(pick.games, n, `${pick.name}: ${pick.games} games`);
 });

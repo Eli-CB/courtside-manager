@@ -12,9 +12,10 @@ Each player: "n" name, "s" per-game stats in STAT_KEYS order (as in data/players
 "g" game-to-game totals over games of 10+ minutes: [games, sum of each SD_KEYS stat..., sum of
 squares...], so the daily job can combine them with this season's games for spreads.
 
-Alongside it, data/seasons/<season>-games.json holds every regular-season game line (day number
-from "start", then GAME_KEYS), which the site loads for Awards: what each pickup did in the weeks
-he was in a lineup.
+Alongside it, data/seasons/<season>-games.json holds every regular-season game line: day number
+from "start", the player's team (an index into "teams"), then GAME_KEYS. The site loads it for
+Awards: what pickups did in the weeks they started, and the games starters missed (a team's
+schedule is every day any of its players played).
 """
 import json
 import os
@@ -75,13 +76,15 @@ def archive_games(season):
     rows = result_rows(get_json('https://stats.nba.com/stats/leaguegamelog', params, timeout=90))
     start = min(r['GAME_DATE'] for r in rows)
     d0 = date.fromisoformat(start)
+    teams = sorted({r['TEAM_ABBREVIATION'] for r in rows})
+    team_ix = {t: i for i, t in enumerate(teams)}
     players = {}
     for r in rows:
         day = (date.fromisoformat(r['GAME_DATE']) - d0).days
         line = [round(r[c] or 0, 1) if c == 'MIN' else int(r[c] or 0) for c in GAME_COLS]
-        players.setdefault(str(r['PLAYER_ID']), []).append([day] + line)
+        players.setdefault(str(r['PLAYER_ID']), []).append([day, team_ix[r['TEAM_ABBREVIATION']]] + line)
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump({'season': season, 'start': start, 'keys': GAME_KEYS, 'players': players}, f, separators=(',', ':'))
+        json.dump({'season': season, 'v': 2, 'start': start, 'teams': teams, 'keys': GAME_KEYS, 'players': players}, f, separators=(',', ':'))
     print(f'{season} games: {len(rows)} lines, {os.path.getsize(path) // 1024} KB')
 
 
