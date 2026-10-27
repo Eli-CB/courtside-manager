@@ -1724,37 +1724,39 @@ const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => 
 const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 }))));
 
 function topPerformancesCard() {
-  const head = '<div class="card-head"><h2>Top performances</h2><span class="muted small">every NBA player</span></div>';
-  if (!BOX) return `<div class="card">${head}<p class="muted small" style="margin:0">Loading the latest box scores…</p></div>`;
   const today = todayIso(), yesterday = addDays(today, -1);
-  const days = [...new Set([...BOX.finals].map(x => x.slice(0, 10)))].filter(d => d <= today).sort().slice(-2).reverse();
-  if (!days.length) return `<div class="card">${head}<p class="muted small" style="margin:0">No games have been played yet.</p></div>`;
+  const card = (sub, body) => `<div class="card"><div class="card-head"><h2>Performances</h2><span class="muted small">${sub}</span></div>${body}</div>`;
+  if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
+  // the latest day with finished games
+  const d = [...new Set([...BOX.finals].map(x => x.slice(0, 10)))].filter(x => x <= today).sort().pop();
+  if (!d) return card('', '<p class="muted small" style="margin:0">No games have been played yet.</p>');
   const owner = new Map();
   const L = fxLeague();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
   const mine = ui.viewing ? ui.viewA : state.fxTeam;
-  const label = d => (d === today ? 'Today' : d === yesterday ? 'Last night' : fmtDay(d));
   const who = id => {
     const tid = owner.get(id);
     if (tid) return tid === mine ? '<span class="badge accent">Your team</span>' : `<span class="perf-owner">${esc(fxTeamName(tid))}</span>`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
-  const statLine = l => [`${l.pts} PTS`, `${l.reb} REB`, `${l.ast} AST`, ...[['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM']].filter(([k]) => l[k] >= 2).map(([k, n]) => `${l[k]} ${n}`)].map(x => `<span>${x}</span>`).join(' · ');
-  const section = d => {
-    const games = [];
-    for (const [id, m] of BOX.day) { const line = m.get(d); if (line && nbaById.has(id)) games.push({ raw: nbaById.get(id), line, v: lineValue(line) }); }
-    games.sort((a, b) => b.v - a.v);
-    return `<h3 class="sub">${label(d)}${label(d) !== fmtDay(d) ? ` <span class="muted small">${fmtDay(d)}</span>` : ''}</h3>
-      <ul class="perf">${games.slice(0, 6).map(({ raw, line, v }) => `<li>
-        ${headshot({ nbaId: raw.id, name: raw.name }, 40)}
-        <div class="perf-main"><div><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
-          <div class="perf-line">${statLine(line)}</div>
-          <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min · ${line.fgm}-${line.fga} FG · ${who(raw.id)}</div></div>
-        <div class="perf-val" data-tip="${esc(isPoints() ? 'Fantasy points in your league' : "Value for the game: each of your league's categories against an average rostered player's game")}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
-      </li>`).join('')}</ul>`;
-  };
-  return `<div class="card">${head}${days.map(section).join('')}</div>`;
+  const statLine = l => [`${l.pts} PTS`, `${l.reb} REB`, `${l.ast} AST`, ...[['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO']].filter(([k]) => l[k] >= (k === 'to' ? 4 : 2)).map(([k, n]) => `${l[k]} ${n}`)].map(x => `<span>${x}</span>`).join(' · ');
+  const tip = esc(isPoints() ? 'Fantasy points in your league' : "Value for the game: each of your league's categories against an average rostered player's game");
+  const games = [];
+  for (const [id, m] of BOX.day) { const line = m.get(d); if (line && nbaById.has(id)) games.push({ raw: nbaById.get(id), line, v: lineValue(line) }); }
+  const list = rows => `<ul class="perf">${rows.map(({ raw, line, v }) => `<li>
+      ${headshot({ nbaId: raw.id, name: raw.name }, 40)}
+      <div class="perf-main"><div><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
+        <div class="perf-line">${statLine(line)}</div>
+        <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min · ${line.fgm}-${line.fga} FG · ${who(raw.id)}</div></div>
+      <div class="perf-val ${v < 0 ? 'pos-bad' : ''}" data-tip="${tip}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
+    </li>`).join('')}</ul>`;
+  // best: anyone, so free agents worth adding show up; worst: only players someone in your league rosters
+  const best = [...games].sort((a, b) => b.v - a.v).slice(0, 6);
+  const worst = games.filter(g => owner.has(g.raw.id)).sort((a, b) => a.v - b.v).slice(0, 6);
+  return card(`${d === today ? 'Today' : d === yesterday ? 'Last night' : ''} ${fmtDay(d)}`.trim(), `
+    <h3 class="sub">Best <span class="muted small">every NBA player</span></h3>${list(best)}
+    ${worst.length ? `<h3 class="sub">Worst <span class="muted small">players rostered in your league</span></h3>${list(worst)}` : ''}`);
 }
 
 function newsCard() {
