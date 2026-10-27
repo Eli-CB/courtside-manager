@@ -394,8 +394,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .fx-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: .9rem; }
 .fx-strip select { max-width: 100%; }
 .fx-vs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.fx-lock { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
 .fx-cycle { display: inline-flex; align-items: center; gap: 4px; }
-.fx-cycle select { padding: 4px 8px; font-weight: 600; max-width: 200px; }
+.fx-cycle select { padding: 4px 8px; font-weight: 600; max-width: 300px; }
 .week-stack { display: grid; gap: 16px; }
 .week-stack > .card + .card { margin-top: 0; }
 .board { table-layout: fixed; min-width: 340px; }

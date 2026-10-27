@@ -1204,7 +1204,14 @@ function fxStrip(ctx) {
       </span>
       ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
       ${stale ? `<span class="muted small">rosters as of week ${L.rosterPeriod}</span>` : ''}
-    </span></div>`;
+    </span>${ctx.locked ? lockNote(ctx) : ''}</div>`;
+}
+
+// Weekly lineups locked: when, and a jump to next week, at the right of the matchup bar
+function lockNote(ctx) {
+  const t = lockTime(ctx.start);
+  const when = `${t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  return `<span class="actions fx-lock"><span class="muted small" title="Starters locked ${esc(when)}, so this shows the lineups as set. Suggestions pick up again for next week.">Lineups locked</span>${ui.weekShift < 4 ? '<button class="btn sm" data-action="week-shift" data-step="1">Plan next week →</button>' : ''}</span>`;
 }
 
 function validateLineup() {
@@ -2597,11 +2604,7 @@ function catCompareTable(ctx, changed) {
 }
 
 function lineupSection(ctx) {
-  if (ctx.locked) {
-    const t = lockTime(ctx.start);
-    return `<div class="card"><div class="card-head"><h2>Lineups are locked</h2>${ui.weekShift < 4 ? '<button class="btn sm" data-action="week-shift" data-step="1">Plan next week →</button>' : ''}</div>
-      <p class="small muted" style="margin:0">Starters locked ${esc(t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))} at ${esc(t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))}, so this shows the lineups as set. Suggestions pick up again for next week.</p></div>`;
-  }
+  if (ctx.locked) return ''; // the matchup bar says so, with a way to plan next week
   const { steps, rest } = pairSwaps(ctx);
   const changed = steps.length > 0 || !!rest;
   const base = ctx.bestIds;
