@@ -1684,6 +1684,7 @@ function activeStints(L, G, tid) {
 }
 
 ui.pastRosterMode = 'total';
+ui.pastRosterSort = { key: 'value', dir: 1 }; // dir 1: biggest first; clicking again flips it
 function viewPastRosters() {
   const L = fxLeague();
   const teams = fxPickable();
@@ -1722,9 +1723,16 @@ function viewPastRosters() {
 
 function pastStarters(L, G, tid, r, teams) {
   const total = ui.pastRosterMode === 'total';
-  const list = [...activeStints(L, G, tid).values()].sort((a, b) => b.v - a.v);
   const how = { start: ['Drafted', ''], trade: ['Trade', 'warn'], pickup: ['Pickup', 'good'] };
   const per = (P, k) => (total ? P.s[k] || 0 : P.gp ? (P.s[k] || 0) / P.gp : 0);
+  // any column sorts, following the Totals / Per game choice
+  const so = ui.pastRosterSort;
+  const sortVal = P => (so.key === 'name' ? P.name.toLowerCase() : so.key === 'how' ? ['start', 'pickup', 'trade'].indexOf(P.how)
+    : so.key === 'weeks' || so.key === 'gp' || so.key === 'missed' ? P[so.key]
+    : so.key === 'fgPct' ? (P.s.fga ? P.s.fgm / P.s.fga : -1) : so.key === 'ftPct' ? (P.s.fta ? P.s.ftm / P.s.fta : -1)
+    : so.key === 'value' ? (total ? P.v : P.gp ? P.v / P.gp : -1e9) : per(P, so.key));
+  const list = [...activeStints(L, G, tid).values()].sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? 1 : x > y ? -1 : 0) * so.dir; });
+  const th = (key, label, cls = 'num', tip = '') => `<th class="sortable ${cls}${so.key === key ? ' sorted' : ''}" data-action="past-roster-sort" data-key="${key}"${tip ? ` title="${tip}"` : ''} aria-sort="${so.key === key ? (so.dir > 0 ? 'descending' : 'ascending') : 'none'}">${label}${so.key === key ? (so.dir > 0 ? ' ↓' : ' ↑') : ''}</th>`;
   const num = (P, k) => (P.gp ? (total ? Math.round(per(P, k)) : fmt(per(P, k), 1)) : '—');
   const pct = (P, m, a) => (P.s[a] ? fmtPct(P.s[m] / P.s[a]) : '—');
   const val = P => (!P.gp ? '—' : isPoints() ? fmt(total ? P.v : P.v / P.gp, total ? 0 : 1) : signed(total ? P.v : P.v / P.gp, 1));
@@ -1734,7 +1742,7 @@ function pastStarters(L, G, tid, r, teams) {
   <div class="page-sub-row">${seg}<p class="page-sub">${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''} · everyone who started, and what he did while starting ${infoBtn('pastRoster')}</p></div>
   <div class="card">
     ${list.length ? `<div class="table-wrap"><table>
-      <thead><tr><th>Player</th><th>How</th><th class="num" title="Weeks in the starting lineup">Wks</th><th class="num" title="Games played while starting">GP</th><th class="num" title="Games his NBA team played without him while he was starting">Missed</th>${STATS.map(([, l]) => `<th class="num">${l}</th>`).join('')}<th class="num">FG%</th><th class="num">FT%</th><th class="num">${isPoints() ? (total ? 'FP' : 'FP/G') : 'Value'}</th></tr></thead>
+      <thead><tr>${th('name', 'Player', '')}${th('how', 'How', '')}${th('weeks', 'Wks', 'num', 'Weeks in the starting lineup')}${th('gp', 'GP', 'num', 'Games played while starting')}${th('missed', 'Missed', 'num', 'Games his NBA team played without him while he was starting')}${STATS.map(([k, l]) => th(k, l)).join('')}${th('fgPct', 'FG%')}${th('ftPct', 'FT%')}${th('value', isPoints() ? (total ? 'FP' : 'FP/G') : 'Value')}</tr></thead>
       <tbody>${list.map(P => {
         const raw = nbaById.get(P.nba);
         const [label, cls] = how[P.how];
@@ -3597,6 +3605,12 @@ const actions = {
   },
   'close-info'() { $('#infoDialog').close(); },
   'past-roster-mode'(el) { ui.pastRosterMode = el.dataset.mode; render(); },
+  'past-roster-sort'(el) {
+    const k = el.dataset.key, so = ui.pastRosterSort;
+    if (so.key === k) so.dir *= -1;
+    else { so.key = k; so.dir = k === 'name' || k === 'how' ? -1 : 1; }
+    render();
+  },
   'draft-mode'(el) {
     ui.draftMode = el.dataset.mode;
     try { localStorage.setItem(DRAFT_MODE_KEY, ui.draftMode); } catch (e) { /* ignore */ }
