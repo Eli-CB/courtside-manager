@@ -2499,9 +2499,20 @@ function showPlayerDetail(nbaId) {
   if (!raw) return;
   const owned = ownedNbaIds();
   const t = teamInfo(raw.team);
-  const rows = [['Projection', nbaStats(raw)], [NBA.season, statObj(raw.cur)], ['Last 10', statObj(raw.l10)], [NBA.prevSeason, statObj(raw.prev)]]
-    .filter(([, s]) => s && s.gp)
+  const lines = [['Projection', 'Proj', nbaStats(raw)], [NBA.season, String(NBA.season).slice(2), statObj(raw.cur)], ['Last 10', 'L10', statObj(raw.l10)], [NBA.prevSeason, String(NBA.prevSeason).slice(2), statObj(raw.prev)]]
+    .filter(([, , s]) => s && s.gp);
+  // phones: stats down the side, seasons across
+  const AVG = [['GP', s => Math.round(s.gp)], ['MIN', s => fmt(s.min, 1)], ['PTS', s => fmt(s.pts)], ['REB', s => fmt(s.reb)], ['AST', s => fmt(s.ast)], ['STL', s => fmt(s.stl)], ['BLK', s => fmt(s.blk)], ['3PM', s => fmt(s.tpm)], ['TO', s => fmt(s.to)], ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0)], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0)]];
+  const avgNarrow = lines.length ? `<table class="pc-avg show-sm"><thead><tr><th></th>${lines.map(([, short]) => `<th class="num">${esc(short)}</th>`).join('')}</tr></thead>
+    <tbody>${AVG.map(([label, f]) => `<tr><td><b>${label}</b></td>${lines.map(([, , st]) => `<td class="num">${f(st)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '';
+  const rows = lines.map(([l, , s]) => [l, s])
     .map(([l, s]) => `<tr><td><b>${l}</b></td><td class="num">${Math.round(s.gp)}</td><td class="num">${fmt(s.min, 1)}</td><td class="num">${fmt(s.pts)}</td><td class="num">${fmt(s.reb)}</td><td class="num">${fmt(s.ast)}</td><td class="num">${fmt(s.stl)}</td><td class="num">${fmt(s.blk)}</td><td class="num">${fmt(s.tpm)}</td><td class="num">${fmt(s.to)}</td><td class="num">${fmtPct(s.fga ? s.fgm / s.fga : 0)}</td><td class="num">${fmtPct(s.fta ? s.ftm / s.fta : 0)}</td></tr>`).join('');
+  const games = (raw.log || []).map(g => { const o = {}; NBA.logKeys.forEach((k, i) => { o[k] = g[i]; }); return o; });
+  // phones: each game as a short block
+  const gamesNarrow = games.length ? `<ul class="pc-games show-sm">${games.map(o => `<li>
+      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min</span></div>
+      <div>${[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`].map(x => `<span>${x}</span>`).join(' · ')}</div>
+      <div class="muted">${o.fgm}-${o.fga} FG · ${o.ftm}-${o.fta} FT</div></li>`).join('')}</ul>` : '';
   const logs = (raw.log || []).map(g => {
     const o = {}; NBA.logKeys.forEach((k, i) => { o[k] = g[i]; });
     return `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${o.min}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td></tr>`;
@@ -2519,9 +2530,9 @@ function showPlayerDetail(nbaId) {
       <div class="proj"><div class="k">${valueLabel()}</div><div class="v">${(() => { const s = nbaStats(raw); return s && s.gp ? fmtValue(value({ ...s, pos: raw.pos })) : '—'; })()}</div></div>
     </div>
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
-    ${rows ? `<div class="table-wrap"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}
+    ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}
     <h3 class="sub" style="margin-top:16px">Recent games</h3>
-    ${logs ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
+    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   $('#detailFoot').innerHTML = `
     <button type="button" class="btn ghost" data-action="close-detail">Close</button>
     ${onRoster ? '<span class="badge accent">On your roster</span>' : ''}`;
