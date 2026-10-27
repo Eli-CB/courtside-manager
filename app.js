@@ -1265,9 +1265,7 @@ function viewPastRosters() {
   }).sort((a, b) => (b.val ?? -99) - (a.val ?? -99));
   const graded = !!seasonCtx.basis;
   return `
-  <div class="page-head">
-    <div><h1>Final roster ${graded ? infoBtn('value') : ''}</h1><p>${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''}${graded ? ` · ${seasonCtx.label} per-game stats` : ''}</p></div>
-  </div>
+  <p class="page-sub">${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''}${graded ? ` · ${seasonCtx.label} per-game stats ${infoBtn('value')}` : ''}</p>
   <div class="card">
     ${rows.length ? `<div class="table-wrap"><table>
       <thead><tr><th>Player</th><th>Slot</th>${graded ? '<th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">Value</th>' : ''}</tr></thead>
@@ -1365,14 +1363,11 @@ function seasonAwards() {
 
 function viewAwards() {
   if (!seasonCtx.basis) {
-    return `<div class="page-head"><div><h1>Awards</h1></div></div>
-      <div class="card"><div class="empty"><strong>No awards for this season</strong>The site only keeps NBA stats back to ${esc(NBA.prevSeason)}, and every award needs that season's numbers.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>No awards for this season</strong>The site only keeps NBA stats back to ${esc(NBA.prevSeason)}, and every award needs that season's numbers.</div></div>`;
   }
   const me = state.fxTeam;
   return `
-  <div class="page-head">
-    <div><h1>Awards ${infoBtn('awards')}</h1><p>${esc(fxLeague().name)} · ${seasonCtx.label}</p></div>
-  </div>
+  <p class="page-sub">${seasonCtx.label} · how awards are decided ${infoBtn('awards')}</p>
   <div class="awards">${seasonAwards().map(a => {
     const [win, ...rest] = a.list;
     return `<div class="card award">
@@ -1703,13 +1698,10 @@ function viewRoster() {
     return att ? sum(act.map(p => p[c.key] * p[a])) / att : 0;
   };
   return `
-  <div class="page-head">
-    <div><h1>Roster ${infoBtn('value')}</h1><p>${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR</p></div>
-  </div>
   <div class="week-stack">
   ${strengthsCard()}
   <div class="card">
-    <div class="card-head"><h2>Players</h2><span class="muted small">per game · green helps, red hurts, vs an average rostered player</span></div>
+    <div class="card-head"><h2>Players ${infoBtn('value')}</h2><span class="muted small">${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR · per game, green helps, red hurts</span></div>
     ${list.length ? `<div class="table-wrap"><table class="roster-table">
       <thead><tr>${headerRow(rosterCols(), ui.rosterSort, 'roster')}</tr></thead>
       <tbody>${list.map(p => `<tr${state.il.includes(p.id) ? ' class="muted-row"' : ''}>
@@ -1733,9 +1725,6 @@ function viewStandings() {
   const L = fxLeague();
   const rows = (L && L.standings) || [];
   return `
-  <div class="page-head">
-    <div><h1>Standings</h1><p>${esc(L ? L.name : '')} · ${seasonCtx ? `${seasonCtx.label} final standings` : 'from Fantrax'}</p></div>
-  </div>
   <div class="card">
     ${rows.length ? `<div class="table-wrap"><table>
       <thead><tr><th class="num">#</th><th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">GB</th>${rows.some(r => r.pf != null) ? '<th class="num">Pts for</th>' : ''}</tr></thead>
@@ -1926,9 +1915,6 @@ function viewTrade() {
   }
 
   return `
-  <div class="page-head">
-    <div><h1>Trade analyzer</h1><p>Compare what you give against what you get from another team in your league.</p></div>
-  </div>
   <div class="trade-grid">
     <div class="card"><div class="card-head"><h2>You give</h2><span class="muted small">${give.length} selected</span></div>${pick(state.players, ui.tradeGive, 'give', p => p.id)}</div>
     <div class="card"><div class="card-head"><h2>You get</h2>${others.length ? `<select class="trade-team" data-change="trade-team" aria-label="Team to trade with">${others.map(t => `<option value="${esc(t.id)}" ${t.id === ui.tradeTeam ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}<span class="muted small">${get.length} selected</span></div>${pick(theirs, ui.tradeGet, 'get', p => String(p.nbaId))}</div>
@@ -1984,18 +1970,14 @@ function playerRows() {
 
 function viewPlayers() {
   if (!NBA) {
-    return `<div class="page-head"><div><h1>Free agents</h1></div></div>
-      <div class="card"><div class="empty"><strong>Loading player data…</strong>If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>Loading player data…</strong>If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.</div></div>`;
   }
   const f = ui.pf;
   const teams = [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort();
   return `
-  <div class="page-head">
-    <div><h1>Free agents ${infoBtn('projection')}</h1><p>Free agents and waivers${fxLeague() ? ` in ${esc(fxLeague().name)}` : ''}, or switch Show to see every NBA player. ${BASIS_LABELS[state.basis]} stats (${NBA.season} / ${NBA.prevSeason}).</p></div>
-    ${LOCAL ? '<div class="actions"><button class="btn" data-action="refresh-data">Refresh stats</button></div>' : ''}
-  </div>
   ${ui.viewing ? '' : recommendedCard()}
   <div class="card">
+    <div class="card-head"><h2>${f.show === 'fa' ? 'Available players' : 'NBA players'} ${infoBtn('projection')}</h2><span class="muted small">${BASIS_LABELS[state.basis]} stats</span>${LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : ''}</div>
     <div class="filters">
       <label class="field grow" for="pfQ">Search<input id="pfQ" type="search" placeholder="Player name" value="${esc(f.q)}" data-input="pf" data-key="q" autocomplete="off"></label>
       <label class="field" for="pfPos">Position<select id="pfPos" data-change="pf" data-key="pos"><option value="">All</option>${POSITIONS.map(x => `<option ${f.pos === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
@@ -2564,8 +2546,7 @@ function pickupsCard() {
 
 function viewWeek() {
   if (!NBA) {
-    return `<div class="page-head"><div><h1>Matchups</h1></div></div>
-      <div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the NBA data file.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the NBA data file.</div></div>`;
   }
   const ctx = weekContext();
   const { start, dates, weekly, hasOpp, asSet, best, oSet, oBest, mine } = ctx;
@@ -2693,8 +2674,7 @@ function draftList(title, list, mine, info) {
 function viewDraft() {
   const d = draftData();
   if (!d) {
-    return `<div class="page-head"><div><h1>Draft</h1></div></div>
-      <div class="card"><div class="empty"><strong>No draft results</strong>Fantrax didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>No draft results</strong>Fantrax didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
   }
   const mine = state.fxTeam;
   const best = [...d.picks].filter(p => p.gp).sort((a, b) => (b.gain - a.gain) || (b.val - a.val)).slice(0, 10);
@@ -2743,9 +2723,7 @@ function viewDraft() {
   }).join('')}</tr>`).join('');
 
   return `
-  <div class="page-head">
-    <div><h1>Draft ${infoBtn('draft')}</h1><p>${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? 'not graded: the site has no NBA stats for that season' : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`}</p></div>
-  </div>
+  <p class="page-sub">${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? 'not graded: the site has no NBA stats for that season' : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`} ${infoBtn('draft')}</p>
   ${!seasonCtx && d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
   ${d.graded ? `<div class="trade-grid">
     ${draftList(seasonCtx ? 'Best picks' : 'Best picks so far', best, mine, true)}

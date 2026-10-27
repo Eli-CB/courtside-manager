@@ -131,6 +131,7 @@ a { color: var(--accent); }
   gap: 12px; margin-bottom: 16px;
 }
 .page-head p { margin: 4px 0 0; color: var(--muted); }
+.page-sub { margin: 0 0 14px; color: var(--muted); font-size: .9rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .card {
