@@ -480,6 +480,8 @@ def fantrax(league_id, index, saved_league=None):
         'matchups': {str(m['period']): [[x['away']['id'], x['home']['id']] for x in m.get('matchupList', [])
                                         if x.get('away', {}).get('id') and x.get('home', {}).get('id')] for m in info.get('matchups', [])},
         'rosterPeriod': rosters.get('period'),
+        # every lineup period's dates, for adding up what each team's starters produced
+        'rosterPeriods': [[p['number'], p['startDate'], p['endDate']] for p in info.get('rosterPeriods') or []],
         # "points" is the W-L-T record
         'standings': [dict(zip(('w', 'l', 't'), [int(x) if x.isdigit() else 0 for x in (str(r.get('points') or '0-0-0').split('-') + ['0', '0'])[:3]]),
                            id=r['teamId'], name=r.get('teamName', ''), rank=r.get('rank'), gb=r.get('gamesBack') or 0)

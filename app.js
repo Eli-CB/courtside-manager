@@ -883,6 +883,7 @@ async function fetchFantraxLeague(id) {
     matchups: Object.fromEntries((info.matchups || []).map(m => [String(m.period),
       (m.matchupList || []).filter(x => x.away && x.away.id && x.home && x.home.id).map(x => [x.away.id, x.home.id])])),
     rosterPeriod: rosters.period,
+    rosterPeriods: (info.rosterPeriods || []).map(p => [p.number, String(p.startDate), String(p.endDate)]),
     rosters: Object.fromEntries(Object.entries(rosters.rosters || {}).map(([tid, r]) => [tid,
       (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
     rosterInfo: info.rosterInfo || null,
@@ -1725,9 +1726,6 @@ function viewRoster() {
 function viewStandings() {
   const L = fxLeague();
   const rows = (L && L.standings) || [];
-  const week = fxPeriodFor(weekStart());
-  const pairs = week && L.matchups ? L.matchups[String(week.n)] || [] : [];
-  const name = id => esc(fxTeamName(id) || '');
   return `
   <div class="page-head">
     <div><h1>Standings</h1><p>${esc(L ? L.name : '')} · ${seasonCtx ? `${seasonCtx.label} final standings` : 'from Fantrax'}</p></div>
@@ -1742,10 +1740,127 @@ function viewStandings() {
       }).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No standings yet</strong>Fantrax didn't return standings for this league.</div>`}
   </div>
-  ${pairs.length ? `<div class="card" style="margin-top:16px">
-    <div class="card-head"><h2>Week ${week.n} matchups</h2><span class="muted small">${fmtDay(week.start)} – ${fmtDay(week.end)}</span></div>
-    <ul class="alerts">${pairs.map(([a, b]) => `<li class="alert"><span class="grow">${a === state.fxTeam || b === state.fxTeam ? '<b>' : ''}${name(a)} vs ${name(b)}${a === state.fxTeam || b === state.fxTeam ? '</b>' : ''}</span></li>`).join('')}</ul>
-  </div>` : ''}`;
+  ${seasonCtx || !L ? '' : seasonTotalsCard(L, rows)}`;
+}
+
+// ----- Season totals: what each team's starters actually produced -----
+// Fantrax returns every lineup period's rosters. A player's games count for a team only in periods he
+// was ACTIVE there, using this season's box scores (data/boxscores.json, loaded when Standings opens).
+const LINEUP_CACHE_KEY = 'courtside-lineups-v1';
+const BOX_COLS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'];
+let boxLoad = null;
+const seasonTot = {}; // league id -> { state: 'loading' | 'ready' | 'error', teams, msg }
+
+function rosterPeriodsOf(L) {
+  if (L.rosterPeriods && L.rosterPeriods.length) return L.rosterPeriods.map(([n, start, end]) => ({ n, start, end }));
+  return (L.periods || []).map(p => ({ n: p.n, start: p.lock, end: p.endAt })); // weekly leagues lock by scoring period
+}
+// a game day belongs to a period from its first day; the last day only if the period runs into the night
+const periodHas = (p, d) => d >= p.start.slice(0, 10) && (d < p.end.slice(0, 10) || (d === p.end.slice(0, 10) && +p.end.slice(11, 13) >= 21));
+
+function loadBoxes() {
+  boxLoad = boxLoad || fetch(`data/boxscores.json?v=${encodeURIComponent(NBA.updated || '')}`).then(r => {
+    if (!r.ok) throw new Error(`box scores ${r.status}`);
+    return r.json();
+  }).then(data => {
+    const byPlayer = new Map(); // NBA id -> [[date, stats]]
+    for (const g of Object.values(data.games || {})) {
+      for (const row of g.rows) {
+        const st = Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0]));
+        const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => st[k] >= 10).length;
+        Object.assign(st, { dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 });
+        if (!byPlayer.has(row[0])) byPlayer.set(row[0], []);
+        byPlayer.get(row[0]).push([g.d, st]);
+      }
+    }
+    return byPlayer;
+  }).catch(e => { boxLoad = null; throw e; });
+  return boxLoad;
+}
+
+// completed periods never change, so their lineups are fetched once and kept on this device
+async function loadLineups(L) {
+  let all = {};
+  try { all = JSON.parse(localStorage.getItem(LINEUP_CACHE_KEY)) || {}; } catch (e) { /* none saved */ }
+  const have = all[L.id] || {};
+  const toNba = new Map(NBA.players.filter(r => r.fx).map(r => [r.fx.id, r.id]));
+  const want = rosterPeriodsOf(L).filter(p => p.n < L.rosterPeriod && !have[p.n]).map(p => p.n);
+  let next = 0;
+  const worker = async () => {
+    while (next < want.length) {
+      const n = want[next++];
+      const d = await fxGet(`getTeamRosters?leagueId=${encodeURIComponent(L.id)}&period=${n}`);
+      have[n] = Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) =>
+        [tid, (r.rosterItems || []).filter(it => it.status === 'ACTIVE').map(it => toNba.get(it.id)).filter(Boolean)]));
+    }
+  };
+  try { await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker)); } finally {
+    all[L.id] = have;
+    try { localStorage.setItem(LINEUP_CACHE_KEY, JSON.stringify(all)); } catch (e) { /* storage full or blocked */ }
+  }
+  // the current period comes with the league
+  return { ...have, [L.rosterPeriod]: Object.fromEntries(Object.entries(L.rosters || {}).map(([tid, r]) => [tid, r.filter(x => x.st === 'ACTIVE' && x.nba).map(x => x.nba)])) };
+}
+
+async function buildSeasonTotals(L) {
+  const [boxes, lineups] = await Promise.all([loadBoxes(), loadLineups(L)]);
+  const teams = {};
+  for (const p of rosterPeriodsOf(L)) {
+    for (const [tid, ids] of Object.entries(lineups[p.n] || {})) {
+      const T = teams[tid] || (teams[tid] = { gp: 0, s: {} });
+      for (const id of ids) {
+        for (const [d, st] of boxes.get(id) || []) {
+          if (!periodHas(p, d)) continue;
+          T.gp++;
+          for (const [k, v] of Object.entries(st)) T.s[k] = (T.s[k] || 0) + v;
+        }
+      }
+    }
+  }
+  return teams;
+}
+
+function seasonTotalsCard(L, standings) {
+  const id = L.id;
+  const S = seasonTot[id];
+  if (!S) {
+    seasonTot[id] = { state: 'loading' };
+    buildSeasonTotals(L).then(teams => { seasonTot[id] = { state: 'ready', teams }; })
+      .catch(e => { seasonTot[id] = { state: 'error', msg: e.message }; })
+      .finally(() => { if (ui.tab === 'standings' && !ui.season) render(); });
+  }
+  const head = `<div class="card-head"><h2>Season totals</h2><span class="muted small">from each ${state.lineupMode === 'daily' ? "day's" : "week's"} starting lineups</span></div>`;
+  if (!S || S.state === 'loading') return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">Loading every lineup from Fantrax…</p></div>`;
+  if (S.state === 'error') return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">Couldn't load season totals (${esc(S.msg)}).</p></div>`;
+
+  // totals of any scored stat, derived ones included
+  const tot = (T, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (T.s[b] || 0) * c)) : T.s[k] || 0);
+  const sc = leaguePoints();
+  const cols = sc
+    ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ label: STAT_LABEL[k], neg: sc[k] < 0, val: T => tot(T, k), fmt: v => fmt(v, 0) })),
+      { label: 'FP', val: T => sum(Object.entries(sc).map(([k, v]) => tot(T, k) * v)), fmt: v => fmt(v, 1) }]
+    : CATS.map(c => ({ label: c.label, neg: c.neg,
+      val: c.pct ? (T => { const [m, a] = c.key === 'fgPct' ? ['fgm', 'fga'] : ['ftm', 'fta']; return T.s[a] ? T.s[m] / T.s[a] : 0; }) : T => T.s[c.key] || 0,
+      fmt: c.pct ? fmtPct : v => fmt(v, 0) }));
+  const order = standings.length ? standings.map(r => r.id) : fxPickable().map(t => t.id);
+  const list = order.map(tid => ({ tid, T: S.teams[tid] || { gp: 0, s: {} } }));
+  const stats = cols.map(c => {
+    const vals = list.map(x => c.val(x.T));
+    const m = sum(vals) / vals.length;
+    const sd = Math.sqrt(sum(vals.map(v => (v - m) ** 2)) / vals.length) || 1e-9;
+    return { vals, z: v => (c.neg ? -1 : 1) * (v - m) / sd, rank: v => 1 + vals.filter(x => (c.neg ? x < v : x > v)).length };
+  });
+  const avgRank = i => sum(stats.map(st => st.rank(st.vals[i]))) / cols.length;
+  return `<div class="card" style="margin-top:16px">
+    ${head}
+    <div class="table-wrap"><table class="season-tot">
+      <thead><tr><th>Team</th><th class="num" title="Player games counted from starting lineups">GP</th>${cols.map(c => `<th class="num">${c.label}</th>`).join('')}${sc ? '' : '<th class="num" title="Average rank across the categories">Avg rank</th>'}</tr></thead>
+      <tbody>${list.map((x, i) => `<tr${x.tid === state.fxTeam ? ' class="me-row"' : ''}><td><b>${esc(fxTeamName(x.tid) || '')}</b></td><td class="num muted">${x.T.gp}</td>
+        ${cols.map((c, j) => { const v = stats[j].vals[i]; return `<td class="num" style="${shade(stats[j].z(v))}" title="${c.label}: ${ordinal(stats[j].rank(v))} of ${list.length}">${c.fmt(v)}</td>`; }).join('')}
+        ${sc ? '' : `<td class="num"><b>${fmt(avgRank(i), 1)}</b></td>`}</tr>`).join('')}</tbody>
+    </table></div>
+    <p class="small muted" style="margin:10px 0 0">A player's games count for the team that had him in its starting lineup that ${state.lineupMode === 'daily' ? 'day' : 'week'}. GP is the player games counted. Green is best in the league, red is worst; hover a number for its rank.</p>
+  </div>`;
 }
 
 /* ---------- Trade ---------- */
@@ -2868,6 +2983,7 @@ const actions = {
         Object.assign(state, { players: side.players, il: side.il, lineup: side.lineup, teamName: side.name || state.teamName });
       }
       syncLinked();
+      delete seasonTot[fxLeague().id];
       commit(`Reloaded ${fxLeague().name} from Fantrax`);
     } catch (e) {
       toast(`Couldn't reach Fantrax (${e.message})`);
