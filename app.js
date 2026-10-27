@@ -1748,7 +1748,7 @@ function topPerformancesCard() {
       ${headshot({ nbaId: raw.id, name: raw.name }, 40)}
       <div class="perf-main"><div><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
         <div class="perf-line">${statLine(line)}</div>
-        <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min · ${line.fgm}-${line.fga} FG · ${who(raw.id)}</div></div>
+        <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min · ${line.fgm}-${line.fga} FG · ${line.ftm}-${line.fta} FT · ${who(raw.id)}</div></div>
       <div class="perf-val ${v < 0 ? 'pos-bad' : ''}" data-tip="${tip}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
     </li>`).join('')}</ul>`;
   // best: anyone, so free agents worth adding show up; worst: only players someone in your league rosters
