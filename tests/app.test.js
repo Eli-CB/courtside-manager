@@ -387,3 +387,18 @@ test('past Rosters list only starters, with games and misses that match the awar
     assert.equal(app.sum(st.map(p => p.missed)), app.sum((sat[t.id] || []).map(p => p.games)), `${t.name}: missed games agree with Street Clothes`);
   }
 });
+
+test('a past season shows its keepers without grading them', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league;
+  const team = L.teams.find(t => t.name === "Eli's SGAteam");
+  const names = L.draft.keepers[team.id].map(id => app.nbaById.get(id).name).sort();
+  assert.deepEqual(names, ['Karl-Anthony Towns', 'Shai Gilgeous-Alexander']);
+  assert.ok(Object.values(L.draft.keepers).every(k => k.length === 2), 'two keepers per team');
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  let d;
+  try { app.withSeason(() => { d = app.draftData(); }); } finally { app.get('ui').season = null; }
+  const ks = d.keepers[team.id];
+  assert.ok(ks.every(k => k.past && k.gain === undefined && k.slot === undefined), 'listed, not graded');
+  assert.ok(!d.picks.some(p => names.includes(p.name)), 'keepers are not draft picks');
+});

@@ -842,7 +842,7 @@ const INFO = {
     <p><b>Past seasons.</b> A past draft is graded the same way, but on that season's full per-game stats, so the rank is where each player finished.</p>
     <p><b>Team drafts.</b> The average +/− across all of a team's picks. Total value adds up the per-game value of every pick who has played.</p>
     <p><b>Colors.</b> Each pick and keeper is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
-    <p><b>Keepers</b> fill the top two rows. The one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks.</p>
+    <p><b>Keepers</b> fill the top two rows. This season, the one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks. A past season's keepers are shown but not graded.</p>
     <p><b>Board.</b> One row per round, one column per draft slot. Traded picks stay in their original slot, marked with the team that made the pick. "No pick" means the slot went unused.</p>`],
   board: ['Reading the draft board', `
     <p><b>Each cell</b> is one pick: the pick number, the player, and his <b>+/−</b>.</p>
@@ -851,7 +851,7 @@ const INFO = {
     <p><b>+/−</b> is the pick number minus that rank. A #40 pick playing like the #5 player is <b>+35</b>; a #3 pick playing like #50 is <b>−47</b>. "DNP" means he hasn't played.</p>
     <p><b>Colors.</b> Green is outplaying the slot, red is underplaying it, getting stronger the bigger the gap. Hover a cell for the player's rank.</p>
     <p><b>Layout.</b> One row per round, one column per draft slot. A traded pick stays in its original slot, marked "by" the team that made it. "No pick" means the slot went unused.</p>
-    <p><b>Keepers</b> fill the K rows at the top. The one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick.</p>`],
+    <p><b>Keepers</b> fill the K rows at the top. This season, the one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick. A past season's keepers (players on a team's opening-week roster it didn't draft) are shown but not graded, and don't count toward any grade or award.</p>`],
   data: ['Where the data comes from', `
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
@@ -1361,13 +1361,20 @@ function seasonsFor(L) {
 async function loadSeason(id) {
   if (pastCache[id]) return pastCache[id];
   const { league, idMap } = await fetchFantraxLeague(id, { opening: true });
-  // end-of-season rosters can't tell keepers from waiver pickups, so past drafts show picks only
   if (league.draft) league.draft.keepers = {};
   // that season's NBA stats, if saved, grade its draft, awards and rosters
   const season = league.year ? seasonOf(league.year) : null;
   const A = season ? await loadArchive(season) : null;
   const findOld = A ? matchInactive(league, A) : () => null;
   league.fidNba = fid => idMap.toNba[fid] || (idMap.names[fid] ? findOld(idMap.names[fid]) : null);
+  // keepers: on a team's opening-week roster but not among its draft picks (shown on the board, not graded)
+  if (league.draft && league.openingRosters) {
+    for (const [tid, items] of Object.entries(league.openingRosters)) {
+      const drafted = new Set(league.draft.picks.filter(p => p[2] === tid).map(p => p[3]));
+      const kept = items.map(x => x.nba).filter(nba => nba && !drafted.has(nba));
+      if (kept.length) league.draft.keepers[tid] = kept;
+    }
+  }
   league.weeks = await loadRosterWeeks(league).catch(() => null);
   league.arrivals = league.weeks ? arrivalsOf(league.weeks) : null;
   league.season = season; // its game log loads when Awards opens
@@ -3314,6 +3321,10 @@ function draftData() {
   // keepers: where each would slot among this year's picks, by value per game so far
   const keepers = {};
   for (const [tid, ids] of Object.entries(L.draft.keepers || {})) {
+    if (seasonCtx) {
+      keepers[tid] = ids.map(nba => ({ nbaId: nba, name: (nbaById.get(nba) || {}).name || '', past: true })).sort((a, b) => a.name.localeCompare(b.name));
+      continue;
+    }
     keepers[tid] = ids.map(nba => {
       const raw = nbaById.get(nba);
       const s = raw && basis ? nbaStats(raw, basis) : null;
@@ -3389,15 +3400,23 @@ function viewDraft() {
   const colOf = p => (forward[p.round] ? inRound(p) - 1 : T - inRound(p));
   const grid = {};
   for (const p of d.picks) grid[`${p.round}|${colOf(p)}`] = p;
+  // each column belongs to the team that picked there most often, so a traded first-rounder doesn't move it
+  const cols = order.map((first, c) => {
+    const n = {};
+    for (let r = 1; r <= rounds; r++) { const p = grid[`${r}|${c}`]; if (p) n[p.teamId] = (n[p.teamId] || 0) + 1; }
+    const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
+    return top ? top[0] : first;
+  });
   const nameBtn = (nbaId, name) => nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${nbaId}"><span class="n-full">${esc(name)}</span><span class="n-short">${esc(shortName(name))}</span></button>` : esc(name);
   const gainTag = (gain, gp) => !d.graded ? '' : `<span class="dr-gain ${gain > 0 ? 'pos-good' : gain < 0 ? 'pos-bad' : 'muted'}">${gp ? signed(gain, 0) : 'DNP'}</span>`;
-  const keeperRows = !Object.values(d.keepers).some(k => k.length) ? '' : [0, 1].map(i => `<tr class="dr-krow"><th scope="row">K${i + 1}</th>${order.map(t => {
+  const keeperRows = !Object.values(d.keepers).some(k => k.length) ? '' : [0, 1].map(i => `<tr class="dr-krow"><th scope="row">K${i + 1}</th>${cols.map(t => {
     const k = (d.keepers[t] || [])[i];
     if (!k) return '<td class="dr-cell dr-keeper"></td>';
+    if (k.past) return `<td class="dr-cell dr-keeper" title="${esc(k.name)} · keeper (not graded)"><span class="dr-pick">Keeper</span> ${nameBtn(k.nbaId, k.name)}</td>`;
     return `<td class="dr-cell dr-keeper" style="${k.gain != null ? shade(k.gain / 15) : ''}" title="${esc(k.name)} · keeper, graded as pick #${k.slot} · ${k.like ? `${seasonCtx ? 'finished as' : 'playing like'} #${k.like} (${signed(k.gain, 0)})` : "hasn't played"}">
       <span class="dr-pick">Keeper · as #${k.slot}</span> ${nameBtn(k.nbaId, k.name)} ${gainTag(k.gain, k.gp)}</td>`;
   }).join('')}</tr>`).join('');
-  const board = keeperRows + Array.from({ length: rounds }, (_, r) => `<tr><th scope="row" class="num">R${r + 1}</th>${order.map((t, c) => {
+  const board = keeperRows + Array.from({ length: rounds }, (_, r) => `<tr><th scope="row" class="num">R${r + 1}</th>${cols.map((t, c) => {
     const p = grid[`${r + 1}|${c}`];
     if (!p) return '<td class="dr-cell"><span class="dr-pick">No pick</span></td>';
     const via = p.teamId !== t ? `<span class="dr-via">by ${esc(p.team)}</span>` : '';
@@ -3426,7 +3445,7 @@ function viewDraft() {
   <div class="card" style="margin-top:16px">
     <div class="card-head"><h2>Draft board ${infoBtn('board')}</h2></div>
     <div class="table-wrap"><table class="dr-board">
-      <thead><tr><th></th>${order.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${esc(fxTeamName(t))}</th>`).join('')}</tr></thead>
+      <thead><tr><th></th>${cols.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${esc(fxTeamName(t))}</th>`).join('')}</tr></thead>
       <tbody>${board}</tbody>
     </table></div>
   </div>`;
