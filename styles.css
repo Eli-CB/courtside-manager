@@ -132,6 +132,8 @@ a { color: var(--accent); }
 }
 .page-head p { margin: 4px 0 0; color: var(--muted); }
 .page-sub { margin: 0 0 14px; color: var(--muted); font-size: .9rem; }
+.page-sub-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 14px; }
+.page-sub-row .page-sub { margin: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .card {

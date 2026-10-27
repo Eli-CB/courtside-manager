@@ -756,7 +756,8 @@ const INFO = {
     <li><b>Biggest punt</b> and <b>Even Steven:</b> each category of that typical week is compared with the league's other teams in team-to-team spreads. The punt is the lowest category; Even Steven has the smallest spread across its nine.</li>
     <li><b>Oldest / youngest:</b> average age of the final roster on the last day of the season, from ESPN birth dates.</li></ul>`],
   draft: ['How draft picks are graded', `
-    <p><b>Now.</b> Every drafted player is ranked by his value per game using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
+    <p><b>Now.</b> Every drafted player is ranked using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
+    <p><b>Per game or season totals.</b> The toggle at the top re-ranks the whole tab. <b>Per game</b> ranks by value per game, so a player who's missed time isn't held against his pick. <b>Season totals</b> also counts games played: in points leagues it's total fantasy points; in category leagues it's value above a replacement-level starter (the last player who'd start in your league) times games played, so playing more only helps players worth starting.</p>
     <p><b>+/−.</b> Draft slot minus current rank. A #40 pick who's playing like the #5 player is +35; a #3 pick playing like #50 is −47.</p>
     <p><b>Past seasons.</b> A past draft is graded the same way, but on that season's full per-game stats, so the rank is where each player finished.</p>
     <p><b>Team drafts.</b> The average +/− across all of a team's picks. Total value adds up the per-game value of every pick who has played.</p>
@@ -765,7 +766,8 @@ const INFO = {
     <p><b>Board.</b> One row per round, one column per draft slot. Traded picks stay in their original slot, marked with the team that made the pick. "No pick" means the slot went unused.</p>`],
   board: ['Reading the draft board', `
     <p><b>Each cell</b> is one pick: the pick number, the player, and his <b>+/−</b>.</p>
-    <p><b>How a pick is ranked.</b> Every drafted player is ranked against the others by his value per game (fantasy points per game in points leagues), using this season's stats so far, or that season's full stats for a past draft. #1 is the best player of the whole draft class. Players who haven't played rank below everyone who has.</p>
+    <p><b>How a pick is ranked.</b> Every drafted player is ranked against the others using this season's stats so far, or that season's full stats for a past draft. #1 is the best player of the whole draft class. Players who haven't played rank below everyone who has.</p>
+    <p><b>Per game or season totals</b> (the toggle at the top of the tab). Per game ranks by value per game (fantasy points per game in points leagues). Season totals also counts games played, so missed games pull a player down: total fantasy points in points leagues, or value above a replacement-level starter times games in category leagues.</p>
     <p><b>+/−</b> is the pick number minus that rank. A #40 pick playing like the #5 player is <b>+35</b>; a #3 pick playing like #50 is <b>−47</b>. "DNP" means he hasn't played.</p>
     <p><b>Colors.</b> Green is outplaying the slot, red is underplaying it, getting stronger the bigger the gap. Hover a cell for the player's rank.</p>
     <p><b>Layout.</b> One row per round, one column per draft slot. A traded pick stays in its original slot, marked "by" the team that made it. "No pick" means the slot went unused.</p>
@@ -1504,6 +1506,8 @@ function standingOf(teamId) {
 
 // ----- Dashboard: category strengths vs your league -----
 const STR_KEY = 'courtside-strengths';
+const DRAFT_MODE_KEY = 'courtside-draft-mode';
+ui.draftMode = (() => { try { return localStorage.getItem(DRAFT_MODE_KEY) || 'game'; } catch (e) { return 'game'; } })();
 ui.strBasis = (() => { try { return localStorage.getItem(STR_KEY) || 'starters'; } catch (e) { return 'starters'; } })();
 
 function teamCatAvg(players) {
@@ -2632,7 +2636,14 @@ function draftData() {
     if (s && gp) p.val = value({ ...s, pos: raw.pos });
     return p;
   });
-  const played = picks.filter(p => p.val != null).sort((a, b) => b.val - a.val);
+  // Totals: points leagues add up fantasy points; cats leagues add up value above a replacement-level starter
+  // (the per-game value of the last player who'd start in this league), so games only help players worth starting
+  const totals = ui.draftMode === 'total';
+  const perGame = picks.filter(p => p.val != null).map(p => p.val).sort((a, b) => b - a);
+  const repl = isPoints() || !perGame.length ? 0 : perGame[Math.min(perGame.length, Math.max(1, fxPickable().length * state.slots.length)) - 1];
+  const score = (val, gp) => (val == null ? null : totals ? (val - repl) * gp : val);
+  picks.forEach(p => { p.score = score(p.val, p.gp); });
+  const played = picks.filter(p => p.score != null).sort((a, b) => b.score - a.score);
   played.forEach((p, i) => { p.rank = i + 1; });
   // players who haven't played yet rank below everyone who has, in draft order
   picks.filter(p => p.val == null).sort((a, b) => a.pick - b.pick).forEach((p, i) => { p.rank = played.length + i + 1; });
@@ -2646,13 +2657,14 @@ function draftData() {
       const s = raw && basis ? nbaStats(raw, basis) : null;
       const gp = s ? Math.round(s.gp) : 0;
       const val = s && gp ? value({ ...s, pos: raw.pos }) : null;
-      const like = val == null ? null : played.filter(p => p.val > val).length + 1;
+      const sc = score(val, gp);
+      const like = sc == null ? null : played.filter(p => p.score > sc).length + 1;
       return { nbaId: nba, name: raw ? raw.name : '', gp, val, like, adp: (raw && raw.fx && raw.fx.adp) || 999 };
     }).sort((a, b) => a.adp - b.adp);
     // the better keeper (lower ADP) counts as the #5 pick, the other as #15
     keepers[tid].forEach((k, i) => { k.slot = KEEPER_SLOTS[i] || 25; k.gain = k.like == null ? null : k.slot - k.like; });
   }
-  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers };
+  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals };
 }
 
 function draftRow(p, mine) {
@@ -2664,15 +2676,17 @@ function draftRow(p, mine) {
     <td class="num">${p.gp ? `#${p.rank}` : '<span class="muted">—</span>'}</td>
     <td class="num"><b class="${gainCls}">${p.gp ? signed(p.gain, 0) : 'DNP'}</b></td>
     <td class="num hide-sm">${p.gp}</td>
-    <td class="num hide-sm">${p.val != null ? fmtValue(p.val) : '—'}</td>
+    <td class="num hide-sm">${p.score != null ? (ui.draftMode === 'total' ? fmt(p.score, isPoints() ? 0 : 1) : fmtValue(p.score)) : '—'}</td>
   </tr>`;
 }
+
+const draftValueLabel = () => (ui.draftMode === 'total' ? (isPoints() ? 'Total FP' : 'Total value') : valueLabel());
 
 function draftList(title, list, mine, info) {
   return `<div class="card">
     <div class="card-head"><h2>${title} ${info ? infoBtn('draft') : ''}</h2></div>
     <div class="table-wrap"><table class="dr-table">
-      <thead><tr><th>Player</th><th class="num">Drafted</th><th class="num">${seasonCtx ? 'Finished' : 'Now'}</th><th class="num">+/−</th><th class="num hide-sm">GP</th><th class="num hide-sm">${valueLabel()}</th></tr></thead>
+      <thead><tr><th>Player</th><th class="num">Drafted</th><th class="num">${seasonCtx ? 'Finished' : 'Now'}</th><th class="num">+/−</th><th class="num hide-sm">GP</th><th class="num hide-sm">${draftValueLabel()}</th></tr></thead>
       <tbody>${list.map(p => draftRow(p, mine)).join('')}</tbody>
     </table></div>
   </div>`;
@@ -2684,7 +2698,7 @@ function viewDraft() {
     return `<div class="card"><div class="empty"><strong>No draft results</strong>Fantrax didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
   }
   const mine = state.fxTeam;
-  const best = [...d.picks].filter(p => p.gp).sort((a, b) => (b.gain - a.gain) || (b.val - a.val)).slice(0, 10);
+  const best = [...d.picks].filter(p => p.gp).sort((a, b) => (b.gain - a.gain) || (b.score - a.score)).slice(0, 10);
   const worst = [...d.picks].sort((a, b) => (a.gain - b.gain) || (a.pick - b.pick)).slice(0, 10);
 
   // team rankings: average +/− of every pick, plus best and worst pick
@@ -2694,7 +2708,7 @@ function viewDraft() {
     const avg = sum(ps.map(p => p.gain)) / ps.length;
     const top = ps.reduce((a, b) => (b.gain > a.gain ? b : a));
     const low = ps.reduce((a, b) => (b.gain < a.gain ? b : a));
-    const total = sum(ps.filter(p => p.val != null).map(p => p.val));
+    const total = sum(ps.filter(p => p.score != null).map(p => p.score));
     return { id, name: fxTeamName(id), n: ps.length, avg, top, low, total };
   }).sort((a, b) => b.avg - a.avg);
 
@@ -2729,8 +2743,9 @@ function viewDraft() {
       <span class="dr-pick">#${p.pick}</span> ${nameBtn(p.nbaId, p.name)} ${gainTag(p.gain, p.gp)}${via}</td>`;
   }).join('')}</tr>`).join('');
 
+  const modeSeg = !d.graded ? '' : `<div class="seg seg-sm" role="group" aria-label="Rank picks by">${[['game', 'Per game'], ['total', 'Season totals']].map(([k, l]) => `<button type="button" class="${ui.draftMode === k ? 'on' : ''}" data-action="draft-mode" data-mode="${k}" aria-pressed="${ui.draftMode === k}">${l}</button>`).join('')}</div>`;
   return `
-  <p class="page-sub">${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? 'not graded: the site has no NBA stats for that season' : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`} ${infoBtn('draft')}</p>
+  <div class="page-sub-row">${modeSeg}<p class="page-sub">${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? 'not graded: the site has no NBA stats for that season' : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`} ${infoBtn('draft')}</p></div>
   ${!seasonCtx && d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
   ${d.graded ? `<div class="trade-grid">
     ${draftList(seasonCtx ? 'Best picks' : 'Best picks so far', best, mine, true)}
@@ -2739,7 +2754,7 @@ function viewDraft() {
   <div class="card" style="margin-top:16px">
     <div class="card-head"><h2>Team drafts</h2><span class="muted small">ranked by average +/− per pick</span></div>
     <div class="table-wrap"><table class="dr-teams">
-      <thead><tr><th class="num">#</th><th>Team</th><th class="num">Avg +/−</th><th class="num">Total ${valueLabel()}</th><th>Best pick</th><th>Worst pick</th></tr></thead>
+      <thead><tr><th class="num">#</th><th>Team</th><th class="num">Avg +/−</th><th class="num">${d.totals ? draftValueLabel() : `Total ${valueLabel()}`}</th><th>Best pick</th><th>Worst pick</th></tr></thead>
       <tbody>${teamRows.map((t, i) => `<tr class="${t.id === mine ? 'dr-mine' : ''}"><td class="num">${i + 1}</td><td><b>${esc(t.name)}</b>${t.id === mine ? ' <span class="badge accent">you</span>' : ''}</td>
         <td class="num"><b class="${t.avg > 0 ? 'pos-good' : t.avg < 0 ? 'pos-bad' : ''}">${signed(t.avg, 1)}</b></td><td class="num">${fmtValue(t.total)}</td>
         <td>${inlinePlayer(t.top, esc(lastName(t.top.name)))} <span class="muted small">#${t.top.pick}</span> <span class="pos-good small">${t.top.gp ? signed(t.top.gain, 0) : ''}</span></td>
@@ -2933,6 +2948,11 @@ const actions = {
     el.nextElementSibling.hidden = !open;
   },
   'close-info'() { $('#infoDialog').close(); },
+  'draft-mode'(el) {
+    ui.draftMode = el.dataset.mode;
+    try { localStorage.setItem(DRAFT_MODE_KEY, ui.draftMode); } catch (e) { /* ignore */ }
+    render();
+  },
   'str-basis'(el) {
     ui.strBasis = el.dataset.basis;
     try { localStorage.setItem(STR_KEY, ui.strBasis); } catch (e) { /* ignore */ }
