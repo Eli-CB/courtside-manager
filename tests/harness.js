@@ -29,6 +29,7 @@ function fakeFetch(url) {
   let body = null;
   if (u.pathname.endsWith('/data/players.json')) body = readFixture('players.json');
   else if (u.pathname.endsWith('/data/boxscores.json')) body = readFixture('boxscores.json');
+  else if (u.pathname.includes('/data/seasons/')) body = readFixture('seasons/' + u.pathname.split('/').pop());
   else if (u.hostname === 'www.fantrax.com') {
     const ep = u.pathname.split('/').pop();
     const id = u.searchParams.get('leagueId');

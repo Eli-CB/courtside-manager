@@ -89,6 +89,42 @@ def season_str(start_year):
     return f'{start_year}-{str(start_year + 1)[-2:]}'
 
 
+def name_key(name):
+    w = norm_name(name).split(' ')
+    return f'{w[0][:1]} {" ".join(w[1:])}' if len(w) > 1 else w[0]
+
+
+def match_nicknames(ids, fx_names, fx_to_nba, index):
+    """Second pass for names written differently ("Cameron Thomas" on Fantrax, "Cam Thomas" on NBA.com):
+    same last name, first initial and team, with Fantrax's team abbreviations learned from exact matches."""
+    from collections import Counter
+    team_of = {r['PERSON_ID']: r['TEAM_ABBREVIATION'] for r in index}
+    votes = {}
+    for fid, pid in fx_to_nba.items():
+        t, nt = ids[fid].get('team'), team_of.get(pid)
+        if t and nt:
+            votes.setdefault(t, Counter())[nt] += 1
+    team = {t: c.most_common(1)[0][0] for t, c in votes.items()}
+    taken = set(fx_to_nba.values())
+    open_ = {}
+    for r in index:
+        if r['PERSON_ID'] in taken:
+            continue
+        k = (name_key(f"{r['PLAYER_FIRST_NAME']} {r['PLAYER_LAST_NAME']}"), r['TEAM_ABBREVIATION'])
+        open_[k] = None if k in open_ else r['PERSON_ID']
+    found = {}
+    for fid, v in ids.items():
+        if fid in fx_to_nba or v.get('team') not in team:
+            continue
+        pid = open_.get((name_key(fx_names[fid]), team[v['team']]))
+        if pid:
+            found[fid] = pid
+    claims = Counter(found.values())
+    for fid, pid in found.items():
+        if claims[pid] == 1:
+            fx_to_nba[fid] = pid
+
+
 def norm_name(name):
     s = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode().lower()
     s = re.sub(r'[^a-z ]', '', s.replace('-', ' '))
@@ -143,6 +179,30 @@ def stat_sds(rows):
         mean = sum(vals) / len(vals)
         out.append(round((sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)) ** 0.5, 2))
     return out
+
+
+def sds_with(rows, mom):
+    """stat_sds over this season's game rows plus last season's archived totals ([games, sums, squares])."""
+    games = [g for g in rows if (g[3] or 0) >= 10]
+    n, k = mom[0] + len(games), len(SD_KEYS)
+    if n < 8:
+        return None
+    out = []
+    for j in range(k):
+        total = mom[1 + j] + sum(g[4 + j] for g in games)
+        squares = mom[1 + k + j] + sum(g[4 + j] ** 2 for g in games)
+        mean = total / n
+        out.append(round((max(squares - n * mean * mean, 0) / (n - 1)) ** 0.5, 2))
+    return out
+
+
+def read_archive(season):
+    """A finished season saved by scripts/archive_season.py, keyed by player id ({} if not saved)."""
+    path = os.path.join(ROOT, 'data', 'seasons', f'{season}.json')
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding='utf-8') as f:
+        return {int(pid): p for pid, p in json.load(f)['players'].items()}
 
 
 def injuries():
@@ -449,6 +509,7 @@ def fantrax(league_id, index, saved_league=None):
             hits = [h for h in hits if h['TEAM_ABBREVIATION'] == v.get('team')] or hits[:1]
         if hits:
             fx_to_nba[fid] = hits[0]['PERSON_ID']
+    match_nicknames(ids, fx_names, fx_to_nba, index)
 
     players = {}
     for fid, pi in info.get('playerInfo', {}).items():
@@ -572,12 +633,21 @@ def main():
             games = cached.get('games', {})
     cur, l10, logs = season_from_boxes(games) if games else ({}, {}, {})
     latest_team = {pid: rows[0][1].split(' ')[0] for pid, rows in logs.items()}
-    if stats_ok:
+    # last season comes from its saved archive (scripts/archive_season.py), which never changes
+    archived = read_archive(prev_season)
+    prev_mom = {}
+    if archived:
+        log(f'- {prev_season} stats: from data/seasons/{prev_season}.json')
+        prev = {pid: p['s'] for pid, p in archived.items()}
+        prev_mom = {pid: p['g'] for pid, p in archived.items() if 'g' in p}
+        prev_logs = {}
+        pre_logs = optional(f'{season} preseason game logs', lambda: game_logs(season, 'Pre Season', 'PRE'), {}) if stats_ok else {}
+    elif stats_ok:
         prev = optional(f'{prev_season} per-game stats', lambda: dash_stats(prev_season), {})
         pre_logs = optional(f'{season} preseason game logs', lambda: game_logs(season, 'Pre Season', 'PRE'), {})
         prev_logs = optional(f'{prev_season} game logs (for variability)', lambda: game_logs(prev_season, 'Regular Season', 'REG'), {})
     else:
-        log(f'- {prev_season} stats, preseason logs and spreads: keeping the saved copy')
+        log(f'- {prev_season} stats, preseason logs and spreads: keeping the saved copy (run scripts/archive_season.py {prev_season})')
         prev, pre_logs, prev_logs = {}, {}, {}
     inj = optional('Injury report (ESPN)', injuries, {})
     born = optional('Birth dates (ESPN rosters)', birthdates, {})
@@ -631,6 +701,8 @@ def main():
         elif 'log' in was: p['log'] = was['log']
         if prev_logs:
             sd = stat_sds(logs.get(pid, []) + prev_logs.get(pid, []))
+        elif pid in prev_mom:
+            sd = sds_with(logs.get(pid, []), prev_mom[pid])
         else:
             sd = was.get('sd') or stat_sds(logs.get(pid, []))
         if sd: p['sd'] = sd

@@ -230,3 +230,36 @@ test('a finished week projects exactly what happened', async () => {
     assert.equal(won > lost ? 'win' : won < lost ? 'loss' : 'tie', ra.w ? 'win' : ra.l ? 'loss' : 'tie', `${app.fxTeamName(a)} ${won}-${lost}`);
   }
 });
+
+test('a past season is graded from its archived stats, inactive players included', async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  assert.equal(P.basis, 'arch:2025-26');
+  const picks = P.league.draft.picks;
+  const matched = picks.filter(p => p[3]).length;
+  const inactive = picks.filter(p => p[3] && app.nbaById.get(p[3]).inactive).length;
+  assert.equal(matched, picks.length, 'every pick matched, nicknames and players since out of the NBA included');
+  // grade it the way the past-season Draft tab does
+  app.set('seasonCtx', { basis: P.basis, label: P.label });
+  const savedLeague = app.get('NBA').league;
+  app.get('NBA').league = P.league;
+  try {
+    const d = app.draftData();
+    assert.ok(d.graded);
+    const played = d.picks.filter(p => p.gp);
+    assert.ok(played.length >= picks.length - 10, `${played.length} picks have 2025-26 stats`);
+    assert.ok(played.every(p => Number.isFinite(p.val)));
+    if (inactive) assert.ok(played.some(p => p.raw && p.raw.inactive), 'a player no longer in the NBA is graded too');
+  } finally {
+    app.get('NBA').league = savedLeague;
+    app.set('seasonCtx', null);
+  }
+});
+
+test('Fantrax names written differently still match (Nicolas / Nic Claxton)', async () => {
+  const { fxPlayers } = await app.fetchFantraxLeague(CATS9);
+  const nic = app.get('NBA').players.find(p => p.name === 'Nic Claxton');
+  assert.ok(nic, 'fixture has Nic Claxton');
+  const ids = JSON.parse(readFixture('fantrax/getPlayerIds.json'));
+  const fid = Object.keys(ids).find(k => ids[k].name === 'Claxton, Nicolas');
+  assert.equal(fxPlayers[nic.id] && fxPlayers[nic.id].id, fid);
+});

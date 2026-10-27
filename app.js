@@ -346,6 +346,7 @@ function statObj(arr) {
 // Per-game stats for a player under the chosen basis. "Smart blend" shrinks a small
 // current-season sample toward last season (10 games of weight), then trusts this season.
 function nbaStats(raw, basis = state.basis) {
+  if (String(basis).startsWith('arch:')) return archivedStats(raw, basis.slice(5));
   const cur = statObj(raw.cur), prev = statObj(raw.prev), l10 = statObj(raw.l10);
   let s;
   if (basis === 'cur') s = cur;
@@ -847,6 +848,29 @@ async function fxGet(path) {
   return JSON.parse(await r.text()); // served as text/plain
 }
 
+// Second pass for names written differently ("Cameron Thomas" on Fantrax, "Cam Thomas" on NBA.com):
+// same last name, first initial and team. How Fantrax abbreviates teams (GS for GSW, say) is learned
+// from the players that matched exactly. A player two Fantrax entries point to is left unmatched.
+const nameKey = n => { const w = normName(n).split(' '); return w.length > 1 ? `${w[0][0]} ${w.slice(1).join(' ')}` : w[0]; };
+function matchNicknames(ids, names, toNba) {
+  const votes = {};
+  for (const [fid, id] of Object.entries(toNba)) {
+    const t = ids[fid].team, nt = (nbaById.get(id) || {}).team;
+    if (t && nt) (votes[t] = votes[t] || {})[nt] = (votes[t][nt] || 0) + 1;
+  }
+  const team = Object.fromEntries(Object.entries(votes).map(([t, v]) => [t, Object.entries(v).sort((a, b) => b[1] - a[1])[0][0]]));
+  const taken = new Set(Object.values(toNba));
+  const open = new Map();
+  for (const raw of NBA.players) if (!taken.has(raw.id)) { const k = `${nameKey(raw.name)}|${raw.team}`; open.set(k, open.has(k) ? null : raw.id); }
+  const found = {}, claims = {};
+  for (const [fid, v] of Object.entries(ids)) {
+    if (toNba[fid] || !team[v.team]) continue;
+    const id = open.get(`${nameKey(names[fid])}|${team[v.team]}`);
+    if (id) { found[fid] = id; claims[id] = (claims[id] || 0) + 1; }
+  }
+  for (const [fid, id] of Object.entries(found)) if (claims[id] === 1) toNba[fid] = id;
+}
+
 // "Last, First" -> "First Last"
 const fxName = n => { const [last, first] = String(n).split(', '); return first ? `${first} ${last}` : String(n); };
 
@@ -953,6 +977,7 @@ async function fetchFantraxLeague(id) {
     const hit = hits.length > 1 ? (hits.find(h => h.team === v.team) || hits[0]) : hits[0];
     if (hit) toNba[fid] = hit.id;
   }
+  matchNicknames(ids, names, toNba);
   const adp = Object.fromEntries((Array.isArray(adpList) ? adpList : []).filter(a => a.id).map(a => [a.id, a.ADP]));
   const fxPlayers = {};
   for (const [fid, pi] of Object.entries(info.playerInfo || {})) {
@@ -1308,9 +1333,51 @@ async function loadSeason(id) {
   const { league } = await fetchFantraxLeague(id);
   // end-of-season rosters can't tell keepers from waiver pickups, so past drafts show picks only
   if (league.draft) league.draft.keepers = {};
-  // NBA stats go back one season, so only last season's draft can be graded
+  // that season's NBA stats, if saved, grade its draft, awards and rosters
+  const season = league.year ? seasonOf(league.year) : null;
+  const A = season ? await loadArchive(season) : null;
+  if (A) matchInactive(league, A);
   const prevStart = NBA && NBA.prevSeason ? +String(NBA.prevSeason).slice(0, 4) : null;
-  return (pastCache[id] = { league, basis: league.year && league.year === prevStart ? 'prev' : null, label: league.year ? seasonLabel(league.year) : 'Past season' });
+  const basis = A ? 'arch:' + season : league.year && league.year === prevStart ? 'prev' : null;
+  return (pastCache[id] = { league, basis, label: league.year ? seasonLabel(league.year) : 'Past season' });
+}
+
+// ----- Archived seasons: data/seasons/<season>.json, saved once by scripts/archive_season.py -----
+const archives = {}; // season -> { keys, players: Map(id -> { n, s }) }, or null when not saved
+const seasonOf = year => `${year}-${String(year + 1).slice(2)}`;
+async function loadArchive(season) {
+  if (season in archives) return archives[season];
+  try {
+    const r = await fetch(`data/seasons/${season}.json`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    archives[season] = { keys: d.statKeys, players: new Map(Object.entries(d.players).map(([pid, p]) => [+pid, p])) };
+  } catch (e) { archives[season] = null; }
+  return archives[season];
+}
+function archivedStats(raw, season) {
+  const A = archives[season], p = A && A.players.get(raw.id);
+  if (!p) return null;
+  const s = Object.fromEntries(A.keys.map((k, i) => [k, +p.s[i] || 0]));
+  return { ...s, fgPct: s.fga ? s.fgm / s.fga : 0, ftPct: s.fta ? s.ftm / s.fta : 0 };
+}
+// Players no longer on an NBA roster aren't in today's data, so a past league's picks and rosters
+// left unmatched are matched by name against that season's archive (positions unknown: any slot)
+function matchInactive(league, A) {
+  const byName = new Map(), byKey = new Map();
+  for (const [pid, p] of A.players) {
+    if (nbaById.has(pid) || !p.n) continue;
+    byName.set(normName(p.n), pid);
+    const k = nameKey(p.n);
+    byKey.set(k, byKey.has(k) ? null : pid); // "Cameron" vs "Cam": initial and last name, if only one fits
+  }
+  const find = name => {
+    const pid = byName.get(normName(name)) || byKey.get(nameKey(name));
+    if (pid && !nbaById.has(pid)) nbaById.set(pid, { id: pid, name: A.players.get(pid).n, team: '', pos: [...POSITIONS], inactive: true });
+    return pid || null;
+  };
+  for (const pick of (league.draft && league.draft.picks) || []) if (!pick[3] && pick[4]) pick[3] = find(pick[4]);
+  for (const r of Object.values(league.rosters || {})) for (const x of r) if (!x.nba && x.name) x.nba = find(x.name);
 }
 
 async function switchSeason(id) {
@@ -1368,7 +1435,7 @@ function viewPastRosters() {
       </tr>`).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No roster</strong>Fantrax didn't return a roster for this team.</div>`}
   </div>
-  ${graded ? '' : `<p class="small muted">The site only keeps NBA stats back to ${esc(NBA.prevSeason)}, so this season's players show without stats.</p>`}`;
+  ${graded ? '' : `<p class="small muted">No NBA stats are saved for this season (the site has 2016-17 on), so players show without stats.</p>`}`;
 }
 
 // ----- Season awards (past seasons) -----
@@ -1456,7 +1523,7 @@ function seasonAwards() {
 
 function viewAwards() {
   if (!seasonCtx.basis) {
-    return `<div class="card"><div class="empty"><strong>No awards for this season</strong>The site only keeps NBA stats back to ${esc(NBA.prevSeason)}, and every award needs that season's numbers.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>No awards for this season</strong>No NBA stats are saved for this season (the site has 2016-17 on), and every award needs that season's numbers.</div></div>`;
   }
   const me = state.fxTeam;
   return `

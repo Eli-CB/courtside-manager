@@ -18,6 +18,7 @@ LEAGUES = {
     'my19c8mwmoipvhon': '9-cat H2H, most categories, weekly lineups',
     'la2a76bkmt6aqekb': 'H2H points, weekly lineups',
     'frapfs43mutrff0g': 'H2H points with double/triple-doubles, daily lineups',
+    'czqgnyozmf2tbr93': 'last season of the 9-cat league (graded from its archive)',
 }
 PAST_PERIODS = {'my19c8mwmoipvhon': [1]}  # finished lineup periods, for season totals
 
@@ -44,7 +45,8 @@ def main():
             save(f'fantrax/{lid}/{ep}.json', get(f'{ep}?leagueId={lid}'))
         for n in PAST_PERIODS.get(lid, []):
             save(f'fantrax/{lid}/getTeamRosters-{n}.json', get(f'getTeamRosters?leagueId={lid}&period={n}'))
-    for name in ('players.json', 'boxscores.json'):
+    for name in ('players.json', 'boxscores.json', 'seasons/2025-26.json'):
+        os.makedirs(os.path.dirname(os.path.join(OUT, name)), exist_ok=True)
         shutil.copy(os.path.join(ROOT, 'data', name), os.path.join(OUT, name))
         print(f'{name}: copied from data/')
 
