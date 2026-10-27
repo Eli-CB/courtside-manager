@@ -806,9 +806,10 @@ const INFO = {
     <p>Fantrax's public data has final standings, end-of-season rosters and the draft, but not weekly scores, so awards are built from each team's <b>final roster</b> and that season's <b>full per-game stats</b>.</p>
     <ul><li><b>Best draft:</b> average +/− per pick (draft slot minus where the player finished; see the Draft tab).</li>
     <li><b>Best manager:</b> actual wins (ties count half) minus expected wins. Expected wins: each team's typical week (its best 8 starters, each counted for the share of games he played) is matched against every other team with the same win-chance math as Matchups, and the average win chance × games played gives the expected record.</li>
-    <li><b>Most games lost to injury:</b> 82 minus games played, summed over the final roster.</li>
+    <li><b>Waiver Wire Wizard:</b> players on the final roster who weren't on the team's opening-week roster, so they were picked up (or traded for) during the season; drafted players and keepers don't count. Their per-game values added up, or fantasy points per game in points leagues.</li>
+    <li><b>Street Clothes:</b> 82 minus games played, summed over the final roster.</li>
     <li><b>Biggest punt</b> and <b>Even Steven:</b> each category of that typical week is compared with the league's other teams in team-to-team spreads. The punt is the lowest category; Even Steven has the smallest spread across its categories.</li>
-    <li><b>Oldest / youngest:</b> average age of the final roster on the last day of the season, from ESPN birth dates.</li></ul>`],
+    <li><b>Unc Status:</b> the oldest final roster, by average age on the last day of the season, from ESPN birth dates.</li></ul>`],
   draft: ['How draft picks are graded', `
     <p><b>Now.</b> Every drafted player is ranked using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
     <p><b>Per game or season totals.</b> The toggle at the top re-ranks the whole tab. <b>Per game</b> ranks by value per game, so a player who's missed time isn't held against his pick. <b>Season totals</b> also counts games played: in points leagues it's total fantasy points; in category leagues it's value above a replacement-level starter (the last player who'd start in your league) times games played, so playing more only helps players worth starting.</p>
@@ -954,7 +955,7 @@ function rosterPeriodDays(periods) {
   return lens.length ? Math.round(lens[Math.floor(lens.length / 2)] * 100) / 100 : null;
 }
 
-async function fetchFantraxLeague(id) {
+async function fetchFantraxLeague(id, opts = {}) {
   const q = encodeURIComponent(id);
   const [ids, info, rosters, draft, adpList, standings] = await Promise.all([
     fxGet('getPlayerIds?sport=NBA'), fxGet(`getLeagueInfo?leagueId=${q}`), fxGet(`getTeamRosters?leagueId=${q}`),
@@ -962,6 +963,7 @@ async function fetchFantraxLeague(id) {
     fxGet(`getStandings?leagueId=${q}`).catch(() => []),
   ]);
   if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
+  const opening = opts.opening ? await fxGet(`getTeamRosters?leagueId=${q}&period=1`).catch(() => null) : null;
 
   // match Fantrax players to NBA.com players by name (team breaks ties)
   const byName = new Map();
@@ -1003,6 +1005,8 @@ async function fetchFantraxLeague(id) {
     rosterPeriods: (info.rosterPeriods || []).map(p => [p.number, String(p.startDate), String(p.endDate)]),
     rosters: Object.fromEntries(Object.entries(rosters.rosters || {}).map(([tid, r]) => [tid,
       (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
+    openingRosters: opening ? Object.fromEntries(Object.entries(opening.rosters || {}).map(([tid, r]) => [tid,
+      (r.rosterItems || []).map(it => ({ nba: toNba[it.id] || null, name: names[it.id] || '' }))])) : null,
     rosterInfo: info.rosterInfo || null,
     draft: null,
     draftAt: draft.draftDate || null,
@@ -1330,7 +1334,7 @@ function seasonsFor(L) {
 
 async function loadSeason(id) {
   if (pastCache[id]) return pastCache[id];
-  const { league } = await fetchFantraxLeague(id);
+  const { league } = await fetchFantraxLeague(id, { opening: true });
   // end-of-season rosters can't tell keepers from waiver pickups, so past drafts show picks only
   if (league.draft) league.draft.keepers = {};
   // that season's NBA stats, if saved, grade its draft, awards and rosters
@@ -1377,7 +1381,7 @@ function matchInactive(league, A) {
     return pid || null;
   };
   for (const pick of (league.draft && league.draft.picks) || []) if (!pick[3] && pick[4]) pick[3] = find(pick[4]);
-  for (const r of Object.values(league.rosters || {})) for (const x of r) if (!x.nba && x.name) x.nba = find(x.name);
+  for (const r of [...Object.values(league.rosters || {}), ...Object.values(league.openingRosters || {})]) for (const x of r) if (!x.nba && x.name) x.nba = find(x.name);
 }
 
 async function switchSeason(id) {
@@ -1464,7 +1468,15 @@ function seasonTeam(t, L, basis, endDate) {
   const ages = players.map(x => x.age).filter(a => a != null);
   // players on the books who played little or not at all that season
   const missed = sum(players.filter(x => x.raw).map(x => Math.max(0, SEASON_GAMES - x.gp)));
-  return { id: t.id, name: t.name, week: { tot, vr }, age: ages.length ? sum(ages) / ages.length : null, ages: ages.length, missed };
+  // pickups: on the final roster but not the opening week's (so drafted players and keepers don't count)
+  let pickups = null;
+  if (L.openingRosters) {
+    const start = new Set((L.openingRosters[t.id] || []).map(x => x.nba || x.name));
+    pickups = players.filter((x, i) => x.p && !start.has(L.rosters[t.id][i].nba || L.rosters[t.id][i].name)).map(x => ({ name: x.raw.name, v: value(x.p) }));
+  }
+  return { id: t.id, name: t.name, week: { tot, vr }, age: ages.length ? sum(ages) / ages.length : null, ages: ages.length, missed,
+    waiver: pickups && pickups.length ? sum(pickups.map(x => x.v)) : pickups ? 0 : null,
+    waiverN: pickups ? pickups.length : 0, waiverBest: pickups && pickups.length ? pickups.reduce((a, b) => (b.v > a.v ? b : a)) : null };
 }
 
 function seasonAwards() {
@@ -1513,11 +1525,11 @@ function seasonAwards() {
   return [
     { title: 'Best draft', blurb: 'Average +/− per pick: draft slot vs where each player finished.', list: ranked('draft', 1, T => `${signed(T.draft, 1)} per pick`, T => T.draftBest ? `best: ${T.draftBest.name} (${signed(T.draftBest.gain, 0)})` : '') },
     { title: 'Best manager', blurb: 'Most wins above what the roster projected against the league.', list: ranked('luck', 1, T => `${signed(T.luck, 1)} wins`, T => `${T.record} vs ${fmt(T.expW, 1)} expected`) },
-    { title: 'Most games lost to injury', blurb: 'Games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
+    { title: 'Waiver Wire Wizard', blurb: 'The most production from players picked up during the season (on the final roster, but not on opening night’s).', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 1)} FP/G` : `${signed(T.waiver, 1)} value`), T => (T.waiverBest ? `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${T.waiverBest.name} (${fmtValue(T.waiverBest.v)})` : 'no pickups on the final roster')) },
+    { title: 'Street Clothes', blurb: 'Most games missed by players on the final roster.', list: ranked('missed', 1, T => `${T.missed} games`) },
     ...(isPoints() ? [] : [{ title: 'Biggest punt', blurb: 'The weakest single category relative to the league.', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
     { title: 'Even Steven', blurb: 'The most balanced team: smallest gap between its best and worst categories.', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`) }]),
-    { title: 'Oldest team', blurb: 'Average age of the final roster at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
-    { title: 'Youngest team', blurb: 'Average age of the final roster at season’s end.', list: ranked('age', -1, T => `${fmt(T.age, 1)} yrs`) },
+    { title: 'Unc Status', blurb: 'The oldest roster: average age at season’s end.', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`) },
   ].filter(a => a.list.length);
 }
 
