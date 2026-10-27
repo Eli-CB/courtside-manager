@@ -26,7 +26,7 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
     'Referer': 'https://www.nba.com/',
 }
-SIZE = 56   # px per headshot in the sprite (shown at 28px, so sharp on high-DPI screens)
+SIZE = 80   # px per headshot in the sprite (shown at up to 40px, so sharp on high-DPI screens)
 COLS = 24
 
 
