@@ -1,7 +1,7 @@
 """Build player headshots and team logos for Courtside Manager.
 
-The hosted page can't load images from other sites, so this packs them into
-files that ship with it:
+Packs them into files that ship with the site, so a visit downloads one cached
+sprite instead of hundreds of separate images:
   data/headshots.webp  one sprite sheet with every active player's headshot
   data/images.json     where each player sits in the sprite, plus team logos
 

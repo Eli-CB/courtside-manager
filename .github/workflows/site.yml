@@ -36,9 +36,12 @@ jobs:
       - name: Pull NBA, ESPN and Fantrax data
         run: python scripts/update_data.py
 
-      - name: Rebuild headshots and logos (Mondays, or when asked)
+      - name: Rebuild headshots and logos (1st of the month, new players, or when asked)
         run: |
-          if [ "${{ inputs.images }}" = "true" ] || [ "$(date -u +%u)" = "1" ]; then
+          # active players with no headshot yet (new signings, call-ups) trigger a rebuild between monthly ones
+          missing=$(python -c "import json; p={x['id'] for x in json.load(open('data/players.json', encoding='utf-8'))['players']}; i=set(json.load(open('data/images.json', encoding='utf-8'))['ids']); print(len(p - i))")
+          echo "Players without a headshot: $missing"
+          if [ "${{ inputs.images }}" = "true" ] || [ "$(date -u +%d)" = "01" ] || [ "$missing" -gt 5 ]; then
             python -m pip install --quiet pillow
             python scripts/build_images.py
           else
