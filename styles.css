@@ -139,6 +139,8 @@ a { color: var(--accent); }
   padding: 16px; min-width: 0;
 }
 .card + .card { margin-top: 16px; }
+/* side-by-side cards line up: grids space them with gap instead */
+.kpis > .card + .card, .grid-2 > .card + .card, .trade-grid > .card + .card, .awards > .card + .card { margin-top: 0; }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 
 .grid { display: grid; gap: 16px; }
