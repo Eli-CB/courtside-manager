@@ -9,7 +9,7 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
   scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, render, history, views,
   matchups, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
-  - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots (ringed in team colors,
+  - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo)
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
     model (`scoreCats`, `catZ`, `BASE`, `fillBase`), lineup optimizer

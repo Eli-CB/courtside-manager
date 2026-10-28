@@ -314,7 +314,7 @@ function cropLogos(logos) {
 
 const initials = name => String(name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-// Each team's primary and secondary colors, for the ring around a player's photo
+// Each team's primary and secondary colors, for the ring and background of a player's photo
 const TEAM_COLORS = {
   ATL: ['#E03A3E', '#C1D32F'], BOS: ['#007A33', '#BA9653'], BKN: ['#000000', '#FFFFFF'], CHA: ['#1D1160', '#00788C'],
   CHI: ['#CE1141', '#000000'], CLE: ['#860038', '#FDBB30'], DAL: ['#00538C', '#B8C4CA'], DEN: ['#0E2240', '#FEC524'],
@@ -331,7 +331,7 @@ function headshot(p, px = 28) {
   // the ring shows the player's current team, like the jersey in the photo
   const raw = p && p.nbaId != null ? nbaById.get(p.nbaId) : null;
   const tc = TEAM_COLORS[(raw && raw.team) || (p && p.team)];
-  const box = `width:${px}px;height:${px}px${tc ? `;--t1:${tc[0]};--t2:${tc[1]};--rw:${Math.max(2, Math.round(px / 14))}px` : ''}`;
+  const box = `width:${px}px;height:${px}px${tc ? `;--t1:${tc[0]};--t2:${tc[1]};--rw:${Math.max(1.25, +(px / 24).toFixed(2))}px` : ''}`;
   const tm = tc ? ' tm' : '';
   if (i === undefined) return `<span class="hs hs-none${tm}" style="${box}" aria-hidden="true">${esc(initials(p && p.name))}</span>`;
   const col = i % IMG.cols, row = Math.floor(i / IMG.cols);

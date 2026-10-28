@@ -607,12 +607,12 @@ test('performances: best games helped, worst games hurt, and no one is on both l
   }
 });
 
-test("player photos get a ring in their NBA team's colors", async () => {
+test("player photos get a ring and background in their NBA team's colors", async () => {
   await app.ready();
   const raw = app.NBA.players.find(r => r.team === 'BOS');
   const html = app.headshot({ nbaId: raw.id, name: raw.name }, 40);
   assert.match(html, /class="hs[^"]* tm"/);
-  assert.ok(html.includes('--t1:#007A33;--t2:#BA9653;--rw:3px'), html);
+  assert.ok(html.includes('--t1:#007A33;--t2:#BA9653;--rw:1.67px'), html);
   assert.ok(!app.headshot({ name: 'Nobody' }, 28).includes(' tm'), 'no team, no ring');
   assert.equal(Object.keys(app.TEAM_COLORS).length, 30);
 });

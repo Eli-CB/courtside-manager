@@ -529,10 +529,12 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 
 /* ---------- Headshots, logos, board stats ---------- */
 .hs { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background-color: var(--surface-2); background-image: url(data/headshots.webp); background-repeat: no-repeat; box-shadow: inset 0 0 0 1px var(--border); }
-/* team-color ring over the photo's edge: two thirds the team's primary color, the bottom third its secondary */
-.hs.tm { position: relative; }
+/* team colors: a light tint of the secondary color behind the photo, and a thin, soft ring over its edge
+   (two thirds primary, the bottom third secondary). Browsers without color-mix get the full colors. */
+.hs.tm { position: relative; background-color: color-mix(in srgb, var(--t2) 30%, var(--surface-2)); }
 .hs.tm::after { content: ''; position: absolute; inset: 0; border-radius: 50%;
   background: conic-gradient(from 240deg, var(--t1) 0 66.67%, var(--t2) 0);
+  background: conic-gradient(from 240deg, color-mix(in srgb, var(--t1) 60%, var(--surface)) 0 66.67%, color-mix(in srgb, var(--t2) 60%, var(--surface)) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--rw)), #000 calc(100% - var(--rw) + .5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--rw)), #000 calc(100% - var(--rw) + .5px)); }
 .hs-none { background-image: none; font-size: .62rem; font-weight: 800; color: var(--muted); }
