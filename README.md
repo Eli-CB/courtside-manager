@@ -23,7 +23,7 @@ It's a plain static site reading data files in `data/`: `index.html`, `styles.cs
 
 `scripts/build_images.py` builds the headshot sprite and team logos (`data/headshots.webp`, `data/images.json`). It needs Pillow.
 
-A GitHub Actions workflow (`.github/workflows/site.yml`) refreshes the data every morning, rebuilds images on the 1st of each month (or sooner when more than 5 active players have no headshot), and publishes the site to GitHub Pages. Run it by hand from the Actions tab at any time.
+A GitHub Actions workflow (`.github/workflows/site.yml`) refreshes the data every night at 08:00 UTC (4 a.m. Eastern, 3 a.m. in winter), rebuilds images on the 1st of each month (or sooner when more than 5 active players have no headshot), and publishes the site to GitHub Pages. Run it by hand from the Actions tab at any time.
 
 ## Running locally
 

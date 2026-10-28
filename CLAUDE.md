@@ -24,7 +24,7 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   - matchups: Matchups tab, schedule dots, stat tables, tooltips
   - draft: Draft tab/board, saved leagues, landing page
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
-- `scripts/update_data.py`: daily data job (GitHub Actions 11:00 UTC) builds `data/players.json` and
+- `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax. `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 - `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
