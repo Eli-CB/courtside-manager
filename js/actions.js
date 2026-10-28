@@ -188,10 +188,8 @@ const actions = {
     ui.perfRange = el.dataset.range;
     render();
   },
-  // Best lists start best first, Worst lists worst first
   'perf-sort'(el) {
-    const list = el.dataset.list;
-    nextSort(ui.perfSort[list], el.dataset.key, el.dataset.key === 'name' || list === 'worst' ? 1 : -1);
+    nextSort(ui.perfSort, el.dataset.key, el.dataset.key === 'name' ? 1 : -1);
     render();
   },
   'tot-sort'(el) {

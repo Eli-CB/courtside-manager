@@ -613,7 +613,13 @@ test("performances: this week adds up each player's games", async () => {
   const lines = dates.map(d => app.BOX.day.get(r.raw.id).get(d)).filter(Boolean);
   assert.equal(r.g, lines.length);
   assert.equal(r.tot.pts, lines.reduce((t, l) => t + l.pts, 0));
-  assert.ok(Math.abs(r.v - lines.reduce((t, l) => t + app.lineValue(l), 0)) < 1e-9, 'value is the sum of his games');
+  // against an average starter's 1.5 games over three days: the games' values, plus an average game's worth
+  // (against not playing) for each game beyond 1.5, so every game counts
+  const expected = 3.5 * 3 / 7, perGame = -app.lineValue({});
+  assert.ok(perGame > 5, `an average game is worth ${perGame} against not playing`);
+  const week = app.perfRows(dates, expected).find(x => x.raw.id === r.raw.id);
+  const games = lines.reduce((t, l) => t + app.lineValue(l), 0);
+  assert.ok(Math.abs(week.v - (games + (r.g - expected) * perGame)) < 1e-9);
   app.ui.perfRange = 'week';
   try {
     const html = await onDay('2026-10-25', () => app.topPerformancesCard());
@@ -621,36 +627,37 @@ test("performances: this week adds up each player's games", async () => {
   } finally { app.ui.perfRange = 'day'; }
 });
 
-test('performances: best lines helped, worst lines hurt, and no one is on both lists', async () => {
+test('performances: everyone who played in one table, top 50 by the sorted column, ranked by value', async () => {
   await app.loadBoxes();
+  const cell = (tr, i) => [...tr.matchAll(/<td class="sc"[^>]*>([^<]*)</g)][i][1];
+  const bodyRows = html => html.split('<tbody>')[1].split('</tr>').slice(0, -1);
+  const val = tr => parseFloat(tr.match(/class="num pf-v[^"]*"[^>]*>([^<]+)</)[1].replace('\u2212', '-'));
   for (const id of [CATS9, ESPN]) {
     await app.useLeague(id);
-    const par = app.isPoints() ? app.fpBase()[0] : 0;
-    const html = app.topPerformancesCard();
-    const [best, worst = ''] = html.split('<h3 class="sub">Worst');
-    const ids = part => [...part.matchAll(/data-nba="(\d+)"/g)].map(m => m[1]);
-    const vals = part => [...part.matchAll(/class="num pf-v[^"]*"[^>]*>([^<]+)</g)].map(m => parseFloat(m[1].replace('−', '-')));
-    assert.ok(ids(best).length && ids(worst).length, `${id}: both lists have games`);
-    assert.ok(vals(best).every(v => v > par) && vals(worst).every(v => v < par), `${id}: split at ${par}`);
-    assert.ok(!ids(best).some(x => ids(worst).includes(x)), `${id}: no one on both lists`);
+    const all = app.perfRows([app.perfDays().day]);
+    let rows = bodyRows(app.topPerformancesCard());
+    assert.equal(rows.length, Math.min(50, all.length), `${id}: up to 50 rows`);
+    assert.ok(!app.topPerformancesCard().includes('<h3 class="sub">'), 'no separate Best and Worst lists');
+    const vals = rows.map(val);
+    assert.ok(vals.every((v, i) => !i || v <= vals[i - 1]), `${id}: best first`);
+    assert.deepEqual(rows.slice(0, 5).map(tr => +tr.match(/perf-rank">(\d+)/)[1]), [1, 2, 3, 4, 5]);
+    app.ui.perfSort = { key: 'v', dir: 1 };
+    try {
+      rows = bodyRows(app.topPerformancesCard());
+      assert.equal(+rows[0].match(/perf-rank">(\d+)/)[1], all.length, `${id}: sorted the other way, the worst line of all ${all.length} comes first`);
+    } finally { app.ui.perfSort = { key: 'v', dir: -1 }; }
   }
-});
-
-test('performances: columns sort, the rank stays by value', async () => {
-  await app.loadBoxes();
   await app.useLeague(CATS9);
   const cats = app.scoreCats().map(c => c.key);
-  app.ui.perfSort.best = { key: 'pts', dir: -1 };
+  app.ui.perfSort = { key: 'pts', dir: -1 };
   try {
-    const best = app.topPerformancesCard().split('<h3 class="sub">Worst')[0];
-    const rows = best.split('<tbody>')[1].split('</tr>').slice(0, -1);
-    const pts = rows.map(tr => +[...tr.matchAll(/<td class="sc"[^>]*>([^<]*)</g)][cats.indexOf('pts')][1]);
-    assert.ok(pts.length > 5 && pts.every((v, i) => !i || v <= pts[i - 1]), `points, most first: ${pts.slice(0, 8)}`);
+    const rows = bodyRows(app.topPerformancesCard());
+    const pts = rows.map(tr => +cell(tr, cats.indexOf('pts')));
+    assert.ok(pts.every((v, i) => !i || v <= pts[i - 1]), `points, most first: ${pts.slice(0, 8)}`);
     const fg = rows.map(tr => tr.match(/<td class="sc"[^>]*title="FG%: ([^"]+)">([^<]*)</));
     assert.ok(fg.every(m => m && /^\d+-\d+$/.test(m[2]) && /%$|no attempts/.test(m[1])), 'shooting shows makes-attempts, the percentage on hover');
-    const ranks = rows.map(tr => +tr.match(/perf-rank">(\d+)/)[1]);
-    assert.ok(ranks.some((v, i) => v !== i + 1), 'ranks still by value');
-  } finally { app.ui.perfSort.best = { key: 'v', dir: -1 }; }
+    assert.ok(rows.map(tr => +tr.match(/perf-rank">(\d+)/)[1]).some((v, i) => v !== i + 1), 'ranks still by value');
+  } finally { app.ui.perfSort = { key: 'v', dir: -1 }; }
 });
 
 test("player photos get a ring and background in their NBA team's colors", async () => {

@@ -128,10 +128,10 @@ function viewDashboard() {
   </div>`;
 }
 
-// ----- Performances: the best and worst stat lines across the NBA, last game day or this week so far -----
-// Ranked like player value (each category against an average rostered player's game, added up over his games),
-// or by fantasy points in points leagues. Each shows who has him in your league. A line helped if it beat
-// average rostered players' games (value above 0, or more fantasy points than one scores in that many games).
+// ----- Performances: every NBA stat line from the last game day or this week so far, in one sortable table -----
+// The last game day ranks each game like player value (each category against an average rostered player's game).
+// This week ranks what a player's games added to each category against an average starter's output over the same
+// days (3.5 games a week), so every game counts, like the Matchups week totals. Points leagues use fantasy points.
 const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
 const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
 const lineZ = line => catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 });
@@ -147,8 +147,11 @@ function perfDays() {
   return { day, week: week.length > 1 ? week : null };
 }
 
-// Each player's lines over those days, added up, with his value and each category's contribution
-function perfRows(dates) {
+// Each player's lines over those days, added up, with each category's contribution and his value against
+// expected games (an average starter's games over those days; 1 for a single game). In category leagues a game
+// beyond those adds what an average game is worth, everything else as player value.
+function perfRows(dates, expected = 1) {
+  const perGame = isPoints() ? 0 : -lineValue({}); // an average game against not playing
   const rows = [];
   for (const [id, byDay] of BOX.day) {
     const raw = nbaById.get(id);
@@ -159,7 +162,7 @@ function perfRows(dates) {
       for (const [k, v] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + v;
       if (!isPoints()) for (const [k, v] of Object.entries(lineZ(line))) z[k] = (z[k] || 0) + v;
     }
-    rows.push({ raw, g: lines.length, tot, z, v: sum(lines.map(lineValue)) });
+    rows.push({ raw, g: lines.length, tot, z, v: sum(lines.map(lineValue)) + (lines.length - expected) * perGame });
   }
   return rows;
 }
@@ -188,8 +191,8 @@ function topPerformancesCard() {
   };
 
   const pts = leaguePoints();
-  const perGame = pts ? fpBase()[0] : 0;
-  const par = r => perGame * r.g;
+  const expected = weekly ? WEEK_GAMES * dates.length / 7 : 1; // an average starter's games over these days
+  const par = pts ? fpBase()[0] * expected : 0;
   const cats = scoreCats().filter(c => !c.fp);
   // a column sorts by what it adds: its category contribution, or its fantasy points, so best-first works for TO too
   const sortVal = (r, key) => (key === 'name' ? r.raw.name.toLowerCase() : key === 'v' ? r.v : pts ? lineStat(r.tot, key) * (pts[key] || 0) : r.z[key] || 0);
@@ -200,35 +203,29 @@ function topPerformancesCard() {
     }
     return `<td class="sc" style="${pts ? '' : shade((r.z[c.key] || 0) / r.g)}">${fmt(lineStat(r.tot, c.key), 0)}</td>`;
   };
-  const valTip = r => esc(pts ? `Fantasy points in your league; a typical rostered player scores ${fmt(par(r), 1)} in ${r.g === 1 ? 'a game' : `${r.g} games`}`
-    : `Value${weekly ? ` over ${r.g === 1 ? '1 game' : `${r.g} games`}` : ' for the game'}: each of your league's categories against an average rostered player's game`);
-  const table = (rows, list) => {
-    const so = ui.perfSort[list];
-    const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0, attrs: ` data-list="${list}"` });
-    const rank = new Map(rows.map((r, i) => [r, i + 1])); // rank by value, whatever the sort
-    const sorted = [...rows].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
-    return `<div class="perf-wrap${rows.length > 5 ? ' scroll' : ''}"><table class="perf-table">
+  const e = +expected.toFixed(1);
+  const over = weekly ? `${e} game${e === 1 ? '' : 's'} over these days` : 'a game';
+  const valTip = esc(pts ? `Fantasy points in your league; an average starter scores ${fmt(par, 1)} in ${over}`
+    : weekly ? `Value: what his games added to each category against an average starter's ${over}` : "Value for the game: each category against an average rostered player's game");
+
+  // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
+  const rows = perfRows(dates, expected);
+  const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
+  const so = ui.perfSort;
+  const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0 });
+  const shown = [...rows].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; }).slice(0, 50);
+  const count = `${rows.length > shown.length ? `${shown.length} of ` : ''}${rows.length} players`;
+  const table = !rows.length ? '' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
       <thead><tr>${th('name', 'Player', 'pf-name')}${cats.map(c => th(c.key, c.label, 'sc')).join('')}${th('v', pts ? 'FP' : 'Value', 'num pf-v')}</tr></thead>
-      <tbody>${sorted.map(r => `<tr>
+      <tbody>${shown.map(r => `<tr>
         <td class="pf-name"><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 28)}<div class="bmain">
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button></div>
           <div class="pmeta">${weekly ? `${r.g} G · ` : ''}${Math.round(r.tot.min || 0)} min · ${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
-        <td class="num pf-v${r.v < par(r) ? ' pos-bad' : ''}" data-tip="${valTip(r)}">${pts ? fmt(r.v, 1) : signed(r.v, 1)}</td>
+        <td class="num pf-v${r.v < par ? ' pos-bad' : ''}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 1)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
-  };
-
-  // best: anyone whose line helped, so free agents worth adding show up; worst: lines that hurt, only from
-  // players someone in your league rosters. No one is on both; a line that shows as +0.0 is on neither.
-  const rows = perfRows(dates);
-  const vsPar = r => Math.round((r.v - par(r)) * 10) / 10;
-  const best = rows.filter(r => vsPar(r) > 0).sort((a, b) => b.v - a.v).slice(0, 50);
-  const worst = rows.filter(r => vsPar(r) < 0 && owner.has(r.raw.id)).sort((a, b) => a.v - b.v).slice(0, 50);
-  return card(toggle || `<span class="muted small">${when}</span>`, `
-    ${toggle ? `<p class="muted small perf-when">${when}</p>` : ''}
-    ${best.length ? `<h3 class="sub">Best <span class="muted small">every NBA player</span></h3>${table(best, 'best')}` : ''}
-    ${worst.length ? `<h3 class="sub">Worst <span class="muted small">players rostered in your league</span></h3>${table(worst, 'worst')}` : ''}`);
+  return card(toggle, `<p class="muted small perf-when">${when} · ${count}</p>${table}`);
 }
 
 function newsCard() {

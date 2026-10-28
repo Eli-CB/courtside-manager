@@ -68,7 +68,7 @@ function emptyState() {
    ========================================================= */
 let state = null;
 const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'fa', sort: 'val', limit: 50 }, tab: 'dashboard', rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
-  perfRange: 'day', perfSort: { best: { key: 'v', dir: -1 }, worst: { key: 'v', dir: 1 } } };
+  perfRange: 'day', perfSort: { key: 'v', dir: -1 } };
 
 function load() {
   let s = null;
