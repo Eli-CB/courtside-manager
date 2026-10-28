@@ -178,6 +178,8 @@ a { color: var(--accent); }
 .pill { font: inherit; font-size: .8rem; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
 .pill:hover { background: var(--surface-2); }
 .pill.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.pf-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
+.badge.active { background: transparent; color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
 .perf-wrap { overflow: auto; margin: 0 0 14px; } /* no padding: pinned columns stick to its edges */
 .perf-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .perf-table th, .perf-table td { padding: 6px 4px; }
@@ -194,7 +196,7 @@ a { color: var(--accent); }
 .perf-table td.pf-v { font-weight: 800; font-variant-numeric: tabular-nums; }
 .perf-rank { flex: none; min-width: 1.5em; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .perf-owner { color: var(--muted); }
-@media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 160px; } }
+@media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 160px; } .perf-table .pf-name .pmeta { white-space: normal; } } /* phones: badges wrap instead of hiding */
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; }
 .kpi { padding: 14px 16px; }
 .kpi .label { color: var(--muted); font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }

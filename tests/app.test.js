@@ -696,7 +696,28 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
     }
   } finally {
     app.state.fxTeam = was;
-    Object.assign(app.ui.perfShow, { me: true, opp: true, fa: true, other: true });
+    Object.assign(app.ui.perfShow, { me: true, opp: true, fa: true, other: true, active: true, bench: true });
+  }
+});
+
+test('performances: Active and Bench filters, and an Active badge', async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(CATS9);
+  const spot = new Map(Object.values(L.rosters).flat().filter(x => x.nba).map(x => [x.nba, x.st]));
+  const ids = html => [...(html.split('<tbody>')[1] || '').matchAll(/data-nba="(\d+)"/g)].map(m => +m[1]);
+  try {
+    let html = app.topPerformancesCard();
+    assert.ok(html.includes('data-group="active" aria-pressed="true"') && html.includes('data-group="bench" aria-pressed="true"'));
+    const rowsOf = h => h.split('<tbody>')[1].split('</tr>').slice(0, -1);
+    assert.ok(rowsOf(html).every(tr => tr.includes('badge active') === (spot.get(+tr.match(/data-nba="(\d+)"/)[1]) === 'ACTIVE')), 'Active badge on exactly the active players');
+    app.ui.perfShow.bench = false;
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).every(id => !spot.has(id) || spot.get(id) === 'ACTIVE'), 'bench hidden, waivers still shown');
+    app.ui.perfShow.bench = true; app.ui.perfShow.active = false; app.ui.perfShow.fa = false;
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).length && ids(html).every(id => spot.has(id) && spot.get(id) !== 'ACTIVE'), 'only bench players');
+  } finally {
+    Object.assign(app.ui.perfShow, { me: true, opp: true, fa: true, other: true, active: true, bench: true });
   }
 });
 
