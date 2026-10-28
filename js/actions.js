@@ -49,7 +49,7 @@ const actions = {
     const item = INFO[el.dataset.key];
     if (!item) return;
     $('#infoTitle').textContent = item[0];
-    $('#infoBody').innerHTML = item[1];
+    $('#infoBody').innerHTML = typeof item[1] === 'function' ? item[1]() : item[1]; // some are written from live numbers
     const d = $('#infoDialog');
     if (!d.open) d.showModal();
   },

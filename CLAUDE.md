@@ -12,7 +12,8 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo)
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
-    model (`scoreCats`, `catZ`, `BASE`, `fillBase`), lineup optimizer
+    model (`scoreCats`, `catZ`, `BASE`: each stat's mean/spread from the data via `baseNow`, the league's teams × roster
+    spots by minutes, smart blend, or a past season's archive inside `withSeason`), lineup optimizer
   - info: `INFO` texts for every (i) button (`infoBtn(key)`)
   - fantrax: `fxGet` (retries/backoff), `fxGetAll`, `fetchFantraxLeague`, league cache (`getLeague`, 6h), shared
     player list/ADP (daily), scoring (`fxScoring`: points or categories), keepers (`keepersOf`), name matching

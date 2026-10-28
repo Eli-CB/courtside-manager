@@ -32,14 +32,16 @@ const CATS = [
   { key: 'to', label: 'TO', neg: true },
 ];
 
-// Rough mean / spread of a rostered player in a standard 12-team league, for turning stats into
-// "value" (a z-score sum). Other categories a league might count get theirs from the data (fillBase).
-const BASE = {
+// Mean / spread of each stat for an average rostered player, for turning stats into "value" (a z-score sum).
+// BASE comes from the data (baseNow: the league's rostered-player pool, that season's stats); these rough
+// numbers for a standard 12-team league stand in until the NBA data has loaded.
+const BASE_DEFAULT = {
   pts: [15, 6], reb: [6, 3], ast: [3.8, 2.3], stl: [1.0, 0.4], blk: [0.6, 0.5],
   tpm: [1.7, 1.0], to: [1.9, 0.9],
   fgPct: [0.47, 0.9], // impact = (FG% - mean) * FGA
   ftPct: [0.78, 0.7], // impact = (FT% - mean) * FTA
 };
+let BASE = { ...BASE_DEFAULT };
 
 
 const STAT_FIELDS = [
@@ -234,6 +236,7 @@ function scoreCats() {
     catsMemo = { L, cats: sc
       ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0, dec: k === 'dd' || k === 'td' ? 2 : null })), { key: 'fp', label: 'FP', fp: true }]
       : L && L.cats && L.cats.length ? L.cats.map(catDef) : CATS };
+    BASE = baseNow(); // and on the league's size (and, for a past season, that season's stats)
     nbaCache = null; // player values depend on the categories
   }
   return catsMemo.cats;

@@ -355,7 +355,7 @@ function withSeason(fn) {
   const myName = fxTeamName(state.fxTeam);
   const me = P.league.teams.find(t => t.name === myName);
   seasonCtx = { basis: P.basis, label: P.label };
-  try { return viewingLeague(P.league, me ? me.id : null, fn); } finally { seasonCtx = null; }
+  try { return viewingLeague(P.league, me ? me.id : null, fn); } finally { seasonCtx = null; BASE = baseNow(); } // back to this season's baselines
 }
 
 // Everyone a team started at some point in a past season, with what he did while starting: weeks in the

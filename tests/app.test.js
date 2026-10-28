@@ -726,6 +726,32 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
   }
 });
 
+test("value baselines come from the data: the league's rostered pool, that season's stats", async () => {
+  await app.ready();
+  const L = await app.useLeague(CATS9);
+  app.scoreCats();
+  const B = app.get('BASE');
+  assert.equal(B.pool, L.teams.length * (app.state.slots.length + app.state.benchSize), 'teams x roster spots');
+  assert.ok(B.pts[0] > 10 && B.pts[0] < 25 && B.pts[1] > 2, `PTS ${B.pts}`);
+  assert.notDeepEqual([...B.ftPct], [0.78, 0.7], 'not the old fixed numbers');
+  const E = await app.useLeague(ESPN);
+  app.scoreCats();
+  const BE = app.get('BASE');
+  assert.equal(BE.pool, E.teams.length * (app.state.slots.length + app.state.benchSize), 'ESPN too: teams x roster spots');
+  const stats = app.get('NBA').players.map(r => app.nbaStats(r, 'blend')).filter(Boolean).map(x => ({ ...x, sample: x.gp }));
+  assert.ok(app.computeBase(stats, 60).pts[0] > app.computeBase(stats, 200).pts[0], 'a smaller league rosters better players, so the bar is higher');
+  // a past season is judged against its own season's stats
+  await app.loadSeason('czqgnyozmf2tbr93');
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  let past;
+  try { app.withSeason(() => { app.scoreCats(); past = app.get('BASE'); }); } finally { app.get('ui').season = null; }
+  assert.notEqual(app.get('BASE'), past, "this season's baselines are back as soon as the past season is done");
+  await app.useLeague(CATS9);
+  app.scoreCats();
+  const now = app.get('BASE');
+  assert.ok(past.pool >= 20 && past !== now && past.pts[0] !== now.pts[0], `2025-26 PTS ${past.pts} vs now ${now.pts}`);
+});
+
 test("player photos get a ring and background in their NBA team's colors", async () => {
   await app.ready();
   const raw = app.NBA.players.find(r => r.team === 'BOS');

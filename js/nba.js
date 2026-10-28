@@ -86,7 +86,8 @@ async function loadNba(fresh = false) {
     for (const raw of NBA.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
     countNames();
     if (NBA.league && NBA.league.scoringSystem) Object.assign(NBA.league, fxScoring(NBA.league.scoringSystem));
-    fillBase();
+    baseMemo.clear(); // new stats, new baselines
+    BASE = baseNow();
     NBA.siteLeague = NBA.league;
     // a reload from Fantrax since this morning's file beats the file (the site's own league is on Fantrax)
     const fresher = NBA.league && !state.fxLeagueId ? cachedLeague(NBA.league.id) : null;
@@ -237,24 +238,46 @@ function matchDates(start = weekStart()) {
 const playsOn = (p, d) => !!(teamDates.get(p.team) && teamDates.get(p.team).has(d));
 const gamesIn = (p, dates) => dates.filter(d => playsOn(p, d)).length;
 
-// Baselines for any category beyond the usual nine (3P%, OREB, DD...): the mean and spread among
-// likely-rostered players, the 160 with the most minutes. Percentages measure (% − average) × attempts.
-function fillBase() {
-  const pool = NBA.players.map(raw => nbaStats(raw)).filter(x => x && x.gp >= 3).sort((a, b) => b.min - a.min).slice(0, 160);
-  if (pool.length < 20) return;
+// Baselines for "value": each category's mean and spread among the players a league rosters (its teams × roster
+// spots, the ones with the most minutes), from that season's per-game stats: this season's smart blend, or a past
+// season's archive while one shows, so seasons never mix. Percentages measure (% − average) × attempts.
+const baseMemo = new Map(); // "season|pool size" -> BASE
+function baseNow() {
+  const season = seasonCtx && String(seasonCtx.basis || '').startsWith('arch:') ? seasonCtx.basis.slice(5) : 'cur';
+  const n = (fxPickable().length || 12) * (state.slots.length + (state.benchSize ?? 5));
+  const key = `${season}|${n}`;
+  if (baseMemo.has(key)) return baseMemo.get(key);
+  const A = season !== 'cur' ? archives[season] : null;
+  if (season !== 'cur' && !A) return baseMemo.get(`cur|${n}`) || { ...BASE_DEFAULT }; // archive still loading
+  if (!A && !NBA) return { ...BASE_DEFAULT };
+  // each player's sample: his games, plus the 10 games of last season the smart blend mixes in
+  const stats = A ? [...A.players.keys()].map(id => { const s = archivedStats({ id }, season); return s && { ...s, sample: s.gp }; })
+    : NBA.players.map(raw => {
+      const s = nbaStats(raw, 'blend'), cur = statObj(raw.cur), prev = statObj(raw.prev);
+      return s && { ...s, sample: cur && cur.gp && prev && prev.gp ? cur.gp + 10 : s.gp };
+    });
+  const base = computeBase(stats, n);
+  baseMemo.set(key, base);
+  return base;
+}
+
+function computeBase(stats, n) {
+  const pool = stats.filter(x => x && x.sample >= 3).sort((a, b) => b.min - a.min).slice(0, n);
+  if (pool.length < 20) return { ...BASE_DEFAULT };
   const spread = (xs, m) => Math.max(Math.sqrt(sum(xs.map(x => (x - m) ** 2)) / xs.length), 0.02);
+  const out = {};
   for (const k of [...COUNT_KEYS, ...Object.keys(DERIVED)]) {
-    if (BASE[k]) continue;
     const xs = pool.map(x => statVal(x, k));
     const m = sum(xs) / xs.length;
-    BASE[k] = [m, spread(xs, m)];
+    out[k] = [m, spread(xs, m)];
   }
   for (const [k, [, made, att]] of Object.entries(PCT_CATS)) {
-    if (BASE[k]) continue;
     const a = sum(pool.map(x => statVal(x, att)));
     const m = a ? sum(pool.map(x => statVal(x, made))) / a : 0;
-    BASE[k] = [m, spread(pool.map(x => { const n = statVal(x, att); return n ? (statVal(x, made) / n - m) * n : 0; }), 0)];
+    out[k] = [m, spread(pool.map(x => { const v = statVal(x, att); return v ? (statVal(x, made) / v - m) * v : 0; }), 0)];
   }
+  out.pool = pool.length; // for the explanation
+  return out;
 }
 
 // Per-game means and spreads. Spreads come from the player's real game logs when available.

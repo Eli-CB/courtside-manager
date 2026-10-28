@@ -17,10 +17,10 @@ const INFO = {
     <p><b>The goal.</b> Your league gives one win to whoever takes more categories, so the goal is your chance of winning the week. Total categories won only breaks ties.</p>
     <p><b>Punting.</b> A category's win chance follows a bell curve, so adding stats to one you're far behind in (or far ahead in) barely moves it. Those categories effectively get ignored, and players are used where the matchup is close.</p>
     <p><b>Explaining it.</b> The suggested lineup is broken into one-for-one swaps, best first. Each swap's numbers assume the swaps above it are already made.</p>`],
-  shading: ['Stat shading', `
-    <p><b>Per game.</b> Each stat is compared with an average rostered player in a 12-team league:</p>
-    <ul><li>PTS 15 ± 6, REB 6 ± 3, AST 3.8 ± 2.3, STL 1.0 ± 0.4, BLK 0.6 ± 0.5, 3PM 1.7 ± 1.0, TO 1.9 ± 0.9 (fewer is better)</li>
-    <li>FG%: (FG% − 47%) × attempts ÷ 0.9 · FT%: (FT% − 78%) × attempts ÷ 0.7, so shot volume counts</li></ul>
+  shading: ['Stat shading', () => `
+    <p><b>Per game.</b> Each stat is compared with an average rostered player in your league: the ${BASE.pool || 'about 156'} players with the most minutes (its teams × roster spots), by ${seasonCtx && seasonCtx.label ? `${esc(seasonCtx.label)} per-game stats` : "this season's stats (smart blend: 10 games of last season mixed in, so it's steady early on)"}. Average ± spread:</p>
+    <ul><li>${scoreCats().filter(c => !c.fp && !c.pct && BASE[c.key]).map(c => `${c.label} ${fmt(BASE[c.key][0], BASE[c.key][0] < 3 ? 2 : 1)} ± ${fmt(BASE[c.key][1], 2)}${c.neg ? ' (fewer is better)' : ''}`).join(', ')}</li>
+    ${scoreCats().filter(c => c.pct && BASE[c.key]).map(c => `<li>${c.label}: (${c.label} − ${fmt(BASE[c.key][0] * 100, 1)}%) × attempts ÷ ${fmt(BASE[c.key][1], 2)}, so shot volume counts</li>`).join('')}</ul>
     <p><b>Week total.</b> The player's weekly number is compared with an average starter's week of about 3.5 games: (weekly total − average × 3.5) ÷ (spread × 3.5). The same weekly total always gets the same shade.</p>
     <p><b>Colors.</b> Green helps the category, red hurts it, getting stronger up to ±2.5 spreads. The Projected week row is shaded by your chance to win each category instead. Hover any number for the exact value.</p>`],
   dots: ['Schedule dots', `
@@ -36,7 +36,7 @@ const INFO = {
     <p><b>Columns.</b> Everyone who played is ranked by value (the number by each name). Click a column to sort; the top 50 by that column show, so sort Value the other way for the worst. Categories sort by how much they helped, so the fewest turnovers and the most valuable shooting come first. Shading is per game, as on the Matchups tables. Shooting shows makes-attempts; hover for the percentage.</p>
     <p><b>Filters.</b> By team: yours, this matchup's opponent and the other teams. By where players are: Active (in their team's starting lineup now), Bench (IR included) and Waivers (not on a roster in your league; they have no team, so the team filters don't hide them). Ranks stay out of everyone who played.</p>`],
   value: ['Player value', `
-    <p>Value is the sum of a player's contributions per game in each of your league's categories, each measured against an average rostered player (see Stat shading for the exact averages). +5 is an elite all-around player; around 0 is replacement level in a 12-team league.</p>
+    <p>Value is the sum of a player's contributions per game in each of your league's categories, each measured against an average rostered player in your league (see Stat shading for the averages, which come from this season's stats and your league's size). +5 is an elite all-around player; 0 is an average rostered player.</p>
     <p>FG% and FT% count shot volume, and turnovers count against.</p>
     <p><b>Points leagues:</b> value is fantasy points per game (FP/G), using your league's points for each stat.</p>`],
   projection: ['Which stats are used', `
