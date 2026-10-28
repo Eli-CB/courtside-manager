@@ -195,6 +195,16 @@ a { color: var(--accent); }
 .perf-table .pf-v { position: sticky; right: 0; z-index: 1; background: var(--surface); padding-left: 8px; } /* the value stays in view too */
 .perf-table thead th.pf-v { z-index: 3; }
 .perf-table td.pf-v { font-weight: 800; font-variant-numeric: tabular-nums; }
+/* your players' rows are tinted orange, the opponent's red: the player and value cells (the stats keep their shading) */
+.perf-table { --pf-me: color-mix(in srgb, var(--accent) 14%, var(--surface)); --pf-opp: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
+.perf-table tr.pf-me td.pf-name, .perf-table tr.pf-me td.pf-v { background: var(--pf-me); }
+.perf-table tr.pf-opp td.pf-name, .perf-table tr.pf-opp td.pf-v { background: var(--pf-opp); }
+.perf-table tr.pf-me td.pf-name { box-shadow: inset 3px 0 0 var(--accent); }
+.perf-table tr.pf-opp td.pf-name { box-shadow: inset 3px 0 0 var(--bad); }
+.perf-table td.pf-name { padding-left: 6px; }
+.pf-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+.pf-swatch.pf-me { background: var(--accent); }
+.pf-swatch.pf-opp { background: var(--bad); }
 .perf-rank { flex: none; min-width: 1.5em; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .perf-owner { color: var(--muted); }
 @media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 160px; } .perf-table .pf-name .pmeta { white-space: normal; } } /* phones: badges wrap instead of hiding */

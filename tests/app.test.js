@@ -682,6 +682,8 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
     html = app.topPerformancesCard();
     assert.equal(count(html), per[me]);
     assert.ok(ids(html).every(id => owned.get(id) === me), 'only my players');
+    assert.equal((html.match(/<tr class="pf-me">/g) || []).length, ids(html).length, 'my rows are tinted');
+    assert.ok(!html.includes('>Your team<'), 'no Your team badge');
     app.ui.perfShow.me = false; app.ui.perfShow.fa = true;
     html = app.topPerformancesCard();
     assert.ok(ids(html).length && ids(html).every(id => !owned.has(id)), 'only players not on a roster');
@@ -692,7 +694,7 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
       app.ui.perfShow.opp = true;
       html = app.topPerformancesCard();
       assert.ok(ids(html).length && ids(html).every(id => owned.get(id) === opp.id), "only the opponent's players");
-      assert.ok(html.includes('class="badge bad" title="') && html.includes('>Opponent</span>'), 'an Opponent badge');
+      assert.ok(html.includes('<tr class="pf-opp">') && html.includes(`title="Opponent: ${opp.name.replace(/'/g, '&#39;')}"`), "the opponent's rows are tinted");
     }
   } finally {
     app.state.fxTeam = was;
