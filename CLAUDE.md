@@ -1,0 +1,62 @@
+# Courtside Manager: notes for working on this repo
+
+Fantasy basketball (Fantrax) weekly matchup site. Static GitHub Pages site, no build step, no backend.
+Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager). Owner's league:
+"Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
+8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26).
+
+## Layout
+- `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
+  scope; they must load in the order index.html lists: core, nba, info, fantrax, render, history, views,
+  matchups, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
+  - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots
+  - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
+    model (`scoreCats`, `catZ`, `BASE`, `fillBase`), lineup optimizer
+  - info: `INFO` texts for every (i) button (`infoBtn(key)`)
+  - fantrax: `fxGet` (retries/backoff), `fxGetAll`, `fetchFantraxLeague`, league cache (`getLeague`, 6h), shared
+    player list/ADP (daily), scoring (`fxScoring`: points or categories), keepers (`keepersOf`), name matching
+  - render: `render()`, league/season bar (`ctxBar`), gear menu, past-season switching (`withSeason`,
+    address `#tab/<seasonLeagueId>`), `viewLeague`/`myTeamId()` override
+  - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
+    archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
+    all awards, past Rosters
+  - views: Dashboard, Roster, Standings + Season totals, Trades, Free Agents + recommended adds
+  - matchups: Matchups tab, schedule dots, stat tables, tooltips
+  - draft: Draft tab/board, saved leagues, landing page
+  - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
+- `scripts/update_data.py`: daily data job (GitHub Actions 11:00 UTC) builds `data/players.json` and
+  `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax. `scripts/build_images.py`: headshot sprite (80px)
+  + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
+- `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
+  in page order with fake fetch (fixtures) and a fixed clock (2026-10-26 20:00 ET). Fixtures in
+  `tests/fixtures` (refresh: `python tests/capture_fixtures.py`). Runs on every push (`.github/workflows/tests.yml`).
+
+## Rules settled with the owner (keep them)
+- Everything follows each league's Fantrax settings (category list or point values, slots, daily vs weekly
+  lineups, playoffs). Never hard-code the owner's league.
+- Fantrax: minimize requests. League data cached on the device; manual ↻ Reload (gear menu) instead of
+  loading fresh each visit. Weekly rosters fetched once per finished period. Shared player list/ADP once a day.
+- Keepers exist only if draft rounds < roster spots (starters + bench); keepers = opening-week roster minus
+  that team's picks. Past keepers are shown, never graded; never compare today's ADP to a past draft.
+- Awards (current season "so far" + past seasons) all come from weekly starters (ACTIVE status) and game logs:
+  Best draft (picks' games until first dropped, through trades, above replacement in cats), Best manager
+  (actual wins vs all-play record), Waiver Wire Wizard (pickups' games while starting; trades excluded),
+  Street Clothes (games starters missed while starting), Biggest punt / Even Steven (real season totals),
+  Unc Status (starters' ages, week-weighted). Seasons never mix.
+- Static explanations go in (i) popups; on-screen text stays short and specific.
+- Mobile matters: check phone width (375px); no page-level sideways scroll.
+
+## Gotchas
+- `python serve.py` (preview config "site", port 5173) refreshes `data/` locally: never commit
+  `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
+- stats.nba.com blocks GitHub runners. Past seasons live in `data/seasons/<season>.json` + `-games.json`
+  (2016-17..2025-26), made on the owner's PC. Each fall archive the season just ended:
+  `python scripts/archive_season.py 2026-27`.
+- Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data.
+  Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
+  Commit messages end with the Co-Authored-By line.
+- `__BUILD__` in index.html and js/core.js is replaced with the commit hash at deploy (cache busting).
+- Box score cache holds NBA.com and ESPN copies of games: always dedupe by date+teams (`loadBoxes` does).
+- Fantrax names can differ from NBA.com ("Nicolas"/"Nic"): `matchNicknames` (initial + last name + team).
+- The preview browser sometimes loses localStorage on restart (back to the landing page): reconnect the
+  league by ID in the form, then pick "Eli's SGAteam".
