@@ -646,6 +646,8 @@ test('performances: columns sort, the rank stays by value', async () => {
     const rows = best.split('<tbody>')[1].split('</tr>').slice(0, -1);
     const pts = rows.map(tr => +[...tr.matchAll(/<td class="sc"[^>]*>([^<]*)</g)][cats.indexOf('pts')][1]);
     assert.ok(pts.length > 5 && pts.every((v, i) => !i || v <= pts[i - 1]), `points, most first: ${pts.slice(0, 8)}`);
+    const fg = rows.map(tr => tr.match(/<td class="sc"[^>]*title="FG%: ([^"]+)">([^<]*)</));
+    assert.ok(fg.every(m => m && /^\d+-\d+$/.test(m[2]) && /%$|no attempts/.test(m[1])), 'shooting shows makes-attempts, the percentage on hover');
     const ranks = rows.map(tr => +tr.match(/perf-rank">(\d+)/)[1]);
     assert.ok(ranks.some((v, i) => v !== i + 1), 'ranks still by value');
   } finally { app.ui.perfSort.best = { key: 'v', dir: -1 }; }

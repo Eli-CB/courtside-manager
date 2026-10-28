@@ -196,7 +196,7 @@ function topPerformancesCard() {
   const cell = (r, c) => {
     if (c.pct) {
       const [m, a] = [r.tot[c.made] || 0, r.tot[c.att] || 0];
-      return `<td class="sc" style="${shade((r.z[c.key] || 0) / r.g)}" title="${c.label}: ${m}-${a}">${a ? fmtPct(m / a) : '—'}</td>`;
+      return `<td class="sc" style="${shade((r.z[c.key] || 0) / r.g)}" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}">${m}-${a}</td>`;
     }
     return `<td class="sc" style="${pts ? '' : shade((r.z[c.key] || 0) / r.g)}">${fmt(lineStat(r.tot, c.key), 0)}</td>`;
   };
