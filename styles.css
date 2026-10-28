@@ -171,6 +171,8 @@ a { color: var(--accent); }
 .perf { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 2px; }
 .perf li { display: grid; grid-template-columns: 40px minmax(0, 1fr) 56px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .perf li:last-child { border-bottom: 0; }
+.perf.scroll { position: relative; max-height: 380px; overflow-y: auto; padding-right: 4px; }
+.perf-rank { display: inline-block; min-width: 1.6em; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .perf-main { min-width: 0; }
 .perf-main .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .perf-owner { color: var(--muted); }

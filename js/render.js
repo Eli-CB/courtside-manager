@@ -199,10 +199,21 @@ function render() {
   const early = preDraft();
   if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
   const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade };
-  // keep scroll position of inner lists (e.g. trade picker) across re-renders
-  const scrolls = [...document.querySelectorAll('.pick-list')].map(el => el.scrollTop);
+  // keep scroll position of inner lists (e.g. trade picker, performances) across re-renders
+  const inner = '.pick-list, .perf.scroll';
+  const scrolls = [...document.querySelectorAll(inner)].map(el => el.scrollTop);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
-  document.querySelectorAll('.pick-list').forEach((el, i) => { el.scrollTop = scrolls[i] || 0; });
+  fitPerfLists();
+  document.querySelectorAll(inner).forEach((el, i) => { el.scrollTop = scrolls[i] || 0; });
+}
+
+// Long performance lists show their first 5 rows (and a peek of the 6th, so it's clear they scroll).
+// Rows change height when stat lines wrap, so this measures them; it runs again when the window resizes.
+function fitPerfLists() {
+  document.querySelectorAll('.perf.scroll').forEach(ul => {
+    const sixth = ul.children[5];
+    if (sixth) ul.style.maxHeight = `${sixth.offsetTop + 22}px`;
+  });
 }
 
 // A league that hasn't drafted: no picks made and every roster empty

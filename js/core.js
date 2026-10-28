@@ -286,8 +286,30 @@ async function loadImages() {
     if (!r.ok) return;
     IMG = await r.json();
     IMG.ids.forEach((id, i) => IMG_INDEX.set(id, i));
+    cropLogos(IMG.logos);
     render();
   } catch (e) { /* images are optional */ }
+}
+
+// The NBA's logo files leave about a quarter of their box empty, so a 14px logo was drawn in about 10 screen
+// pixels and looked blocky. Crop each to its drawing (measured once, off screen) so it fills its box.
+function cropLogos(logos) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:absolute;left:-9999px;top:0;width:100px;height:100px';
+  document.body.appendChild(box);
+  for (const [team, src] of Object.entries(logos)) {
+    try {
+      box.innerHTML = new TextDecoder().decode(Uint8Array.from(atob(src.split(',')[1]), c => c.charCodeAt(0)));
+      const svg = box.querySelector('svg'), b = svg.getBBox();
+      if (!b.width || !b.height) continue;
+      const pad = Math.max(b.width, b.height) * 0.03; // strokes reach a little past the measured shapes
+      svg.setAttribute('viewBox', [b.x - pad, b.y - pad, b.width + 2 * pad, b.height + 2 * pad].map(n => +n.toFixed(2)).join(' '));
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      logos[team] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(svg));
+    } catch (e) { /* keep the logo as it came */ }
+  }
+  box.remove();
 }
 
 const initials = name => String(name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();

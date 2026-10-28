@@ -135,6 +135,28 @@ const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map((
 const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
 const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 }))));
 
+// A game's line in the stats the league scores: its categories, or every stat worth points.
+// Makes and attempts show together ("8-16 FG"); shown says which stats are in it.
+const SHOTS = { FG: ['fgm', 'fga'], FT: ['ftm', 'fta'], '3P': ['tpm', 'tpa'] };
+function perfStats(line) {
+  const keys = scoreCats().filter(c => !c.fp).map(c => c.key);
+  const stats = [], shown = new Set();
+  for (const k of keys) {
+    if (shown.has(k)) continue;
+    const pair = PCT_CATS[k] ? [PCT_CATS[k][0].replace('%', ''), PCT_CATS[k].slice(1)]
+      : Object.entries(SHOTS).find(([, ma]) => ma.includes(k) && ma.every(x => keys.includes(x)));
+    if (pair) {
+      const [name, [m, a]] = pair;
+      stats.push(`<span>${line[m] || 0}-${line[a] || 0} ${name}</span>`);
+      shown.add(k).add(m).add(a);
+    } else {
+      stats.push(`<span>${lineStat(line, k)} ${STAT_LABEL[k] || k.toUpperCase()}</span>`);
+      shown.add(k);
+    }
+  }
+  return { stats, shown };
+}
+
 function topPerformancesCard() {
   const today = todayIso(), yesterday = addDays(today, -1);
   const card = (sub, body) => `<div class="card"><div class="card-head"><h2>Performances</h2><span class="muted small">${sub}</span></div>${body}</div>`;
@@ -152,20 +174,20 @@ function topPerformancesCard() {
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
-  const statLine = l => [`${l.pts} PTS`, `${l.reb} REB`, `${l.ast} AST`, ...[['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO']].filter(([k]) => l[k] >= (k === 'to' ? 4 : 2)).map(([k, n]) => `${l[k]} ${n}`)].map(x => `<span>${x}</span>`).join(' · ');
   const tip = esc(isPoints() ? 'Fantasy points in your league' : "Value for the game: each of your league's categories against an average rostered player's game");
   const games = [];
   for (const [id, m] of BOX.day) { const line = m.get(d); if (line && nbaById.has(id)) games.push({ raw: nbaById.get(id), line, v: lineValue(line) }); }
-  const list = rows => `<ul class="perf">${rows.map(({ raw, line, v }) => `<li>
+  // the first 5 show; the rest scroll inside the list (see fitPerfLists)
+  const list = rows => `<ul class="perf${rows.length > 5 ? ' scroll' : ''}">${rows.map(({ raw, line, v }, i) => { const { stats, shown } = perfStats(line); return `<li>
       ${headshot({ nbaId: raw.id, name: raw.name }, 40)}
-      <div class="perf-main"><div><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
-        <div class="perf-line">${statLine(line)}</div>
-        <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min · ${line.fgm}-${line.fga} FG · ${line.ftm}-${line.fta} FT · ${who(raw.id)}</div></div>
+      <div class="perf-main"><div><span class="perf-rank">${i + 1}</span><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
+        <div class="perf-line">${stats.join(' · ')}</div>
+        <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min${shown.has('fga') ? '' : ` · ${line.fgm}-${line.fga} FG`}${shown.has('fta') ? '' : ` · ${line.ftm}-${line.fta} FT`} · ${who(raw.id)}</div></div>
       <div class="perf-val ${v < 0 ? 'pos-bad' : ''}" data-tip="${tip}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
-    </li>`).join('')}</ul>`;
+    </li>`; }).join('')}</ul>`;
   // best: anyone, so free agents worth adding show up; worst: only players someone in your league rosters
-  const best = [...games].sort((a, b) => b.v - a.v).slice(0, 6);
-  const worst = games.filter(g => owner.has(g.raw.id)).sort((a, b) => a.v - b.v).slice(0, 6);
+  const best = [...games].sort((a, b) => b.v - a.v).slice(0, 50);
+  const worst = games.filter(g => owner.has(g.raw.id)).sort((a, b) => a.v - b.v).slice(0, 50);
   return card(`${d === today ? 'Today' : d === yesterday ? 'Last night' : ''} ${fmtDay(d)}`.trim(), `
     <h3 class="sub">Best <span class="muted small">every NBA player</span></h3>${list(best)}
     ${worst.length ? `<h3 class="sub">Worst <span class="muted small">players rostered in your league</span></h3>${list(worst)}` : ''}`);

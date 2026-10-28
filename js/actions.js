@@ -377,6 +377,7 @@ function route() {
   if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 window.addEventListener('hashchange', route);
+window.addEventListener('resize', fitPerfLists);
 
 (function init() {
   try {

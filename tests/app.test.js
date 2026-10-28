@@ -580,3 +580,14 @@ test('ESPN: leagues are reused from the device, the player list fetched once, pr
   app.fetch = (url, init) => (String(url).includes('/leagues/') ? Promise.resolve({ ok: false, status: 401, headers: { get: () => null } }) : realFetch(url, init));
   try { await assert.rejects(app.fetchEspnLeague('123456'), /private league/); } finally { app.fetch = realFetch; }
 });
+
+test("performances show each game in the league's own stats", async () => {
+  const line = { pts: 29, reb: 6, ast: 11, stl: 5, blk: 3, to: 5, fgm: 12, fga: 23, ftm: 3, fta: 3, tpm: 2, tpa: 6, dd: 1, td: 0, min: 40 };
+  const text = r => r.stats.join(' · ').replace(/<\/?span>/g, '');
+  await app.useLeague(CATS9);
+  assert.equal(text(app.perfStats(line)), '12-23 FG · 3-3 FT · 2 3PM · 29 PTS · 6 REB · 11 AST · 5 STL · 3 BLK · 5 TO', 'the categories, in order');
+  await app.useLeague(ESPN);
+  const pts = app.perfStats(line);
+  assert.equal(text(pts), '29 PTS · 6 REB · 11 AST · 5 STL · 3 BLK · 2 3PM · 5 TO · 12-23 FG · 3-3 FT', 'every stat worth points, makes and attempts together');
+  assert.ok(pts.shown.has('fga') && pts.shown.has('fta'));
+});
