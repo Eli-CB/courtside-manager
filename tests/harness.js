@@ -23,7 +23,7 @@ function readFixture(rel) {
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 }
 
-// Serve data files and Fantrax API calls from tests/fixtures
+// Serve data files and Fantrax and ESPN API calls from tests/fixtures
 function fakeFetch(url) {
   const u = new URL(String(url), 'http://localhost/');
   let body = null;
@@ -35,6 +35,9 @@ function fakeFetch(url) {
     const id = u.searchParams.get('leagueId');
     const period = u.searchParams.get('period');
     body = id ? readFixture(`fantrax/${id}/${ep}${period ? '-' + period : ''}.json`) : readFixture(`fantrax/${ep}.json`);
+  } else if (u.hostname === 'lm-api-reads.fantasy.espn.com') {
+    const league = u.pathname.match(/\/leagues\/(\d+)$/);
+    body = league ? readFixture(`espn/${league[1]}/league.json`) : u.pathname.endsWith('/players') ? readFixture('espn/players.json') : null;
   }
   const ok = body != null;
   return Promise.resolve({ ok, status: ok ? 200 : 404, text: async () => body, json: async () => JSON.parse(body) });
@@ -85,9 +88,9 @@ function loadApp() {
   app.get = expr => ctx.__get(expr);
   app.set = (name, value) => { ctx.__value = value; ctx.__get(`${name} = globalThis.__value`); };
   app.ready = () => ctx.__get('nbaLoading');
-  // load a Fantrax league from the fixtures and make it the current one
+  // load a Fantrax or ESPN league from the fixtures and make it the current one
   app.useLeague = async id => {
-    const res = await ctx.fetchFantraxLeague(id);
+    const res = await (ctx.__get('leagueSourceOf')(id) === 'espn' ? ctx.fetchEspnLeague(id) : ctx.fetchFantraxLeague(id));
     const L = res.league;
     ctx.__get('NBA').league = L;
     ctx.applyLeagueRules(L);

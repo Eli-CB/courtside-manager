@@ -5,24 +5,42 @@
 // ----- Any visitor's Fantrax league, fetched in the browser -----
 // The daily data file carries NBA stats for everyone plus the site's default league. Fantrax's
 // public league API allows requests from any site, so a visitor's own league can be loaded here.
+// Public ESPN leagues load the same way (js/espn.js) into the same league shape, so the rest of the
+// site doesn't care where a league came from; "fx" names (fxLeague, raw.fx, fxTeamSide) cover both.
 const FX_API = 'https://www.fantrax.com/fxea/general/';
 const NBA_POS_MAP = { G: ['PG', 'SG'], F: ['SF', 'PF'], C: ['C'], 'G-F': ['SG', 'SF'], 'F-G': ['SG', 'SF'], 'F-C': ['PF', 'C'], 'C-F': ['PF', 'C'] };
 const FX_SLOT_MAP = { PG: 'PG', SG: 'SG', G: 'G', SF: 'SF', PF: 'PF', F: 'F', C: 'C', Flx: 'FLX', Util: 'FLX', UT: 'FLX' };
 
-// One Fantrax request. "Too many requests", server errors and dropped connections are retried after a
-// growing wait (Fantrax's Retry-After when it sends one); anything else fails straight away.
+// Which site a league is on. ESPN league IDs are all digits; Fantrax's mix letters and digits.
+const SOURCE_NAME = { fantrax: 'Fantrax', espn: 'ESPN' };
+const leagueSourceOf = id => (/^\d+$/.test(String(id || '')) ? 'espn' : 'fantrax');
+const sourceName = (L = fxLeague()) => SOURCE_NAME[(L && L.source) || 'fantrax'];
+// A league ID from what someone typed or pasted: the ID itself, or the league's address on either site
+function parseLeagueId(text) {
+  const s = String(text || '').trim();
+  const m = s.match(/[?&]leagueId=(\d+)/i) || s.match(/fantrax\.com\/fantasy\/league\/([A-Za-z0-9]+)/i);
+  const id = m ? m[1] : s;
+  return /^\d{3,12}$/.test(id) || /^[A-Za-z0-9]{6,32}$/.test(id) ? id : null;
+}
+const BAD_LEAGUE_ID = "That doesn't look like a league ID. Paste your league's address from Fantrax or ESPN, or just its ID.";
+// Weekly lineup history (Season totals, Awards, past seasons) is read from Fantrax only, so far
+const hasLineupHistory = L => !!L && (L.source || 'fantrax') === 'fantrax';
+
+// One request to a league site. "Too many requests", server errors and dropped connections are retried
+// after a growing wait (the site's Retry-After when it sends one); anything else fails straight away.
 const pause = ms => new Promise(res => setTimeout(res, ms));
-async function fxGet(path, tries = 3) {
+async function getJson(url, site, init, tries = 3) {
   for (let i = 0; ; i++) {
     let r = null;
-    try { r = await fetch(FX_API + path); } catch (e) { if (i >= tries - 1) throw new Error("couldn't reach Fantrax"); }
-    if (r && r.ok) return JSON.parse(await r.text()); // served as text/plain
-    if (r && r.status !== 429 && r.status < 500) throw new Error(`Fantrax answered ${r.status}`);
-    if (i >= tries - 1) throw new Error(`Fantrax answered ${r ? r.status : 'nothing'}`);
+    try { r = await fetch(url, init); } catch (e) { if (i >= tries - 1) throw new Error(`couldn't reach ${site}`); }
+    if (r && r.ok) return JSON.parse(await r.text()); // Fantrax serves JSON as text/plain
+    if (r && r.status !== 429 && r.status < 500) throw new Error(`${site} answered ${r.status}`);
+    if (i >= tries - 1) throw new Error(`${site} answered ${r ? r.status : 'nothing'}`);
     const after = r && r.headers && +r.headers.get('Retry-After');
     await pause(Math.min(after ? after * 1000 : 600 * 3 ** i, 10000));
   }
 }
+const fxGet = (path, tries) => getJson(FX_API + path, 'Fantrax', undefined, tries);
 // Many requests at once (weekly rosters): a few at a time, and stop as soon as one fails for good
 async function fxGetAll(paths, each, width = 4) {
   let next = 0, failed = null;
@@ -76,6 +94,25 @@ function matchNicknames(ids, names, toNba) {
     if (id) { found[fid] = id; claims[id] = (claims[id] || 0) + 1; }
   }
   for (const [fid, id] of Object.entries(found)) if (claims[id] === 1) toNba[fid] = id;
+}
+
+// A league site's players matched to NBA.com players by name (team breaks ties), then by nickname.
+// ids: { site id: { team } }, names: { site id: "First Last" } -> { site id: NBA id }
+function matchPlayers(ids, names) {
+  const byName = new Map();
+  for (const raw of NBA.players) {
+    const n = normName(raw.name);
+    if (!byName.has(n)) byName.set(n, []);
+    byName.get(n).push(raw);
+  }
+  const toNba = {};
+  for (const [fid, v] of Object.entries(ids)) {
+    const hits = byName.get(normName(names[fid])) || [];
+    const hit = hits.length > 1 ? (hits.find(h => h.team === v.team) || hits[0]) : hits[0];
+    if (hit) toNba[fid] = hit.id;
+  }
+  matchNicknames(ids, names, toNba);
+  return toNba;
 }
 
 // "Last, First" -> "First Last"
@@ -150,9 +187,10 @@ function fxCategories(ss) {
       else other.push(sc.shortName || sc.name || sc.code);
     }
   }
-  const cats = [...keys].sort((a, b) => (CAT_ORDER.indexOf(a) + 1 || 99) - (CAT_ORDER.indexOf(b) + 1 || 99));
-  return cats.length ? { cats, catsOther: other } : {};
+  return keys.size ? { cats: inCatOrder(keys), catsOther: other } : {};
 }
+// Categories in the usual display order (FG%, FT%, 3PM, PTS...), any others after
+const inCatOrder = keys => [...keys].sort((a, b) => (CAT_ORDER.indexOf(a) + 1 || 99) - (CAT_ORDER.indexOf(b) + 1 || 99));
 const fxScoring = ss => ({ ...fxPointsScoring(ss), ...fxCategories(ss) });
 
 // Typical length in days of a league's lineup lock periods: about 1 for daily lineups, 7 for weekly
@@ -184,21 +222,8 @@ async function fetchFantraxLeague(id, opts = {}) {
   // the opening week's rosters: past seasons use them for keepers and pickups, and so does this season once week 1 is over
   const opening = opts.opening || (rosters.period || 1) > 1 ? await fxGet(`getTeamRosters?leagueId=${q}&period=1`).catch(() => null) : null;
 
-  // match Fantrax players to NBA.com players by name (team breaks ties)
-  const byName = new Map();
-  for (const raw of NBA.players) {
-    const n = normName(raw.name);
-    if (!byName.has(n)) byName.set(n, []);
-    byName.get(n).push(raw);
-  }
-  const toNba = {}, names = {};
-  for (const [fid, v] of Object.entries(ids)) {
-    names[fid] = fxName(v.name || '');
-    const hits = byName.get(normName(names[fid])) || [];
-    const hit = hits.length > 1 ? (hits.find(h => h.team === v.team) || hits[0]) : hits[0];
-    if (hit) toNba[fid] = hit.id;
-  }
-  matchNicknames(ids, names, toNba);
+  const names = Object.fromEntries(Object.entries(ids).map(([fid, v]) => [fid, fxName(v.name || '')]));
+  const toNba = matchPlayers(ids, names);
   const adp = Object.fromEntries((Array.isArray(adpList) ? adpList : []).filter(a => a.id).map(a => [a.id, a.ADP]));
   const fxPlayers = {};
   for (const [fid, pi] of Object.entries(info.playerInfo || {})) {
@@ -211,7 +236,7 @@ async function fetchFantraxLeague(id, opts = {}) {
     fxPlayers[nba] = { id: fid, st: pi.status || '', pos: POSITIONS.filter(x => elig.has(x)), adp: adp[fid] };
   }
   const league = {
-    id, name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
+    id, source: 'fantrax', name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
     historyId: info.leagueHistoryId || null, year: info.seasonYear || null,
     ...fxScoring(info.scoringSystem),
     teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
@@ -300,7 +325,8 @@ function viewingLeague(L, me, fn) {
   viewLeague = L; viewTeam = me;
   try { return fn(); } finally { [viewLeague, viewTeam] = was; }
 }
-const FX_STATUS = { T: 'Taken', W: 'Waivers', WW: 'Waivers', FA: 'Free agent' };
+// A = not on any roster (ESPN: free agent or on waivers; the league data doesn't say which)
+const FX_STATUS = { T: 'Taken', W: 'Waivers', WW: 'Waivers', FA: 'Free agent', A: 'Available' };
 const fxAvailable = raw => !!(raw && raw.fx && raw.fx.st !== 'T');
 
 function fxPeriodFor(start) {
@@ -381,8 +407,8 @@ function syncLeagueRules() {
   if (cfg.ir != null) state.ilSize = cfg.ir;
 }
 
-// Every league loaded from Fantrax is kept on this device (the five most recent). The site's own league
-// uses it until the daily data file is newer; any other league for 6 hours, or until ↻ Reload.
+// Every league loaded from Fantrax or ESPN is kept on this device (the five most recent). The site's own
+// league uses it until the daily data file is newer; any other league for 6 hours, or until ↻ Reload.
 const FX_CACHE_KEY = 'courtside-fantrax-v2';
 const LEAGUE_FRESH_MS = 6 * 36e5;
 try { localStorage.removeItem('courtside-fantrax-v1'); } catch (e) { /* the old one-league copy */ }
@@ -399,17 +425,17 @@ function saveLeague(id, res) {
   const keep = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, 5);
   try { localStorage.setItem(FX_CACHE_KEY, JSON.stringify(Object.fromEntries(keep))); } catch (e) { /* storage full or blocked */ }
 }
-// A league from this device if it's fresh enough, else from Fantrax (force: always from Fantrax)
+// A league from this device if it's fresh enough, else from its site (force: always from its site)
 async function getLeague(id, force) {
   const kept = force ? null : cachedLeague(id);
   if (kept) return kept;
-  const res = await fetchFantraxLeague(id);
+  const res = await (leagueSourceOf(id) === 'espn' ? fetchEspnLeague(id) : fetchFantraxLeague(id));
   saveLeague(id, res);
   delete rosterWeeksLoad[id]; // the current period's lineups may have changed
   return res;
 }
 
-// Pull the league fresh from Fantrax: matchups, rosters and lineups change during the week
+// Pull the league fresh from its site: matchups, rosters and lineups change during the week
 async function refreshLeague(force = true) {
   const id = state.fxLeagueId || (NBA.siteLeague && NBA.siteLeague.id);
   if (!id) return false;

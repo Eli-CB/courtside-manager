@@ -1,13 +1,13 @@
 # Courtside Manager: notes for working on this repo
 
-Fantasy basketball (Fantrax) weekly matchup site. Static GitHub Pages site, no build step, no backend.
+Fantasy basketball (Fantrax, and public ESPN leagues) weekly matchup site. Static GitHub Pages site, no build step, no backend.
 Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager). Owner's league:
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
 8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26).
 
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
-  scope; they must load in the order index.html lists: core, nba, info, fantrax, render, history, views,
+  scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, render, history, views,
   matchups, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
@@ -15,6 +15,9 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   - info: `INFO` texts for every (i) button (`infoBtn(key)`)
   - fantrax: `fxGet` (retries/backoff), `fxGetAll`, `fetchFantraxLeague`, league cache (`getLeague`, 6h), shared
     player list/ADP (daily), scoring (`fxScoring`: points or categories), keepers (`keepersOf`), name matching
+    (`matchPlayers`), which site an ID is on (`leagueSourceOf`, `parseLeagueId`, `sourceName`), `getJson` (shared retries)
+  - espn: `fetchEspnLeague` turns a public ESPN league into the same league shape (`source: 'espn'`), so every
+    tab works unchanged. "fx" names (`fxLeague`, `raw.fx`, `fxTeamSide`) mean "the league's site", either one.
   - render: `render()`, league/season bar (`ctxBar`), gear menu, past-season switching (`withSeason`,
     address `#tab/<seasonLeagueId>`), `viewLeague`/`myTeamId()` override
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
@@ -32,8 +35,8 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   `tests/fixtures` (refresh: `python tests/capture_fixtures.py`). Runs on every push (`.github/workflows/tests.yml`).
 
 ## Rules settled with the owner (keep them)
-- Everything follows each league's Fantrax settings (category list or point values, slots, daily vs weekly
-  lineups, playoffs). Never hard-code the owner's league.
+- Everything follows each league's own settings on Fantrax or ESPN (category list or point values, slots, daily
+  vs weekly lineups, playoffs). Never hard-code the owner's league.
 - Fantrax: minimize requests. League data cached on the device; manual ↻ Reload (gear menu) instead of
   loading fresh each visit. Weekly rosters fetched once per finished period. Shared player list/ADP once a day.
 - Keepers exist only if draft rounds < roster spots (starters + bench); keepers = opening-week roster minus
@@ -47,6 +50,14 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
 - Mobile matters: check phone width (375px); no page-level sideways scroll.
 
 ## Gotchas
+- ESPN (phase 1, Oct 2026): public leagues only; API is `lm-api-reads.fantasy.espn.com/apis/v3/games/fba/...`
+  (the old `/apps/fantasy/v3` path answers 403). One league request (views in `ESPN_LEAGUE_VIEWS`) plus ESPN's
+  player list (daily, needs the `X-Fantasy-Filter` header). ESPN sends no dates: day 1 = NBA opening night; weeks
+  Monday-Sunday with the All-Star week joined to the next (verified on ESPN's schedule page: 2027 Matchup 18 =
+  Feb 15-28), checked against `status.finalScoringPeriod`. Matchup numbers are ESPN's week numbers; weeks before
+  `status.firstScoringPeriod` aren't the league's. Season totals, Awards and past seasons are Fantrax-only
+  (`hasLineupHistory`); doing ESPN means one roster request per day (`mRoster&scoringPeriodId=N`) or its
+  transactions (`mTransactions2`). ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
 - `python serve.py` (preview config "site", port 5173) refreshes `data/` locally: never commit
   `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
 - stats.nba.com blocks GitHub runners. Past seasons live in `data/seasons/<season>.json` + `-games.json`

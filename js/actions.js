@@ -8,11 +8,11 @@
 const actions = {
   'nav-toggle'(el) { setNav(!document.body.classList.contains('nav-open')); },
   'clear-saved'() {
-    for (const k of SAVED_FANTRAX) { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } }
-    fxShared = null;
+    for (const k of SAVED_LEAGUE_DATA) { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } }
+    fxShared = null; espnShared = null;
     for (const id of Object.keys(rosterWeeksLoad)) delete rosterWeeksLoad[id];
     gearMenu();
-    toast('Cleared saved Fantrax data');
+    toast('Cleared saved league data');
   },
   'toggle-theme'() {
     const root = document.documentElement;
@@ -24,7 +24,7 @@ const actions = {
   },
   'fx-load-opp'() {
     const opp = fxOpponentFor(weekStart());
-    if (!opp) return toast('No Fantrax matchup found for this week');
+    if (!opp) return toast(`No ${sourceName()} matchup found for this week`);
     loadFxTeam(opp.id);
   },
   'fx-cycle'(el) {
@@ -127,9 +127,9 @@ const actions = {
       delete seasonTot[fxLeague().id];
       delete curAwards[fxLeague().id];
       if (gameLogs.cur) delete gameLogs.cur;
-      commit(`Reloaded ${fxLeague().name} from Fantrax`);
+      commit(`Reloaded ${fxLeague().name} from ${sourceName()}`);
     } catch (e) {
-      toast(`Couldn't reach Fantrax (${e.message})`);
+      toast(`Couldn't reload from ${sourceName()} (${e.message})`);
       el.disabled = false; el.textContent = label;
     }
   },
@@ -230,7 +230,7 @@ const forms = {
   async 'add-season'(f) {
     const id = f.sid.value.trim();
     const L = fxLeague();
-    if (!/^[A-Za-z0-9]{6,32}$/.test(id)) return toast("That doesn't look like a Fantrax league ID. It's letters and numbers only.");
+    if (leagueSourceOf(id) !== 'fantrax' || !parseLeagueId(id)) return toast("That doesn't look like a Fantrax league ID. It's letters and numbers only.");
     if (id === L.id) return toast("That's this season's league.");
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true; btn.textContent = 'Adding…';

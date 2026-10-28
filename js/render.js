@@ -61,7 +61,7 @@ function leagueMenu() {
 
 // ----- Past seasons -----
 // Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
-// (keyed by Fantrax's league history id); a past season gets its own tabs.
+// (keyed by Fantrax's league history id); a past season gets its own tabs. Fantrax leagues only, so far.
 const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
@@ -108,7 +108,7 @@ function ctxBar() {
   const seasons = seasonsFor(L);
   const seasonSel = `<select class="ctx-team ctx-season" data-change="season" aria-label="Season">
       <option value="">${esc(L.year ? seasonLabel(L.year) : NBA ? NBA.season : 'This season')}</option>${seasons.map(x => `<option value="${esc(x.id)}" ${x.id === ui.season ? 'selected' : ''}>${x.year ? seasonLabel(x.year) : 'Past season'}</option>`).join('')}
-      <option value="add">+ Add season…</option></select>`;
+      ${hasLineupHistory(L) ? '<option value="add">+ Add season…</option>' : ''}</select>`;
   const addForm = ui.addingSeason ? `<form class="ctx-add" data-form="add-season">
       <input name="sid" placeholder="Past season's league ID" autocomplete="off" spellcheck="false" aria-label="Past season's Fantrax league ID" title="Open that season on Fantrax; the ID is the part of the address after /league/">
       <button class="btn sm primary" type="submit">Add</button><button class="btn sm ghost" type="button" data-action="season-cancel">Cancel</button></form>` : '';
@@ -144,9 +144,10 @@ function ctxBar() {
   $('#ctxMeta').hidden = !notes.length;
 }
 
-// Settings (the gear at the right of the tab bar): data freshness, reloading from Fantrax, the theme
+// Settings (the gear at the right of the tab bar): data freshness, reloading the league, the theme
 // What this site keeps in the browser (about 5 MB is allowed), counted in characters
-const SAVED_FANTRAX = ['courtside-fantrax-v2', 'courtside-fantrax-shared-v1', 'courtside-roster-weeks-v2'];
+// (league data from Fantrax and ESPN: what "Clear saved league data" removes)
+const SAVED_LEAGUE_DATA = ['courtside-fantrax-v2', 'courtside-fantrax-shared-v1', 'courtside-espn-shared-v1', 'courtside-roster-weeks-v2'];
 function savedSize() {
   let n = 0;
   try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('courtside-')) n += k.length + (localStorage.getItem(k) || '').length; } } catch (e) { return 'unknown'; }
@@ -164,9 +165,9 @@ function gearMenu() {
     <div class="gear-pop">
       <div class="lm-sec">Data</div>
       <div class="gear-row">${NBA ? `NBA stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable'}</div>
-      ${league ? '<button type="button" class="lm-item" data-action="league-reload">↻ Reload from Fantrax<span class="gear-sub">rosters, lineups, matchups and standings</span></button>' : ''}
+      ${league ? `<button type="button" class="lm-item" data-action="league-reload">↻ Reload from ${sourceName()}<span class="gear-sub">rosters, lineups, matchups and standings</span></button>` : ''}
       <div class="gear-row">Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
-      <button type="button" class="lm-item" data-action="clear-saved">Clear saved Fantrax data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
+      <button type="button" class="lm-item" data-action="clear-saved">Clear saved league data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
     </div>

@@ -83,7 +83,7 @@ function draftList(title, list, mine, info) {
 function viewDraft() {
   const d = draftData();
   if (!d) {
-    return `<div class="card"><div class="empty"><strong>No draft results</strong>Fantrax didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>No draft results</strong>${sourceName()} didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
   }
   const mine = myTeamId();
   const best = [...d.picks].filter(p => p.gp).sort((a, b) => (b.gain - a.gain) || (b.score - a.score)).slice(0, 10);
@@ -209,16 +209,19 @@ function leagueLineupMode(league) {
   return days >= 5 ? 'weekly' : 'daily';
 }
 
-// Switch the whole app to a Fantrax league by ID. Throws a readable message.
-async function switchLeague(id) {
-  if (!/^[A-Za-z0-9]{6,32}$/.test(id || '')) throw new Error("That doesn't look like a Fantrax league ID. It's letters and numbers only.");
+// Switch the whole app to a Fantrax or ESPN league by ID (or the league's address). Throws a readable message.
+async function switchLeague(input) {
+  const id = parseLeagueId(input);
+  if (!id) throw new Error(BAD_LEAGUE_ID);
   if (!NBA) await nbaLoading;
   if (!NBA) throw new Error("Couldn't load NBA data. Check your connection and try again.");
   let res;
   try {
     res = await getLeague(id);
   } catch (e) {
-    throw new Error(`Fantrax didn't find that league (${e.message}). Check the ID in your league's address.`);
+    const site = SOURCE_NAME[leagueSourceOf(id)];
+    if (e.message === 'private league') throw new Error("That ESPN league is private, so ESPN won't share it. Only public ESPN leagues can be loaded; the league manager can make it viewable to the public in the league's settings.");
+    throw new Error(`${site} didn't find that league (${e.message}). Check the ID in your league's address.${site === 'ESPN' ? ' Only public ESPN leagues can be loaded.' : ''}`);
   }
   const wasCurrent = currentLeagueId() === id;
   ui.season = null; ui.addingSeason = false; ui.pastTeam = null;
@@ -274,20 +277,24 @@ function viewLanding() {
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const step1 = chosen ? '' : `
       <p class="land-step">${ui.addingLeague && state.fxTeam ? 'Add a league' : 'Courtside Manager'}</p>
-      <h1>${ui.addingLeague && state.fxTeam ? 'Connect another Fantrax league' : 'Plan your fantasy basketball week'}</h1>
-      <p class="muted">${ui.addingLeague && state.fxTeam ? "Enter its league ID. Each league keeps its own team and notes, and you can switch between them from the menu at the top." : "Connect your Fantrax league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
+      <h1>${ui.addingLeague && state.fxTeam ? 'Connect another league' : 'Plan your fantasy basketball week'}</h1>
+      <p class="muted">${ui.addingLeague && state.fxTeam ? "Enter its league ID. Each league keeps its own team and notes, and you can switch between them from the menu at the top." : "Connect your Fantrax or ESPN league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
       <form class="land-form" data-form="land-league">
-        <label class="field" for="landLeague">Fantrax league ID
-          <input id="landLeague" name="leagueId" placeholder="e.g. abc123def456" autocomplete="off" spellcheck="false" autofocus>
+        <label class="field" for="landLeague">League ID or address
+          <input id="landLeague" name="leagueId" placeholder="Fantrax or ESPN league ID" autocomplete="off" spellcheck="false" autofocus>
         </label>
         <button class="btn primary" type="submit">Connect league</button>
       </form>
       <p class="form-error" id="landMsg" role="alert"></p>
       <details class="land-help">
         <summary>Where do I find my league ID?</summary>
-        <p>Open your league on fantrax.com. The ID is the part of the address right after <b>/league/</b>:<br>
+        <p><b>Fantrax:</b> open your league on fantrax.com. The ID is the part of the address right after <b>/league/</b>:<br>
         <span class="land-url">fantrax.com/fantasy/league/<b>abc123def456</b>/home</span></p>
+        <p><b>ESPN:</b> open your league on espn.com. The ID is the number after <b>leagueId=</b>:<br>
+        <span class="land-url">fantasy.espn.com/basketball/league?leagueId=<b>12345678</b></span><br>
+        Only public ESPN leagues can be loaded.</p>
+        <p>Pasting the whole address works too.</p>
       </details>
-      <p class="small muted land-foot">Built for head-to-head category leagues on Fantrax. ${ui.addingLeague && state.fxTeam ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
+      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax and ESPN. ${ui.addingLeague && state.fxTeam ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
 }

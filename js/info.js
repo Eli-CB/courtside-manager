@@ -8,7 +8,7 @@ const INFO = {
     <p><b>Projected totals.</b> For each category we add up every starter's per-game average × the games they play on your matchup days (from the NBA schedule). Players who are Out count zero. Bench games never count while lineups are locked for the week.</p>
     <p><b>Uncertainty.</b> Each player's game-to-game spread (standard deviation) comes from his NBA game logs: last season plus this season, games of 10+ minutes, at least 8 games. Spreads add up across every starter game, so a team's weekly total has a known range.</p>
     <p><b>Category win chance.</b> For counting stats: the chance your total beats theirs, using a bell curve with the gap divided by the combined spread. Turnovers are reversed (fewer wins). FG% and FT% use team makes ÷ attempts, with shot-making luck (binomial, widened 30%) as the spread.</p>
-    <p><b>Lineups.</b> Both teams' starters as set on Fantrax. Projections use the stats chosen in the league menu (smart blend by default).</p>
+    <p><b>Lineups.</b> Both teams' starters as set on your league's site. Projections use the stats chosen in the league menu (smart blend by default).</p>
     <p><b>Points leagues.</b> Each side's projected fantasy points come from those totals × your league's points per stat. The spread combines every stat's spread, assuming stats in a game move together somewhat (correlation 0.35), and the win chance is the chance of outscoring them on that bell curve. The suggested lineup maximizes that chance, then projected points. We project points, rebounds (offensive and defensive too), assists, steals, blocks, turnovers, threes made and attempted, field goals and free throws made, attempted and missed, two-pointers, double-doubles and triple-doubles (as how often a player gets one), fouls, plus/minus, minutes and games played. Anything else your league scores, like technicals, percentages or position-specific points, is left out and listed in the top bar.</p>
     <p><b>Winning the week.</b> Categories are treated as independent, and we add up the chances of every way to take more than half of them. The projected category score is the sum of the category win chances.</p>`],
   suggest: ['How lineup suggestions work', `
@@ -33,13 +33,13 @@ const INFO = {
   value: ['Player value', `
     <p>Value is the sum of a player's contributions per game in each of your league's categories, each measured against an average rostered player (see Stat shading for the exact averages). +5 is an elite all-around player; around 0 is replacement level in a 12-team league.</p>
     <p>FG% and FT% count shot volume, and turnovers count against.</p>
-    <p><b>Points leagues:</b> value is fantasy points per game (FP/G), using your league's points for each stat from Fantrax.</p>`],
+    <p><b>Points leagues:</b> value is fantasy points per game (FP/G), using your league's points for each stat.</p>`],
   projection: ['Which stats are used', `
     <p><b>Smart blend (default):</b> this season's averages with 10 games of last season mixed in: (this season × games played + last season × 10) ÷ (games played + 10). Early on it leans on last season; after a month or two it's mostly this season.</p>
     <p>Switch to this season only, last season only, or the last 10 games from the league menu at the top.</p>`],
   strengths: ['Category strengths', `
     <p><b>You.</b> Your players' real per-game numbers: the average per player for counting stats (starters, or your whole active roster), and team FG% and FT% as total makes ÷ total attempts.</p>
-    <p><b>League avg.</b> The same number averaged across every team in your Fantrax league, using each team's current roster and lineup.</p>
+    <p><b>League avg.</b> The same number averaged across every team in your league, using each team's current roster and lineup.</p>
     <p><b>Bar.</b> How far you are from that league average, measured in the typical gap between teams (one standard deviation across the league). The bar reaches the edge at two gaps above or below. Fewer turnovers counts as above average.</p>
     <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
     <p><b>Who helped and hurt.</b> Click a category's row to show the players who helped most (green) and hurt most (red). Each player's own per-game number in that category, compared with the league average in the same row. For FG% and FT% it's their percentage and attempts a game ("<b>.700</b> on 6.2 FTA"), ranked by makes above or below what the league average would give at that volume, so a poor shooter who takes a lot of shots hurts more than one who rarely shoots. Hover a name for the detail.</p>
@@ -58,8 +58,8 @@ const INFO = {
     <li><b>Missed:</b> games his NBA team played in those weeks without him (injury, rest or a coach's decision).</li>
     <li><b>Value:</b> each game valued against an average rostered player's game (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
   storage: ['Saved on this device', `
-    <p>To keep requests to Fantrax low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), Fantrax's player list and ADP (refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
-    <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved Fantrax data</b> removes only what came from Fantrax; it's fetched again the next time it's needed.</p>`],
+    <p>To keep requests to Fantrax and ESPN low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), each site's player list (and Fantrax's ADP, refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
+    <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved league data</b> removes only what came from Fantrax and ESPN; it's fetched again the next time it's needed.</p>`],
   awDraft: ['Best draft', `
     <p>Everything a team's draft picks produced over the season: every game each pick played from the draft until he was first <b>dropped</b> to free agency, whether he was starting or on the bench. A pick who's <b>traded</b> keeps counting for the team that drafted him; one who's dropped stops counting (if someone picks him up later, that's their Waiver Wire Wizard).</p>
     <p>In category leagues each game is valued against a <b>replacement-level starter</b> (the per-game value of the last player who'd start in your league), so every game by a player worth starting adds to the total and staying healthy pays. Points leagues add up fantasy points.</p>
@@ -104,8 +104,8 @@ const INFO = {
   data: ['Where the data comes from', `
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>
-    <li><b>Fantrax:</b> your league's position eligibility, every team's roster and lineup, matchups, and who's available.</li></ul>
-    <p>NBA stats, box scores and injuries refresh every night at about 4 a.m. Eastern, after the last games finish. The site's own league gets its Fantrax data (rosters, lineups, matchups, draft) in that same refresh; other leagues are saved on this device for up to 6 hours. For the latest from Fantrax any time, use ↻ Reload from Fantrax in the ⚙ menu.</p>`],
+    <li><b>Fantrax or ESPN</b> (wherever your league is): your league's position eligibility, every team's roster and lineup, matchups, and who's available.</li></ul>
+    <p>NBA stats, box scores and injuries refresh every night at about 4 a.m. Eastern, after the last games finish. The site's own league gets its Fantrax data (rosters, lineups, matchups, draft) in that same refresh; other leagues are saved on this device for up to 6 hours. For the latest from your league's site any time, use ↻ Reload in the ⚙ menu.</p>`],
 };
 
 const infoBtn = key => `<button type="button" class="info-btn" data-action="info" data-key="${key}" aria-label="How this is calculated" title="How this is calculated">i</button>`;

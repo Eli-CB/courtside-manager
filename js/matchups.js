@@ -372,12 +372,15 @@ function statsBoard(ctx, myStarters, myBench, oppStarters, oppBench) {
 
 function matchupBoard(ctx) {
   const mySlots = state.slots.map((_, i) => byId(state.lineup[i]));
-  const oppStarters = ctx.opp.filter(p => ctx.oppIds && ctx.oppIds.has(p.id)).sort((a, b) => value(b) - value(a));
+  // weekly lineups: the starters the projection uses; daily: their lineup as set now (like yours), while
+  // each day's best lineup is what's projected
+  const oppOn = ctx.oppIds || new Set(Array.isArray(state.opp.starters) ? state.opp.starters : []);
+  const oppStarters = ctx.opp.filter(p => oppOn.has(p.id)).sort((a, b) => value(b) - value(a));
   const oppSlotIds = fillSlots(oppStarters, state.slots);
   const oppById = new Map(ctx.opp.map(p => [p.id, p]));
   const prio = p => weeklyPriority(p, ctx.dates);
   const myBench = benchPlayers().sort((a, b) => prio(b) - prio(a));
-  const oppBench = ctx.opp.filter(p => !(ctx.oppIds && ctx.oppIds.has(p.id))).sort((a, b) => prio(b) - prio(a));
+  const oppBench = ctx.opp.filter(p => !oppOn.has(p.id)).sort((a, b) => prio(b) - prio(a));
   const sched = ui.boardMode === 'sched';
   const legend = sched
     ? ''
@@ -518,7 +521,7 @@ function viewWeek() {
       <div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
       <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>
       ${changed ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'points' : 'cats'} · ${pctTxt(oSet.win)} to win · ${asSet.games} starter games</div></div>` : ''}
-    </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from Fantrax</button>` : 'Fantrax has no matchup for you this week.'}</div></div>`;
+    </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from ${sourceName()}</button>` : `${sourceName()} has no matchup for you this week.`}</div></div>`;
 
   // Daily-lineup leagues keep the day-by-day swap list
   let dailyCards = '';

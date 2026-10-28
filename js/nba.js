@@ -88,16 +88,16 @@ async function loadNba(fresh = false) {
     if (NBA.league && NBA.league.scoringSystem) Object.assign(NBA.league, fxScoring(NBA.league.scoringSystem));
     fillBase();
     NBA.siteLeague = NBA.league;
-    // a reload from Fantrax since this morning's file beats the file
+    // a reload from Fantrax since this morning's file beats the file (the site's own league is on Fantrax)
     const fresher = NBA.league && !state.fxLeagueId ? cachedLeague(NBA.league.id) : null;
     if (fresher) applyFantraxLeague(withSiteExtras(fresher));
     const other = state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId);
     if (other) {
-      // someone else's league: from this device if it's fresh, else from Fantrax
+      // someone else's league: from this device if it's fresh, else from its site
       try {
         await refreshLeague(false);
       } catch (e) {
-        toast(`Couldn't load your Fantrax league right now. Showing ${NBA.league ? NBA.league.name : 'the site league'}.`);
+        toast(`Couldn't load your ${SOURCE_NAME[leagueSourceOf(state.fxLeagueId)]} league right now. Showing ${NBA.league ? NBA.league.name : 'the site league'}.`);
       }
     }
     if (state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
@@ -365,10 +365,11 @@ function matchOdds(cats) {
 }
 
 // How a week is decided. "most": one win for taking more categories (Fantrax
-// HEAD_TO_HEAD_ROTI_SINGLE_WIN). "each": every category counts in the standings.
+// HEAD_TO_HEAD_ROTI_SINGLE_WIN, ESPN H2H_MOST_CATEGORIES). "each": every category counts in the standings.
+const mostCatsWins = scoring => /SINGLE_WIN|MOST_CATEGORIES/.test(scoring || '');
 function matchupScoring() {
   const L = fxLeague();
-  if (L && L.scoring) return /SINGLE_WIN/.test(L.scoring) ? 'most' : 'each';
+  if (L && L.scoring) return mostCatsWins(L.scoring) ? 'most' : 'each';
   return 'most';
 }
 

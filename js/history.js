@@ -28,6 +28,7 @@ function loadRosterWeeks(L) {
   return rosterWeeksLoad[L.id];
 }
 async function fetchRosterWeeks(L) {
+  if (!hasLineupHistory(L)) return null; // only Fantrax shares each period's rosters, so far
   const all = readRosterWeeks();
   const have = { ...((all[L.id] || {}).p || {}) };
   const today = todayIso();
@@ -476,7 +477,7 @@ function seasonAwards() {
   const G = L.season ? gameLogs[L.season] : null;
   if (!L.weeks || !G) return null;
   const teams = fxPickable().map(t => ({ id: t.id, name: t.name }));
-  const each = matchupScoring() === 'each' || !/SINGLE_WIN/.test(L.scoring || '');
+  const each = matchupScoring() === 'each' || !mostCatsWins(L.scoring);
 
   // Best manager: actual wins against an all-play record
   const allPlay = allPlayRecords(L, G, each);
@@ -546,6 +547,7 @@ const curAwards = {}; // league id -> { weeks, fidNba } once loaded
 function viewAwardsSoFar() {
   const L = fxLeague();
   if (!L || !NBA) return '';
+  if (!hasLineupHistory(L)) return `<div class="card"><div class="empty"><strong>No awards for ${esc(sourceName(L))} leagues yet</strong>Awards come from every day's lineups, which the site reads from Fantrax only for now.</div></div>`;
   const C = curAwards[L.id];
   if (!C) {
     curAwards[L.id] = { loading: true };

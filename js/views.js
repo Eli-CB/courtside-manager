@@ -250,7 +250,7 @@ function viewRoster() {
       </tbody>
       <tfoot><tr><td colspan="4"><b>Active totals</b></td>
         ${cats.map(c => `<td class="num"><b>${fmtC(c, total(c))}</b></td>`).join('')}${isPoints() ? '' : '<td></td>'}</tr></tfoot>
-    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from Fantrax. Use ↻ Reload from Fantrax in the league menu to pull the latest.</div>`}
+    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from ${sourceName()}. Use ↻ Reload from ${sourceName()} in the ⚙ menu to pull the latest.</div>`}
   </div>
   </div>`;
 }
@@ -269,7 +269,7 @@ function viewStandings() {
         return `<tr${r.id === myTeamId() ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.id === myTeamId() ? ' <span class="muted small">(you)</span>' : ''}</td>
           <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td>${rows.some(x => x.pf != null) ? `<td class="num">${r.pf != null ? fmt(r.pf, 1) : '—'}</td>` : ''}</tr>`;
       }).join('')}</tbody>
-    </table></div>` : `<div class="empty"><strong>No standings yet</strong>Fantrax didn't return standings for this league.</div>`}
+    </table></div>` : `<div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div>`}
   </div>
   ${L ? seasonTotalsCard(L, rows) : ''}`;
 }
@@ -360,6 +360,8 @@ function seasonTotalsCard(L, standings) {
     }
     if (!gameLogs[L.season]) return note('No NBA game logs are saved for this season (the site has 2016-17 on).');
     teams = pastSeasonTotals(L, gameLogs[L.season]);
+  } else if (!hasLineupHistory(L)) {
+    return note(`Season totals need every day's lineups, which the site reads from Fantrax only for now, not ${sourceName(L)}.`);
   } else {
     const id = L.id;
     const S = seasonTot[id];
@@ -423,7 +425,7 @@ function viewTrade() {
   const pick = (list, set, side, key) => list.length ? `<ul class="pick-list">${[...list].sort((a, b) => value(b) - value(a)).map(p => `
     <li><label><input type="checkbox" data-change="trade" data-side="${side}" value="${key(p)}" ${set.has(key(p)) ? 'checked' : ''}>
       <span class="grow">${playerCell(p)}</span>${p.status !== 'Healthy' ? statusBadge(p) : ''}<span class="val">${fmtValue(value(p))}</span></label></li>`).join('')}</ul>`
-    : `<p class="muted small">${side === 'get' ? (others.length ? 'This team has no players yet.' : 'Connect a Fantrax league to trade with its teams.') : 'Your roster is empty.'}</p>`;
+    : `<p class="muted small">${side === 'get' ? (others.length ? 'This team has no players yet.' : 'Connect a league to trade with its teams.') : 'Your roster is empty.'}</p>`;
 
   const give = [...ui.tradeGive].map(byId).filter(Boolean);
   const get = theirs.filter(p => ui.tradeGet.has(String(p.nbaId)));

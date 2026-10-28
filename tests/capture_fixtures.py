@@ -22,11 +22,24 @@ LEAGUES = {
 }
 PAST_PERIODS = {'my19c8mwmoipvhon': [1], 'czqgnyozmf2tbr93': list(range(1, 22))}  # finished lineup periods: season totals; every week of last season (trades vs pickups)
 
+# ESPN: the same requests js/espn.js makes (public leagues only)
+ESPN = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/2027'
+ESPN_LEAGUES = {'794342666': 'H2H points, daily lineups, starts in week 3'}
+ESPN_LEAGUE_VIEWS = 'view=mSettings&view=mTeam&view=mRoster&view=mMatchupScore&view=mDraftDetail&view=mStatus'
 
-def get(path):
-    req = urllib.request.Request(FX + path, headers=HEADERS)
+
+def get(path, base=FX, headers=None):
+    req = urllib.request.Request(base + path, headers={**(HEADERS if base == FX else {}), **(headers or {})})
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.loads(r.read().decode('utf-8'))
+
+
+def strip_espn_stats(league):
+    """Rostered players come with their stat lines (most of the 1.4 MB); the site doesn't use them."""
+    for t in league.get('teams', []):
+        for e in t.get('roster', {}).get('entries', []):
+            e.get('playerPoolEntry', {}).get('player', {}).pop('stats', None)
+    return league
 
 
 def save(name, data):
@@ -45,6 +58,9 @@ def main():
             save(f'fantrax/{lid}/{ep}.json', get(f'{ep}?leagueId={lid}'))
         for n in PAST_PERIODS.get(lid, []):
             save(f'fantrax/{lid}/getTeamRosters-{n}.json', get(f'getTeamRosters?leagueId={lid}&period={n}'))
+    save('espn/players.json', get('/players?scoringPeriodId=0&view=players_wl', ESPN, {'X-Fantasy-Filter': json.dumps({'filterActive': {'value': True}})}))
+    for lid in ESPN_LEAGUES:
+        save(f'espn/{lid}/league.json', strip_espn_stats(get(f'/segments/0/leagues/{lid}?{ESPN_LEAGUE_VIEWS}', ESPN)))
     for name in ('players.json', 'boxscores.json', 'seasons/2025-26.json', 'seasons/2025-26-games.json'):
         os.makedirs(os.path.dirname(os.path.join(OUT, name)), exist_ok=True)
         shutil.copy(os.path.join(ROOT, 'data', name), os.path.join(OUT, name))
