@@ -188,6 +188,10 @@ const actions = {
     ui.perfRange = el.dataset.range;
     render();
   },
+  'perf-show'(el) {
+    ui.perfShow[el.dataset.group] = !ui.perfShow[el.dataset.group];
+    render();
+  },
   'perf-sort'(el) {
     nextSort(ui.perfSort, el.dataset.key, el.dataset.key === 'name' ? 1 : -1);
     render();

@@ -660,6 +660,39 @@ test('performances: everyone who played in one table, top 50 by the sorted colum
   } finally { app.ui.perfSort = { key: 'v', dir: -1 }; }
 });
 
+test('performances: filter by my team, the opponent, waivers and other teams', async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(CATS9);
+  const day = app.perfDays().day;
+  const owned = new Map(Object.entries(L.rosters).flatMap(([tid, r]) => r.filter(x => x.nba).map(x => [x.nba, tid])));
+  // my team: whoever has the most players in that day's games
+  const played = app.perfRows([day]);
+  const per = {};
+  for (const r of played) { const t = owned.get(r.raw.id); if (t) per[t] = (per[t] || 0) + 1; }
+  const me = Object.keys(per).sort((a, b) => per[b] - per[a])[0];
+  const was = app.state.fxTeam;
+  app.state.fxTeam = me;
+  const ids = html => [...(html.split('<tbody>')[1] || '').matchAll(/data-nba="(\d+)"/g)].map(m => +m[1]);
+  const count = html => +html.match(/· (?:\d+ of )?(\d+) players?</)[1];
+  try {
+    let html = app.topPerformancesCard();
+    assert.ok(['me', 'fa', 'other'].every(k => html.includes(`data-group="${k}" aria-pressed="true"`)), 'all on by default');
+    assert.equal(count(html), played.length);
+    for (const k of ['opp', 'fa', 'other']) app.ui.perfShow[k] = false;
+    html = app.topPerformancesCard();
+    assert.equal(count(html), per[me]);
+    assert.ok(ids(html).every(id => owned.get(id) === me), 'only my players');
+    app.ui.perfShow.me = false; app.ui.perfShow.fa = true;
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).length && ids(html).every(id => !owned.has(id)), 'only players not on a roster');
+    app.ui.perfShow.fa = false;
+    assert.match(app.topPerformancesCard(), /No players match/);
+  } finally {
+    app.state.fxTeam = was;
+    Object.assign(app.ui.perfShow, { me: true, opp: true, fa: true, other: true });
+  }
+});
+
 test("player photos get a ring and background in their NBA team's colors", async () => {
   await app.ready();
   const raw = app.NBA.players.find(r => r.team === 'BOS');

@@ -211,11 +211,17 @@ function topPerformancesCard() {
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
   const rows = perfRows(dates, expected);
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
+  // filter by whose players they are: yours, this matchup's opponent's, unrostered (waivers), other teams'
+  const opp = owner.size && mine ? fxOpponentFor(dates[0], mine) : null;
+  const groupOf = r => { const tid = owner.get(r.raw.id); return !tid ? 'fa' : tid === mine ? 'me' : opp && tid === opp.id ? 'opp' : 'other'; };
+  const groups = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['fa', 'Waivers'], ['other', 'Other teams']];
+  const filters = !owner.size ? '' : `<div class="perf-filters" role="group" aria-label="Show players from">${groups.map(([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${l}</button>`).join('')}</div>`;
+  const picked = owner.size ? rows.filter(r => ui.perfShow[groupOf(r)]) : rows;
   const so = ui.perfSort;
   const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0 });
-  const shown = [...rows].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; }).slice(0, 50);
-  const count = `${rows.length > shown.length ? `${shown.length} of ` : ''}${rows.length} players`;
-  const table = !rows.length ? '' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
+  const shown = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; }).slice(0, 50);
+  const count = `${picked.length > shown.length ? `${shown.length} of ` : ''}${picked.length} player${picked.length === 1 ? '' : 's'}`;
+  const table = !rows.length ? '' : !shown.length ? '<p class="muted small" style="margin:0">No players match these filters.</p>' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
       <thead><tr>${th('name', 'Player', 'pf-name')}${cats.map(c => th(c.key, c.label, 'sc')).join('')}${th('v', pts ? 'FP' : 'Value', 'num pf-v')}</tr></thead>
       <tbody>${shown.map(r => `<tr>
         <td class="pf-name"><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 28)}<div class="bmain">
@@ -225,7 +231,7 @@ function topPerformancesCard() {
         <td class="num pf-v${r.v < par ? ' pos-bad' : ''}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 1)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
-  return card(toggle, `<p class="muted small perf-when">${when} · ${count}</p>${table}`);
+  return card(toggle, `<p class="muted small perf-when">${when} · ${count}</p>${filters}${table}`);
 }
 
 function newsCard() {

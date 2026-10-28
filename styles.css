@@ -174,6 +174,10 @@ a { color: var(--accent); }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: -6px 0 10px; }
+.perf-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.pill { font: inherit; font-size: .8rem; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+.pill:hover { background: var(--surface-2); }
+.pill.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
 .perf-wrap { overflow: auto; margin: 0 0 14px; } /* no padding: pinned columns stick to its edges */
 .perf-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .perf-table th, .perf-table td { padding: 6px 4px; }
