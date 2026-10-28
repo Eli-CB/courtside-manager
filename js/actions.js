@@ -184,6 +184,16 @@ const actions = {
     el.textContent = 'Refresh stats';
     toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : "Couldn't reach the local data server");
   },
+  'perf-range'(el) {
+    ui.perfRange = el.dataset.range;
+    render();
+  },
+  // Best lists start best first, Worst lists worst first
+  'perf-sort'(el) {
+    const list = el.dataset.list;
+    nextSort(ui.perfSort[list], el.dataset.key, el.dataset.key === 'name' || list === 'worst' ? 1 : -1);
+    render();
+  },
   'tot-sort'(el) {
     const k = el.dataset.key;
     const key = /^\d+$/.test(k) ? +k : k;

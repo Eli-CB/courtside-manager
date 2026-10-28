@@ -24,7 +24,7 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards, past Rosters
-  - views: Dashboard, Roster, Standings + Season totals, Trades, Free Agents + recommended adds
+  - views: Dashboard (Performances: last game day or this week, sortable tables), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
   - matchups: Matchups tab, schedule dots, stat tables, tooltips
   - draft: Draft tab/board, saved leagues, landing page
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`

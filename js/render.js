@@ -200,19 +200,19 @@ function render() {
   if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
   const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade };
   // keep scroll position of inner lists (e.g. trade picker, performances) across re-renders
-  const inner = '.pick-list, .perf.scroll';
-  const scrolls = [...document.querySelectorAll(inner)].map(el => el.scrollTop);
+  const inner = '.pick-list, .perf-wrap.scroll';
+  const scrolls = [...document.querySelectorAll(inner)].map(el => [el.scrollTop, el.scrollLeft]);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
   fitPerfLists();
-  document.querySelectorAll(inner).forEach((el, i) => { el.scrollTop = scrolls[i] || 0; });
+  document.querySelectorAll(inner).forEach((el, i) => { [el.scrollTop, el.scrollLeft] = scrolls[i] || [0, 0]; });
 }
 
-// Long performance lists show their first 5 rows (and a peek of the 6th, so it's clear they scroll).
-// Rows change height when stat lines wrap, so this measures them; it runs again when the window resizes.
+// Long performance tables show their first 5 rows (and a peek of the 6th, so it's clear they scroll).
+// Rows change height when names or stats wrap, so this measures them; it runs again when the window resizes.
 function fitPerfLists() {
-  document.querySelectorAll('.perf.scroll').forEach(ul => {
-    const sixth = ul.children[5];
-    if (sixth) ul.style.maxHeight = `${sixth.offsetTop + 22}px`;
+  document.querySelectorAll('.perf-wrap.scroll').forEach(wrap => {
+    const sixth = wrap.querySelectorAll('tbody tr')[5];
+    if (sixth) wrap.style.maxHeight = `${sixth.getBoundingClientRect().top - wrap.getBoundingClientRect().top + wrap.scrollTop + 22}px`;
   });
 }
 

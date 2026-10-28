@@ -30,6 +30,11 @@ const INFO = {
     <li><b>Light green ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
     <p>Hover any played game for his minutes and stat line. The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
+  perf: ['Performances', `
+    <p><b>Ranking.</b> Each player's stat line counts like player value: every one of your league's categories against an average rostered player's game, added up. In points leagues it's fantasy points.</p>
+    <p><b>Best and Worst.</b> Best is every NBA player whose line beat an average rostered player's (value above 0; in points leagues, more fantasy points than a typical rostered player scores in that many games). Worst is lines below that, only from players rostered in your league. No one is on both.</p>
+    <p><b>This week.</b> Adds up each player's games on this matchup's days that have been played. It appears once the week has more than one day of games.</p>
+    <p><b>Columns.</b> Click one to sort by it. Categories sort by how much they helped, so the fewest turnovers and the most valuable shooting come first. Shading is per game, as on the Matchups tables. Hover a percentage for makes and attempts.</p>`],
   value: ['Player value', `
     <p>Value is the sum of a player's contributions per game in each of your league's categories, each measured against an average rostered player (see Stat shading for the exact averages). +5 is an elite all-around player; around 0 is replacement level in a 12-team league.</p>
     <p>FG% and FT% count shot volume, and turnovers count against.</p>

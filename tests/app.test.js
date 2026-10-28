@@ -581,18 +581,47 @@ test('ESPN: leagues are reused from the device, the player list fetched once, pr
   try { await assert.rejects(app.fetchEspnLeague('123456'), /private league/); } finally { app.fetch = realFetch; }
 });
 
-test("performances show each game in the league's own stats", async () => {
-  const line = { pts: 29, reb: 6, ast: 11, stl: 5, blk: 3, to: 5, fgm: 12, fga: 23, ftm: 3, fta: 3, tpm: 2, tpa: 6, dd: 1, td: 0, min: 40 };
-  const text = r => r.stats.join(' · ').replace(/<\/?span>/g, '');
+// run fn as if it were noon Eastern on that day
+async function onDay(iso, fn) {
+  const RealDate = app.Date;
+  const at = Date.parse(`${iso}T12:00:00-04:00`);
+  app.Date = class extends RealDate { constructor(...a) { super(...(a.length ? a : [at])); } static now() { return at; } };
+  try { return await fn(); } finally { app.Date = RealDate; }
+}
+
+test('performances: the latest game day, and this week once it has more than that day', async () => {
+  await app.loadBoxes();
   await app.useLeague(CATS9);
-  assert.equal(text(app.perfStats(line)), '12-23 FG · 3-3 FT · 2 3PM · 29 PTS · 6 REB · 11 AST · 5 STL · 3 BLK · 5 TO', 'the categories, in order');
-  await app.useLeague(ESPN);
-  const pts = app.perfStats(line);
-  assert.equal(text(pts), '29 PTS · 6 REB · 11 AST · 5 STL · 3 BLK · 2 3PM · 5 TO · 12-23 FG · 3-3 FT', 'every stat worth points, makes and attempts together');
-  assert.ok(pts.shown.has('fga') && pts.shown.has('fta'));
+  const days = iso => onDay(iso, () => app.perfDays());
+  assert.deepEqual(JSON.parse(JSON.stringify(await days('2026-10-20'))), { day: '2026-10-20', week: null }, "Tuesday: the week so far is just Monday's games, so no toggle");
+  assert.deepEqual(JSON.parse(JSON.stringify(await days('2026-10-21'))), { day: '2026-10-21', week: ['2026-10-20', '2026-10-21'] }, 'Wednesday: the days played so far');
+  assert.deepEqual(JSON.parse(JSON.stringify(app.perfDays())), { day: '2026-10-25', week: null }, "Monday: last night was last week's");
+  const html = app.topPerformancesCard();
+  assert.ok(!html.includes('data-action="perf-range"'), 'no toggle when both would show the same');
+  await onDay('2026-10-21', () => {
+    const toggle = app.topPerformancesCard();
+    assert.ok(toggle.includes('data-range="week"') && toggle.includes('>Today<'), 'the toggle, named for the day');
+  });
 });
 
-test('performances: best games helped, worst games hurt, and no one is on both lists', async () => {
+test("performances: this week adds up each player's games", async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const dates = ['2026-10-23', '2026-10-24', '2026-10-25'];
+  const rows = app.perfRows(dates);
+  const r = rows.find(x => x.g >= 2);
+  const lines = dates.map(d => app.BOX.day.get(r.raw.id).get(d)).filter(Boolean);
+  assert.equal(r.g, lines.length);
+  assert.equal(r.tot.pts, lines.reduce((t, l) => t + l.pts, 0));
+  assert.ok(Math.abs(r.v - lines.reduce((t, l) => t + app.lineValue(l), 0)) < 1e-9, 'value is the sum of his games');
+  app.ui.perfRange = 'week';
+  try {
+    const html = await onDay('2026-10-25', () => app.topPerformancesCard());
+    assert.match(html, /\d G · \d+ min/, 'rows show games played');
+  } finally { app.ui.perfRange = 'day'; }
+});
+
+test('performances: best lines helped, worst lines hurt, and no one is on both lists', async () => {
   await app.loadBoxes();
   for (const id of [CATS9, ESPN]) {
     await app.useLeague(id);
@@ -600,11 +629,26 @@ test('performances: best games helped, worst games hurt, and no one is on both l
     const html = app.topPerformancesCard();
     const [best, worst = ''] = html.split('<h3 class="sub">Worst');
     const ids = part => [...part.matchAll(/data-nba="(\d+)"/g)].map(m => m[1]);
-    const vals = part => [...part.matchAll(/class="perf-val[^"]*"[^>]*>([^<]+)</g)].map(m => parseFloat(m[1].replace('−', '-')));
+    const vals = part => [...part.matchAll(/class="num pf-v[^"]*"[^>]*>([^<]+)</g)].map(m => parseFloat(m[1].replace('−', '-')));
     assert.ok(ids(best).length && ids(worst).length, `${id}: both lists have games`);
     assert.ok(vals(best).every(v => v > par) && vals(worst).every(v => v < par), `${id}: split at ${par}`);
     assert.ok(!ids(best).some(x => ids(worst).includes(x)), `${id}: no one on both lists`);
   }
+});
+
+test('performances: columns sort, the rank stays by value', async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const cats = app.scoreCats().map(c => c.key);
+  app.ui.perfSort.best = { key: 'pts', dir: -1 };
+  try {
+    const best = app.topPerformancesCard().split('<h3 class="sub">Worst')[0];
+    const rows = best.split('<tbody>')[1].split('</tr>').slice(0, -1);
+    const pts = rows.map(tr => +[...tr.matchAll(/<td class="sc"[^>]*>([^<]*)</g)][cats.indexOf('pts')][1]);
+    assert.ok(pts.length > 5 && pts.every((v, i) => !i || v <= pts[i - 1]), `points, most first: ${pts.slice(0, 8)}`);
+    const ranks = rows.map(tr => +tr.match(/perf-rank">(\d+)/)[1]);
+    assert.ok(ranks.some((v, i) => v !== i + 1), 'ranks still by value');
+  } finally { app.ui.perfSort.best = { key: 'v', dir: -1 }; }
 });
 
 test("player photos get a ring and background in their NBA team's colors", async () => {

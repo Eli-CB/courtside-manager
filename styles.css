@@ -166,21 +166,31 @@ a { color: var(--accent); }
 
 .grid { display: grid; gap: 16px; }
 .grid-2 { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.dash-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
+/* Dashboard: things to act on first (side by side when there's room), then Performances at full width for its columns */
+.dash-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.dash-side { order: -1; display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.dash-side > .card + .card { margin-top: 0; }
+@media (max-width: 900px) { .dash-side { grid-template-columns: minmax(0, 1fr); } }
 /* top performances */
-.perf { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 2px; }
-.perf li { display: grid; grid-template-columns: 40px minmax(0, 1fr) 56px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
-.perf li:last-child { border-bottom: 0; }
-.perf.scroll { position: relative; max-height: 380px; overflow-y: auto; padding-right: 4px; }
-.perf-rank { display: inline-block; min-width: 1.6em; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
-.perf-main { min-width: 0; }
-.perf-main .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
+.perf-when { margin: -6px 0 10px; }
+.perf-wrap { overflow: auto; margin: 0 0 14px; } /* no padding: pinned columns stick to its edges */
+.perf-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.perf-table th, .perf-table td { padding: 6px 4px; }
+.perf-table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); font-size: .7rem; }
+.perf-table th.sc { text-align: center; }
+.perf-table td.sc { text-align: center; font-size: .82rem; font-variant-numeric: tabular-nums; min-width: 36px; white-space: nowrap; border-bottom: 2px solid var(--surface); }
+.perf-table .pf-name { position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 190px; max-width: 230px; padding-left: 0; }
+.perf-table thead th.pf-name { z-index: 3; }
+.perf-table .pf-name .bname { flex-wrap: nowrap; }
+.perf-table .pf-name .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.perf-table .pf-name .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perf-table .pf-v { position: sticky; right: 0; z-index: 1; background: var(--surface); padding-left: 8px; } /* the value stays in view too */
+.perf-table thead th.pf-v { z-index: 3; }
+.perf-table td.pf-v { font-weight: 800; font-variant-numeric: tabular-nums; }
+.perf-rank { flex: none; min-width: 1.5em; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .perf-owner { color: var(--muted); }
-.perf-line { font-size: .86rem; font-variant-numeric: tabular-nums; margin: 1px 0; }
-.perf-line span { white-space: nowrap; }
-@media (max-width: 900px) { .dash-side { order: -1; } } /* phones: things to act on first */
-.perf-val { font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
-
+@media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 160px; } }
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; }
 .kpi { padding: 14px 16px; }
 .kpi .label { color: var(--muted); font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
