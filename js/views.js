@@ -184,7 +184,7 @@ function topPerformancesCard() {
       ${headshot({ nbaId: raw.id, name: raw.name }, 40)}
       <div class="perf-main"><div><span class="perf-rank">${i + 1}</span><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
         <div class="perf-line">${stats.join(' · ')}</div>
-        <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min${shown.has('fga') ? '' : ` · ${line.fgm}-${line.fga} FG`}${shown.has('fta') ? '' : ` · ${line.ftm}-${line.fta} FT`} · ${who(raw.id)}</div></div>
+        <div class="pmeta">${Math.round(line.min)} min${shown.has('fga') ? '' : ` · ${line.fgm}-${line.fga} FG`}${shown.has('fta') ? '' : ` · ${line.ftm}-${line.fta} FT`} · ${who(raw.id)}</div></div>
       <div class="perf-val ${v < par ? 'pos-bad' : ''}" data-tip="${tip}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
     </li>`; }).join('')}</ul>`;
   // best: anyone whose game helped, so free agents worth adding show up; worst: games that hurt, only from
@@ -661,7 +661,7 @@ function showPlayerDetail(nbaId) {
   const onRoster = owned.roster.has(raw.id);
   $('#detailBody').innerHTML = `
     <div class="detail-head">
-      <div class="detail-id">${headshot({ nbaId: raw.id, name: raw.name }, 64)}<div><h2>${esc(raw.name)}</h2><p class="muted" style="margin:2px 0 0">${teamLogo(raw.team, 18)} ${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)} (NBA: ${esc(raw.nbaPos || '—')}) · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}</p></div></div>
+      <div class="detail-id">${headshot({ nbaId: raw.id, name: raw.name }, 64)}<div><h2>${esc(raw.name)}</h2><p class="muted" style="margin:2px 0 0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)} (NBA: ${esc(raw.nbaPos || '—')}) · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}</p></div></div>
       <div>${raw.inj ? `<span class="badge ${raw.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(raw.inj.label)}</span>` : '<span class="badge good">Healthy</span>'}</div>
     </div>
     ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small">${esc(raw.inj.note)} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}

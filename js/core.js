@@ -314,12 +314,28 @@ function cropLogos(logos) {
 
 const initials = name => String(name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
+// Each team's primary and secondary colors, for the ring around a player's photo
+const TEAM_COLORS = {
+  ATL: ['#E03A3E', '#C1D32F'], BOS: ['#007A33', '#BA9653'], BKN: ['#000000', '#FFFFFF'], CHA: ['#1D1160', '#00788C'],
+  CHI: ['#CE1141', '#000000'], CLE: ['#860038', '#FDBB30'], DAL: ['#00538C', '#B8C4CA'], DEN: ['#0E2240', '#FEC524'],
+  DET: ['#C8102E', '#1D42BA'], GSW: ['#1D428A', '#FFC72C'], HOU: ['#CE1141', '#000000'], IND: ['#002D62', '#FDBB30'],
+  LAC: ['#12173F', '#C8102E'], LAL: ['#552583', '#FDB927'], MEM: ['#5D76A9', '#12173F'], MIA: ['#98002E', '#F9A01B'],
+  MIL: ['#00471B', '#EEE1C6'], MIN: ['#0C2340', '#78BE20'], NOP: ['#0C2340', '#B4975A'], NYK: ['#006BB6', '#F58426'],
+  OKC: ['#007AC1', '#EF3B24'], ORL: ['#0077C0', '#C4CED4'], PHI: ['#006BB6', '#ED174C'], PHX: ['#1D1160', '#E56020'],
+  POR: ['#E03A3E', '#000000'], SAC: ['#5A2D81', '#63727A'], SAS: ['#000000', '#C4CED4'], TOR: ['#CE1141', '#000000'],
+  UTA: ['#4E008E', '#000000'], WAS: ['#002B5C', '#E31837'],
+};
+
 function headshot(p, px = 28) {
   const i = IMG && p && p.nbaId != null ? IMG_INDEX.get(p.nbaId) : undefined;
-  const box = `width:${px}px;height:${px}px`;
-  if (i === undefined) return `<span class="hs hs-none" style="${box}" aria-hidden="true">${esc(initials(p && p.name))}</span>`;
+  // the ring shows the player's current team, like the jersey in the photo
+  const raw = p && p.nbaId != null ? nbaById.get(p.nbaId) : null;
+  const tc = TEAM_COLORS[(raw && raw.team) || (p && p.team)];
+  const box = `width:${px}px;height:${px}px${tc ? `;--t1:${tc[0]};--t2:${tc[1]};--rw:${Math.max(2, Math.round(px / 14))}px` : ''}`;
+  const tm = tc ? ' tm' : '';
+  if (i === undefined) return `<span class="hs hs-none${tm}" style="${box}" aria-hidden="true">${esc(initials(p && p.name))}</span>`;
   const col = i % IMG.cols, row = Math.floor(i / IMG.cols);
-  return `<span class="hs" style="${box};background-size:${IMG.cols * px}px auto;background-position:-${col * px}px -${row * px}px" aria-hidden="true"></span>`;
+  return `<span class="hs${tm}" style="${box};background-size:${IMG.cols * px}px auto;background-position:-${col * px}px -${row * px}px" aria-hidden="true"></span>`;
 }
 
 function teamLogo(team, px = 16) {
@@ -335,7 +351,8 @@ function playerCell(p, link = true, photo = true) {
   const name = link && p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`;
   const next = p.next ? ` · ${nextGame(p.next)}` : '';
   const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note.length > 60 ? p.inj.note.slice(0, 60) + '…' : p.inj.note) : ''}</div>` : '';
-  const body = `<div>${name}</div><div class="pmeta">${teamLogo(p.team, 14)} ${posTags(p.pos)}${next}</div>${inj}`;
+  // the photo's ring shows the team; without a photo the logo does
+  const body = `<div>${name}</div><div class="pmeta">${photo ? '' : teamLogo(p.team, 14) + ' '}${posTags(p.pos)}${next}</div>${inj}`;
   return photo ? `<div class="bplayer">${headshot(p, 32)}<div class="bmain">${body}</div></div>` : body;
 }
 
