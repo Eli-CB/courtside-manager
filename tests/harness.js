@@ -1,4 +1,4 @@
-// Loads app.js in Node with a stand-in page, saved Fantrax/NBA responses instead of the network,
+// Loads the site's scripts (js/*.js) in Node with a stand-in page, saved Fantrax/NBA responses instead of the network,
 // and a fixed clock, so the tests exercise the same code the site runs.
 const fs = require('fs');
 const path = require('path');
@@ -68,9 +68,13 @@ function loadApp() {
   ctx.window = ctx;
   ctx.globalThis = ctx;
   vm.createContext(ctx);
-  // the appended line gives tests access to the script's top-level let/const bindings
-  const src = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8') + '\n;globalThis.__get = expr => eval(expr);';
-  vm.runInContext(src, ctx, { filename: 'app.js' });
+  // the page's scripts, in the order index.html loads them, one script at a time like the browser
+  // (so a file using something only a later file defines fails here too)
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const files = [...html.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
+  for (const f of files) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+  // gives tests access to the scripts' top-level let/const bindings
+  vm.runInContext('globalThis.__get = expr => eval(expr);', ctx);
   // app.anyName finds functions and constants whether they're declared with function, const or let
   const app = new Proxy(ctx, {
     get(t, k) {

@@ -81,8 +81,8 @@ jobs:
       - name: Stamp this version on the page's files, so a refresh fetches the new ones
         run: |
           v="$(git rev-parse --short HEAD)"
-          sed -i "s/__BUILD__/$v/g" index.html app.js
-          grep -o "app.js?v=[a-z0-9]*" index.html
+          sed -i "s/__BUILD__/$v/g" index.html js/*.js
+          grep -o "core.js?v=[a-z0-9]*" index.html
 
       - uses: actions/configure-pages@v5
 

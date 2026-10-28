@@ -10,7 +10,7 @@ A weekly matchup optimizer for 9-category head-to-head fantasy basketball. It pu
 - **Awards:** this season's awards so far (and each past season's): best draft, best manager (actual wins vs an all-play record), Waiver Wire Wizard, Street Clothes, biggest punt, Even Steven and Unc Status, all from each week's starting lineups
 - **Trades:** what a deal with another team in your league does to your per-game production
 
-It's a plain static site (`index.html`, `styles.css`, `app.js`) reading data files in `data/`.
+It's a plain static site reading data files in `data/`: `index.html`, `styles.css`, and the script in `js/`, split by area (`core`, `nba`, `info`, `fantrax`, `render`, `history`, `views`, `matchups`, `draft`, `actions`). The files share one scope and must load in the order `index.html` lists them; no build step.
 
 ## Data
 
@@ -47,4 +47,4 @@ Scoring comes from each league's Fantrax settings: its own categories for catego
 node --test tests/app.test.js
 ```
 
-The tests load `app.js` in Node against saved Fantrax and NBA responses in `tests/fixtures` (a 9-cat league, a weekly points league and a daily points league), with the date fixed at Oct 26, 2026. They cover reading league settings, category and points scoring, projections, season totals (which must reproduce the real week-1 results), short names, draft grading and recommended adds. They run on every push. `python tests/capture_fixtures.py` saves fresh fixtures, which may mean updating expected values.
+The tests load the site's scripts in Node (in page order, one at a time like a browser) against saved Fantrax and NBA responses in `tests/fixtures` (a 9-cat league, a weekly points league and a daily points league), with the date fixed at Oct 26, 2026. They cover reading league settings, category and points scoring, projections, season totals (which must reproduce the real week-1 results), short names, draft grading and recommended adds. They run on every push. `python tests/capture_fixtures.py` saves fresh fixtures, which may mean updating expected values.

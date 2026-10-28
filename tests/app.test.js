@@ -262,12 +262,13 @@ test('Fantrax names written differently still match (Nicolas / Nic Claxton)', as
 test('weekly rosters tell trades from waiver pickups', async () => {
   const P = await app.loadSeason('czqgnyozmf2tbr93');
   const L = P.league;
-  assert.ok(L.arrivals, 'every week of the season loaded');
+  assert.ok(L.weeks && L.weeks.length > 15, 'every week of the season loaded');
+  const last = L.weeks.length - 1;
   const team = L.teams.find(t => t.name === "Eli's SGAteam");
-  const how = name => { const it = L.rosters[team.id].find(x => x.name === name); return it && L.arrivals[team.id][it.fid]; };
+  const how = name => { const it = L.rosters[team.id].find(x => x.name === name); return it && app.arrivalAt(L.weeks, last, it.fid); };
   assert.equal(how('Lauri Markkanen'), 'trade', 'Markkanen came over from mikeysak in week 17');
   assert.equal(how('VJ Edgecombe'), 'trade');
-  const kinds = Object.values(L.arrivals[team.id]);
+  const kinds = [...L.weeks[last].owner].filter(([, o]) => o.tid === team.id).map(([f]) => app.arrivalAt(L.weeks, last, f));
   assert.ok(kinds.includes('pickup') && kinds.includes('start'));
   // the award counts only pickups
   const G = await app.loadGameLog('2025-26');

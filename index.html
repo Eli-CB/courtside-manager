@@ -76,6 +76,16 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
-  <script src="app.js?v=__BUILD__"></script>
+  <!-- one script, split into files that share a scope: keep this order -->
+  <script src="js/core.js?v=__BUILD__"></script>
+  <script src="js/nba.js?v=__BUILD__"></script>
+  <script src="js/info.js?v=__BUILD__"></script>
+  <script src="js/fantrax.js?v=__BUILD__"></script>
+  <script src="js/render.js?v=__BUILD__"></script>
+  <script src="js/history.js?v=__BUILD__"></script>
+  <script src="js/views.js?v=__BUILD__"></script>
+  <script src="js/matchups.js?v=__BUILD__"></script>
+  <script src="js/draft.js?v=__BUILD__"></script>
+  <script src="js/actions.js?v=__BUILD__"></script>
 </body>
 </html>
