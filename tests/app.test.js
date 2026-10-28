@@ -709,7 +709,10 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
     let html = app.topPerformancesCard();
     assert.ok(html.includes('data-group="active" aria-pressed="true"') && html.includes('data-group="bench" aria-pressed="true"'));
     const rowsOf = h => h.split('<tbody>')[1].split('</tr>').slice(0, -1);
-    assert.ok(rowsOf(html).every(tr => tr.includes('badge active') === (spot.get(+tr.match(/data-nba="(\d+)"/)[1]) === 'ACTIVE')), 'Active badge on exactly the active players');
+    const stOf = tr => spot.get(+tr.match(/data-nba="(\d+)"/)[1]);
+    assert.ok(rowsOf(html).every(tr => tr.includes('badge active') === (stOf(tr) === 'ACTIVE')), 'Active badge on exactly the active players');
+    assert.ok(rowsOf(html).every(tr => tr.includes('badge bench') === (!!stOf(tr) && stOf(tr) !== 'ACTIVE')), 'Bench or IR badge on the rest of the rostered players');
+    assert.ok(html.indexOf('data-group="other"') < html.indexOf('pf-sep') && html.indexOf('pf-sep') < html.indexOf('data-group="fa"'), 'Waivers sits with Active and Bench');
     app.ui.perfShow.bench = false;
     html = app.topPerformancesCard();
     assert.ok(ids(html).every(id => !spot.has(id) || spot.get(id) === 'ACTIVE'), 'bench hidden, waivers still shown');

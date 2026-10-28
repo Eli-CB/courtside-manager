@@ -185,13 +185,18 @@ function topPerformancesCard() {
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) { owner.set(x.nba, tid); spot.set(x.nba, x); }
   const mine = ui.viewing ? ui.viewA : state.fxTeam;
   const opp = owner.size && mine ? fxOpponentFor(dates[0], mine) : null; // this matchup's opponent
-  const isActive = id => spot.has(id) && spot.get(id).st === 'ACTIVE';
+  // where a player is: in a team's starting lineup (active), on its bench (IR included), or on no roster (waivers)
+  const statusOf = id => (!spot.has(id) ? 'fa' : spot.get(id).st === 'ACTIVE' ? 'active' : 'bench');
+  const lineupBadge = id => {
+    const x = spot.get(id);
+    if (x.st === 'ACTIVE') return `<span class="badge active" title="In the starting lineup${x.slot ? ` at ${esc(x.slot)}` : ''}">Active</span>`;
+    return x.st === 'INJURED_RESERVE' ? '<span class="badge bench" title="On injured reserve">IR</span>' : '<span class="badge bench" title="On the bench">Bench</span>';
+  };
   const who = id => {
     const tid = owner.get(id);
-    const active = isActive(id) ? ` <span class="badge active" title="In the starting lineup${spot.get(id).slot ? ` at ${esc(spot.get(id).slot)}` : ''}">Active</span>` : '';
-    if (tid === mine) return `<span class="badge accent">Your team</span>${active}`;
-    if (opp && tid === opp.id) return `<span class="badge bad" title="${esc(opp.name)}">Opponent</span>${active}`;
-    if (tid) return `<span class="perf-owner">${esc(fxTeamName(tid))}</span>${active}`;
+    if (tid === mine) return `<span class="badge accent">Your team</span> ${lineupBadge(id)}`;
+    if (opp && tid === opp.id) return `<span class="badge bad" title="${esc(opp.name)}">Opponent</span> ${lineupBadge(id)}`;
+    if (tid) return `<span class="perf-owner">${esc(fxTeamName(tid))}</span> ${lineupBadge(id)}`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
@@ -217,15 +222,14 @@ function topPerformancesCard() {
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
   const rows = perfRows(dates, expected);
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
-  // filter by whose players they are (yours, this matchup's opponent's, unrostered = waivers, other teams') and,
-  // for rostered players, whether they're in their team's lineup now (active) or on the bench (IR included)
-  const groupOf = r => { const tid = owner.get(r.raw.id); return !tid ? 'fa' : tid === mine ? 'me' : opp && tid === opp.id ? 'opp' : 'other'; };
-  const lineupOf = r => (!owner.has(r.raw.id) ? null : isActive(r.raw.id) ? 'active' : 'bench');
+  // filter by team (yours, this matchup's opponent's, the others') and by where players are: active, bench, or
+  // waivers (no team, so the team filters don't hide them)
+  const teamOf = r => { const tid = owner.get(r.raw.id); return !tid ? null : tid === mine ? 'me' : opp && tid === opp.id ? 'opp' : 'other'; };
   const pill = ([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${l}</button>`;
-  const groups = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['fa', 'Waivers'], ['other', 'Other teams']];
-  const lineups = [['active', 'Active', 'In their team\'s starting lineup'], ['bench', 'Bench', 'On their team\'s bench or IR']];
-  const filters = !owner.size ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${groups.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${lineups.map(pill).join('')}</div>`;
-  const picked = owner.size ? rows.filter(r => ui.perfShow[groupOf(r)] && (!lineupOf(r) || ui.perfShow[lineupOf(r)])) : rows;
+  const teams = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['other', 'Other teams']];
+  const where = [['active', 'Active', 'In their team\'s starting lineup'], ['bench', 'Bench', 'On their team\'s bench or IR'], ['fa', 'Waivers', 'Not on a roster in your league']];
+  const filters = !owner.size ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${teams.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${where.map(pill).join('')}</div>`;
+  const picked = owner.size ? rows.filter(r => { const t = teamOf(r); return (!t || ui.perfShow[t]) && ui.perfShow[statusOf(r.raw.id)]; }) : rows;
   const so = ui.perfSort;
   const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0 });
   const shown = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; }).slice(0, 50);
