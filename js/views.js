@@ -130,7 +130,8 @@ function viewDashboard() {
 
 // ----- Top performances: the best single games across the NBA on the latest game days -----
 // Ranked like player value but for one game (each category against an average rostered player's game),
-// or by fantasy points in points leagues. Each shows who has him in your league.
+// or by fantasy points in points leagues. Each shows who has him in your league. A game helped if it beat an
+// average rostered player's game (value above 0, or more fantasy points than one scores a game), hurt if it didn't.
 const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
 const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
 const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 }))));
@@ -174,7 +175,8 @@ function topPerformancesCard() {
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
-  const tip = esc(isPoints() ? 'Fantasy points in your league' : "Value for the game: each of your league's categories against an average rostered player's game");
+  const par = isPoints() ? fpBase()[0] : 0;
+  const tip = esc(isPoints() ? `Fantasy points in your league; a typical rostered player scores ${fmt(par, 1)} a game` : "Value for the game: each of your league's categories against an average rostered player's game");
   const games = [];
   for (const [id, m] of BOX.day) { const line = m.get(d); if (line && nbaById.has(id)) games.push({ raw: nbaById.get(id), line, v: lineValue(line) }); }
   // the first 5 show; the rest scroll inside the list (see fitPerfLists)
@@ -183,13 +185,15 @@ function topPerformancesCard() {
       <div class="perf-main"><div><span class="perf-rank">${i + 1}</span><button class="link-btn pname" data-action="player-detail" data-nba="${raw.id}">${esc(raw.name)}</button></div>
         <div class="perf-line">${stats.join(' · ')}</div>
         <div class="pmeta">${teamLogo(raw.team, 14)} ${Math.round(line.min)} min${shown.has('fga') ? '' : ` · ${line.fgm}-${line.fga} FG`}${shown.has('fta') ? '' : ` · ${line.ftm}-${line.fta} FT`} · ${who(raw.id)}</div></div>
-      <div class="perf-val ${v < 0 ? 'pos-bad' : ''}" data-tip="${tip}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
+      <div class="perf-val ${v < par ? 'pos-bad' : ''}" data-tip="${tip}">${isPoints() ? `${fmt(v, 1)} FP` : signed(v, 1)}</div>
     </li>`; }).join('')}</ul>`;
-  // best: anyone, so free agents worth adding show up; worst: only players someone in your league rosters
-  const best = [...games].sort((a, b) => b.v - a.v).slice(0, 50);
-  const worst = games.filter(g => owner.has(g.raw.id)).sort((a, b) => a.v - b.v).slice(0, 50);
+  // best: anyone whose game helped, so free agents worth adding show up; worst: games that hurt, only from
+  // players someone in your league rosters. No one is on both; a game that shows as +0.0 is on neither.
+  const vsPar = g => Math.round((g.v - par) * 10) / 10;
+  const best = games.filter(g => vsPar(g) > 0).sort((a, b) => b.v - a.v).slice(0, 50);
+  const worst = games.filter(g => vsPar(g) < 0 && owner.has(g.raw.id)).sort((a, b) => a.v - b.v).slice(0, 50);
   return card(`${d === today ? 'Today' : d === yesterday ? 'Last night' : ''} ${fmtDay(d)}`.trim(), `
-    <h3 class="sub">Best <span class="muted small">every NBA player</span></h3>${list(best)}
+    ${best.length ? `<h3 class="sub">Best <span class="muted small">every NBA player</span></h3>${list(best)}` : ''}
     ${worst.length ? `<h3 class="sub">Worst <span class="muted small">players rostered in your league</span></h3>${list(worst)}` : ''}`);
 }
 

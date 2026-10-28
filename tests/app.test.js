@@ -591,3 +591,18 @@ test("performances show each game in the league's own stats", async () => {
   assert.equal(text(pts), '29 PTS · 6 REB · 11 AST · 5 STL · 3 BLK · 2 3PM · 5 TO · 12-23 FG · 3-3 FT', 'every stat worth points, makes and attempts together');
   assert.ok(pts.shown.has('fga') && pts.shown.has('fta'));
 });
+
+test('performances: best games helped, worst games hurt, and no one is on both lists', async () => {
+  await app.loadBoxes();
+  for (const id of [CATS9, ESPN]) {
+    await app.useLeague(id);
+    const par = app.isPoints() ? app.fpBase()[0] : 0;
+    const html = app.topPerformancesCard();
+    const [best, worst = ''] = html.split('<h3 class="sub">Worst');
+    const ids = part => [...part.matchAll(/data-nba="(\d+)"/g)].map(m => m[1]);
+    const vals = part => [...part.matchAll(/class="perf-val[^"]*"[^>]*>([^<]+)</g)].map(m => parseFloat(m[1].replace('−', '-')));
+    assert.ok(ids(best).length && ids(worst).length, `${id}: both lists have games`);
+    assert.ok(vals(best).every(v => v > par) && vals(worst).every(v => v < par), `${id}: split at ${par}`);
+    assert.ok(!ids(best).some(x => ids(worst).includes(x)), `${id}: no one on both lists`);
+  }
+});
