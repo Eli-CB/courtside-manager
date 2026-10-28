@@ -687,6 +687,13 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
     assert.ok(ids(html).length && ids(html).every(id => !owned.has(id)), 'only players not on a roster');
     app.ui.perfShow.fa = false;
     assert.match(app.topPerformancesCard(), /No players match/);
+    const opp = app.fxOpponentFor(day, me);
+    if (opp && played.some(r => owned.get(r.raw.id) === opp.id)) {
+      app.ui.perfShow.opp = true;
+      html = app.topPerformancesCard();
+      assert.ok(ids(html).length && ids(html).every(id => owned.get(id) === opp.id), "only the opponent's players");
+      assert.ok(html.includes('class="badge bad" title="') && html.includes('>Opponent</span>'), 'an Opponent badge');
+    }
   } finally {
     app.state.fxTeam = was;
     Object.assign(app.ui.perfShow, { me: true, opp: true, fa: true, other: true });

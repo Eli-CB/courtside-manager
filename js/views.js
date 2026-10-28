@@ -183,9 +183,12 @@ function topPerformancesCard() {
   const L = fxLeague();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
   const mine = ui.viewing ? ui.viewA : state.fxTeam;
+  const opp = owner.size && mine ? fxOpponentFor(dates[0], mine) : null; // this matchup's opponent
   const who = id => {
     const tid = owner.get(id);
-    if (tid) return tid === mine ? '<span class="badge accent">Your team</span>' : `<span class="perf-owner">${esc(fxTeamName(tid))}</span>`;
+    if (tid === mine) return '<span class="badge accent">Your team</span>';
+    if (opp && tid === opp.id) return `<span class="badge bad" title="${esc(opp.name)}">Opponent</span>`;
+    if (tid) return `<span class="perf-owner">${esc(fxTeamName(tid))}</span>`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
@@ -212,7 +215,6 @@ function topPerformancesCard() {
   const rows = perfRows(dates, expected);
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
   // filter by whose players they are: yours, this matchup's opponent's, unrostered (waivers), other teams'
-  const opp = owner.size && mine ? fxOpponentFor(dates[0], mine) : null;
   const groupOf = r => { const tid = owner.get(r.raw.id); return !tid ? 'fa' : tid === mine ? 'me' : opp && tid === opp.id ? 'opp' : 'other'; };
   const groups = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['fa', 'Waivers'], ['other', 'Other teams']];
   const filters = !owner.size ? '' : `<div class="perf-filters" role="group" aria-label="Show players from">${groups.map(([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${l}</button>`).join('')}</div>`;
