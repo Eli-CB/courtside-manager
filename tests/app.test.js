@@ -594,14 +594,17 @@ test('performances: today, the last game day before it, and this week once it ha
   await app.useLeague(CATS9);
   const days = async iso => JSON.parse(JSON.stringify(await onDay(iso, () => app.perfDays())));
   assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
-  assert.deepEqual(JSON.parse(JSON.stringify(app.perfDays())), { today: '2026-10-26', started: false, day: '2026-10-25', week: null }, "Monday before tip-off: last night was last week's");
-  const html = app.topPerformancesCard();
-  assert.ok(html.includes('data-range="today"') && html.includes('>Yesterday<') && !html.includes('data-range="week"'), 'Today and Yesterday; no week yet');
-  assert.ok(html.includes('class="on" data-action="perf-range" data-range="day"') && html.includes('Last night'), "before tip-off it opens on last night's games");
-  app.ui.perfRange = 'today';
-  try {
-    assert.ok(app.topPerformancesCard().includes("Loading today's games"), 'today, before ESPN has answered');
-  } finally { app.ui.perfRange = null; }
+  // Monday at noon (the same date in any US time zone and UTC)
+  assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: null }, "Monday before tip-off: last night was last week's");
+  await onDay('2026-10-26', () => {
+    const html = app.topPerformancesCard();
+    assert.ok(html.includes('data-range="today"') && html.includes('>Yesterday<') && !html.includes('data-range="week"'), 'Today and Yesterday; no week yet');
+    assert.ok(html.includes('class="on" data-action="perf-range" data-range="day"') && html.includes('Last night'), "before tip-off it opens on last night's games");
+    app.ui.perfRange = 'today';
+    try {
+      assert.ok(app.topPerformancesCard().includes("Loading today's games"), 'today, before ESPN has answered');
+    } finally { app.ui.perfRange = null; }
+  });
   await onDay('2026-10-21', () => {
     const toggle = app.topPerformancesCard();
     assert.ok(toggle.includes('data-range="week"') && toggle.includes('class="on" data-action="perf-range" data-range="today"'), "all three, on today once its games have started");
