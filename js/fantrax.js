@@ -454,11 +454,11 @@ async function refreshLeague(force = true) {
   return true;
 }
 
-function loadFxTeam(teamId) {
+function loadFxTeam(teamId, week = weekStart()) {
   const side = fxTeamSide(teamId);
   const name = side.name;
-  state.opp = { name, week: weekStart(), fxId: teamId, players: side.players, starters: side.starters };
-  const opp = fxOpponentFor(weekStart());
+  state.opp = { name, week, fxId: teamId, players: side.players, starters: side.starters };
+  const opp = fxOpponentFor(week);
   commit(opp && opp.id === teamId ? `Loaded ${name}, your week ${opp.period} opponent` : `Scouting ${name}`);
 }
 

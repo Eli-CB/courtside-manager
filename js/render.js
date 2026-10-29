@@ -62,7 +62,7 @@ function leagueMenu() {
 // ----- Past seasons -----
 // Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
 // (keyed by Fantrax's league history id); a past season gets its own tabs. Fantrax leagues only, so far.
-const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
+const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['live', 'Live'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
@@ -197,8 +197,8 @@ function render() {
     return;
   }
   const early = preDraft();
-  if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
-  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade };
+  if (early && ['week', 'live', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
+  const views = { week: () => withViewedTeam(viewWeek), live: viewLive, draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade };
   // keep scroll position of inner lists (e.g. trade picker, performances) across re-renders
   const inner = '.pick-list, .perf-wrap.scroll';
   const scrolls = [...document.querySelectorAll(inner)].map(el => [el.scrollTop, el.scrollLeft]);

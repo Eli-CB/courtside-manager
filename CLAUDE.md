@@ -8,7 +8,7 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
   scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, render, history, views,
-  matchups, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
+  matchups, live, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo)
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
@@ -27,6 +27,10 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
     all awards, past Rosters
   - views: Dashboard (Performances: last game day or this week, sortable tables), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
   - matchups: Matchups tab, schedule dots, stat tables, tooltips
+  - live: Live tab. The browser polls ESPN's site API (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) about
+    once a minute while the tab is open and visible and one of the two teams' players has a game on: scoreboard + the
+    box score of each such game. ESPN players matched by `espn` id (from the daily job) else initial + last name + team.
+    Earlier days of the week missing from `data/boxscores.json` are asked for once. Week totals = current starters.
   - draft: Draft tab/board, saved leagues, landing page
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and

@@ -184,6 +184,17 @@ const actions = {
     el.textContent = 'Refresh stats';
     toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : "Couldn't reach the local data server");
   },
+  'live-refresh'() {
+    live.at = 0;
+    pollLive();
+    render();
+  },
+  'live-load-opp'() {
+    const week = mondayOf(liveDay());
+    const opp = fxOpponentFor(week);
+    if (!opp) return toast(`No ${sourceName()} matchup found for this week`);
+    loadFxTeam(opp.id, week);
+  },
   'perf-range'(el) {
     ui.perfRange = el.dataset.range;
     render();

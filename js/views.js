@@ -366,6 +366,12 @@ function rosterPeriodsOf(L) {
 // a game day belongs to a period from its first day; the last day only if the period runs into the night
 const periodHas = (p, d) => d >= p.start.slice(0, 10) && (d < p.end.slice(0, 10) || (d === p.end.slice(0, 10) && +p.end.slice(11, 13) >= 21));
 
+// a box score line with the counts some leagues score: double-doubles, triple-doubles, games
+function boxCounts(st) {
+  const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => st[k] >= 10).length;
+  return Object.assign(st, { dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 });
+}
+
 function loadBoxes() {
   boxLoad = boxLoad || fetch(`data/boxscores.json?v=${encodeURIComponent(NBA.updated || '')}`).then(r => {
     if (!r.ok) throw new Error(`box scores ${r.status}`);
@@ -381,9 +387,7 @@ function loadBoxes() {
     for (const g of unique.values()) {
       finals.add(`${g.d} ${g.home}`).add(`${g.d} ${g.away}`);
       for (const row of g.rows) {
-        const st = Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0]));
-        const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => st[k] >= 10).length;
-        Object.assign(st, { dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 });
+        const st = boxCounts(Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0])));
         const margin = row[1] === g.home ? g.hs - g.as : g.as - g.hs;
         if (!byPlayer.has(row[0])) byPlayer.set(row[0], []);
         byPlayer.get(row[0]).push([g.d, st, margin, row[1]]);

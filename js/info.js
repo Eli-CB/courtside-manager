@@ -30,6 +30,11 @@ const INFO = {
     <li><b>Light green ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
     <p>Hover any played game for his minutes and stat line. The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
+  live: ['Live', () => `
+    <p><b>Where it comes from.</b> ESPN's box scores, which your browser asks for about once a minute while this tab is open and one of your or your opponent's players has a game on (ESPN runs a minute or so behind the broadcast). Finished days come from the saved box scores, like the rest of the site.</p>
+    <p><b>Who counts.</b> Each team's starters as the lineups are now (your lineup, and your opponent's from ${sourceName()}): their games on this matchup's days add up. In leagues that set lineups daily, a day already played counts today's starters, so it can differ from ${sourceName()} if lineups changed. Use ↻ Reload in the ⚙ menu after changing a lineup.</p>
+    <p><b>The tables.</b> Today's players, starters first, with each category shaded against an average rostered player's game. Bench players show muted: their stats don't count.</p>
+  `],
   perf: ['Performances', `
     <p><b>Value.</b> A single game counts like player value: every one of your league's categories against an average rostered player's game. In points leagues it's fantasy points, red when below a typical rostered player's game.</p>
     <p><b>This week.</b> Adds up each player's games on this matchup's days that have been played, and compares what they added to each category with an average starter's output over the same days (3.5 games a week), like the Matchups week totals. Every game counts, so a player with more games ranks higher. It appears once the week has more than one day of games.</p>

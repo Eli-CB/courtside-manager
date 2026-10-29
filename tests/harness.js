@@ -35,6 +35,11 @@ function fakeFetch(url) {
     const id = u.searchParams.get('leagueId');
     const period = u.searchParams.get('period');
     body = id ? readFixture(`fantrax/${id}/${ep}${period ? '-' + period : ''}.json`) : readFixture(`fantrax/${ep}.json`);
+  } else if (u.hostname === 'site.api.espn.com') {
+    // live box scores: one saved evening (Oct 28); other days' scoreboards aren't saved, so they answer 404
+    const ep = u.pathname.split('/').pop();
+    if (ep === 'scoreboard') body = readFixture(`espn/live/scoreboard${u.searchParams.get('dates') ? '-' + u.searchParams.get('dates') : ''}.json`);
+    else if (ep === 'summary') body = readFixture(`espn/live/summary-${u.searchParams.get('event')}.json`);
   } else if (u.hostname === 'lm-api-reads.fantasy.espn.com') {
     const league = u.pathname.match(/\/leagues\/(\d+)$/);
     body = league ? readFixture(`espn/${league[1]}/league.json`) : u.pathname.endsWith('/players') ? readFixture('espn/players.json') : null;

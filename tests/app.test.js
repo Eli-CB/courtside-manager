@@ -761,3 +761,74 @@ test("player photos get a ring and background in their NBA team's colors", async
   assert.ok(!app.headshot({ name: 'Nobody' }, 28).includes(' tm'), 'no team, no ring');
   assert.equal(Object.keys(app.TEAM_COLORS).length, 30);
 });
+
+test('live: ESPN box scores, read in the browser, add to the week so far', async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(CATS9);
+  const live = app.get('live');
+  // one ESPN box score as stat lines, ESPN players matched to NBA.com's (the fixture data has no ESPN ids: by name and team)
+  const sm = JSON.parse(readFixture('espn/live/summary-401909882.json'));
+  const lines = app.espnLines(sm);
+  const played = sm.boxscore.players.flatMap(t => t.statistics[0].athletes.filter(a => !a.didNotPlay && +a.stats[0] > 0));
+  assert.ok(lines.size >= played.length - 1 && lines.size <= played.length, `${lines.size} of ${played.length} matched`);
+  const top = played.reduce((a, b) => (+b.stats[1] > +a.stats[1] ? b : a));
+  const raw = app.NBA.players.find(r => app.nameKey(r.name) === app.nameKey(top.athlete.displayName));
+  const line = lines.get(raw.id);
+  assert.equal(line.pts, +top.stats[1]);
+  assert.equal(`${line.fgm}-${line.fga}`, top.stats[2]);
+  assert.equal(line.gp1, 1);
+
+  // my team: the one with the most players in that evening's games; the opponent, this week's
+  const sb = JSON.parse(readFixture('espn/live/scoreboard.json'));
+  const teamsOn = new Set(app.espnGames(sb).flatMap(g => [g.home, g.away]));
+  const count = tid => L.rosters[tid].filter(x => x.nba && teamsOn.has((app.nbaById.get(x.nba) || {}).team)).length;
+  const me = Object.keys(L.rosters).sort((a, b) => count(b) - count(a))[0];
+  const st = app.get('state');
+  const saved = { fxTeam: st.fxTeam, players: st.players, il: st.il, lineup: st.lineup, teamName: st.teamName, opp: st.opp };
+  const urls = [];
+  const realFetch = app.fetch;
+  app.fetch = url => { urls.push(String(url)); return realFetch(url); };
+  try {
+    useTeam(me);
+    const week = '2026-10-26';
+    const opp = app.fxOpponentFor(week, me);
+    const o = app.fxTeamSide(opp.id);
+    st.opp = { name: o.name, week, fxId: opp.id, players: o.players, starters: o.starters };
+    app.ui.tab = 'live';
+    await app.pollLive();
+    assert.equal(live.error, '');
+    assert.equal(live.day, '2026-10-28');
+    assert.ok(live.timer, 'games on: the next update is scheduled');
+    // box scores only for games under way with one of the two teams' players; days before tonight were asked for once
+    const teams = app.liveTeams();
+    const asked = urls.filter(u => u.includes('/summary?')).map(u => u.split('event=')[1]).sort();
+    const want = app.espnGames(sb).filter(g => g.state !== 'pre' && (teams.has(g.home) || teams.has(g.away))).map(g => g.id).sort();
+    assert.deepEqual(asked, want);
+    assert.ok(urls.some(u => u.endsWith('scoreboard?dates=20261026')), "the week's earlier days, missing from the saved box scores");
+    // the week so far: my starters' lines from tonight (the saved box scores end on Oct 25)
+    const day = live.day, dates = app.matchDates(week);
+    const ids = new Set(st.lineup.filter(Boolean));
+    const A = app.liveSide(st.players, ids, dates, day);
+    const mine = st.players.filter(p => ids.has(p.id)).map(p => live.lines.get(`${day}|${p.nbaId}`)).filter(Boolean);
+    assert.ok(mine.length > 0, 'some of my starters played tonight');
+    assert.equal(A.tot.pts, mine.reduce((s, x) => s + x.pts, 0));
+    assert.equal(A.today.pts, A.tot.pts);
+    assert.equal(A.games, mine.length);
+    const html = app.viewLive();
+    assert.ok(html.includes('Categories so far') && html.includes(app.esc(o.name)) && html.includes('lv-dot'), 'scoreboard, categories and live games');
+    assert.equal((html.match(/<tr class="pf-me">/g) || []).length, st.players.filter(p => ids.has(p.id) && app.liveGame(p, day)).length, 'my starters playing tonight');
+    // a game still on is measured for the minutes played: half an average game, at half the minutes, is about even
+    const B = app.get('BASE');
+    const half = Object.fromEntries(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to'].map(k => [k, B[k][0] / 2]));
+    half.min = B.min[0] / 2;
+    const z = app.liveZ(half, true);
+    assert.ok(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to'].every(k => Math.abs(z[k]) < 1e-9), JSON.stringify(z));
+    assert.ok(app.liveZ(half, false).pts < -1, 'a finished game is measured against a whole one');
+  } finally {
+    app.ui.tab = 'dashboard';
+    clearTimeout(live.timer);
+    live.timer = null;
+    app.fetch = realFetch;
+    Object.assign(st, saved);
+  }
+});
