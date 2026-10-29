@@ -113,6 +113,7 @@ function strengthsCard() {
 function viewDashboard() {
   // the latest games come from the box scores, loaded on first need
   if (!BOX && NBA) loadBoxes().then(() => { if (ui.tab === 'dashboard') render(); }).catch(() => {});
+  if (NBA) startLive(); // today's games, as they're played (when Performances shows them)
   return `
   <div class="dash-grid">
     <div>${topPerformancesCard()}</div>
@@ -128,8 +129,8 @@ function viewDashboard() {
   </div>`;
 }
 
-// ----- Performances: every NBA stat line from the last game day or this week so far, in one sortable table -----
-// The last game day ranks each game like player value (each category against an average rostered player's game).
+// ----- Performances: every NBA stat line from today, the last game day or this week so far, in one sortable table -----
+// Today's games come from ESPN as they're played (live.js); a day ranks each game like player value (each category against an average rostered player's game).
 // This week ranks what a player's games added to each category against an average starter's output over the same
 // days (3.5 games a week), so every game counts, like the Matchups week totals. Points leagues use fantasy points.
 const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
@@ -137,32 +138,42 @@ const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => 
 const lineZ = line => catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 });
 const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(lineZ(line))));
 
-// The days Performances can show: the latest day with finished games, and the days of this week's matchup
-// that have them. The week is only offered once it holds more than that one day.
+// The days Performances can show: today (when there are games), the latest earlier day with games, and the days of
+// this week's matchup that have them. The week is only offered once it holds more than one day.
 function perfDays() {
   const today = todayIso();
   const played = new Set([...BOX.finals].map(x => x.slice(0, 10)));
-  const day = [...played].filter(x => x <= today).sort().pop() || null;
+  for (const [d, lines] of live.lines) if (lines.size) played.add(d);
+  const day = [...played].filter(x => x < today).sort().pop() || null;
+  const games = played.has(today) || [...teamDates.values()].some(ds => ds.has(today)) || live.games.some(g => g.d === today);
   const week = matchDates(mondayOf(today)).filter(x => x <= today && played.has(x));
-  return { day, week: week.length > 1 ? week : null };
+  return { today: games ? today : null, started: played.has(today) || live.games.some(g => g.d === today && g.state !== 'pre'), day, week: week.length > 1 ? week : null };
 }
 
-// Each player's lines over those days, added up, with each category's contribution and his value against
-// expected games (an average starter's games over those days; 1 for a single game). In category leagues a game
-// beyond those adds what an average game is worth, everything else as player value.
+// Each player's lines over those days (the saved box scores, else ESPN's), added up, with each category's
+// contribution and his value against expected games (an average starter's games over those days; 1 for a single
+// game). In category leagues a game beyond those adds what an average game is worth, everything else as player
+// value. A game still on counts for the minutes played so far (liveZ).
 function perfRows(dates, expected = 1) {
   const perGame = isPoints() ? 0 : -lineValue({}); // an average game against not playing
+  const byId = new Map();
+  const add = (id, d, line) => { if (!byId.has(id)) byId.set(id, []); byId.get(id).push([d, line]); };
+  for (const [id, byDay] of BOX.day) for (const d of dates) if (byDay.has(d)) add(id, d, byDay.get(d));
+  for (const d of dates) for (const [id, line] of liveLines(d)) if (!(BOX.day.has(id) && BOX.day.get(id).has(d))) add(id, d, line);
   const rows = [];
-  for (const [id, byDay] of BOX.day) {
+  for (const [id, lines] of byId) {
     const raw = nbaById.get(id);
-    const lines = raw ? dates.map(d => byDay.get(d)).filter(Boolean) : [];
-    if (!lines.length) continue;
+    if (!raw) continue;
     const tot = {}, z = {};
-    for (const line of lines) {
-      for (const [k, v] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + v;
-      if (!isPoints()) for (const [k, v] of Object.entries(lineZ(line))) z[k] = (z[k] || 0) + v;
+    let v = 0;
+    for (const [d, line] of lines) {
+      for (const [k, x] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + x;
+      if (isPoints()) { v += lineFp(line); continue; }
+      const lz = liveZ(line, liveOn(raw, d));
+      for (const [k, x] of Object.entries(lz)) z[k] = (z[k] || 0) + x;
+      v += sum(Object.values(lz));
     }
-    rows.push({ raw, g: lines.length, tot, z, v: sum(lines.map(lineValue)) + (lines.length - expected) * perGame });
+    rows.push({ raw, g: lines.length, tot, z, v: v + (lines.length - expected) * perGame, on: lines.some(([d]) => liveOn(raw, d)) });
   }
   return rows;
 }
@@ -171,13 +182,19 @@ function topPerformancesCard() {
   const today = todayIso(), yesterday = addDays(today, -1);
   const card = (head, body) => `<div class="card"><div class="card-head"><h2>Performances ${infoBtn('perf')}</h2>${head}</div>${body}</div>`;
   if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
-  const { day, week } = perfDays();
-  if (!day) return card('', '<p class="muted small" style="margin:0">No games have been played yet.</p>');
-  const weekly = ui.perfRange === 'week' && !!week;
-  const dates = weekly ? week : [day];
-  const dayName = day === today ? 'Today' : day === yesterday ? 'Yesterday' : fmtDay(day);
-  const when = weekly ? `${fmtDay(week[0])} – ${fmtDay(week[week.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim();
-  const toggle = week ? `<div class="seg seg-sm" role="group" aria-label="Show games from">${[['day', dayName], ['week', 'This week']].map(([k, l]) => `<button type="button" class="${(k === 'week') === weekly ? 'on' : ''}" data-action="perf-range" data-range="${k}" aria-pressed="${(k === 'week') === weekly}">${l}</button>`).join('')}</div>` : '';
+  const P = perfDays();
+  // the buttons: Today, the last game day before it, This week. Until one is picked: today once its games have
+  // started, else the last game day
+  const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This week']].filter(Boolean);
+  if (!opts.length) return card('', '<p class="muted small" style="margin:0">No games have been played yet.</p>');
+  const range = opts.some(([k]) => k === ui.perfRange) ? ui.perfRange : P.started || !P.day ? opts[0][0] : 'day';
+  const weekly = range === 'week';
+  const dates = weekly ? P.week : [range === 'today' ? today : P.day];
+  const day = dates[0];
+  const updated = range === 'day' ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
+    : live.at ? ` · updated ${new Date(live.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
+  const when = (weekly ? `${fmtDay(P.week[0])} – ${fmtDay(P.week[P.week.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
+  const toggle = opts.length > 1 ? `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="perf-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>` : '';
 
   // who rosters each player, and where in that team's lineup he is now (active or on the bench)
   const owner = new Map(), spot = new Map();
@@ -217,7 +234,7 @@ function topPerformancesCard() {
   const e = +expected.toFixed(1);
   const over = weekly ? `${e} game${e === 1 ? '' : 's'} over these days` : 'a game';
   const valTip = esc(pts ? `Fantasy points in your league; an average starter scores ${fmt(par, 1)} in ${over}`
-    : weekly ? `Value: what his games added to each category against an average starter's ${over}` : "Value for the game: each category against an average rostered player's game");
+    : weekly ? `Value: what his games added to each category against an average starter's ${over}` : "Value for the game: each category against an average rostered player's game (a game still on: for the minutes played)");
 
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
   const rows = perfRows(dates, expected);
@@ -229,23 +246,26 @@ function topPerformancesCard() {
   const pill = ([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${k === 'me' || k === 'opp' ? `<span class="pf-swatch pf-${k}"></span>` : ''}${l}</button>`;
   const teams = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['other', 'Other teams']];
   const where = [['active', 'Active', 'In their team\'s starting lineup'], ['bench', 'Bench', 'On their team\'s bench or IR'], ['fa', 'Waivers', 'Not on a roster in your league']];
-  const filters = !owner.size ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${teams.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${where.map(pill).join('')}</div>`;
+  const filters = !owner.size || !rows.length ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${teams.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${where.map(pill).join('')}</div>`;
   const picked = owner.size ? rows.filter(r => { const t = teamOf(r); return (!t || ui.perfShow[t]) && ui.perfShow[statusOf(r.raw.id)]; }) : rows;
   const so = ui.perfSort;
   const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0 });
   const shown = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; }).slice(0, 50);
   const count = `${picked.length > shown.length ? `${shown.length} of ` : ''}${picked.length} player${picked.length === 1 ? '' : 's'}`;
-  const table = !rows.length ? '' : !shown.length ? '<p class="muted small" style="margin:0">No players match these filters.</p>' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
+  // today before tip-off: when the first game starts
+  const first = live.games.filter(g => g.d === day && g.state === 'pre').sort((a, b) => a.start - b.start)[0];
+  const waiting = range === 'today' && !rows.length ? `<p class="muted small" style="margin:0">${live.at || live.error ? `No games have started yet.${first ? ` First tip-off ${first.start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : ''}` : "Loading today's games…"}</p>` : '';
+  const table = !rows.length ? waiting : !shown.length ? '<p class="muted small" style="margin:0">No players match these filters.</p>' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
       <thead><tr>${th('name', 'Player', 'pf-name')}${cats.map(c => th(c.key, c.label, 'sc')).join('')}${th('v', pts ? 'FP' : 'Value', 'num pf-v')}</tr></thead>
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 28)}<div class="bmain">
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button></div>
-          <div class="pmeta">${weekly ? `${r.g} G · ` : ''}${Math.round(r.tot.min || 0)} min · ${who(r.raw.id)}</div></div></div></td>
+          <div class="pmeta">${weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${Math.round(r.tot.min || 0)} min · ${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v${r.v < par ? ' pos-bad' : ''}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 1)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
-  return card(toggle, `<p class="muted small perf-when">${when} · ${count}</p>${filters}${table}`);
+  return card(toggle, `<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p>${filters}${table}`);
 }
 
 function newsCard() {

@@ -25,12 +25,13 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards, past Rosters
-  - views: Dashboard (Performances: last game day or this week, sortable tables), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
+  - views: Dashboard (Performances: today, last game day or this week, sortable tables), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
   - matchups: Matchups tab, schedule dots, stat tables, tooltips
-  - live: Live tab. The browser polls ESPN's site API (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) about
-    once a minute while the tab is open and visible and one of the two teams' players has a game on: scoreboard + the
-    box score of each such game. ESPN players matched by `espn` id (from the daily job) else initial + last name + team.
-    Earlier days of the week missing from `data/boxscores.json` are asked for once. Week totals = current starters.
+  - live: live box scores for Performances' Today (and This week). The browser polls ESPN's site API
+    (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) about once a minute while the Dashboard is visible,
+    Performances isn't set to the last game day, and games are on: scoreboard + the box score of each game in progress
+    (`live.lines`: date -> NBA id -> line). ESPN players matched by `espn` id (from the daily job) else initial + last
+    name + team. Yesterday and this week's earlier days missing from `data/boxscores.json` are asked for once.
   - draft: Draft tab/board, saved leagues, landing page
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and

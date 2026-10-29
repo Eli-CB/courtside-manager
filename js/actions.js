@@ -184,17 +184,6 @@ const actions = {
     el.textContent = 'Refresh stats';
     toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : "Couldn't reach the local data server");
   },
-  'live-refresh'() {
-    live.at = 0;
-    pollLive();
-    render();
-  },
-  'live-load-opp'() {
-    const week = mondayOf(liveDay());
-    const opp = fxOpponentFor(week);
-    if (!opp) return toast(`No ${sourceName()} matchup found for this week`);
-    loadFxTeam(opp.id, week);
-  },
   'perf-range'(el) {
     ui.perfRange = el.dataset.range;
     render();
@@ -390,6 +379,7 @@ function route() {
   if (!sid && ui.season) { ui.season = null; ui.pastTeam = null; }
   let tab = hashTab || 'dashboard';
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
+  if (tab === 'live') tab = 'dashboard'; // and the old Live tab on Performances (Today)
   if (tab === 'rosters' && !ui.season) tab = 'roster';
   ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : 'dashboard';
   if (!VIEW_TABS.includes(ui.tab)) { ui.viewA = null; ui.viewB = null; }

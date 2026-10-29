@@ -205,19 +205,7 @@ a { color: var(--accent); }
 .pf-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
 .pf-swatch.pf-me { background: var(--accent); }
 .pf-swatch.pf-opp { background: var(--bad); }
-/* Live: the category table tints the leader (you orange, them red, like Performances); bench rows are muted */
-.lv-cats { --pf-me: color-mix(in srgb, var(--accent) 16%, var(--surface)); --pf-opp: color-mix(in srgb, var(--bad) 14%, var(--surface)); width: 100%; table-layout: fixed; }
-.lv-cats th:first-child { width: 64px; }
-.lv-cats th[scope="row"] { text-align: left; font-weight: 700; }
-.lv-cats th:not([scope]), .lv-cats td { text-align: center; font-variant-numeric: tabular-nums; }
-.lv-cats thead th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lv-cats td.lead-me { background: var(--pf-me); font-weight: 800; }
-.lv-cats td.lead-opp { background: var(--pf-opp); font-weight: 800; }
-.lv-today { display: block; font-size: .7rem; font-weight: 500; color: var(--muted); min-height: 1em; }
-.lv-table tr.lv-bench td { color: var(--muted); }
-.lv-table tr.lv-bench td.sc { opacity: .6; }
-.sb-foot.lv-foot { grid-template-columns: 1fr 1fr; }
-.lv-right { text-align: right; }
+/* a game still on: a pulsing dot by the clock */
 .lv-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); margin-right: 4px; vertical-align: 1px; animation: lv-pulse 1.6s ease-in-out infinite; }
 @keyframes lv-pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }

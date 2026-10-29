@@ -589,18 +589,22 @@ async function onDay(iso, fn) {
   try { return await fn(); } finally { app.Date = RealDate; }
 }
 
-test('performances: the latest game day, and this week once it has more than that day', async () => {
+test('performances: today, the last game day before it, and this week once it has more than one day', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
-  const days = iso => onDay(iso, () => app.perfDays());
-  assert.deepEqual(JSON.parse(JSON.stringify(await days('2026-10-20'))), { day: '2026-10-20', week: null }, "Tuesday: the week so far is just Monday's games, so no toggle");
-  assert.deepEqual(JSON.parse(JSON.stringify(await days('2026-10-21'))), { day: '2026-10-21', week: ['2026-10-20', '2026-10-21'] }, 'Wednesday: the days played so far');
-  assert.deepEqual(JSON.parse(JSON.stringify(app.perfDays())), { day: '2026-10-25', week: null }, "Monday: last night was last week's");
+  const days = async iso => JSON.parse(JSON.stringify(await onDay(iso, () => app.perfDays())));
+  assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
+  assert.deepEqual(JSON.parse(JSON.stringify(app.perfDays())), { today: '2026-10-26', started: false, day: '2026-10-25', week: null }, "Monday before tip-off: last night was last week's");
   const html = app.topPerformancesCard();
-  assert.ok(!html.includes('data-action="perf-range"'), 'no toggle when both would show the same');
+  assert.ok(html.includes('data-range="today"') && html.includes('>Yesterday<') && !html.includes('data-range="week"'), 'Today and Yesterday; no week yet');
+  assert.ok(html.includes('class="on" data-action="perf-range" data-range="day"') && html.includes('Last night'), "before tip-off it opens on last night's games");
+  app.ui.perfRange = 'today';
+  try {
+    assert.ok(app.topPerformancesCard().includes("Loading today's games"), 'today, before ESPN has answered');
+  } finally { app.ui.perfRange = null; }
   await onDay('2026-10-21', () => {
     const toggle = app.topPerformancesCard();
-    assert.ok(toggle.includes('data-range="week"') && toggle.includes('>Today<'), 'the toggle, named for the day');
+    assert.ok(toggle.includes('data-range="week"') && toggle.includes('class="on" data-action="perf-range" data-range="today"'), "all three, on today once its games have started");
   });
 });
 
@@ -624,7 +628,7 @@ test("performances: this week adds up each player's games", async () => {
   try {
     const html = await onDay('2026-10-25', () => app.topPerformancesCard());
     assert.match(html, /\d G · \d+ min/, 'rows show games played');
-  } finally { app.ui.perfRange = 'day'; }
+  } finally { app.ui.perfRange = null; }
 });
 
 test('performances: everyone who played in one table, top 50 by the sorted column, ranked by value', async () => {
@@ -762,9 +766,9 @@ test("player photos get a ring and background in their NBA team's colors", async
   assert.equal(Object.keys(app.TEAM_COLORS).length, 30);
 });
 
-test('live: ESPN box scores, read in the browser, add to the week so far', async () => {
+test("performances: today's games from ESPN's box scores, read in the browser as they're played", async () => {
   await app.loadBoxes();
-  const L = await app.useLeague(CATS9);
+  await app.useLeague(CATS9);
   const live = app.get('live');
   // one ESPN box score as stat lines, ESPN players matched to NBA.com's (the fixture data has no ESPN ids: by name and team)
   const sm = JSON.parse(readFixture('espn/live/summary-401909882.json'));
@@ -778,45 +782,32 @@ test('live: ESPN box scores, read in the browser, add to the week so far', async
   assert.equal(`${line.fgm}-${line.fga}`, top.stats[2]);
   assert.equal(line.gp1, 1);
 
-  // my team: the one with the most players in that evening's games; the opponent, this week's
+  // Wednesday Oct 28, games under way (the saved box scores end on Oct 25)
   const sb = JSON.parse(readFixture('espn/live/scoreboard.json'));
-  const teamsOn = new Set(app.espnGames(sb).flatMap(g => [g.home, g.away]));
-  const count = tid => L.rosters[tid].filter(x => x.nba && teamsOn.has((app.nbaById.get(x.nba) || {}).team)).length;
-  const me = Object.keys(L.rosters).sort((a, b) => count(b) - count(a))[0];
-  const st = app.get('state');
-  const saved = { fxTeam: st.fxTeam, players: st.players, il: st.il, lineup: st.lineup, teamName: st.teamName, opp: st.opp };
+  const day = '2026-10-28';
   const urls = [];
   const realFetch = app.fetch;
   app.fetch = url => { urls.push(String(url)); return realFetch(url); };
   try {
-    useTeam(me);
-    const week = '2026-10-26';
-    const opp = app.fxOpponentFor(week, me);
-    const o = app.fxTeamSide(opp.id);
-    st.opp = { name: o.name, week, fxId: opp.id, players: o.players, starters: o.starters };
-    app.ui.tab = 'live';
-    await app.pollLive();
+    app.ui.tab = 'dashboard';
+    await onDay(day, () => app.pollLive());
     assert.equal(live.error, '');
-    assert.equal(live.day, '2026-10-28');
+    assert.equal(live.day, day);
     assert.ok(live.timer, 'games on: the next update is scheduled');
-    // box scores only for games under way with one of the two teams' players; days before tonight were asked for once
-    const teams = app.liveTeams();
+    // the box score of every game under way or over; the week's earlier days, missing from the saved box scores, once
     const asked = urls.filter(u => u.includes('/summary?')).map(u => u.split('event=')[1]).sort();
-    const want = app.espnGames(sb).filter(g => g.state !== 'pre' && (teams.has(g.home) || teams.has(g.away))).map(g => g.id).sort();
-    assert.deepEqual(asked, want);
-    assert.ok(urls.some(u => u.endsWith('scoreboard?dates=20261026')), "the week's earlier days, missing from the saved box scores");
-    // the week so far: my starters' lines from tonight (the saved box scores end on Oct 25)
-    const day = live.day, dates = app.matchDates(week);
-    const ids = new Set(st.lineup.filter(Boolean));
-    const A = app.liveSide(st.players, ids, dates, day);
-    const mine = st.players.filter(p => ids.has(p.id)).map(p => live.lines.get(`${day}|${p.nbaId}`)).filter(Boolean);
-    assert.ok(mine.length > 0, 'some of my starters played tonight');
-    assert.equal(A.tot.pts, mine.reduce((s, x) => s + x.pts, 0));
-    assert.equal(A.today.pts, A.tot.pts);
-    assert.equal(A.games, mine.length);
-    const html = app.viewLive();
-    assert.ok(html.includes('Categories so far') && html.includes(app.esc(o.name)) && html.includes('lv-dot'), 'scoreboard, categories and live games');
-    assert.equal((html.match(/<tr class="pf-me">/g) || []).length, st.players.filter(p => ids.has(p.id) && app.liveGame(p, day)).length, 'my starters playing tonight');
+    assert.deepEqual(asked, app.espnGames(sb).filter(g => g.state !== 'pre').map(g => g.id).sort());
+    assert.ok(['20261026', '20261027'].every(d => urls.some(u => u.endsWith(`scoreboard?dates=${d}`))), urls.join('\n'));
+
+    await onDay(day, () => {
+      assert.equal(app.perfDays().today, day);
+      const rows = app.perfRows([day]);
+      assert.equal(rows.length, app.liveLines(day).size, "everyone who's played today");
+      assert.equal(rows.find(r => r.raw.id === raw.id).tot.pts, line.pts);
+      const html = app.topPerformancesCard();
+      assert.ok(html.includes('class="on" data-action="perf-range" data-range="today"'), 'it opens on today once games have started');
+      assert.ok(html.includes('lv-dot') && html.includes('Halftime') && html.includes('Q4 2:08') && html.includes('updated '), 'the clock of each game still on');
+    });
     // a game still on is measured for the minutes played: half an average game, at half the minutes, is about even
     const B = app.get('BASE');
     const half = Object.fromEntries(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to'].map(k => [k, B[k][0] / 2]));
@@ -824,11 +815,15 @@ test('live: ESPN box scores, read in the browser, add to the week so far', async
     const z = app.liveZ(half, true);
     assert.ok(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to'].every(k => Math.abs(z[k]) < 1e-9), JSON.stringify(z));
     assert.ok(app.liveZ(half, false).pts < -1, 'a finished game is measured against a whole one');
+    // last night's games picked: no more updates
+    app.ui.perfRange = 'day';
+    app.scheduleLive();
+    assert.equal(live.timer, null);
   } finally {
-    app.ui.tab = 'dashboard';
+    app.ui.perfRange = null;
     clearTimeout(live.timer);
     live.timer = null;
+    live.lines.clear(); live.games = []; live.done.clear(); live.at = 0;
     app.fetch = realFetch;
-    Object.assign(st, saved);
   }
 });
