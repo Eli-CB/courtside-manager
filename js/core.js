@@ -281,6 +281,14 @@ function statusBadge(p) {
   return `<span class="badge ${cls}">${esc(p.status)}</span>`;
 }
 
+// ‹ [dropdown] ›: step buttons joined to a picker (a select that looks like the league bar's). The buttons call
+// `action` with data-step -1 / 1; `ends` disables them at the first or last choice.
+const chev = dir => `<svg viewBox="0 0 8 14" width="8" height="14" aria-hidden="true"><path d="${dir < 0 ? 'M6.5 1.5 1.5 7l5 5.5' : 'M1.5 1.5 6.5 7l-5 5.5'}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function stepper(action, what, select, ends = {}) {
+  const btn = dir => `<button type="button" class="step-btn" data-action="${action}" data-step="${dir}" aria-label="${dir < 0 ? 'Previous' : 'Next'} ${what}" title="${dir < 0 ? 'Previous' : 'Next'} ${what}"${(dir < 0 ? ends.first : ends.last) ? ' disabled' : ''}>${chev(dir)}</button>`;
+  return `<span class="stepper">${btn(-1)}${select}${btn(1)}</span>`;
+}
+
 // ----- Headshots and team logos (data/headshots.webp + data/images.json, built by scripts/build_images.py) -----
 let IMG = null;
 const IMG_INDEX = new Map();

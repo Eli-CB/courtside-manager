@@ -147,6 +147,8 @@ function fmtDay(d) {
   return Number.isNaN(dt.getTime()) ? d : dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+const fmtMonthDay = d => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
 function nextGame(next) {
   return next ? `${fmtDay(next.date).split(',')[0]} ${next.home ? 'vs' : '@'} ${esc(next.opp)}` : '';
 }
@@ -219,10 +221,20 @@ const dayOffset = iso => (new Date(iso + 'T12:00:00').getDay() + 6) % 7; // Mon 
 const mondayOf = iso => addDays(iso, -dayOffset(iso));
 
 // The matchup week to show: this week, or next week once this week's matchup days are over
-function weekStart() {
+function weekStart() { return weekStartAt(ui.weekShift); }
+function weekStartAt(shift) {
   const t = todayIso();
   const base = dayOffset(t) > Math.max(...state.matchDays) ? addDays(mondayOf(t), 7) : mondayOf(t);
-  return addDays(base, 7 * ui.weekShift);
+  return addDays(base, 7 * shift);
+}
+const WEEK_SHIFTS = 4; // weeks back and ahead the Matchups tab goes
+// The weeks Matchups can show, as shifts from this week: up to WEEK_SHIFTS either way, within the league's
+// matchup weeks when it has them (this week always)
+function weekShifts() {
+  const L = fxLeague();
+  const out = [];
+  for (let s = -WEEK_SHIFTS; s <= WEEK_SHIFTS; s++) if (!s || !(L && L.periods && L.periods.length) || fxPeriodFor(weekStartAt(s))) out.push(s);
+  return out;
 }
 function matchDates(start = weekStart()) {
   const p = fxLeague() && fxLeague().periods ? fxPeriodFor(start) : null;

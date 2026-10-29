@@ -5,6 +5,18 @@
 /* =========================================================
    Actions
    ========================================================= */
+// Show another week on Matchups (one of weekShifts)
+function goWeek(shift) {
+  const shifts = weekShifts();
+  ui.weekShift = Math.max(shifts[0], Math.min(shifts[shifts.length - 1], shift));
+  // a new week brings its real opponent: a hypothetical belongs to the week it was set up in
+  if (viewingOther()) { ui.viewB = null; render(); return; }
+  const opp = fxOpponentFor(weekStart());
+  if (!opp) render();
+  else if (opp.id !== state.opp.fxId) loadFxTeam(opp.id);
+  else { state.opp.week = weekStart(); commit(); }
+}
+
 const actions = {
   'nav-toggle'(el) { setNav(!document.body.classList.contains('nav-open')); },
   'clear-saved'() {
@@ -162,16 +174,9 @@ const actions = {
     state.lineup = fillSlots(chosen, state.slots);
     commit('Lineup updated for this week');
   },
-  'week-shift'(el) {
-    ui.weekShift = Math.max(-4, Math.min(4, ui.weekShift + +el.dataset.step));
-    // a new week brings its real opponent: a hypothetical belongs to the week it was set up in
-    if (viewingOther()) { ui.viewB = null; render(); return; }
-    const opp = fxOpponentFor(weekStart());
-    if (!opp) render();
-    else if (opp.id !== state.opp.fxId) loadFxTeam(opp.id);
-    else { state.opp.week = weekStart(); commit(); }
-  },
+  'week-shift'(el) { goWeek(ui.weekShift + +el.dataset.step); },
   'player-detail'(el) { showPlayerDetail(+el.dataset.nba); },
+
   'close-detail'() { $('#detailDialog').close(); },
   'more-players'() { ui.pf.limit += 50; $('#playerResults').innerHTML = playerRows(); },
   async 'refresh-data'(el) {
@@ -310,6 +315,8 @@ document.addEventListener('change', e => {
     ui.viewB = null;
     if (ui.viewA && !VIEW_TABS.includes(ui.tab)) location.hash = '#dashboard';
     else render();
+  } else if (el.dataset.change === 'week-pick') {
+    goWeek(+el.value);
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);

@@ -434,11 +434,11 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 @media (max-width: 900px) { .filters { grid-template-columns: 1fr 1fr; } .filters .field.grow { grid-column: 1 / -1; } }
 
 /* ---------- Matchups ---------- */
-.week-nav { display: flex; align-items: center; gap: 10px; }
+.week-nav { display: flex; min-width: 0; }
 .week-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .week-main > .card + .card, .week-side > .card + .card { margin-top: 16px; }
 .scoreboard { padding: 18px 20px; }
-.sb-main { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 12px; }
+.sb-main { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; }
 .sb-side.right { text-align: right; }
 .sb-label { font-weight: 700; color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-score { font-size: 2.6rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
@@ -469,12 +469,10 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 
 /* ---------- Matchup board + lineup analysis ---------- */
 .fx-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: .9rem; }
-.fx-strip select { max-width: 100%; }
 .fx-vs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .fx-lock { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
-.fx-cycle { display: inline-flex; align-items: center; gap: 4px; }
-.fx-cycle select { padding: 4px 8px; font-weight: 600; max-width: 300px; }
-.week-stack { display: grid; gap: 16px; }
+.fx-vs .stepper .ctx-team { max-width: 300px; }
+.week-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .week-stack > .card + .card { margin-top: 0; }
 .board { table-layout: fixed; min-width: 340px; }
 .board col.c-slot { width: 58px; }
@@ -747,7 +745,7 @@ tr.me-row td { background: var(--accent-soft); }
 .ctx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .ctx-sep { display: none; }
 .ctx-team-wrap { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-/* league, season and team pickers share one look: a bordered box with a caret */
+/* league, season and team pickers share one look: a bordered box with a caret (also inside a stepper) */
 .ctx-team, .lm summary {
   font: inherit; font-size: .95rem; font-weight: 600; color: var(--text); line-height: 1.2;
   background-color: var(--surface); border: 1px solid var(--border); border-radius: 8px;
@@ -756,6 +754,18 @@ tr.me-row td { background: var(--accent-soft); }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a94a6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px;
 }
 .ctx-team:hover, .ctx-team:focus-visible, .lm summary:hover, .lm[open] summary { background-color: var(--surface-2); border-color: var(--muted); }
+/* ‹ [dropdown] ›: the buttons join the picker into one bordered control */
+.stepper { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; }
+.stepper .ctx-team { border-radius: 0; margin: 0 -1px; min-width: 0; text-overflow: ellipsis; }
+.step-btn {
+  position: relative; display: inline-grid; place-items: center; width: 36px; flex: none; padding: 0;
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); cursor: pointer;
+}
+.step-btn:first-child { border-radius: 8px 0 0 8px; }
+.step-btn:last-child { border-radius: 0 8px 8px 0; }
+.step-btn:hover:not(:disabled), .stepper .ctx-team:hover { z-index: 1; background-color: var(--surface-2); border-color: var(--muted); }
+.step-btn:focus-visible, .stepper .ctx-team:focus-visible { z-index: 2; }
+.step-btn:disabled { color: var(--muted); opacity: .45; cursor: default; }
 .ctx-meta { color: var(--muted); font-size: .82rem; padding-left: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .ctx-meta .btn.sm { padding: 2px 10px; font-size: .78rem; }
 .ctx-season { font-weight: 600; }
@@ -792,8 +802,8 @@ body.past .ctx-season { color: var(--accent); }
   /* Fantrax bar: team pickers fill the width */
   .fx-strip { padding: 10px 12px; }
   .fx-vs { width: 100%; }
-  .fx-cycle { flex: 1 1 100%; }
-  .fx-cycle select { flex: 1; max-width: none; }
+  .fx-vs .stepper, .week-nav, .week-nav .stepper { flex: 1 1 100%; }
+  .stepper .ctx-team, .fx-vs .stepper .ctx-team { flex: 1; width: auto; max-width: none; }
   .fx-strip .actions { width: 100%; }
   .fx-strip .actions .btn { flex: 1 1 auto; }
   /* scoreboard */

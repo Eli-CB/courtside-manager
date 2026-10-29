@@ -498,11 +498,7 @@ function fxStrip(ctx) {
     <span class="fx-vs">
       <b>${esc(fxTeamName(leftId))}</b>
       <span class="muted">vs</span>
-      <span class="fx-cycle">
-        <button class="icon-btn xs" data-action="fx-cycle" data-step="-1" aria-label="Previous team" title="Previous team">‹</button>
-        <select data-change="fx-opp" aria-label="Compare against">${cur ? '' : '<option value="">Pick a team</option>'}${teams.filter(t => t.id !== leftId).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id ? ' (this week)' : ''}</option>`).join('')}</select>
-        <button class="icon-btn xs" data-action="fx-cycle" data-step="1" aria-label="Next team" title="Next team">›</button>
-      </span>
+      ${stepper('fx-cycle', 'team', `<select class="ctx-team" data-change="fx-opp" aria-label="Compare against">${cur ? '' : '<option value="">Pick a team</option>'}${teams.filter(t => t.id !== leftId).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id ? ' (this week)' : ''}</option>`).join('')}</select>`)}
       ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
       ${stale ? `<span class="muted small">rosters as of week ${L.rosterPeriod}</span>` : ''}
     </span>${ctx.locked ? lockNote(ctx) : ''}</div>`;

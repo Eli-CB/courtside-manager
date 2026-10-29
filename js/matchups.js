@@ -496,6 +496,18 @@ function pickupsCard() {
     </div>`;
 }
 
+// The weeks to step through: the league's matchup numbers (else the week's Monday), this one marked like the
+// opponent picker marks this week's opponent
+function weekPicker() {
+  const shifts = weekShifts();
+  const opts = shifts.map(s => {
+    const p = fxLeague() && fxLeague().periods ? fxPeriodFor(weekStartAt(s)) : null;
+    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${s === 0 ? ' (this week)' : ''}</option>`;
+  });
+  return stepper('week-shift', 'week', `<select class="ctx-team" data-change="week-pick" aria-label="Week">${opts.join('')}</select>`,
+    { first: ui.weekShift <= shifts[0], last: ui.weekShift >= shifts[shifts.length - 1] });
+}
+
 function viewWeek() {
   if (!NBA) {
     return `<div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the NBA data file.</div></div>`;
@@ -543,13 +555,10 @@ function viewWeek() {
   return `
   <div class="page-head">
     <div>
-      <div class="week-nav">
-        <button class="icon-btn" data-action="week-shift" data-step="-1" aria-label="Previous week">‹</button>
-        <h1>${ui.weekShift === 0 ? 'This week' : ui.weekShift === 1 ? 'Next week' : 'Week of ' + fmtDay(start)}</h1>
-        <button class="icon-btn" data-action="week-shift" data-step="1" aria-label="Next week">›</button>
-      </div>
+      <h1>${ui.weekShift === 0 ? 'This week' : ui.weekShift === 1 ? 'Next week' : ui.weekShift === -1 ? 'Last week' : 'Week of ' + fmtDay(start)}</h1>
       <p>${range}</p>
     </div>
+    <div class="week-nav">${weekPicker()}</div>
   </div>
   ${staleOpp && fxOpponentFor(start) ? `<div class="sample-banner"><span>Showing your opponent from the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="fx-load-opp">Load this week's opponent</button></div>` : ''}
   <div class="week-stack">

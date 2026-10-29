@@ -163,6 +163,23 @@ test('a matchup week covers the league period, and daily leagues still project',
   assert.ok(Number.isFinite(app.fpTotals(S).a) && app.fpTotals(S).a > 0, 'double/triple-double points included without NaN');
 });
 
+test("Matchups steps through the league's matchup weeks and its teams", async () => {
+  const L = await app.useLeague(CATS9);
+  useTeam(L.teams[0].id);
+  assert.deepEqual([...app.weekShifts()], [-1, 0, 1, 2, 3, 4], 'week 1 began Oct 20: no stepping back into the preseason');
+  const ui = app.get('ui');
+  ui.weekShift = -1;
+  try {
+    const nav = app.weekPicker();
+    assert.equal((nav.match(/<option /g) || []).length, 6);
+    assert.ok(nav.includes('>Week 2 (this week)<') && nav.includes('selected>Week 1<'), nav);
+    assert.ok(/data-step="-1"[^>]*disabled/.test(nav) && !/data-step="1"[^>]*disabled/.test(nav), 'the first week: only forward');
+  } finally { ui.weekShift = 0; }
+  // the opponent picker is the same control: step buttons around a league-bar dropdown
+  const strip = app.fxStrip(app.weekContext());
+  assert.ok(strip.includes('class="stepper"') && strip.includes('class="ctx-team" data-change="fx-opp"') && strip.includes('data-action="fx-cycle"'), strip);
+});
+
 test('short names never collide', () => {
   const players = app.get('NBA').players;
   for (const fn of [app.lastName, app.shortName]) {
