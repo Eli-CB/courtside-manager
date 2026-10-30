@@ -765,9 +765,46 @@ test("player profile: value per game (each game, each season's averages) and thi
   } finally { doc.querySelector = before; }
 });
 
+test('performances: the last game day marks each category leader with an emoji', async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const day = app.perfDays().day;
+  const rows = app.perfRows([day]);
+  const cats = app.scoreCats().filter(c => !c.fp);
+  const cellsOf = html => Object.fromEntries(html.split('<tbody>')[1].split('</tr>').slice(0, -1).map(tr => [tr.match(/data-nba="(\d+)"/)[1], [...tr.matchAll(/<td class="sc"[^>]*>(.*?)<\/td>/g)].map(m => m[1])]));
+  app.ui.perfRange = 'day';
+  const show = app.ui.perfShow;
+  app.ui.perfShow = { me: true, opp: true, other: true, active: true, bench: true, fa: true };
+  try {
+    const html = app.topPerformancesCard();
+    assert.match(html, /pf-legend/, 'a legend');
+    app.ui.perfSort = { key: 'v', dir: 1 }; // the worst too
+    const cells = { ...cellsOf(html), ...cellsOf(app.topPerformancesCard()) };
+    app.ui.perfSort = { key: 'fgPct', dir: 1 }; // the worst shooting
+    Object.assign(cells, cellsOf(app.topPerformancesCard()));
+    app.ui.perfSort = { key: 'v', dir: -1 };
+    const emo = (id, i) => ((cells[id] || [])[i] || '').match(/pf-emo[^>]*>([^<]+)</);
+    for (const [i, c] of cats.entries()) {
+      if (c.pct) continue;
+      const val = r => app.lineStat(r.tot, c.key);
+      const top = Math.max(...rows.map(val));
+      const leaders = rows.filter(r => val(r) === top);
+      const want = c.neg ? '\u{1F9C8}' : '\u{1F680}';
+      for (const r of leaders) if (leaders.length <= 3 && cells[r.raw.id]) assert.equal((emo(r.raw.id, i) || [])[1], want, `${c.label}: ${r.raw.name} leads with ${top}`);
+      const others = Object.keys(cells).filter(id => !leaders.some(r => String(r.raw.id) === id));
+      assert.ok(others.every(id => !emo(id, i) || emo(id, i)[1] === '\u{1F525}'), `${c.label}: only the leaders and the second best are marked`);
+    }
+    const fg = cats.findIndex(c => c.key === 'fgPct');
+    const marks = Object.keys(cells).map(id => emo(id, fg)).filter(Boolean).map(m => m[1]);
+    assert.ok(marks.includes('\u{1F680}') && marks.includes('\u{1F9CA}'), `FG%: best and worst shooting marked (${marks})`);
+    app.ui.perfRange = 'week';
+    if (app.perfDays().week) assert.ok(!app.topPerformancesCard().includes('pf-emo'), 'only for a single finished day');
+  } finally { app.ui.perfRange = null; app.ui.perfShow = show; app.ui.perfSort = { key: 'v', dir: -1 }; }
+});
+
 test('performances: everyone who played in one table, top 50 by the sorted column, ranked by value', async () => {
   await app.loadBoxes();
-  const cell = (tr, i) => [...tr.matchAll(/<td class="sc"[^>]*>([^<]*)</g)][i][1];
+  const cell = (tr, i) => [...tr.matchAll(/<td class="sc"[^>]*>(?:<span[^>]*>[^<]*<\/span>)?([^<]*)</g)][i][1];
   const bodyRows = html => html.split('<tbody>')[1].split('</tr>').slice(0, -1);
   const val = tr => parseFloat(tr.match(/class="num pf-v[^"]*"[^>]*>([^<]+)</)[1].replace('\u2212', '-'));
   for (const id of [CATS9, ESPN]) {
@@ -796,8 +833,8 @@ test('performances: everyone who played in one table, top 50 by the sorted colum
     const rows = bodyRows(app.topPerformancesCard());
     const pts = rows.map(tr => +cell(tr, cats.indexOf('pts')));
     assert.ok(pts.every((v, i) => !i || v <= pts[i - 1]), `points, most first: ${pts.slice(0, 8)}`);
-    const fg = rows.map(tr => tr.match(/<td class="sc"[^>]*title="FG%: ([^"]+)">([^<]*)</));
-    assert.ok(fg.every(m => m && /^\d+-\d+$/.test(m[2]) && /%$|no attempts/.test(m[1])), 'shooting shows makes-attempts, the percentage on hover');
+    const fg = rows.map(tr => tr.match(/<td class="sc"[^>]*title="FG%: ([^"]+)">(?:<span[^>]*>[^<]*<\/span>)?([^<]*)</));
+    assert.ok(fg.every(m => m && /^\d+-\d+$/.test(m[2]) && /%|no attempts/.test(m[1])), 'shooting shows makes-attempts, the percentage on hover');
     assert.ok(rows.map(tr => +tr.match(/perf-rank">(\d+)/)[1]).some((v, i) => v !== i + 1), 'ranks still by value');
   } finally { app.ui.perfSort = { key: 'v', dir: -1 }; }
 });

@@ -225,11 +225,13 @@ function topPerformancesCard() {
   // a column sorts by what it adds: its category contribution, or its fantasy points, so best-first works for TO too
   const sortVal = (r, key) => (key === 'name' ? r.raw.name.toLowerCase() : key === 'v' ? r.v : pts ? lineStat(r.tot, key) * (pts[key] || 0) : r.z[key] || 0);
   const cell = (r, c) => {
+    const b = badges.get(`${r.raw.id}|${c.key}`);
+    const emo = b ? `<span class="pf-emo" aria-hidden="true">${b[0]}</span>` : '', tip = b ? ` · ${b[1]}` : '';
     if (c.pct) {
       const [m, a] = [r.tot[c.made] || 0, r.tot[c.att] || 0];
-      return `<td class="sc" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}">${m}-${a}</td>`;
+      return `<td class="sc" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}${tip}">${emo}${m}-${a}</td>`;
     }
-    return `<td class="sc">${fmt(lineStat(r.tot, c.key), 0)}</td>`;
+    return `<td class="sc"${b ? ` title="${b[1]}"` : ''}>${emo}${fmt(lineStat(r.tot, c.key), 0)}</td>`;
   };
   // only Value is colored: greener up to a monster night (+0.7 a game, over an average starter's games on these days),
   // red below 0 (the team was better off without it: rare, so −0.25 is full red); points leagues around an average
@@ -242,6 +244,31 @@ function topPerformancesCard() {
 
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
   const rows = perfRows(dates);
+  // a finished day, among everyone who played: 🚀 the best in each category and 🔥 the second best (as many as 3
+  // tied), 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's
+  // average, so volume counts), everything else by the number.
+  const badges = new Map();
+  if (range === 'day') {
+    const night = day === yesterday ? 'last night' : `on ${fmtDay(day)}`;
+    const wins = new Map(pts ? [] : rows.map(r => [r, lineWins(r.tot)]));
+    const tiers = (list, f) => { const m = new Map(); for (const r of list) { const v = +f(r).toFixed(6); m.set(v, [...(m.get(v) || []), r]); } return [...m].sort((a, b) => b[0] - a[0]).map(x => x[1]); };
+    const give = (rs, c, e, tip) => { if (rs && rs.length <= 3) for (const r of rs) badges.set(`${r.raw.id}|${c.key}`, [e, `${tip} ${night}`]); };
+    for (const c of cats) {
+      if (c.pct) {
+        const g = tiers(rows.filter(r => r.tot[c.att] && wins.has(r) && wins.get(r)[c.key] != null), r => wins.get(r)[c.key]);
+        const low = g[g.length - 1];
+        if (low && g.length > 1 && wins.get(low[0])[c.key] < 0) give(low, c, '🧊', `Worst ${c.label} shooting`);
+        give(g[0], c, '🚀', `Best ${c.label} shooting`);
+        if (g[0] && g[0].length === 1) give(g[1], c, '🔥', `2nd best ${c.label} shooting`);
+        continue;
+      }
+      const g = tiers(rows.filter(r => lineStat(r.tot, c.key) > 0), r => lineStat(r.tot, c.key));
+      if (c.neg) { give(g[0], c, '🧈', `Most ${c.label}`); continue; }
+      give(g[0], c, '🚀', `Most ${c.label}`);
+      if (g[0] && g[0].length === 1) give(g[1], c, '🔥', `2nd most ${c.label}`);
+    }
+  }
+  const legend = badges.size ? '<p class="muted small pf-legend">🚀 best · 🔥 2nd best in a category · 🧊 worst shooting · 🧈 most turnovers</p>' : '';
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
   // filter by team (yours, this matchup's opponent's, the others') and by where players are: active, bench, or
   // waivers (no team, so the team filters don't hide them)
@@ -268,7 +295,7 @@ function topPerformancesCard() {
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
-    </table></div>`;
+    </table></div>${legend}`;
   return card(toggle, `<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p>${filters}${table}`);
 }
 
