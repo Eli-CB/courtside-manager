@@ -292,6 +292,52 @@ function computeBase(stats, n) {
   return out;
 }
 
+// What a game adds to winning each category of a week, against not playing: its change to an average team's week
+// (8 starters × 3.5 games: whatever the league starts), over how far apart two teams typically finish in that
+// category (game-to-game swings plus how much rostered players differ), times 0.4, how fast a close category's
+// win chance moves. The unit is categories won in an even matchup. Counting stats only add; turnovers and
+// shooting below the league's average take away.
+let winsMemo = null;
+function winWeights() {
+  scoreCats(); // the league's categories, and their baselines
+  if (winsMemo && winsMemo.BASE === BASE && winsMemo.n === state.slots.length) return winsMemo.w;
+  const S = state.slots.length || 8, G = S * WEEK_GAMES;
+  const w = {};
+  for (const c of scoreCats()) {
+    if (c.fp || !BASE[c.key]) continue;
+    const b = BASE[c.key][1];
+    if (c.pct) {
+      // a week's % moves by (makes − average % × attempts) ÷ the team's attempts; shot-making noise as in compareCats
+      const p = BASE[c.key][0], A = G * ((BASE[c.att] || [0])[0] || 1);
+      w[c.key] = { p, A, sd: Math.sqrt(2 * (1.3 * p * (1 - p) / A + G * G / S * b * b / (A * A))) };
+    } else {
+      const m = BASE[c.key][0];
+      w[c.key] = { sd: Math.sqrt(2 * (G * gameSd(c.key, m) ** 2 + G * G / S * b * b)) };
+    }
+  }
+  winsMemo = { BASE, n: state.slots.length, w };
+  return w;
+}
+// a player's per-game stats (FG% × attempts for makes) or a game's line (makes as they are)
+function catWins(s) {
+  const W = winWeights(), z = {};
+  const get = k => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => get(b) * c)) : s[k] != null ? s[k] : statVal(s, k) || 0);
+  for (const c of scoreCats()) {
+    const w = W[c.key];
+    if (!w) continue;
+    const d = c.pct ? (get(c.made) - w.p * get(c.att)) / w.A : (c.neg ? -1 : 1) * get(c.key);
+    z[c.key] = 0.4 * d / w.sd;
+  }
+  return z;
+}
+const lineWins = catWins;
+
+// The per-game value of the best player a league leaves on waivers (the first past its teams × roster spots)
+function waiverValue() {
+  const vals = nbaPlayers().filter(p => p.gp).map(p => p.val).sort((a, b) => b - a);
+  const n = (fxPickable().length || 12) * (state.slots.length + (state.benchSize ?? 5));
+  return vals.length > n ? vals[n] : 0;
+}
 // How much a stat swings from game to game for a player who averages m
 const gameSd = (k, m) => (k === 'pts' ? 0.3 * m + 2.5
   : k === 'dd' || k === 'td' ? Math.sqrt(m * (1 - m)) // happens or not, game to game
@@ -424,9 +470,9 @@ function playerFromRaw(raw, extra = {}) {
 }
 
 // ----- Locked weekly lineups -----
-// Rough worth of starting a player for the week: games × (value above a deep-bench player)
+// Rough worth of starting a player for the week: games × value (against not playing)
 function weeklyPriority(p, dates) {
-  return p.status === 'Out' ? -1 : gamesIn(p, dates) * Math.max(value(p) + 4, 0.2);
+  return p.status === 'Out' ? -1 : gamesIn(p, dates) * Math.max(value(p), 0.01);
 }
 
 function fitsSlots(ids, players) {

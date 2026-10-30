@@ -43,8 +43,8 @@ const INFO = {
     <p><b>Columns.</b> Everyone who played is ranked by value (the number by each name). Click a column to sort; the top 50 by that column show, so sort Value the other way for the worst. Categories sort by how much they helped, so the fewest turnovers and the most valuable shooting come first. Shading is per game against an average rostered player's game, as on the Matchups tables. Shooting shows makes-attempts; hover for the percentage.</p>
     <p><b>Filters.</b> By team: yours, this matchup's opponent and the other teams. By where players are: Active (in their team's starting lineup now), Bench (IR included) and Waivers (not on a roster in your league; they have no team, so the team filters don't hide them). Ranks stay out of everyone who played.</p>`],
   value: ['Player value', `
-    <p>Value is the sum of a player's contributions per game in each of your league's categories, each measured against an average rostered player in your league (see Stat shading for the averages, which come from this season's stats and your league's size). +5 is an elite all-around player; 0 is an average rostered player.</p>
-    <p>FG% and FT% count shot volume, and turnovers count against.</p>
+    <p>Value is categories won per game: how much an average game of his adds to winning a week's categories, compared with not playing at all (the same as a single game on the Dashboard's Performances). A typical starter is about +0.2; the best players +0.4 or more.</p>
+    <p>Each category's share of an average team's week (your league's starters × 3.5 games) is divided by how far apart two teams usually finish in it, so every category weighs the same, as it does in the standings. Counting stats only add; turnovers take away, and FG% and FT% add or take away by shot volume against the league's average.</p>
     <p><b>Points leagues:</b> value is fantasy points per game (FP/G), using your league's points for each stat.</p>`],
   projection: ['Which stats are used', `
     <p><b>Smart blend (default):</b> this season's averages with 10 games of last season mixed in: (this season × games played + last season × 10) ÷ (games played + 10). Early on it leans on last season; after a month or two it's mostly this season.</p>
@@ -68,7 +68,10 @@ const INFO = {
     <li><b>Wks:</b> weeks in the starting lineup.</li>
     <li><b>GP:</b> games played in those weeks; every stat comes from just these games.</li>
     <li><b>Missed:</b> games his NBA team played in those weeks without him (injury, rest or a coach's decision).</li>
-    <li><b>Value:</b> each game valued against an average rostered player's game (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
+    <li><b>Value:</b> each game valued like a single game on the Dashboard: categories won against not playing (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
+  tradeValue: ['Value over a waiver player', `
+    <p>Each player's value per game (see Player value) minus the best player your league leaves on waivers, since every player in a deal takes a roster spot someone off waivers could fill. So two good players for one star only wins if they're worth more than the star plus the waiver player you'd otherwise have.</p>
+    <p>Within about 0.04 (2 fantasy points in points leagues) it's called roughly even. The table shows what happens to each category.</p>`],
   storage: ['Saved on this device', `
     <p>To keep requests to Fantrax and ESPN low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), each site's player list (and Fantrax's ADP, refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
     <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved league data</b> removes only what came from Fantrax and ESPN; it's fetched again the next time it's needed.</p>`],
@@ -83,7 +86,7 @@ const INFO = {
     <p>The week still underway doesn't count, and neither do playoff weeks. The totals come from box scores, which can differ slightly from Fantrax's (stat corrections, the odd game counted in a different week), so expect small gaps.</p>`],
   awWaiver: ['Waiver Wire Wizard', `
     <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Dashboard (fantasy points in points leagues), added up.</p>
-    <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. A pickup who played below an average rostered player lowers the total.</p>
+    <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. Only games that hurt the team (below 0: very poor shooting and turnovers with little else) lower the total.</p>
     <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>`],
   awStreet: ['Street Clothes', `
     <p>Games a team lost to players sitting while they were in its <b>starting lineup</b>. For each week, Fantrax's rosters say who started; for each starter, every game his NBA team played that week without him counts one.</p>

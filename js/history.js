@@ -519,7 +519,7 @@ function pastStarters(L, G, tid, r, teams) {
   const th = (key, label, cls = 'num', tip = '') => sortTh('past-roster-sort', key, label, so, { cls, tip, down: so.dir > 0 });
   const num = (P, k) => (P.gp ? (total ? Math.round(per(P, k)) : fmt(per(P, k), 1)) : '—');
   const pct = (P, m, a) => (P.s[a] ? fmtPct(P.s[m] / P.s[a]) : '—');
-  const val = P => (!P.gp ? '—' : isPoints() ? fmt(total ? P.v : P.v / P.gp, total ? 0 : 1) : signed(total ? P.v : P.v / P.gp, 1));
+  const val = P => (!P.gp ? '—' : isPoints() ? fmt(total ? P.v : P.v / P.gp, total ? 0 : 1) : signed(total ? P.v : P.v / P.gp, total ? 1 : 2));
   const seg = `<div class="seg seg-sm" role="group" aria-label="Show stats as">${[['total', 'Totals'], ['game', 'Per game']].map(([k, l]) => `<button type="button" class="${ui.pastRosterMode === k ? 'on' : ''}" data-action="past-roster-mode" data-mode="${k}" aria-pressed="${ui.pastRosterMode === k}">${l}</button>`).join('')}</div>`;
   const STATS = [['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO']];
   return `
@@ -597,7 +597,7 @@ function seasonAwards() {
   const olds = startersAge(L) || {};
   for (const T of teams) { T.age = olds[T.id] ? olds[T.id].age : null; T.oldest = olds[T.id] ? olds[T.id].oldest : null; }
 
-  const total = v => (isPoints() ? `${Math.round(v).toLocaleString()} FP` : `${v >= 0 ? '+' : '−'}${Math.round(Math.abs(v)).toLocaleString()} value`);
+  const total = v => (isPoints() ? `${Math.round(v).toLocaleString()} FP` : `${signed(v, 1)} value`);
   const ranked = (key, dir, fmtFn, note) => teams.filter(T => T[key] != null).sort((a, b) => (b[key] - a[key]) * dir).map(T => ({ T, txt: fmtFn(T), note: note ? note(T) : '' }));
   const pickupNote = T => {
     const b = T.waiverTop;

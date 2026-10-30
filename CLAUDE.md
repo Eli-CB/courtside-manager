@@ -13,7 +13,10 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
     `TEAM_COLORS`; logos only where there is no photo)
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
     model (`scoreCats`, `catZ`, `BASE`: each stat's mean/spread from the data via `baseNow`, the league's teams × roster
-    spots by minutes, smart blend, or a past season's archive inside `withSeason`), lineup optimizer
+    spots by minutes, smart blend, or a past season's archive inside `withSeason`), lineup optimizer. Player value
+    (`value`, `lineValue` for a game) everywhere = categories won per game against not playing (`catWins`: each
+    category's share of an average team's week over the spread of weekly margins); trades count it over a waiver
+    player (`waiverValue`). `catZ` (vs an average rostered player) is only for shading
   - info: `INFO` texts for every (i) button (`infoBtn(key)`)
   - fantrax: `fxGet` (retries/backoff), `fxGetAll`, `fetchFantraxLeague`, league cache (`getLeague`, 6h), shared
     player list/ADP (daily), scoring (`fxScoring`: points or categories), keepers (`keepersOf`), name matching
@@ -25,8 +28,7 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards, past Rosters
-  - views: Dashboard (Performances: today, last game day or this week, sortable tables; category leagues rank by
-    categories won vs not playing, `lineWins`), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
+  - views: Dashboard (Performances: today, last game day or this week, sortable tables, ranked by value), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such

@@ -135,48 +135,11 @@ function viewDashboard() {
 const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
 const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
 const lineZ = line => catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 });
-const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(lineZ(line))));
+// a game's value: fantasy points, or categories won against not playing (catWins), as player value counts an average game
+const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(catWins(line))));
 
-// What a game adds to winning each category of a week, against not playing: its change to an average team's week
-// (8 starters × 3.5 games: whatever the league starts), over how far apart two teams typically finish in that
-// category (game-to-game swings plus how much rostered players differ), times 0.4, how fast a close category's
-// win chance moves. The unit is categories won in an even matchup. Counting stats only add; turnovers and
-// shooting below the league's average take away.
-let winsMemo = null;
-function winWeights() {
-  if (winsMemo && winsMemo.BASE === BASE && winsMemo.n === state.slots.length) return winsMemo.w;
-  const S = state.slots.length || 8, G = S * WEEK_GAMES;
-  const w = {};
-  for (const c of scoreCats()) {
-    if (c.fp || !BASE[c.key]) continue;
-    const b = BASE[c.key][1];
-    if (c.pct) {
-      // a week's % moves by (makes − average % × attempts) ÷ the team's attempts; shot-making noise as in compareCats
-      const p = BASE[c.key][0], A = G * ((BASE[c.att] || [0])[0] || 1);
-      w[c.key] = { p, A, sd: Math.sqrt(2 * (1.3 * p * (1 - p) / A + G * G / S * b * b / (A * A))) };
-    } else {
-      const m = BASE[c.key][0];
-      w[c.key] = { sd: Math.sqrt(2 * (G * gameSd(c.key, m) ** 2 + G * G / S * b * b)) };
-    }
-  }
-  winsMemo = { BASE, n: state.slots.length, w };
-  return w;
-}
-function lineWins(line) {
-  const W = winWeights(), z = {};
-  for (const c of scoreCats()) {
-    const w = W[c.key];
-    if (!w) continue;
-    const d = c.pct ? ((line[c.made] || 0) - w.p * (line[c.att] || 0)) / w.A : (c.neg ? -1 : 1) * lineStat(line, c.key);
-    z[c.key] = 0.4 * d / w.sd;
-  }
-  return z;
-}
-// A game's value as Performances shows it: fantasy points, or categories won. Both add up linearly, so an
-// average line (statLine of per-game stats) is worth the average of its games.
-const gameValue = line => (isPoints() ? lineFp(line) : sum(Object.values(lineWins(line))));
+// Values add up linearly, so an average line (statLine of per-game stats) is worth the average of its games
 const statLine = s => Object.fromEntries(COUNT_KEYS.map(k => [k, s[k] != null ? s[k] : statVal(s, k)])); // season rows have makes, projections FG%
-const fmtGameValue = (v, d = 2) => (isPoints() ? fmt(v, 1) : signed(v, d));
 
 // The days Performances can show: today (when there are games), the latest earlier day with games, and the days of
 // this week's matchup that have them. The week is only offered once it holds more than one day.
@@ -208,7 +171,7 @@ function perfRows(dates) {
       for (const [k, x] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + x;
       if (isPoints()) { v += lineFp(line); continue; }
       for (const [k, x] of Object.entries(liveZ(line, liveOn(raw, d)))) z[k] = (z[k] || 0) + x;
-      v += gameValue(line);
+      v += lineValue(line);
     }
     rows.push({ raw, g: lines.length, tot, z, v, on: lines.some(([d]) => liveOn(raw, d)) });
   }
@@ -573,7 +536,9 @@ function viewTrade() {
     const active = state.players.filter(p => !state.il.includes(p.id));
     const before = totals(active);
     const after = totals([...active.filter(p => !ui.tradeGive.has(p.id)), ...get]);
-    const vGive = sum(give.map(value)), vGet = sum(get.map(value));
+    // over a waiver player: each player in a deal takes a roster spot someone off waivers could fill
+    const wv = waiverValue(), over = p => value(p) - wv;
+    const vGive = sum(give.map(over)), vGet = sum(get.map(over));
     const diff = vGet - vGive;
     const tradeCats = scoreCats();
     const rows = tradeCats.map(c => {
@@ -583,10 +548,10 @@ function viewTrade() {
       return `<tr><td><b>${c.label}</b></td><td class="num">${c.pct ? fmtPct(before[c.key]) : fmt(before[c.key])}</td><td class="num">${c.pct ? fmtPct(after[c.key]) : fmt(after[c.key])}</td><td class="num ${Math.abs(d) < 1e-9 ? 'muted' : good ? 'pos-good' : 'pos-bad'}">${shown}</td></tr>`;
     }).join('');
     const rosterAfter = activeCount() - give.length + get.length;
-    const verdict = Math.abs(diff) < (isPoints() ? 2 : 0.5) ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'];
+    const verdict = Math.abs(diff) < (isPoints() ? 2 : 0.04) ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'];
     const won = tradeCats.filter(c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; }).length;
     result = `
-      <div class="card-head"><div><div class="verdict ${verdict[1]}">${verdict[0]}</div><div class="muted small">${valueLabel()}: give ${fmtValue(vGive)} · get ${fmtValue(vGet)} · net <b>${fmtValue(diff)}</b>${isPoints() ? '' : ` · improves ${won} of ${tradeCats.length} cats`}</div></div></div>
+      <div class="card-head"><div><div class="verdict ${verdict[1]}">${verdict[0]}</div><div class="muted small">${valueLabel()} over a waiver player ${infoBtn('tradeValue')}: give ${fmtValue(vGive)} · get ${fmtValue(vGet)} · net <b>${fmtValue(diff)}</b>${isPoints() ? '' : ` · improves ${won} of ${tradeCats.length} cats`}</div></div></div>
       ${rosterAfter > rosterLimit() ? `<p class="alert warn small" style="margin:0 0 12px">This puts you at ${rosterAfter}/${rosterLimit()} — you'd need to drop ${rosterAfter - rosterLimit()}.</p>` : ''}
       <div class="table-wrap"><table class="delta-table">
         <thead><tr><th>Category</th><th class="num">Now</th><th class="num">After</th><th class="num">Change</th></tr></thead>
@@ -704,7 +669,7 @@ function recommendedAdds() {
   if (!NBA || !state.players.length) return null;
   const act = state.players.filter(p => !state.il.includes(p.id));
   const w = isPoints() ? null : Object.fromEntries(Object.entries(catGaps()).map(([k, g]) => [k, Math.max(0.5, Math.min(1.5, 1 - 0.25 * g))]));
-  const worth = p => (w ? sum(scoreCats().map(c => (catZ(p)[c.key] || 0) * w[c.key])) : fantasyPoints(p));
+  const worth = p => (w ? sum(scoreCats().map(c => (catWins(p)[c.key] || 0) * w[c.key])) : fantasyPoints(p));
   const open = activeCount() < rosterLimit();
   const drop = open || !act.length ? null : act.reduce((a, b) => (worth(a) <= worth(b) ? a : b));
   const base = drop ? worth(drop) : -Infinity;
@@ -712,7 +677,7 @@ function recommendedAdds() {
     .filter(x => x.gp && (fxLeague() ? fxAvailable(nbaById.get(x.nbaId)) : !state.players.some(p => p.nbaId === x.nbaId)))
     .sort((a, b) => b.val - a.val).slice(0, 120)
     .map(x => playerFromRaw(nbaById.get(x.nbaId)));
-  const helps = p => (w && drop ? scoreCats().filter(c => (catZ(p)[c.key] || 0) - (catZ(drop)[c.key] || 0) > 0.5).map(c => c.label) : []);
+  const helps = p => (w && drop ? scoreCats().filter(c => (catWins(p)[c.key] || 0) - (catWins(drop)[c.key] || 0) > 0.01).map(c => c.label) : []);
   const adds = pool.filter(p => p.status !== 'Out')
     .map(p => ({ p, gain: worth(p) - base, helps: helps(p) }))
     .filter(x => x.gain > 0).sort((a, b) => b.gain - a.gain).slice(0, 3);
@@ -731,7 +696,7 @@ function recommendedCard() {
   const r = recommendedAdds();
   if (!r) return '';
   const fx = p => { const raw = nbaById.get(p.nbaId); return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || raw.fx.st}</span>` : ''; };
-  const gainTxt = g => (isPoints() ? `${signed(g, 1)} FP/G` : `${signed(g, 1)} value`);
+  const gainTxt = g => (isPoints() ? `${signed(g, 1)} FP/G` : `${fmtValue(g)} value`);
   const rows = r.adds.map(x => `<li class="rec">
       <div class="rec-who">${playerCell(x.p)}</div>
       <div class="rec-why">${fx(x.p)} ${r.drop ? `<span>for ${inlinePlayer(r.drop, esc(r.drop.name))}</span> <b class="pos-good">${gainTxt(x.gain)}</b>` : '<span>open roster spot</span>'}${x.helps.length ? `<div class="muted small">helps ${x.helps.join(', ')}</div>` : ''}</div>
@@ -757,8 +722,8 @@ function showPlayerDetail(nbaId) {
   // value as Performances counts it (categories won against not playing, or fantasy points): per game, and this season's games added up
   const VAL = isPoints() ? 'FP' : 'Value';
   const valTip = esc(isPoints() ? 'Fantasy points in your league' : "Categories won: what a game adds to winning a week's categories, against not playing (an even matchup). Below 0: his team would have done better without it");
-  const valCell = (v, d) => `<td class="num${v < 0 && !isPoints() ? ' pos-bad' : ''}" data-tip="${valTip}"><b>${fmtGameValue(v, d)}</b></td>`;
-  const perGameVal = s => gameValue(statLine(s));
+  const valCell = (v, d) => `<td class="num${v < 0 && !isPoints() ? ' pos-bad' : ''}" data-tip="${valTip}"><b>${fmtValue(v, d)}</b></td>`;
+  const perGameVal = s => lineValue(statLine(s));
   const cur = statObj(raw.cur);
   const season = cur && cur.gp ? { per: perGameVal(cur), gp: Math.round(cur.gp) } : null;
   // phones: stats down the side, seasons across
@@ -770,11 +735,11 @@ function showPlayerDetail(nbaId) {
     .map(([l, s]) => `<tr><td><b>${l}</b></td><td class="num">${Math.round(s.gp)}</td><td class="num">${fmt(s.min, 1)}</td><td class="num">${fmt(s.pts)}</td><td class="num">${fmt(s.reb)}</td><td class="num">${fmt(s.ast)}</td><td class="num">${fmt(s.stl)}</td><td class="num">${fmt(s.blk)}</td><td class="num">${fmt(s.tpm)}</td><td class="num">${fmt(s.to)}</td><td class="num">${fmtPct(s.fga ? s.fgm / s.fga : 0)}</td><td class="num">${fmtPct(s.fta ? s.ftm / s.fta : 0)}</td>${valCell(perGameVal(s))}</tr>`).join('');
   const games = (raw.log || []).map(g => { const o = {}; NBA.logKeys.forEach((k, i) => { o[k] = g[i]; }); return o; });
   // phones: each game as a short block
-  const gamesNarrow = games.length ? `<ul class="pc-games show-sm">${games.map(o => { const v = gameValue(o); return `<li>
-      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min · <span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtGameValue(v)} ${isPoints() ? 'FP' : 'value'}</span></span></div>
+  const gamesNarrow = games.length ? `<ul class="pc-games show-sm">${games.map(o => { const v = lineValue(o); return `<li>
+      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min · <span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtValue(v)} ${isPoints() ? 'FP' : 'value'}</span></span></div>
       <div>${[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`].map(x => `<span>${x}</span>`).join(' · ')}</div>
       <div class="muted">${o.fgm}-${o.fga} FG · ${o.ftm}-${o.fta} FT</div></li>`; }).join('')}</ul>` : '';
-  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${o.min}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td>${valCell(gameValue(o))}</tr>`).join('');
+  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${o.min}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td>${valCell(lineValue(o))}</tr>`).join('');
   const onRoster = owned.roster.has(raw.id);
   $('#detailBody').innerHTML = `
     <div class="detail-head">
@@ -785,8 +750,8 @@ function showPlayerDetail(nbaId) {
     <div class="proj-grid" style="margin-top:12px">
       <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div></div>
       <div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>
-      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtGameValue(season.per) : '—'}</div></div>
-      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtGameValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div></div>
+      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div></div>
+      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div></div>
     </div>
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
     ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}

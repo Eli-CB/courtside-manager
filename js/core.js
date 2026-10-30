@@ -242,11 +242,13 @@ function scoreCats() {
   return catsMemo.cats;
 }
 
+// Player value: what an average game of his adds to winning a week's categories, against not playing (catWins, the
+// same as a single game on the Dashboard), or fantasy points per game in points leagues
 function value(p) {
-  return isPoints() ? fantasyPoints(p) : sum(Object.values(catZ(p)));
+  return isPoints() ? fantasyPoints(p) : sum(Object.values(catWins(p)));
 }
 const valueLabel = () => (isPoints() ? 'FP/G' : 'Value');
-const fmtValue = v => (isPoints() ? fmt(v, 1) : signed(v, 1));
+const fmtValue = (v, d = 2) => (isPoints() ? fmt(v, 1) : signed(v, d));
 const statOf = (p, c) => (c.fp ? fantasyPoints(p) : c.pct ? pctOf(p, c) : statVal(p, c.key));
 
 // Typical fantasy points per game for a rostered player, for shading the FP column
