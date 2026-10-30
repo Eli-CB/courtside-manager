@@ -172,6 +172,11 @@ function lineWins(line) {
   }
   return z;
 }
+// A game's value as Performances shows it: fantasy points, or categories won. Both add up linearly, so an
+// average line (statLine of per-game stats) is worth the average of its games.
+const gameValue = line => (isPoints() ? lineFp(line) : sum(Object.values(lineWins(line))));
+const statLine = s => Object.fromEntries(COUNT_KEYS.map(k => [k, s[k] != null ? s[k] : statVal(s, k)])); // season rows have makes, projections FG%
+const fmtGameValue = (v, d = 2) => (isPoints() ? fmt(v, 1) : signed(v, d));
 
 // The days Performances can show: today (when there are games), the latest earlier day with games, and the days of
 // this week's matchup that have them. The week is only offered once it holds more than one day.
@@ -203,7 +208,7 @@ function perfRows(dates) {
       for (const [k, x] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + x;
       if (isPoints()) { v += lineFp(line); continue; }
       for (const [k, x] of Object.entries(liveZ(line, liveOn(raw, d)))) z[k] = (z[k] || 0) + x;
-      v += sum(Object.values(lineWins(line)));
+      v += gameValue(line);
     }
     rows.push({ raw, g: lines.length, tot, z, v, on: lines.some(([d]) => liveOn(raw, d)) });
   }
@@ -749,22 +754,27 @@ function showPlayerDetail(nbaId) {
   const t = teamInfo(raw.team);
   const lines = [['Projection', 'Proj', nbaStats(raw)], [NBA.season, String(NBA.season).slice(2), statObj(raw.cur)], ['Last 10', 'L10', statObj(raw.l10)], [NBA.prevSeason, String(NBA.prevSeason).slice(2), statObj(raw.prev)]]
     .filter(([, , s]) => s && s.gp);
+  // value as Performances counts it (categories won against not playing, or fantasy points): per game, and this season's games added up
+  const VAL = isPoints() ? 'FP' : 'Value';
+  const valTip = esc(isPoints() ? 'Fantasy points in your league' : "Categories won: what a game adds to winning a week's categories, against not playing (an even matchup). Below 0: his team would have done better without it");
+  const valCell = (v, d) => `<td class="num${v < 0 && !isPoints() ? ' pos-bad' : ''}" data-tip="${valTip}"><b>${fmtGameValue(v, d)}</b></td>`;
+  const perGameVal = s => gameValue(statLine(s));
+  const cur = statObj(raw.cur);
+  const season = cur && cur.gp ? { per: perGameVal(cur), gp: Math.round(cur.gp) } : null;
   // phones: stats down the side, seasons across
   const AVG = [['GP', s => Math.round(s.gp)], ['MIN', s => fmt(s.min, 1)], ['PTS', s => fmt(s.pts)], ['REB', s => fmt(s.reb)], ['AST', s => fmt(s.ast)], ['STL', s => fmt(s.stl)], ['BLK', s => fmt(s.blk)], ['3PM', s => fmt(s.tpm)], ['TO', s => fmt(s.to)], ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0)], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0)]];
   const avgNarrow = lines.length ? `<table class="pc-avg show-sm"><thead><tr><th></th>${lines.map(([, short]) => `<th class="num">${esc(short)}</th>`).join('')}</tr></thead>
-    <tbody>${AVG.map(([label, f]) => `<tr><td><b>${label}</b></td>${lines.map(([, , st]) => `<td class="num">${f(st)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '';
+    <tbody>${AVG.map(([label, f]) => `<tr><td><b>${label}</b></td>${lines.map(([, , st]) => `<td class="num">${f(st)}</td>`).join('')}</tr>`).join('')}
+    <tr><td><b>${VAL}</b></td>${lines.map(([, , st]) => valCell(perGameVal(st))).join('')}</tr></tbody></table>` : '';
   const rows = lines.map(([l, , s]) => [l, s])
-    .map(([l, s]) => `<tr><td><b>${l}</b></td><td class="num">${Math.round(s.gp)}</td><td class="num">${fmt(s.min, 1)}</td><td class="num">${fmt(s.pts)}</td><td class="num">${fmt(s.reb)}</td><td class="num">${fmt(s.ast)}</td><td class="num">${fmt(s.stl)}</td><td class="num">${fmt(s.blk)}</td><td class="num">${fmt(s.tpm)}</td><td class="num">${fmt(s.to)}</td><td class="num">${fmtPct(s.fga ? s.fgm / s.fga : 0)}</td><td class="num">${fmtPct(s.fta ? s.ftm / s.fta : 0)}</td></tr>`).join('');
+    .map(([l, s]) => `<tr><td><b>${l}</b></td><td class="num">${Math.round(s.gp)}</td><td class="num">${fmt(s.min, 1)}</td><td class="num">${fmt(s.pts)}</td><td class="num">${fmt(s.reb)}</td><td class="num">${fmt(s.ast)}</td><td class="num">${fmt(s.stl)}</td><td class="num">${fmt(s.blk)}</td><td class="num">${fmt(s.tpm)}</td><td class="num">${fmt(s.to)}</td><td class="num">${fmtPct(s.fga ? s.fgm / s.fga : 0)}</td><td class="num">${fmtPct(s.fta ? s.ftm / s.fta : 0)}</td>${valCell(perGameVal(s))}</tr>`).join('');
   const games = (raw.log || []).map(g => { const o = {}; NBA.logKeys.forEach((k, i) => { o[k] = g[i]; }); return o; });
   // phones: each game as a short block
-  const gamesNarrow = games.length ? `<ul class="pc-games show-sm">${games.map(o => `<li>
-      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min</span></div>
+  const gamesNarrow = games.length ? `<ul class="pc-games show-sm">${games.map(o => { const v = gameValue(o); return `<li>
+      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min · <span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtGameValue(v)} ${isPoints() ? 'FP' : 'value'}</span></span></div>
       <div>${[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`].map(x => `<span>${x}</span>`).join(' · ')}</div>
-      <div class="muted">${o.fgm}-${o.fga} FG · ${o.ftm}-${o.fta} FT</div></li>`).join('')}</ul>` : '';
-  const logs = (raw.log || []).map(g => {
-    const o = {}; NBA.logKeys.forEach((k, i) => { o[k] = g[i]; });
-    return `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${o.min}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td></tr>`;
-  }).join('');
+      <div class="muted">${o.fgm}-${o.fga} FG · ${o.ftm}-${o.fta} FT</div></li>`; }).join('')}</ul>` : '';
+  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${o.min}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td>${valCell(gameValue(o))}</tr>`).join('');
   const onRoster = owned.roster.has(raw.id);
   $('#detailBody').innerHTML = `
     <div class="detail-head">
@@ -775,12 +785,13 @@ function showPlayerDetail(nbaId) {
     <div class="proj-grid" style="margin-top:12px">
       <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div></div>
       <div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>
-      <div class="proj"><div class="k">${valueLabel()}</div><div class="v">${(() => { const s = nbaStats(raw); return s && s.gp ? fmtValue(value({ ...s, pos: raw.pos })) : '—'; })()}</div></div>
+      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtGameValue(season.per) : '—'}</div></div>
+      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtGameValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div></div>
     </div>
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
-    ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}
+    ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}
     <h3 class="sub" style="margin-top:16px">Recent games</h3>
-    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
+    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th><th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   $('#detailFoot').innerHTML = `
     <button type="button" class="btn ghost" data-action="close-detail">Close</button>
     ${onRoster ? '<span class="badge accent">On your roster</span>' : ''}`;

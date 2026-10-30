@@ -710,6 +710,30 @@ test('performances: value is categories won against not playing, every category 
   assert.ok(v({ min: 34, pts: 36, reb: 14, ast: 5, stl: 3, blk: 2, tpm: 4, to: 0, fgm: 14, fga: 25, ftm: 4, fta: 4 }) > 2 * v(ordinary));
 });
 
+test("player profile: value per game (each game, each season's averages) and this season's games added up", async () => {
+  await app.useLeague(CATS9);
+  const raw = app.NBA.players.find(r => r.log && r.log.length && app.statObj(r.cur) && app.statObj(r.cur).gp >= 2);
+  assert.ok(raw, 'a player with games this season');
+  const els = {}, doc = app.document, before = doc.querySelector;
+  doc.querySelector = sel => (els[sel] = els[sel] || { innerHTML: '', open: false, showModal() { this.open = true; } });
+  try {
+    app.showPlayerDetail(raw.id);
+    const html = els['#detailBody'].innerHTML;
+    const cur = app.statObj(raw.cur), per = app.gameValue(app.statLine(cur));
+    assert.ok(Math.abs(per - app.gameValue(cur)) < 1e-9, 'makes and attempts as they are (season rows have no FG%)');
+    const proj = app.nbaStats(raw);
+    assert.ok(Math.abs(app.statLine(proj).fgm - proj.fgPct * proj.fga) < 1e-9, 'projections: makes from FG%');
+    assert.ok(html.includes('Value per game') && html.includes(app.signed(per, 2)), 'this season per game');
+    assert.ok(html.includes(`${app.signed(per * Math.round(cur.gp), 1)} <span class="muted small">in ${Math.round(cur.gp)} G</span>`), 'this season in all');
+    // linear: an average line is worth the average of its games
+    const games = raw.log.map(g => Object.fromEntries(app.NBA.logKeys.map((k, i) => [k, g[i]])));
+    for (const o of games) assert.ok(html.includes(app.signed(app.gameValue(o), 2)), `${o.date}: its value`);
+    const avg = Object.fromEntries(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta'].map(k => [k, games.reduce((t, o) => t + o[k], 0) / games.length]));
+    assert.ok(Math.abs(app.gameValue(avg) - games.reduce((t, o) => t + app.gameValue(o), 0) / games.length) < 1e-9);
+    assert.match(html, /<th class="num">Value<\/th><\/tr><\/thead><tbody><tr><td><b>Projection/, 'a Value column for each season');
+  } finally { doc.querySelector = before; }
+});
+
 test('performances: everyone who played in one table, top 50 by the sorted column, ranked by value', async () => {
   await app.loadBoxes();
   const cell = (tr, i) => [...tr.matchAll(/<td class="sc"[^>]*>([^<]*)</g)][i][1];
