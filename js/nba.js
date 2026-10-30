@@ -292,18 +292,18 @@ function computeBase(stats, n) {
   return out;
 }
 
+// How much a stat swings from game to game for a player who averages m
+const gameSd = (k, m) => (k === 'pts' ? 0.3 * m + 2.5
+  : k === 'dd' || k === 'td' ? Math.sqrt(m * (1 - m)) // happens or not, game to game
+  : k === 'pm' ? 9 : k === 'min' ? 4 : k === 'gp1' ? 0
+  : 1.1 * Math.sqrt(Math.max(m, 0.1)));
+
 // Per-game means and spreads. Spreads come from the player's real game logs when available.
 function perGame(p) {
   const m = Object.fromEntries(COUNT_KEYS.map(k => [k, statVal(p, k)]));
   const raw = p.nbaId ? nbaById.get(p.nbaId) : null;
   const sd = {};
-  COUNT_KEYS.forEach((k, i) => {
-    sd[k] = raw && raw.sd && raw.sd[i] != null ? raw.sd[i]
-      : k === 'pts' ? 0.3 * m.pts + 2.5
-      : k === 'dd' || k === 'td' ? Math.sqrt(m[k] * (1 - m[k])) // happens or not, game to game
-      : k === 'pm' ? 9 : k === 'min' ? 4 : k === 'gp1' ? 0
-      : 1.1 * Math.sqrt(Math.max(m[k], 0.1));
-  });
+  COUNT_KEYS.forEach((k, i) => { sd[k] = raw && raw.sd && raw.sd[i] != null ? raw.sd[i] : gameSd(k, m[k]); });
   return { m, sd };
 }
 

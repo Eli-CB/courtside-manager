@@ -680,18 +680,34 @@ test("performances: this week adds up each player's games", async () => {
   const lines = dates.map(d => app.BOX.day.get(r.raw.id).get(d)).filter(Boolean);
   assert.equal(r.g, lines.length);
   assert.equal(r.tot.pts, lines.reduce((t, l) => t + l.pts, 0));
-  // against an average starter's 1.5 games over three days: the games' values, plus an average game's worth
-  // (against not playing) for each game beyond 1.5, so every game counts
-  const expected = 3.5 * 3 / 7, perGame = -app.lineValue({});
-  assert.ok(perGame > 5, `an average game is worth ${perGame} against not playing`);
-  const week = app.perfRows(dates, expected).find(x => x.raw.id === r.raw.id);
-  const games = lines.reduce((t, l) => t + app.lineValue(l), 0);
-  assert.ok(Math.abs(week.v - (games + (r.g - expected) * perGame)) < 1e-9);
+  // categories won against not playing, so the week is just its games added up
+  const games = lines.reduce((t, l) => t + Object.values(app.lineWins(l)).reduce((a, b) => a + b, 0), 0);
+  assert.ok(Math.abs(r.v - games) < 1e-9);
   app.ui.perfRange = 'week';
   try {
     const html = await onDay('2026-10-25', () => app.topPerformancesCard());
     assert.match(html, /\d G · \d+ min/, 'rows show games played');
   } finally { app.ui.perfRange = null; }
+});
+
+test('performances: value is categories won against not playing, every category weighing the same', async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const v = line => Object.values(app.lineWins(line)).reduce((a, b) => a + b, 0);
+  const W = app.winWeights();
+  assert.equal(v({}), 0, 'not playing adds nothing');
+  // counting stats only add; a steal is worth several points (steals decide a category with far smaller totals)
+  const pt = app.lineWins({ pts: 1 }).pts, stl = app.lineWins({ stl: 1 }).stl;
+  assert.ok(pt > 0 && stl / pt > 4 && stl / pt < 20, `a steal is worth ${(stl / pt).toFixed(1)} points`);
+  assert.ok(app.lineWins({ to: 1 }).to < 0, 'turnovers take away');
+  // shooting adds only above the league's average
+  assert.ok(Math.abs(app.lineWins({ fgm: W.fgPct.p * 10, fga: 10 }).fgPct) < 1e-12, 'average shooting: nothing either way');
+  assert.ok(app.lineWins({ ftm: 0, fta: 2 }).ftPct < 0 && app.lineWins({ ftm: 2, fta: 2 }).ftPct > 0);
+  // an ordinary starter's game helps; a brick-and-turnover night with little else hurts
+  const ordinary = { min: 32, pts: 18, reb: 6, ast: 4, stl: 1, blk: 1, tpm: 2, to: 2, fgm: 7, fga: 15, ftm: 2, fta: 3 };
+  assert.ok(v(ordinary) > 0.1 && v(ordinary) < 0.4, `an ordinary game adds ${v(ordinary).toFixed(2)} categories`);
+  assert.ok(v({ min: 30, pts: 2, reb: 7, ast: 6, fgm: 1, fga: 10, ftm: 0, fta: 2, to: 5 }) < 0);
+  assert.ok(v({ min: 34, pts: 36, reb: 14, ast: 5, stl: 3, blk: 2, tpm: 4, to: 0, fgm: 14, fga: 25, ftm: 4, fta: 4 }) > 2 * v(ordinary));
 });
 
 test('performances: everyone who played in one table, top 50 by the sorted column, ranked by value', async () => {

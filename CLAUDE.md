@@ -25,7 +25,8 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards, past Rosters
-  - views: Dashboard (Performances: today, last game day or this week, sortable tables), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
+  - views: Dashboard (Performances: today, last game day or this week, sortable tables; category leagues rank by
+    categories won vs not playing, `lineWins`), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such

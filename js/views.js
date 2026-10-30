@@ -130,13 +130,48 @@ function viewDashboard() {
 }
 
 // ----- Performances: every NBA stat line from today, the last game day or this week so far, in one sortable table -----
-// Today's games come from ESPN as they're played (live.js); a day ranks each game like player value (each category against an average rostered player's game).
-// This week ranks what a player's games added to each category against an average starter's output over the same
-// days (3.5 games a week), so every game counts, like the Matchups week totals. Points leagues use fantasy points.
+// Today's games come from ESPN as they're played (live.js). Category leagues rank what the games added to winning a
+// week's categories against not playing (lineWins), so a week adds them up; points leagues use fantasy points.
 const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
 const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
 const lineZ = line => catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 });
 const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(lineZ(line))));
+
+// What a game adds to winning each category of a week, against not playing: its change to an average team's week
+// (8 starters × 3.5 games: whatever the league starts), over how far apart two teams typically finish in that
+// category (game-to-game swings plus how much rostered players differ), times 0.4, how fast a close category's
+// win chance moves. The unit is categories won in an even matchup. Counting stats only add; turnovers and
+// shooting below the league's average take away.
+let winsMemo = null;
+function winWeights() {
+  if (winsMemo && winsMemo.BASE === BASE && winsMemo.n === state.slots.length) return winsMemo.w;
+  const S = state.slots.length || 8, G = S * WEEK_GAMES;
+  const w = {};
+  for (const c of scoreCats()) {
+    if (c.fp || !BASE[c.key]) continue;
+    const b = BASE[c.key][1];
+    if (c.pct) {
+      // a week's % moves by (makes − average % × attempts) ÷ the team's attempts; shot-making noise as in compareCats
+      const p = BASE[c.key][0], A = G * ((BASE[c.att] || [0])[0] || 1);
+      w[c.key] = { p, A, sd: Math.sqrt(2 * (1.3 * p * (1 - p) / A + G * G / S * b * b / (A * A))) };
+    } else {
+      const m = BASE[c.key][0];
+      w[c.key] = { sd: Math.sqrt(2 * (G * gameSd(c.key, m) ** 2 + G * G / S * b * b)) };
+    }
+  }
+  winsMemo = { BASE, n: state.slots.length, w };
+  return w;
+}
+function lineWins(line) {
+  const W = winWeights(), z = {};
+  for (const c of scoreCats()) {
+    const w = W[c.key];
+    if (!w) continue;
+    const d = c.pct ? ((line[c.made] || 0) - w.p * (line[c.att] || 0)) / w.A : (c.neg ? -1 : 1) * lineStat(line, c.key);
+    z[c.key] = 0.4 * d / w.sd;
+  }
+  return z;
+}
 
 // The days Performances can show: today (when there are games), the latest earlier day with games, and the days of
 // this week's matchup that have them. The week is only offered once it holds more than one day.
@@ -150,12 +185,10 @@ function perfDays() {
   return { today: games ? today : null, started: played.has(today) || live.games.some(g => g.d === today && g.state !== 'pre'), day, week: week.length > 1 ? week : null };
 }
 
-// Each player's lines over those days (the saved box scores, else ESPN's), added up, with each category's
-// contribution and his value against expected games (an average starter's games over those days; 1 for a single
-// game). In category leagues a game beyond those adds what an average game is worth, everything else as player
-// value. A game still on counts for the minutes played so far (liveZ).
-function perfRows(dates, expected = 1) {
-  const perGame = isPoints() ? 0 : -lineValue({}); // an average game against not playing
+// Each player's lines over those days (the saved box scores, else ESPN's), added up, with what they added: fantasy
+// points, or categories won (lineWins), so every game counts. z shades and sorts each category: per game against an
+// average rostered player's game (a game still on: for the minutes played so far, liveZ).
+function perfRows(dates) {
   const byId = new Map();
   const add = (id, d, line) => { if (!byId.has(id)) byId.set(id, []); byId.get(id).push([d, line]); };
   for (const [id, byDay] of BOX.day) for (const d of dates) if (byDay.has(d)) add(id, d, byDay.get(d));
@@ -169,11 +202,10 @@ function perfRows(dates, expected = 1) {
     for (const [d, line] of lines) {
       for (const [k, x] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + x;
       if (isPoints()) { v += lineFp(line); continue; }
-      const lz = liveZ(line, liveOn(raw, d));
-      for (const [k, x] of Object.entries(lz)) z[k] = (z[k] || 0) + x;
-      v += sum(Object.values(lz));
+      for (const [k, x] of Object.entries(liveZ(line, liveOn(raw, d)))) z[k] = (z[k] || 0) + x;
+      v += sum(Object.values(lineWins(line)));
     }
-    rows.push({ raw, g: lines.length, tot, z, v: v + (lines.length - expected) * perGame, on: lines.some(([d]) => liveOn(raw, d)) });
+    rows.push({ raw, g: lines.length, tot, z, v, on: lines.some(([d]) => liveOn(raw, d)) });
   }
   return rows;
 }
@@ -234,10 +266,10 @@ function topPerformancesCard() {
   const e = +expected.toFixed(1);
   const over = weekly ? `${e} game${e === 1 ? '' : 's'} over these days` : 'a game';
   const valTip = esc(pts ? `Fantasy points in your league; an average starter scores ${fmt(par, 1)} in ${over}`
-    : weekly ? `Value: what his games added to each category against an average starter's ${over}` : "Value for the game: each category against an average rostered player's game (a game still on: for the minutes played)");
+    : `Categories won: what ${weekly ? 'his games' : 'the game'} added to winning a week's categories, against not playing (an even matchup). Below 0: his team would have done better without ${weekly ? 'them' : 'it'}`);
 
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
-  const rows = perfRows(dates, expected);
+  const rows = perfRows(dates);
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
   // filter by team (yours, this matchup's opponent's, the others') and by where players are: active, bench, or
   // waivers (no team, so the team filters don't hide them)
@@ -262,7 +294,7 @@ function topPerformancesCard() {
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button></div>
           <div class="pmeta">${weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${Math.round(r.tot.min || 0)} min · ${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
-        <td class="num pf-v${r.v < par ? ' pos-bad' : ''}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 1)}</td>
+        <td class="num pf-v${r.v < par ? ' pos-bad' : ''}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   return card(toggle, `<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p>${filters}${table}`);
