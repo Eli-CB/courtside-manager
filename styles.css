@@ -648,7 +648,16 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .cs-detail td { padding-top: 0; }
 .cs-who { font-size: .85rem; display: flex; flex-wrap: wrap; gap: 6px 28px; padding-left: 1em; }
 .cs-rank { white-space: nowrap; }
+.cs-avg, .show-sm-inline { display: none; }
 .cs-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
+/* phones: the league average goes under your number and the rank drops "/ 10", so the every-team strip gets the room */
+@media (max-width: 640px) {
+  .cs-table .cs-lavg { display: none; }
+  .cs-avg { display: block; font-size: .7rem; font-weight: 500; color: var(--muted); white-space: nowrap; }
+  .show-sm-inline { display: inline; }
+  .cs-table thead th { white-space: nowrap; }
+  .cs-table td.cs-strip, .cs-table th.cs-strip { width: 50%; }
+}
 .roster-table td.rc { font-variant-numeric: tabular-nums; }
 .roster-table tr.muted-row td { opacity: .55; }
 .fx-connect { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }

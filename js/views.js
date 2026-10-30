@@ -79,10 +79,10 @@ function strengthsCard() {
     const open = ui.csOpen.has(c.key);
     return { c, z, rank, html: `<tr class="cs-row" data-action="cs-toggle" data-cat="${c.key}" aria-expanded="${open}" title="Show who helped (green) and hurt (red) most">
       <td><span class="cs-chev" aria-hidden="true">▸</span><b>${c.label}</b></td>
-      <td class="num"><b>${fmtRaw(c, me.raw[c.key])}</b></td>
-      ${league ? `<td class="num muted">${fmtRaw(c, mean)}</td>` : ''}
+      <td class="num"><b>${fmtRaw(c, me.raw[c.key])}</b>${league ? `<span class="cs-avg">avg ${fmtRaw(c, mean)}</span>` : ''}</td>
+      ${league ? `<td class="num muted cs-lavg">${fmtRaw(c, mean)}</td>` : ''}
       <td class="cs-bar" title="${signed(z, 2)} spreads ${league ? 'from the league average' : 'from a typical player'}"><span class="track"><span class="fill ${z >= 0 ? 'up' : 'down'}" style="width:${w}%"></span></span></td>
-      ${league ? `<td class="num cs-rank ${rank <= 3 ? 'pos-good' : rank > n - 3 ? 'pos-bad' : ''}"><b>${ordinal(rank)}</b> <span class="muted">/ ${n}</span></td>
+      ${league ? `<td class="num cs-rank ${rank <= 3 ? 'pos-good' : rank > n - 3 ? 'pos-bad' : ''}"><b>${ordinal(rank)}</b><span class="muted hide-sm"> / ${n}</span></td>
       <td class="cs-strip"><div class="strip">${teams.map(t => `<span class="sdot${t.mine ? ' me' : ''}" style="left:${pos(t.raw[c.key]).toFixed(1)}%" title="${esc(t.name)}: ${fmtRaw(c, t.raw[c.key])}"></span>`).join('')}</div></td>` : ''}
     </tr>
     <tr class="cs-detail"${open ? '' : ' hidden'}><td colspan="${league ? 6 : 3}"><div class="cs-who">
@@ -102,7 +102,7 @@ function strengthsCard() {
   return `<div class="card">
     ${head}
     <div class="table-wrap"><table class="cs-table">
-      <thead><tr><th>Cat</th><th class="num">You <span class="muted">${unit}</span></th>${league ? '<th class="num">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? '<th class="num">Rank</th><th class="cs-strip">Every team<span class="hide-sm"> (you in orange)</span></th>' : ''}</tr></thead>
+      <thead><tr><th>Cat</th><th class="num">You <span class="muted hide-sm">${unit}</span></th>${league ? '<th class="num cs-lavg">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? `<th class="num">Rank</th><th class="cs-strip"><span class="hide-sm">Every team (you in orange)</span><span class="show-sm-inline">All ${n} teams</span></th>` : ''}</tr></thead>
       <tbody>${rows.map(r => r.html).join('')}</tbody>
     </table></div>
     ${summary}
