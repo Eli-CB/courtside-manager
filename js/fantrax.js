@@ -489,7 +489,8 @@ function fxStrip(ctx) {
   if (!state.fxTeam) return `<div class="fx-strip"><span>Pick your team at the top to load your roster and matchup.</span></div>`;
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const opp = fxOpponentFor(ctx.start, leftId); // the left team's real opponent this week
-  const stale = L.rosterPeriod && opp && opp.period !== L.rosterPeriod;
+  const over = ctx.dates[ctx.dates.length - 1] < todayIso(); // a finished week: no lineup to set, its own rosters
+  const stale = !over && L.rosterPeriod && opp && opp.period !== L.rosterPeriod;
   const teams = fxPickable();
   const cur = state.opp.fxId;
   const hypo = cur && (!opp || cur !== opp.id);
@@ -498,10 +499,10 @@ function fxStrip(ctx) {
     <span class="fx-vs">
       <b>${esc(fxTeamName(leftId))}</b>
       <span class="muted">vs</span>
-      ${stepper('fx-cycle', 'team', `<select class="ctx-team" data-change="fx-opp" aria-label="Compare against">${cur ? '' : '<option value="">Pick a team</option>'}${teams.filter(t => t.id !== leftId).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id ? ' (this week)' : ''}</option>`).join('')}</select>`)}
+      ${stepper('fx-cycle', 'team', `<select class="ctx-team" data-change="fx-opp" aria-label="Compare against">${cur ? '' : '<option value="">Pick a team</option>'}${teams.filter(t => t.id !== leftId).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id ? ` (${['last week', 'this week', 'next week'][ui.weekShift + 1] || 'that week'})` : ''}</option>`).join('')}</select>`)}
       ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
       ${stale ? `<span class="muted small">rosters as of week ${L.rosterPeriod}</span>` : ''}
-    </span>${ctx.locked ? lockNote(ctx) : ''}</div>`;
+    </span>${ctx.locked && !over ? lockNote(ctx) : ''}</div>`;
 }
 
 // Weekly lineups locked: when, and a jump to next week, at the right of the matchup bar

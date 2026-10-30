@@ -31,7 +31,7 @@ const INFO = {
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
     <p>Hover any played game for his minutes and stat line. The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
   benchswaps: ['How the week ended', `
-    <p><b>The final score</b> counts every game each team's starters played that week, from the weekly lineups on Fantrax and the NBA box scores (like Season totals).</p>
+    <p><b>The final score</b> counts every game each team's starters played that week, from the weekly lineups on Fantrax and the NBA box scores (like Season totals). The tables show each team's lineup that week: starters' games (what counted), the week total (green where that team won the category, red where it lost), and the bench's games, which didn't count.</p>
     <p><b>Bench swaps.</b> Each bench player is tried in place of each starter: his games that week count instead of the starter's, against the other team's real total. A swap only counts if the lineup could still be filled from the two players' positions (as they're listed now). In daily-lineup leagues the swap covers every day the starter started and the bench player sat.</p>
     <p>The best swaps are listed for both teams, one per bench player, with the categories that change hands: <b>+</b> now won, <b>=</b> now tied, <b>−</b> now lost. Green rows would have changed the result.</p>`],
   perf: ['Performances', `

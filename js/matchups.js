@@ -347,12 +347,13 @@ function statRow(p, ctx, side, starter) {
 }
 
 function statTable(ctx, side, title, rows, { bench = false, totals = '', games = 0 } = {}) {
+  const over = ctx.dates[ctx.dates.length - 1] < todayIso(); // a finished week shown with today's lineups
   const s = ui.statSort;
   const th = (key, label, cls = '') => sortTh('stat-sort', key, label, s, { cls, down: s.dir < 0, arrow: key !== 'slot' });
   return `<table class="stab">
     <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num')}${scoreCats().map(c => th(c.key, c.label, 'sc')).join('')}</tr></thead>
     <tbody>${sortStatRows(rows, ctx).map(p => statRow(p, ctx, side, !bench)).join('') || `<tr><td colspan="11" class="muted small">${bench ? 'Nobody on the bench' : side === 'them' ? 'No opponent loaded' : 'No starters'}</td></tr>`}</tbody>
-    ${totals ? `<tfoot><tr><td class="st-name"><b>Projected week</b></td><td class="num st-g"><b>${games}</b></td>${totals}</tr></tfoot>` : ''}
+    ${totals ? `<tfoot><tr><td class="st-name"><b>${over ? "Week (today's lineup)" : 'Projected week'}</b></td><td class="num st-g"><b>${games}</b></td>${totals}</tr></tfoot>` : ''}
   </table>`;
 }
 
@@ -506,7 +507,7 @@ function pastWeekCard(start) {
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const pair = (L.matchups[String(period.n)] || []).find(m => m.includes(leftId));
   if (!pair) return '';
-  const head = `<div class="card-head"><h2>How week ${period.n} ended ${infoBtn('benchswaps')}</h2><span class="muted small">starters' games · bench swaps</span></div>`;
+  const head = `<div class="card-head"><h2>How week ${period.n} ended ${infoBtn('benchswaps')}</h2><span class="muted small">the week's real lineups and box scores</span></div>`;
   const note = msg => `<div class="card">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
   let P = pastWeeks[L.id];
   if (!P) {
@@ -553,8 +554,32 @@ function pastWeekCard(start) {
     return `<h3 class="sub">${name(S.tid)} <span class="muted small">${verb(o)} ${scoreTxt(base)}</span></h3>
       ${top.length ? `<ul class="alerts">${top.map(item).join('')}</ul>` : `<p class="muted small" style="margin:0 0 4px">No bench swap would have done better.</p>`}`;
   };
+
+  // each team's lineup that week: starters' games (what counted), the week total, then the bench's games
+  const cols = scoreCats().filter(c => !c.fp);
+  const cell = (s, c, cls = '') => {
+    if (c.pct) return `<td class="sc${cls}" title="${s[c.att] ? `${s[c.made] || 0}-${s[c.att]}` : 'no attempts'}">${s[c.att] ? fmtPct(s[c.made] / s[c.att]) : '—'}</td>`;
+    return `<td class="sc${cls}">${fmt(lineStat(s, c.key), 0)}</td>`;
+  };
+  const row = (x, bench) => `<tr class="${bench ? 'bench' : ''}"><td class="st-name"><div class="bplayer">${headshot(x.p, 24)}<div class="bmain"><div class="bname">${playerName(x.p)}</div></div></div></td>
+    <td class="num st-g">${x.line.gp1 || 0}</td>${cols.map(c => cell(x.line, c)).join('')}${pts ? `<td class="sc">${fmt(lineFp(x.line), 1)}</td>` : ''}</tr>`;
+  const table = (S, O) => {
+    const sc = weekScore(S.tot, O.tot);
+    const lead = i => (sc.lead[i] > 0 ? ' pos-good' : sc.lead[i] < 0 ? ' pos-bad' : '');
+    const byG = list => [...list].sort((a, b) => (b.line.gp1 || 0) - (a.line.gp1 || 0) || lineFp(b.line) - lineFp(a.line));
+    return `<table class="stab pw-table">
+      <thead><tr><th class="st-name">${name(S.tid)}</th><th class="num">G</th>${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}${pts ? '<th class="sc">FP</th>' : ''}</tr></thead>
+      <tbody>${byG(S.starters).map(x => row(x, false)).join('')}</tbody>
+      <tbody class="pw-total"><tr><td class="st-name"><b>Week total</b></td><td class="num st-g"><b>${S.tot.gp1 || 0}</b></td>${cols.map((c, i) => cell(S.tot, c, pts ? '' : lead(i))).join('')}${pts ? `<td class="sc${lead(0)}">${fmt(lineFp(S.tot), 1)}</td>` : ''}</tr></tbody>
+      ${S.bench.length ? `<tbody>${byG(S.bench).map(x => row(x, true)).join('')}</tbody>` : ''}
+    </table>`;
+  };
   return `<div class="card">${head}
     <p class="pw-final"><b>${name(A.tid)}</b> ${scoreTxt(final)} <b>${name(B.tid)}</b></p>
+    <div class="table-wrap"><div class="stat-boards">${table(A, B)}${table(B, A)}</div></div>
+    <p class="muted small" style="margin:8px 0 0">Bench rows (muted) are games that didn't count.</p>
+  </div>
+  <div class="card"><div class="card-head"><h2>Bench swaps ${infoBtn('benchswaps')}</h2><span class="muted small">one bench player for one starter</span></div>
     ${side(A, B)}${side(B, A)}
   </div>`;
 }
@@ -586,17 +611,18 @@ function viewWeek() {
   const winPct = Math.round(oBest.win * 100);
   const changed = weekly ? ctx.bestIds && ([...ctx.bestIds].some(id => !ctx.setIds.has(id)) || ctx.bestIds.size !== ctx.setIds.size) : best.games !== asSet.games;
 
-  const past = pastWeekCard(start); // a finished week: its real result instead of a projection
+  const over = dates[dates.length - 1] < today; // a finished week: nothing left to project
+  const past = over ? pastWeekCard(start) : ''; // its real result and lineups, where the league shares them
   const scoreboard = hasOpp ? `
     <div class="card scoreboard">
       <div class="sb-main">
         <div class="sb-side"><div class="sb-label">${esc(state.teamName)}</div><div class="sb-score">${fmt(oBest.expected, isPoints() ? 0 : 1)}</div></div>
-        <div class="sb-vs">projected<br>${isPoints() ? 'points' : 'cats'}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}</div>
+        <div class="sb-vs">${over ? `${isPoints() ? 'points' : 'cats'}<br>with today's<br>lineups` : `projected<br>${isPoints() ? 'points' : 'cats'}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}`}</div>
         <div class="sb-side right"><div class="sb-label">${esc(state.opp.name || 'Opponent')}</div><div class="sb-score">${isPoints() ? fmt(oBest.opp, 0) : fmt(oBest.n - oBest.expected, 1)}</div></div>
       </div>
-      <div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
-      <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>
-      ${changed ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'points' : 'cats'} · ${pctTxt(oSet.win)} to win · ${asSet.games} starter games</div></div>` : ''}
+      ${over ? '' : `<div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
+      <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>`}
+      ${changed && !over ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'points' : 'cats'} · ${pctTxt(oSet.win)} to win · ${asSet.games} starter games</div></div>` : ''}
     </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from ${sourceName()}</button>` : `${sourceName()} has no matchup for you this week.`}</div></div>`;
 
   // Daily-lineup leagues keep the day-by-day swap list
@@ -627,9 +653,9 @@ function viewWeek() {
   ${staleOpp && fxOpponentFor(start) ? `<div class="sample-banner"><span>Showing your opponent from the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="fx-load-opp">Load this week's opponent</button></div>` : ''}
   <div class="week-stack">
     ${fxStrip(ctx)}
-    ${past || scoreboard}
+    ${past || `${scoreboard}
     ${matchupBoard(ctx)}
-    ${weekly ? lineupSection(ctx) : dailyCards}
-    ${ctx.locked && weekly ? '' : pickupsCard()}
+    ${over ? '' : weekly ? lineupSection(ctx) : dailyCards}
+    ${over || (ctx.locked && weekly) ? '' : pickupsCard()}`}
   </div>`;
 }

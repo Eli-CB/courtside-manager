@@ -291,7 +291,8 @@ function startersMissed(L, G) {
 // Each team's starters' games that week, counted as Season totals counts them, and every single swap of a bench
 // player for a starter: the bench player's games in place of the starter's in each lineup period of the week
 // where one started and the other sat, as long as the lineup could still be filled from their positions.
-// period: the matchup period; tids: its two teams. Returns [{ tid, tot, swaps: [{ inP, outP, tot }] }] or null.
+// period: the matchup period; tids: its two teams. Returns [{ tid, tot, swaps: [{ inP, outP, tot }], starters, bench }]
+// or null; starters and bench: [{ p, line }], a player's games while starting (bench: his games that week).
 function benchSwaps(L, G, weeks, period, tids) {
   // the lineup periods that start within it (by time: the next one starts the evening this one ends)
   const rps = weeks.filter(w => fxTime(w.start) >= fxTime(period.lock) && fxTime(w.start) < fxTime(period.endAt));
@@ -315,11 +316,12 @@ function benchSwaps(L, G, weeks, period, tids) {
   const add = (tot, line, sign) => { for (const [k, v] of Object.entries(line)) tot[k] = (tot[k] || 0) + sign * v; };
   const filled = ps => fillSlots(ps, state.slots).filter(Boolean).length;
   return tids.map(tid => {
-    const tot = {};
+    const tot = {}, started = new Map(), sat = new Map();
     const per = rps.map(rp => {
       const on = [], off = [];
       for (const [f, o] of rp.owner) if (o.tid === tid) (o.on ? on : off).push(f);
-      for (const f of on) add(tot, linesIn(f, rp), 1);
+      for (const f of on) { add(tot, linesIn(f, rp), 1); if (!started.has(f)) started.set(f, {}); add(started.get(f), linesIn(f, rp), 1); }
+      for (const f of off) { if (!sat.has(f)) sat.set(f, {}); add(sat.get(f), linesIn(f, rp), 1); }
       const starters = on.map(playerOf).filter(Boolean);
       return { rp, on, off, starters, n: filled(starters) };
     });
@@ -339,7 +341,8 @@ function benchSwaps(L, G, weeks, period, tids) {
         }
       }
     }
-    return { tid, tot, swaps: [...swaps.values()] };
+    const list = m => [...m].map(([f, line]) => ({ p: playerOf(f), line })).filter(x => x.p);
+    return { tid, tot, swaps: [...swaps.values()], starters: list(started), bench: list(sat).filter(x => !started.has(x.p.fid)) };
   });
 }
 

@@ -175,6 +175,10 @@ test('a finished week: its real result, and the bench swaps that would have chan
     await new Promise(r => setTimeout(r, 10));
     const html = app.pastWeekCard(app.weekStart());
     assert.ok(html.includes('How week 1 ended') && html.includes('class="alert good"') && html.includes('Would have won'), html.slice(0, 400));
+    // the page shows the week as it was played, with nothing projected
+    const page = app.viewWeek();
+    assert.ok(page.includes('Week total') && !/project|win chance|to win the week|Plan next week/i.test(page), 'a finished week, not a projection');
+    assert.equal((page.match(/<tr class="bench">/g) || []).length, A.bench.length + B.bench.length, "both teams' benches that week");
   } finally { ui.weekShift = 0; }
   assert.equal(app.pastWeekCard(app.weekStart()), '', 'not for a week still being played');
 });
