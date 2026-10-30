@@ -154,8 +154,8 @@ function perfDays() {
 }
 
 // Each player's lines over those days (the saved box scores, else ESPN's), added up, with what they added: fantasy
-// points, or categories won (lineWins), so every game counts. z shades and sorts each category: per game against an
-// average rostered player's game (a game still on: for the minutes played so far, liveZ).
+// points, or categories won (lineWins), so every game counts. z sorts each category: per game against an average
+// rostered player's game (a game still on: for the minutes played so far, liveZ).
 function perfRows(dates) {
   const byId = new Map();
   const add = (id, d, line) => { if (!byId.has(id)) byId.set(id, []); byId.get(id).push([d, line]); };
@@ -227,10 +227,14 @@ function topPerformancesCard() {
   const cell = (r, c) => {
     if (c.pct) {
       const [m, a] = [r.tot[c.made] || 0, r.tot[c.att] || 0];
-      return `<td class="sc" style="${shade((r.z[c.key] || 0) / r.g)}" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}">${m}-${a}</td>`;
+      return `<td class="sc" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}">${m}-${a}</td>`;
     }
-    return `<td class="sc" style="${pts ? '' : shade((r.z[c.key] || 0) / r.g)}">${fmt(lineStat(r.tot, c.key), 0)}</td>`;
+    return `<td class="sc">${fmt(lineStat(r.tot, c.key), 0)}</td>`;
   };
+  // only Value is colored: greener up to a monster night (+0.7 a game, over an average starter's games on these days),
+  // red below 0 (the team was better off without it: rare, so −0.25 is full red); points leagues around an average
+  // starter's points
+  const valShade = r => { const g = r.v / expected; return shade(pts ? (r.v - par) / (fpBase()[1] * Math.sqrt(expected)) : g / (g < 0 ? 0.1 : 0.28), 'var(--surface)'); };
   const e = +expected.toFixed(1);
   const over = weekly ? `${e} game${e === 1 ? '' : 's'} over these days` : 'a game';
   const valTip = esc(pts ? `Fantasy points in your league; an average starter scores ${fmt(par, 1)} in ${over}`
@@ -262,7 +266,7 @@ function topPerformancesCard() {
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button></div>
           <div class="pmeta">${weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${Math.round(r.tot.min || 0)} min · ${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
-        <td class="num pf-v${r.v < par ? ' pos-bad' : ''}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
+        <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   return card(toggle, `<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p>${filters}${table}`);

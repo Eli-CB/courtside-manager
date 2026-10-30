@@ -210,11 +210,12 @@ window.addEventListener('scroll', hideTip, { passive: true });
 const BOARD_KEY = 'courtside-board';
 ui.boardMode = (() => { try { return localStorage.getItem(BOARD_KEY) || 'sched'; } catch (e) { return 'sched'; } })();
 
-// Smooth shading: strength grows with the size of the contribution, so close values look alike
-function shade(z) {
+// Smooth shading: strength grows with the size of the contribution, so close values look alike (base: an opaque
+// background for sticky cells)
+function shade(z, base = 'transparent') {
   if (!Number.isFinite(z) || Math.abs(z) < 0.2) return '';
   const pct = Math.round(Math.min(Math.abs(z) / 2.5, 1) * 50);
-  return `background: color-mix(in srgb, var(${z > 0 ? '--good' : '--bad'}) ${pct}%, transparent);${Math.abs(z) >= 1.5 ? ' font-weight: 700;' : ''}`;
+  return `background: color-mix(in srgb, var(${z > 0 ? '--good' : '--bad'}) ${pct}%, ${base});${Math.abs(z) >= 1.5 ? ' font-weight: 700;' : ''}`;
 }
 const shadeProb = p => shade((p - 0.5) * 5); // 90% to win ≈ as strong as a +2 contribution
 

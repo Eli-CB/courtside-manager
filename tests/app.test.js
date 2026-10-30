@@ -779,6 +779,10 @@ test('performances: everyone who played in one table, top 50 by the sorted colum
     const vals = rows.map(val);
     assert.ok(vals.every((v, i) => !i || v <= vals[i - 1]), `${id}: best first`);
     assert.deepEqual(rows.slice(0, 5).map(tr => +tr.match(/perf-rank">(\d+)/)[1]), [1, 2, 3, 4, 5]);
+    assert.ok(rows.every(tr => !/<td class="sc"[^>]*style=/.test(tr)), `${id}: stats aren't colored`);
+    const top = rows[0].match(/class="num pf-v" style="([^"]*)"/), low = rows.find(tr => val(tr) < -0.05);
+    assert.match(top[1], /--good/, `${id}: the best value is green`);
+    if (low) assert.match(low, /class="num pf-v" style="[^"]*--bad/, `${id}: a game that hurt is red`);
     app.ui.perfSort = { key: 'v', dir: 1 };
     try {
       rows = bodyRows(app.topPerformancesCard());

@@ -168,7 +168,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : '—');
 const fmtPct = n => (Number.isFinite(n) && n > 0 ? n.toFixed(3).replace(/^0/, '') : '—');
-const signed = (n, d = 1) => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toFixed(d);
+const signed = (n, d = 1) => { const t = Math.abs(n).toFixed(d); return (+t === 0 ? '' : n > 0 ? '+' : '−') + t; }; // 0.00, never −0.00
 const sum = arr => arr.reduce((a, b) => a + b, 0);
 
 const byId = id => state.players.find(p => p.id === id);
