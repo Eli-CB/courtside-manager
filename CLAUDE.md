@@ -26,7 +26,8 @@ Live: https://eli-cb.github.io/courtside-manager/ (repo Eli-CB/courtside-manager
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards, past Rosters
   - views: Dashboard (Performances: today, last game day or this week, sortable tables), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
-  - matchups: Matchups tab, schedule dots, stat tables, tooltips
+  - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows its real result instead of
+    the projection, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history)
   - live: live box scores for Performances' Today (and This week). The browser polls ESPN's site API
     (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) about once a minute while the Dashboard is visible,
     Performances isn't set to the last game day, and games are on: scoreboard + the box score of each game in progress

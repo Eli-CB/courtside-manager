@@ -140,6 +140,39 @@ test('season totals reproduce every week-1 result on Fantrax', async () => {
   }
 });
 
+test('a finished week: its real result, and the bench swaps that would have changed it', async () => {
+  const L = await app.useLeague(CATS9);
+  const weeks = await app.loadRosterWeeks(L);
+  const G = await app.loadGameLog('cur');
+  const fidNba = app.currentFidNba();
+  const period = L.periods.find(p => p.n === 1);
+  const pair = L.matchups['1'].find(m => m.some(t => app.fxTeamName(t).startsWith('Team Sincere')));
+  const me = pair.find(t => app.fxTeamName(t).startsWith('Team Sincere')), them = pair.find(t => t !== me);
+  const [A, B] = app.benchSwaps({ ...L, fidNba }, G, weeks, period, [me, them]);
+  // the final counts what Season totals counts: week 1 here was a tie
+  const tot = app.pastSeasonTotals({ ...L, weeks: [weeks.find(w => w.n === 1)], fidNba }, G);
+  assert.equal(A.tot.pts, tot[me].s.pts);
+  assert.equal(B.tot.reb, tot[them].s.reb);
+  const sc = app.weekScore(A.tot, B.tot);
+  assert.equal(sc.me, sc.opp, 'tied');
+  // a swap: the bench player's games that week in, the starter's out
+  const days = app.periodDays(G, weeks.find(w => w.n === 1));
+  const pts = p => (G.players.get(fidNba(p.fid)) || []).filter(r => days.has(r[0])).reduce((t, r) => t + app.gameLine(G, r).pts, 0);
+  const w = A.swaps.find(x => pts(x.inP) !== pts(x.outP));
+  assert.equal(w.tot.pts, A.tot.pts - pts(w.outP) + pts(w.inP));
+  // the card: for a team with a winning swap, it says so
+  useTeam(me);
+  const ui = app.get('ui');
+  ui.weekShift = -1;
+  try {
+    app.pastWeekCard(app.weekStart()); // starts loading the week's lineups and box scores
+    await new Promise(r => setTimeout(r, 10));
+    const html = app.pastWeekCard(app.weekStart());
+    assert.ok(html.includes('How week 1 ended') && html.includes('class="alert good"') && html.includes('Would have won'), html.slice(0, 400));
+  } finally { ui.weekShift = 0; }
+  assert.equal(app.pastWeekCard(app.weekStart()), '', 'not for a week still being played');
+});
+
 test('points matchups project fantasy points with sensible odds', async () => {
   await app.useLeague(POINTS);
   const [a, b] = app.fxPickable();

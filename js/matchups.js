@@ -496,6 +496,69 @@ function pickupsCard() {
     </div>`;
 }
 
+// ----- A finished week: the final score, and bench swaps that would have changed it -----
+// The weekly rosters and box scores load once (shared with Season totals and Awards); each matchup's replay is kept
+const pastWeeks = {}; // league id -> { state, weeks, G } ; replays: "league|period|team" -> result
+const pastReplays = new Map();
+function pastWeekCard(start) {
+  const L = fxLeague(), period = fxPeriodFor(start);
+  if (!L || !period || !hasLineupHistory(L) || !(fxTime(period.endAt) < Date.now())) return '';
+  const leftId = ui.viewing ? ui.viewA : state.fxTeam;
+  const pair = (L.matchups[String(period.n)] || []).find(m => m.includes(leftId));
+  if (!pair) return '';
+  const head = `<div class="card-head"><h2>How week ${period.n} ended ${infoBtn('benchswaps')}</h2><span class="muted small">starters' games · bench swaps</span></div>`;
+  const note = msg => `<div class="card">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
+  let P = pastWeeks[L.id];
+  if (!P) {
+    P = pastWeeks[L.id] = { state: 'loading' };
+    Promise.all([loadRosterWeeks(L), loadGameLog('cur')])
+      .then(([weeks, G]) => { pastWeeks[L.id] = { state: 'ready', weeks, G }; })
+      .catch(e => { pastWeeks[L.id] = { state: 'error', msg: e.message }; })
+      .finally(() => { if (ui.tab === 'week') render(); });
+  }
+  if (P.state === 'loading') return note(`Loading the week's lineups from ${sourceName(L)}…`);
+  if (P.state === 'error') return note(`Couldn't load the week's lineups (${esc(P.msg)}).`);
+  const key = `${L.id}|${period.n}|${leftId}`;
+  if (!pastReplays.has(key)) {
+    const R = P.weeks && P.G ? benchSwaps({ ...L, fidNba: currentFidNba() }, P.G, P.weeks, period, [leftId, pair[0] === leftId ? pair[1] : pair[0]]) : null;
+    pastReplays.set(key, R);
+  }
+  const R = pastReplays.get(key);
+  if (!R) return note(`${sourceName(L)} hasn't shared this week's lineups.`);
+
+  const pts = leaguePoints();
+  const cats = pts ? [{ label: 'FP' }] : scoreCats();
+  const name = tid => esc(fxTeamName(tid));
+  const scoreTxt = sc => (pts ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
+  const outcome = sc => Math.sign(Math.round((sc.me - sc.opp) * 10));
+  const verb = o => (o > 0 ? 'won' : o < 0 ? 'lost' : 'tied');
+  const [A, B] = R;
+  const final = weekScore(A.tot, B.tot);
+  const side = (S, O) => {
+    const base = weekScore(S.tot, O.tot), o = outcome(base);
+    const margin = sc => sc.me - sc.opp;
+    // the swaps that do better, best first, one per bench player
+    const better = S.swaps.map(w => ({ w, sc: weekScore(w.tot, O.tot) })).filter(x => margin(x.sc) > margin(base) + 1e-9)
+      .sort((x, y) => margin(y.sc) - margin(x.sc));
+    const seen = new Set();
+    const top = better.filter(x => !seen.has(x.w.inP.fid) && seen.add(x.w.inP.fid)).slice(0, 3);
+    // categories that change hands: + now won, = now tied, − now lost
+    const changed = x => cats.map((c, i) => ({ c, now: x.sc.lead[i], was: base.lead[i] })).filter(y => y.now !== y.was)
+      .map(y => `<span class="${y.now > 0 ? 'pos-good' : y.now < 0 ? 'pos-bad' : 'muted'}" title="${y.now > 0 ? 'won' : y.now < 0 ? 'lost' : 'tied'} instead of ${y.was > 0 ? 'won' : y.was < 0 ? 'lost' : 'tied'}">${y.now > 0 ? '+' : y.now < 0 ? '−' : '='}${esc(y.c.label)}</span>`).join(' ');
+    const item = x => {
+      const flip = outcome(x.sc) > o;
+      return `<li class="alert${flip ? ' good' : ''}"><span class="dot"></span><span class="grow">Start ${inlinePlayer(x.w.inP, `<b>${esc(x.w.inP.name)}</b>`)} for ${inlinePlayer(x.w.outP, esc(x.w.outP.name))}<br>
+        <span class="small">${flip ? `<b>Would have ${verb(outcome(x.sc))} ${scoreTxt(x.sc)}</b>` : `${scoreTxt(x.sc)}`}${pts ? '' : ` · ${changed(x)}`}</span></span></li>`;
+    };
+    return `<h3 class="sub">${name(S.tid)} <span class="muted small">${verb(o)} ${scoreTxt(base)}</span></h3>
+      ${top.length ? `<ul class="alerts">${top.map(item).join('')}</ul>` : `<p class="muted small" style="margin:0 0 4px">No bench swap would have done better.</p>`}`;
+  };
+  return `<div class="card">${head}
+    <p class="pw-final"><b>${name(A.tid)}</b> ${scoreTxt(final)} <b>${name(B.tid)}</b></p>
+    ${side(A, B)}${side(B, A)}
+  </div>`;
+}
+
 // The weeks to step through: the league's matchup numbers (else the week's Monday), this one marked like the
 // opponent picker marks this week's opponent
 function weekPicker() {
@@ -523,6 +586,7 @@ function viewWeek() {
   const winPct = Math.round(oBest.win * 100);
   const changed = weekly ? ctx.bestIds && ([...ctx.bestIds].some(id => !ctx.setIds.has(id)) || ctx.bestIds.size !== ctx.setIds.size) : best.games !== asSet.games;
 
+  const past = pastWeekCard(start); // a finished week: its real result instead of a projection
   const scoreboard = hasOpp ? `
     <div class="card scoreboard">
       <div class="sb-main">
@@ -563,7 +627,7 @@ function viewWeek() {
   ${staleOpp && fxOpponentFor(start) ? `<div class="sample-banner"><span>Showing your opponent from the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="fx-load-opp">Load this week's opponent</button></div>` : ''}
   <div class="week-stack">
     ${fxStrip(ctx)}
-    ${scoreboard}
+    ${past || scoreboard}
     ${matchupBoard(ctx)}
     ${weekly ? lineupSection(ctx) : dailyCards}
     ${ctx.locked && weekly ? '' : pickupsCard()}

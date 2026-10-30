@@ -287,6 +287,75 @@ function startersMissed(L, G) {
   return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()]]));
 }
 
+// ----- A finished matchup replayed: bench swaps that would have changed it -----
+// Each team's starters' games that week, counted as Season totals counts them, and every single swap of a bench
+// player for a starter: the bench player's games in place of the starter's in each lineup period of the week
+// where one started and the other sat, as long as the lineup could still be filled from their positions.
+// period: the matchup period; tids: its two teams. Returns [{ tid, tot, swaps: [{ inP, outP, tot }] }] or null.
+function benchSwaps(L, G, weeks, period, tids) {
+  const rps = weeks.filter(w => { const d = w.start.slice(0, 10); return d >= period.start && d <= period.end; });
+  if (!rps.length) return null;
+  const known = new Map();
+  const playerOf = f => {
+    if (!known.has(f)) { const nba = L.fidNba(f), raw = nba && nbaById.get(nba); known.set(f, raw ? playerFromRaw(raw, { fid: f }) : null); }
+    return known.get(f);
+  };
+  // a player's games in one lineup period, added up
+  const lineMemo = new Map();
+  const linesIn = (f, rp) => {
+    const k = `${f}|${rp.n}`;
+    if (!lineMemo.has(k)) {
+      const days = periodDays(G, rp), nba = L.fidNba(f), out = {};
+      for (const r of (nba && G.players.get(nba)) || []) if (days.has(r[0])) for (const [s, v] of Object.entries(gameLine(G, r))) out[s] = (out[s] || 0) + v;
+      lineMemo.set(k, out);
+    }
+    return lineMemo.get(k);
+  };
+  const add = (tot, line, sign) => { for (const [k, v] of Object.entries(line)) tot[k] = (tot[k] || 0) + sign * v; };
+  const filled = ps => fillSlots(ps, state.slots).filter(Boolean).length;
+  return tids.map(tid => {
+    const tot = {};
+    const per = rps.map(rp => {
+      const on = [], off = [];
+      for (const [f, o] of rp.owner) if (o.tid === tid) (o.on ? on : off).push(f);
+      for (const f of on) add(tot, linesIn(f, rp), 1);
+      const starters = on.map(playerOf).filter(Boolean);
+      return { rp, on, off, starters, n: filled(starters) };
+    });
+    // every bench player for every starter, in the periods where that swap was possible
+    const swaps = new Map(); // "in|out" -> swap
+    for (const P of per) {
+      for (const fin of P.off) {
+        const inP = playerOf(fin);
+        if (!inP) continue;
+        for (const fout of P.on) {
+          const outP = playerOf(fout);
+          if (!outP || filled([...P.starters.filter(p => p !== outP), inP]) < P.n) continue;
+          const k = `${fin}|${fout}`;
+          if (!swaps.has(k)) swaps.set(k, { inP, outP, tot: { ...tot } });
+          add(swaps.get(k).tot, linesIn(fout, P.rp), -1);
+          add(swaps.get(k).tot, linesIn(fin, P.rp), 1);
+        }
+      }
+    }
+    return { tid, tot, swaps: [...swaps.values()] };
+  });
+}
+
+// One team's week against another's: categories won, lost and tied (or fantasy points), and who led each
+function weekScore(a, b) {
+  const pts = leaguePoints();
+  if (pts) { const x = lineFp(a), y = lineFp(b); return { me: x, opp: y, ties: 0, lead: [Math.sign(Math.round((x - y) * 10))] }; }
+  const val = (s, c) => (c.pct ? (s[c.att] ? s[c.made] / s[c.att] : null) : lineStat(s, c.key));
+  const lead = scoreCats().map(c => {
+    const x = val(a, c), y = val(b, c);
+    if (x == null || y == null) return x == null && y == null ? 0 : x == null ? -1 : 1;
+    const d = c.pct ? Math.round((x - y) * 1e5) : Math.round((x - y) * 100);
+    return Math.sign(c.neg ? -d : d);
+  });
+  return { me: lead.filter(x => x > 0).length, opp: lead.filter(x => x < 0).length, ties: lead.filter(x => !x).length, lead };
+}
+
 // ----- Archived seasons: data/seasons/<season>.json, saved once by scripts/archive_season.py -----
 const archives = {}; // season -> { keys, players: Map(id -> { n, s }) }, or null when not saved
 const seasonOf = year => `${year}-${String(year + 1).slice(2)}`;

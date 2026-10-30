@@ -30,6 +30,10 @@ const INFO = {
     <li><b>Light green ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
     <p>Hover any played game for his minutes and stat line. The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
+  benchswaps: ['How the week ended', `
+    <p><b>The final score</b> counts every game each team's starters played that week, from the weekly lineups on Fantrax and the NBA box scores (like Season totals).</p>
+    <p><b>Bench swaps.</b> Each bench player is tried in place of each starter: his games that week count instead of the starter's, against the other team's real total. A swap only counts if the lineup could still be filled from the two players' positions (as they're listed now). In daily-lineup leagues the swap covers every day the starter started and the bench player sat.</p>
+    <p>The best swaps are listed for both teams, one per bench player, with the categories that change hands: <b>+</b> now won, <b>=</b> now tied, <b>−</b> now lost. Green rows would have changed the result.</p>`],
   perf: ['Performances', `
     <p><b>Value.</b> A single game counts like player value: every one of your league's categories against an average rostered player's game. In points leagues it's fantasy points, red when below a typical rostered player's game.</p>
     <p><b>Today.</b> ESPN's box scores, which your browser asks for about once a minute while games are on and this shows today's games (ESPN runs a minute or so behind the broadcast). A game still on is measured against an average game's share for the minutes played, so a good start reads as good. Finished days come from the saved box scores, which the site's data job adds overnight.</p>

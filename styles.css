@@ -474,6 +474,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .fx-vs .stepper .ctx-team { max-width: 300px; }
 .week-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .week-stack > .card + .card { margin-top: 0; }
+.pw-final { margin: 0 0 6px; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
 .board { table-layout: fixed; min-width: 340px; }
 .board col.c-slot { width: 58px; }
 .board thead th { font-size: .8rem; color: var(--text); text-transform: none; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
