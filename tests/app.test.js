@@ -148,7 +148,13 @@ test('a finished week: its real result, and the bench swaps that would have chan
   const period = L.periods.find(p => p.n === 1);
   const pair = L.matchups['1'].find(m => m.some(t => app.fxTeamName(t).startsWith('Team Sincere')));
   const me = pair.find(t => app.fxTeamName(t).startsWith('Team Sincere')), them = pair.find(t => t !== me);
-  const [A, B] = app.benchSwaps({ ...L, fidNba }, G, weeks, period, [me, them]);
+  // a game the evening week 1 ends (Monday Oct 26, 7 p.m.) belongs to week 2, as does week 2's lineup
+  const w2 = weeks.find(w => w.n === 2);
+  const late = [...w2.owner].find(([, o]) => o.tid === me && o.on)[0];
+  const day = Math.round((new Date('2026-10-26T12:00:00') - new Date(G.start + 'T12:00:00')) / 864e5);
+  const G2 = { ...G, players: new Map(G.players) };
+  G2.players.set(fidNba(late), [...(G.players.get(fidNba(late)) || []), [day, 0, ...G.keys.map(k => (k === 'pts' ? 50 : 1))]]);
+  const [A, B] = app.benchSwaps({ ...L, fidNba }, G2, weeks, period, [me, them]);
   // the final counts what Season totals counts: week 1 here was a tie
   const tot = app.pastSeasonTotals({ ...L, weeks: [weeks.find(w => w.n === 1)], fidNba }, G);
   assert.equal(A.tot.pts, tot[me].s.pts);

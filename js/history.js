@@ -293,7 +293,8 @@ function startersMissed(L, G) {
 // where one started and the other sat, as long as the lineup could still be filled from their positions.
 // period: the matchup period; tids: its two teams. Returns [{ tid, tot, swaps: [{ inP, outP, tot }] }] or null.
 function benchSwaps(L, G, weeks, period, tids) {
-  const rps = weeks.filter(w => { const d = w.start.slice(0, 10); return d >= period.start && d <= period.end; });
+  // the lineup periods that start within it (by time: the next one starts the evening this one ends)
+  const rps = weeks.filter(w => fxTime(w.start) >= fxTime(period.lock) && fxTime(w.start) < fxTime(period.endAt));
   if (!rps.length) return null;
   const known = new Map();
   const playerOf = f => {
