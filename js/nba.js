@@ -9,7 +9,7 @@ let NBA = null;
 let nbaLoading = Promise.resolve(false);
 const nbaById = new Map();
 const nbaByName = new Map();
-let nbaCache = null; // player-like objects for the Free Agents tab
+let nbaCache = null; // player-like objects for the Players tab
 const BASIS_LABELS = { blend: 'Smart blend', cur: 'This season', prev: 'Last season', l10: 'Last 10 games' };
 
 const normName = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()

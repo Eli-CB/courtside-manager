@@ -215,6 +215,14 @@ const actions = {
     el.textContent = 'Refresh stats';
     toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : "Couldn't reach the local data server");
   },
+  'dash-range'(el) {
+    ui.dashRange = el.dataset.range;
+    render();
+  },
+  'dash-bench'() {
+    ui.dashBench = !ui.dashBench;
+    render();
+  },
   'perf-range'(el) {
     ui.perfRange = el.dataset.range;
     render();

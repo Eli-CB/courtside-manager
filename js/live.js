@@ -1,9 +1,9 @@
-// League Layer: live box scores: today's games on Performances, as they're played.
+// League Layer: live box scores: today's games on the Dashboard's matchup and Performances, as they're played.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
 /* ---------- Live box scores ---------- */
-// There's no server: the browser asks ESPN itself. While Performances shows today's games and is on screen, every
+// There's no server: the browser asks ESPN itself. While the matchup or Performances shows today's games and is on screen, every
 // 30 seconds while games are on (a minute with the browser's data saver on): the day's scoreboard (small), and the
 // box score of each game in progress whose score has changed, or that hasn't been read for a minute (once more when
 // it ends). Earlier days come from the saved box scores; days the daily data job hasn't saved yet (it runs at
@@ -73,9 +73,10 @@ function espnLines(sm) {
 const liveLines = d => live.lines.get(d) || new Map();
 const savedFinal = g => !!(BOX && BOX.finals.has(`${g.d} ${g.home}`));
 const espnDate = d => d.replace(/-/g, '');
-// Performances is on screen and shows games from today (Today, This week, or not picked yet: it opens on Today
-// once games have started)
-const liveWanted = () => ui.tab === 'dashboard' && !document.hidden && ui.perfRange !== 'day';
+// The Dashboard's matchup or Performances (Players) is on screen and shows games from today (Today, This week, or
+// not picked yet: each opens on Today once games have started)
+const liveTab = () => ui.tab === 'dashboard' || ui.tab === 'players';
+const liveWanted = () => !document.hidden && (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && ui.perfRange !== 'day');
 
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {
@@ -121,7 +122,7 @@ async function pollLive() {
     live.busy = false;
   }
   scheduleLive();
-  if (ui.tab === 'dashboard') { live.hold = true; try { render(); } finally { live.hold = false; } }
+  if (liveTab()) { live.hold = true; try { render(); } finally { live.hold = false; } }
 }
 
 // A game's box score is worth asking for again: its score (or state) moved since the last read, or that's a minute old

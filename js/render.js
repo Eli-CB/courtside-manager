@@ -76,7 +76,7 @@ function leagueMenu() {
 // Each Fantrax season is its own league. Past seasons are added by league ID (the league menu, or the league form,
 // which knows one) and kept per league (keyed by Fantrax's league history id); a past season gets its own tabs.
 // Fantrax leagues only, so far.
-const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
+const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
@@ -251,7 +251,7 @@ function viewPreDraft(L) {
   const past = draftTime(L) && draftTime(L) < new Date();
   return `<div class="card"><div class="empty"><strong>${past ? 'Waiting on the draft' : "This league hasn't drafted yet"}</strong>
       ${when ? `${past ? 'The draft was set for' : 'The draft is set for'} <b>${esc(when)}</b>. ` : ''}Rosters, matchups and the draft board fill in here once teams have players.
-      In the meantime, the <a href="#players">Free Agents</a> tab ranks every NBA player (set Show to Every NBA player).</div></div>`;
+      In the meantime, the <a href="#players">Players</a> tab ranks every NBA player (set Show to Every NBA player).</div></div>`;
 }
 
 function standingOf(teamId) {

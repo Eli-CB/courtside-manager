@@ -1,4 +1,4 @@
-// League Layer: Dashboard, Roster, Standings, Trades, Free Agents.
+// League Layer: Dashboard, Roster, Standings, Trades, Players.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
@@ -112,10 +112,10 @@ function strengthsCard() {
 function viewDashboard() {
   // the latest games come from the box scores, loaded on first need
   if (!BOX && NBA) loadBoxes().then(() => { if (ui.tab === 'dashboard') render(); }).catch(() => {});
-  if (NBA) startLive(); // today's games, as they're played (when Performances shows them)
+  if (NBA) startLive(); // today's games, as they're played (when the matchup shows them)
   return `
   <div class="dash-grid">
-    <div>${topPerformancesCard()}</div>
+    ${NBA ? dashMatchupCard() : ''}
     <div class="dash-side">
       <div class="card">
         <div class="card-head"><h2>Action items</h2></div>
@@ -126,6 +126,121 @@ function viewDashboard() {
       ${newsCard()}
     </div>
   </div>`;
+}
+
+// ----- The Dashboard's matchup: both lineups slot by slot, for today, the last game day or the week so far -----
+// Each side's lineup is the league's as it is now (weekly lineups hold all week; daily ones are today's). Every
+// starter shows his game (tip-off, score and clock, or final) and line, and the scoreboard the categories each side
+// leads over those days, counted from the starters' lines.
+const lineOn = (p, d) => actualLine(p, d) || (p.nbaId && liveLines(d).get(p.nbaId)) || null;
+const addLine = (tot, line) => { for (const [k, x] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + x; return tot; };
+
+// This matchup's days: today (when there are games), its last earlier day with games, and its days up to today
+function dashDays() {
+  const today = todayIso(), P = perfDays(), all = matchDates(weekStartAt(0));
+  const day = all.filter(d => d < today && [...teamDates.values()].some(ds => ds.has(d))).pop() || null;
+  return { today: all.includes(today) && P.today ? today : null, started: P.started, day, week: all.filter(d => d <= today), all };
+}
+
+// A player's game that day: tip-off, the score and clock while it's on, the final score
+function dashGame(p, d) {
+  if (!playsOn(p, d)) return '<span class="muted">No game</span>';
+  const g = liveGame(p, d), s = g || (BOX.scores && BOX.scores.get(`${d} ${p.team}`));
+  const vs = x => (x.home === p.team ? `vs ${x.away}` : `@${x.home}`);
+  if (g && g.state === 'pre') return `${vs(g)} ${g.start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  const score = s ? `${s.away} ${s.as} @ ${s.home} ${s.hs}` : '';
+  if (g && g.state === 'in') return `${liveStatus(p, d)} · ${score}`;
+  const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
+  if (s) return `${score} F${dnp}`;
+  const nx = NBA.teams && NBA.teams[p.team] && NBA.teams[p.team].next;
+  return nx && nx.date === d ? (nx.home ? `vs ${nx.opp}` : `@${nx.opp}`) : `Final${dnp}`;
+}
+
+// A line in the league's own categories: makes-attempts for the percentages, fantasy points first in points leagues
+function lineChips(line) {
+  const out = isPoints() ? [`<span class="mu-chip fp"><b>${fmt(lineFp(line), 1)}</b> FP</span>`] : [];
+  for (const c of scoreCats()) {
+    if (c.fp) continue;
+    out.push(c.pct ? `<span class="mu-chip"><b>${line[c.made] || 0}-${line[c.att] || 0}</b> ${c.label.replace('%', '')}</span>`
+      : `<span class="mu-chip"><b>${fmt(lineStat(line, c.key), c.dec || 0)}</b> ${c.label}</span>`);
+  }
+  return out.join('');
+}
+
+function dashMatchupCard() {
+  const L = fxLeague(), today = todayIso(), yesterday = addDays(today, -1);
+  const card = (head, body) => `<div class="card mu-card"><div class="card-head"><h2>Matchup ${infoBtn('dashmatch')}</h2>${head}</div>${body}</div>`;
+  const me = ui.viewing ? ui.viewA : state.fxTeam;
+  if (!L) return '';
+  if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');
+  if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
+  const D = dashDays();
+  // Today, the last game day before it, the week so far. Until one is picked: today once its games have started,
+  // else the last game day
+  const opts = [D.today && ['today', 'Today'], D.day && ['day', D.day === yesterday ? 'Yesterday' : fmtDay(D.day)], ['week', 'This week']].filter(Boolean);
+  const range = opts.some(([k]) => k === ui.dashRange) ? ui.dashRange : D.today && (D.started || !D.day) ? 'today' : D.day ? 'day' : 'week';
+  const dates = range === 'week' ? D.week : [range === 'today' ? today : D.day];
+  const toggle = `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="dash-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>`;
+
+  const opp = ui.viewing && ui.viewB ? { id: ui.viewB } : fxOpponentFor(weekStartAt(0), me);
+  const side = tid => {
+    const S = fxTeamSide(tid), byId = new Map(S.players.map(p => [p.id, p])), on = new Set(S.lineup), il = new Set(S.il);
+    const starters = S.lineup.map(id => byId.get(id) || null);
+    const total = ds => { const t = {}; for (const p of starters) if (p) for (const d of ds) { const l = lineOn(p, d); if (l) addLine(t, l); } return t; };
+    return {
+      tid, name: S.name, starters, tot: total(dates), week: total(D.week),
+      bench: S.players.filter(p => !on.has(p.id) && !il.has(p.id)).sort((a, b) => value(b) - value(a)),
+      ir: S.players.filter(p => il.has(p.id)),
+    };
+  };
+  const A = side(me), B = opp ? side(opp.id) : null;
+  const pts = isPoints(), cats = scoreCats().filter(c => !c.fp);
+  const scoreTxt = sc => (pts ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
+  // the big numbers are the matchup's: the week so far; the table and the players, the days picked
+  const sc = B ? weekScore(A.tot, B.tot) : null, wk = B ? weekScore(A.week, B.week) : null;
+  const period = fxPeriodFor(weekStartAt(0));
+  const when = range === 'week' ? `${fmtDay(D.all[0])} – ${fmtDay(D.all[D.all.length - 1])}` : `${dates[0] === today ? 'Today' : dates[0] === yesterday ? 'Yesterday' : ''} ${fmtDay(dates[0])}`.trim();
+  const updated = range !== 'day' && live.at ? ` · updated ${new Date(live.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : range !== 'day' && live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>` : '';
+  const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div></div>`;
+  const head = `<div class="mu-board">
+      ${big(A, wk && wk.me)}
+      <div class="mu-mid">${B ? `${pts ? 'FP' : wk.ties ? `${wk.ties} tied` : 'cats'}<br>this week` : ''}</div>
+      ${B ? big(B, wk.opp) : `<div class="mu-team right"><div class="mu-name muted">No opponent this week</div></div>`}
+    </div>
+    <p class="muted small mu-when">${period ? `Week ${period.n} · ` : ''}${when}${B && range !== 'week' ? ` · <b>${scoreTxt(sc)}</b> ${dates[0] === today ? 'today' : 'that day'}` : ''}${updated}${state.lineupMode !== 'weekly' && range !== 'today' ? " · today's lineups" : ''}</p>`;
+
+  // who leads each category over these days
+  const catVal = (t, c) => (c.pct ? (t[c.att] ? fmtPct(t[c.made] / t[c.att]) : '—') : fmt(lineStat(t, c.key), c.dec || 0));
+  // phones: the row's color says whose it is (orange: the left team, as in the scoreboard), no name
+  const catRow = (S, i) => `<tr class="${S === A ? 'pf-me' : 'mu-opp'}"><th scope="row" title="${esc(S.name)}"><span class="mu-tn">${esc(S.name)}</span></th>${cats.map((c, j) => `<td class="${sc.lead[j] === i ? 'mu-lead' : ''}">${catVal(S.tot, c)}</td>`).join('')}</tr>`;
+  const catTable = B && !pts ? `<div class="mu-cats-wrap"><table class="mu-cats"><thead><tr><th><span class="mu-tn">${range === 'week' ? 'This week' : dates[0] === today ? 'Today' : fmtDay(dates[0])}</span></th>${cats.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
+      <tbody>${catRow(A, 1)}${catRow(B, -1)}</tbody></table></div>` : '';
+
+  // one player's cell: who, his game (or the week's games), and what he's put up
+  const cell = (p, right, counts) => {
+    if (!p) return `<div class="mu-p${right ? ' right' : ''}"><span class="muted small">${B || !right ? 'Empty' : ''}</span></div>`;
+    const lines = dates.map(d => lineOn(p, d)).filter(Boolean);
+    const tot = lines.reduce(addLine, {});
+    let game;
+    if (range === 'week') {
+      const left = D.all.filter(d => playsOn(p, d) && !lineOn(p, d) && (d > today || (d === today && !gameFinal(p, d) && !(liveGame(p, d) && liveGame(p, d).state === 'post')))).length;
+      game = `${lines.length} G${left && p.status !== 'Out' ? ` · ${left} left` : ''}${liveOn(p, today) && lineOn(p, today) ? ` · ${liveStatus(p, today)}` : ''}`;
+    } else game = dashGame(p, dates[0]);
+    const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
+    return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}">
+      <div class="bplayer">${headshot(p, 32)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}</div>
+        <div class="pmeta">${posTags(p.pos)} · ${esc(p.team || 'FA')}</div></div></div>
+      <div class="mu-game">${game}</div>
+      ${lines.length ? `<div class="mu-chips">${lineChips(tot)}</div>` : ''}
+    </div>`;
+  };
+  const row = (slot, a, b, counts) => `<div class="mu-row${counts ? '' : ' bench'}">${cell(a, false, counts)}<div class="mu-slot">${slotBadge(slot)}</div>${B ? cell(b, true, counts) : '<div></div>'}</div>`;
+  const rows = state.slots.map((s, i) => row(s, A.starters[i], B && B.starters[i], true)).join('');
+  const nb = Math.max(A.bench.length, B ? B.bench.length : 0), ni = Math.max(A.ir.length, B ? B.ir.length : 0);
+  const bench = ui.dashBench ? Array.from({ length: nb }, (x, i) => row('BN', A.bench[i], B && B.bench[i], false)).join('')
+    + Array.from({ length: ni }, (x, i) => row('IL', A.ir[i], B && B.ir[i], false)).join('') : '';
+  const benchBtn = nb + ni ? `<button type="button" class="link-btn mu-bench-btn" data-action="dash-bench" aria-expanded="${!!ui.dashBench}">${ui.dashBench ? 'Hide the bench' : `Show the bench (${nb + ni})`}</button>` : '';
+  return card(toggle, `${head}${catTable}<div class="mu-rows">${rows}${bench}</div>${benchBtn}`);
 }
 
 // ----- Performances: every NBA stat line from today, the last game day or this week so far, in one sortable table -----
@@ -440,8 +555,11 @@ function loadBoxes() {
     }
     const byPlayer = new Map(); // NBA id -> [[date, stats]]
     const finals = new Set(); // "date team" for every finished game
+    const scores = new Map(); // "date team" -> { home, away, hs, as }
     for (const g of unique.values()) {
       finals.add(`${g.d} ${g.home}`).add(`${g.d} ${g.away}`);
+      const s = { home: g.home, away: g.away, hs: g.hs, as: g.as };
+      scores.set(`${g.d} ${g.home}`, s).set(`${g.d} ${g.away}`, s);
       for (const row of g.rows) {
         const st = boxCounts(Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0])));
         const margin = row[1] === g.home ? g.hs - g.as : g.as - g.hs;
@@ -449,7 +567,7 @@ function loadBoxes() {
         byPlayer.get(row[0]).push([g.d, st, margin, row[1]]);
       }
     }
-    BOX = { byPlayer, finals, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };
+    BOX = { byPlayer, finals, scores, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };
     return BOX;
   }).catch(e => { boxLoad = null; throw e; });
   return boxLoad;
@@ -656,7 +774,11 @@ function viewPlayers() {
   }
   const f = ui.pf;
   const teams = [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort();
+  // the latest games come from the box scores, loaded on first need; today's as they're played
+  if (!BOX) loadBoxes().then(() => { if (ui.tab === 'players') render(); }).catch(() => {});
+  startLive();
   return `
+  ${topPerformancesCard()}
   ${ui.viewing ? '' : recommendedCard()}
   <div class="card">
     <div class="card-head"><h2>${f.show === 'fa' ? 'Available players' : 'NBA players'} ${infoBtn('projection')}</h2><span class="muted small">${BASIS_LABELS[state.basis]} stats</span>${LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : ''}</div>

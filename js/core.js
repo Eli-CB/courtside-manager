@@ -70,7 +70,7 @@ function emptyState() {
    ========================================================= */
 let state = null;
 const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'fa', sort: 'val', limit: 50 }, tab: 'dashboard', recapWeek: null, afterPick: null, rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
-  perfRange: null, perfSort: { key: 'v', dir: -1 },
+  dashRange: null, dashBench: false, perfRange: null, perfSort: { key: 'v', dir: -1 },
   perfShow: { me: true, opp: true, fa: true, other: true, active: true, bench: true } };
 
 function load() {
@@ -361,7 +361,7 @@ function teamLogo(team, px = 16) {
 // Position labels in Fantrax's colors
 const posTags = pos => pos.map(x => `<span class="pt pt-${esc(x)}">${esc(x)}</span>`).join(',');
 
-// a player's name and team line, with their photo unless the list is too long for them (the Free Agents tab)
+// a player's name and team line, with their photo unless the list is too long for them (the Players tab)
 function playerCell(p, link = true, photo = true) {
   const name = link && p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`;
   const next = p.next ? ` · ${nextGame(p.next)}` : '';

@@ -672,6 +672,27 @@ test('performances: today, the last game day before it, and this week once it ha
   });
 });
 
+test("the Dashboard's matchup: this matchup's days only", async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  useTeam(app.fxLeague().teams[0].id);
+  const days = async iso => JSON.parse(JSON.stringify(await onDay(iso, () => app.dashDays())));
+  // Monday before tip-off: last night was last week's matchup, so no Yesterday; it opens on today
+  const mon = await days('2026-10-26');
+  assert.equal(mon.today, '2026-10-26');
+  assert.equal(mon.day, null);
+  assert.deepEqual(mon.week, ['2026-10-26']);
+  await onDay('2026-10-26', () => {
+    const m = app.dashMatchupCard();
+    assert.ok(m.includes('class="on" data-action="dash-range" data-range="today"') && !m.includes('data-range="day"'));
+    assert.ok(!m.includes('mu-chip'), 'nobody has played yet');
+  });
+  // Wednesday: yesterday is Tuesday
+  assert.equal((await days('2026-10-28')).day, '2026-10-27');
+  // the tab's new name
+  assert.ok(app.tabList().some(([k, l]) => k === 'players' && l === 'Players'));
+});
+
 test("performances: this week adds up each player's games", async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
@@ -1003,13 +1024,56 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         live.hold = false;
         assert.equal(order(app.topPerformancesCard())[0], before[before.length - 1], 'sorted again');
       } finally { live.hold = false; Object.assign(last, was); }
+
+      // the Dashboard's matchup: both lineups slot by slot, each starter's game and line, and the categories each
+      // side leads, counted from the starters' lines
+      const L = app.fxLeague();
+      // the team whose matchup has the most starters in today's games
+      const on = id => { const S = app.fxTeamSide(id); return S.lineup.filter(pid => { const p = S.players.find(x => x.id === pid); return p && app.liveLines(day).has(p.nbaId); }).length; };
+      const both = id => on(id) + on(app.fxOpponentFor(day, id).id);
+      const tid = L.teams.map(t => t.id).sort((a, b) => both(b) - both(a))[0];
+      const wasTeam = app.state.fxTeam;
+      app.state.fxTeam = tid;
+      try {
+        const side = app.fxTeamSide(tid), opp = app.fxTeamSide(app.fxOpponentFor(day, tid).id);
+        const starters = S => S.lineup.map(id => S.players.find(p => p.id === id)).filter(Boolean);
+        const total = (S, ds) => { const t = {}; for (const p of starters(S)) for (const d of ds) { const l = app.lineOn(p, d); if (l) app.addLine(t, l); } return t; };
+        const scores = h => [...h.matchAll(/class="mu-score">([^<]*)</g)].map(m => m[1]);
+        let m = app.dashMatchupCard();
+        assert.ok(m.includes('class="on" data-action="dash-range" data-range="today"') && m.includes('>Yesterday<') && m.includes('data-range="week"'), 'today, yesterday, the week; on today');
+        assert.equal((m.match(/class="mu-row"/g) || []).length, app.state.slots.length, 'one row per starting slot; the bench hidden');
+        const sc = app.weekScore(total(side, [day]), total(opp, [day]));
+        const week = app.dashDays().week;
+        assert.deepEqual([...week], ['2026-10-26', '2026-10-27', day]);
+        const wk = app.weekScore(total(side, week), total(opp, week));
+        assert.deepEqual(scores(m), [String(wk.me), String(wk.opp)], 'the big numbers: the week so far');
+        assert.ok(m.includes(`<b>${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}</b> today`), "and today's");
+        assert.equal((m.match(/class="mu-lead"/g) || []).length, sc.me + sc.opp, "each category led today is marked");
+        const p = [...starters(side), ...starters(opp)].find(x => app.liveLines(day).has(x.nbaId));
+        assert.ok(p, "someone in this matchup is playing today");
+        assert.ok(m.includes(`<b>${app.liveLines(day).get(p.nbaId).pts}</b> PTS`), "a starter's line");
+        assert.ok(m.includes('lv-dot'), 'a game still on shows its clock');
+        app.ui.dashBench = true;
+        const bench = Math.max(side.players.length - side.lineup.filter(Boolean).length - side.il.length, opp.players.length - opp.lineup.filter(Boolean).length - opp.il.length);
+        assert.ok((app.dashMatchupCard().match(/class="mu-row bench"/g) || []).length >= bench, 'the bench, on request');
+        app.ui.dashRange = 'week';
+        m = app.dashMatchupCard();
+        assert.deepEqual(scores(m), [String(wk.me), String(wk.opp)], 'the week so far');
+        assert.equal((m.match(/class="mu-lead"/g) || []).length, wk.me + wk.opp, "each category led this week is marked");
+        assert.match(m, /\d G · \d left/);
+      } finally { app.state.fxTeam = wasTeam; app.ui.dashBench = false; app.ui.dashRange = null; }
     });
-    // last night's games picked: no more updates
+    // last night's games picked: no more updates, on the Dashboard or in Performances (Players)
+    app.ui.dashRange = 'day';
+    app.scheduleLive();
+    assert.equal(live.timer, null);
+    app.ui.dashRange = null;
+    app.ui.tab = 'players';
     app.ui.perfRange = 'day';
     app.scheduleLive();
     assert.equal(live.timer, null);
   } finally {
-    app.ui.perfRange = null;
+    app.ui.perfRange = null; app.ui.dashRange = null; app.ui.tab = 'standings';
     clearTimeout(live.timer);
     live.timer = null;
     live.lines.clear(); live.games = []; live.done.clear(); live.read.clear(); live.at = 0;

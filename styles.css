@@ -166,11 +166,58 @@ a { color: var(--accent); }
 
 .grid { display: grid; gap: 16px; }
 .grid-2 { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-/* Dashboard: things to act on first (side by side when there's room), then Performances at full width for its columns */
-.dash-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
-.dash-side { order: -1; display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+/* Dashboard: the matchup at full width, then things to act on (side by side when there's room) */
+.dash-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); max-width: 920px; margin: 0 auto; } /* two lineups read best close together */
+.dash-grid > .card + .card { margin-top: 0; }
+.dash-side { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 .dash-side > .card + .card { margin-top: 0; }
 @media (max-width: 900px) { .dash-side { grid-template-columns: minmax(0, 1fr); } }
+/* the Dashboard's matchup: a scoreboard, who leads each category, then both lineups slot by slot (you on the left) */
+.mu-board { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 10px; }
+.mu-team { min-width: 0; }
+.mu-team.right { text-align: right; }
+.mu-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-team:not(.right) .mu-name { color: var(--accent); }
+.mu-score { font-size: 2.2rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.mu-mid { color: var(--muted); font-size: .8rem; padding-bottom: 8px; text-align: center; }
+.mu-when { margin: 4px 0 10px; }
+.mu-cats-wrap { overflow-x: auto; margin: 0 0 12px; }
+.mu-cats { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; table-layout: fixed; }
+.mu-cats th, .mu-cats td { padding: 4px 2px; text-align: center; border-bottom: 1px solid var(--border); }
+.mu-cats thead th { color: var(--muted); font-weight: 700; font-size: .72rem; }
+.mu-cats tbody th { text-align: left; width: 22%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; padding-left: 6px; }
+.mu-cats tr.pf-me th { box-shadow: inset 3px 0 0 var(--accent); }
+.mu-cats tr.mu-opp th { box-shadow: inset 3px 0 0 var(--muted); }
+.mu-cats thead th:first-child { text-align: left; padding-left: 6px; }
+.mu-cats td.mu-lead { font-weight: 800; color: var(--good); background: var(--good-soft); }
+.mu-rows { border-top: 1px solid var(--border); }
+.mu-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); border-bottom: 1px solid var(--border); }
+.mu-slot { display: grid; place-items: center; }
+.mu-slot .slot-label { min-width: 0; padding: 2px 4px; font-size: .7rem; }
+.mu-p { min-width: 0; padding: 8px 4px; display: flex; flex-direction: column; gap: 4px; }
+.mu-p.right { align-items: flex-end; text-align: right; }
+.mu-p.right .bplayer { flex-direction: row-reverse; }
+.mu-p .bname .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mu-p.live { background: color-mix(in srgb, var(--good) 7%, var(--surface)); }
+.mu-row.bench .mu-p { opacity: .62; }
+.mu-game { font-size: .78rem; color: var(--muted); }
+.mu-game b { color: var(--bad); }
+.mu-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.mu-p.right .mu-chips { justify-content: flex-end; }
+.mu-chip { font-size: .72rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px; white-space: nowrap; color: var(--muted); }
+.mu-chip b { color: var(--text); font-variant-numeric: tabular-nums; }
+.mu-chip.fp { border-color: var(--accent); }
+.mu-bench-btn { margin-top: 10px; }
+@media (max-width: 640px) {
+  .mu-score { font-size: 1.8rem; }
+  .mu-row { grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); }
+  .mu-slot .slot-label { font-size: .62rem; padding: 2px 2px; }
+  .mu-p { padding: 7px 2px; }
+  .mu-cats { font-size: .74rem; }
+  .mu-cats thead th { font-size: .64rem; }
+  .mu-cats tbody th, .mu-cats thead th:first-child { width: 6px; padding: 0; }
+  .mu-cats .mu-tn { display: none; }
+}
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: -6px 0 10px; }

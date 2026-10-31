@@ -31,7 +31,10 @@ saved leagues are lost). Owner's league:
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards, past Rosters
-  - views: Dashboard (Performances: today, last game day or this week, sortable tables, ranked by value), Roster, Standings + Season totals, Trades, Free Agents + recommended adds
+  - views: Dashboard (`dashMatchupCard`: this matchup slot by slot for today / this matchup's last game day / the week so far,
+    big score = week so far, category table + each starter's game and line; then action items and injuries), Roster,
+    Standings + Season totals, Trades, Players tab (`#players`, was Free Agents: Performances, every NBA stat line of
+    today / last game day / this week with team and Active/Bench/Waivers filters, ranked by value; recommended adds; player list)
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such
@@ -39,9 +42,9 @@ saved leagues are lost). Owner's league:
     bench regret, best all-play week, then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends the standouts +
     a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
     Fantrax only. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
-  - live: live box scores for Performances' Today (and This week). The browser polls ESPN's site API
-    (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) every 30 s (60 s with Save-Data) while the Dashboard is visible,
-    Performances isn't set to the last game day, and games are on: scoreboard + the box score of each game in progress
+  - live: live box scores for the Dashboard matchup's and Performances' Today (and This week). The browser polls ESPN's site API
+    (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) every 30 s (60 s with Save-Data) while the Dashboard or Players tab is visible,
+    it isn't set to the last game day (`ui.dashRange` / `ui.perfRange`), and games are on: scoreboard + the box score of each game in progress
     (`live.lines`: date -> NBA id -> line). ESPN players matched by `espn` id (from the daily job) else initial + last
     name + team. Yesterday and this week's earlier days missing from `data/boxscores.json` are asked for once.
   - draft: Draft tab/board, saved leagues, landing page. Seasons: the league menu lists the current league's seasons

@@ -41,6 +41,11 @@ const INFO = {
     <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Matchups).</li>
     <li><b>Best week:</b> the team whose week would have beaten the most others.</li></ul>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
+  dashmatch: ['Matchup', `
+    <p>Your matchup this week, slot by slot: each team's lineup as your league has it now, and each starter's game and stat line in your league's categories.</p>
+    <p><b>Today</b> updates while games are on (from ESPN, every 30 seconds). <b>Yesterday</b> is this matchup's last game day. <b>This week</b> adds up the matchup's days so far; each player shows games played and left.</p>
+    <p>The big numbers are categories won over those days (fantasy points in points leagues), counted from the starters' games. The table shows who leads each category. Bench games don't count.</p>
+    <p>Leagues with daily lineups show today's lineup for every day, since the site doesn't keep each day's.</p>`],
   perf: ['Performances', `
     <p><b>Value</b> is categories won: how much a game added to winning a week's categories, compared with not playing at all. A typical starter's game adds about +0.2; a monster night +0.7. It's greener the more it added, and red only when the team would have been better off without the game: very poor shooting and turnovers with little else. A week is colored against an average starter's games over the same days.</p>
     <p>Each category's change to an average team's week (your league's starters × 3.5 games) is divided by how far apart two teams usually finish in it, so every category weighs the same, as it does in the standings. That makes a steal or a block worth about 9-10 points, a turnover about −6 and a missed free throw about −9 in a typical league (those categories are decided by far smaller totals). Made shots add to FG% and FT% only above the league's average. It assumes an even matchup; in a real one, a category that's already decided matters less.</p>
