@@ -156,11 +156,12 @@ function dashGame(p, d) {
   return nx && nx.date === d ? (nx.home ? `vs ${nx.opp}` : `@${nx.opp}`) : `Final${dnp}`;
 }
 
-// A line in the league's own categories: makes-attempts for the percentages, fantasy points first in points leagues
+// A line in the league's own categories: makes-attempts for the percentages, fantasy points first in points leagues;
+// nothing for a stat he didn't put up (no attempts, 0 blocks)
 function lineChips(line) {
   const out = isPoints() ? [`<span class="mu-chip fp"><b>${fmt(lineFp(line), 1)}</b> FP</span>`] : [];
   for (const c of scoreCats()) {
-    if (c.fp) continue;
+    if (c.fp || !(c.pct ? line[c.att] : Math.round(lineStat(line, c.key) * 100))) continue;
     out.push(c.pct ? `<span class="mu-chip"><b>${line[c.made] || 0}-${line[c.att] || 0}</b> ${c.label.replace('%', '')}</span>`
       : `<span class="mu-chip"><b>${fmt(lineStat(line, c.key), c.dec || 0)}</b> ${c.label}</span>`);
   }
@@ -195,7 +196,9 @@ function dashMatchupCard() {
   };
   const A = side(me), B = opp ? side(opp.id) : null;
   const pts = isPoints(), cats = scoreCats().filter(c => !c.fp);
-  const scoreTxt = sc => (pts ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
+  // a tied category counts half to each side: 7.5–1.5
+  const half = (sc, k) => sc[k] + sc.ties / 2;
+  const scoreTxt = sc => (pts ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${half(sc, 'me')}–${half(sc, 'opp')}`);
   // the big numbers are the matchup's: the week so far; the table and the players, the days picked
   const sc = B ? weekScore(A.tot, B.tot) : null, wk = B ? weekScore(A.week, B.week) : null;
   const period = fxPeriodFor(weekStartAt(0));
@@ -203,9 +206,9 @@ function dashMatchupCard() {
   const updated = range !== 'day' && live.at ? ` · updated ${new Date(live.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : range !== 'day' && live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>` : '';
   const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div></div>`;
   const head = `<div class="mu-board">
-      ${big(A, wk && wk.me)}
-      <div class="mu-mid">${B ? `${pts ? 'FP' : wk.ties ? `${wk.ties} tied` : 'cats'}<br>this week` : ''}</div>
-      ${B ? big(B, wk.opp) : `<div class="mu-team right"><div class="mu-name muted">No opponent this week</div></div>`}
+      ${big(A, wk && (pts ? wk.me : half(wk, 'me')))}
+      <div class="mu-mid">${B ? `${pts ? 'FP' : 'cats'}<br>this week` : ''}</div>
+      ${B ? big(B, pts ? wk.opp : half(wk, 'opp')) : `<div class="mu-team right"><div class="mu-name muted">No opponent this week</div></div>`}
     </div>
     <p class="muted small mu-when">${period ? `Week ${period.n} · ` : ''}${when}${B && range !== 'week' ? ` · <b>${scoreTxt(sc)}</b> ${dates[0] === today ? 'today' : 'that day'}` : ''}${updated}${state.lineupMode !== 'weekly' && range !== 'today' ? " · today's lineups" : ''}</p>`;
 
@@ -228,8 +231,7 @@ function dashMatchupCard() {
     } else game = dashGame(p, dates[0]);
     const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
     return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}">
-      <div class="bplayer">${headshot(p, 32)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}</div>
-        <div class="pmeta">${posTags(p.pos)} · ${esc(p.team || 'FA')}</div></div></div>
+      <div class="bplayer">${headshot(p, 32)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}</div></div></div>
       <div class="mu-game">${game}</div>
       ${lines.length ? `<div class="mu-chips">${lineChips(tot)}</div>` : ''}
     </div>`;

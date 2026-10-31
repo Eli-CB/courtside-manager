@@ -1039,6 +1039,7 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         const starters = S => S.lineup.map(id => S.players.find(p => p.id === id)).filter(Boolean);
         const total = (S, ds) => { const t = {}; for (const p of starters(S)) for (const d of ds) { const l = app.lineOn(p, d); if (l) app.addLine(t, l); } return t; };
         const scores = h => [...h.matchAll(/class="mu-score">([^<]*)</g)].map(m => m[1]);
+        const halves = x => [String(x.me + x.ties / 2), String(x.opp + x.ties / 2)]; // a tie counts half to each
         let m = app.dashMatchupCard();
         assert.ok(m.includes('class="on" data-action="dash-range" data-range="today"') && m.includes('>Yesterday<') && m.includes('data-range="week"'), 'today, yesterday, the week; on today');
         assert.equal((m.match(/class="mu-row"/g) || []).length, app.state.slots.length, 'one row per starting slot; the bench hidden');
@@ -1046,19 +1047,22 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         const week = app.dashDays().week;
         assert.deepEqual([...week], ['2026-10-26', '2026-10-27', day]);
         const wk = app.weekScore(total(side, week), total(opp, week));
-        assert.deepEqual(scores(m), [String(wk.me), String(wk.opp)], 'the big numbers: the week so far');
-        assert.ok(m.includes(`<b>${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}</b> today`), "and today's");
+        assert.deepEqual(scores(m), halves(wk), 'the big numbers: the week so far');
+        assert.ok(m.includes(`<b>${halves(sc).join('–')}</b> today`), "and today's");
+        assert.ok(!/tied/.test(m), 'ties only as halves');
         assert.equal((m.match(/class="mu-lead"/g) || []).length, sc.me + sc.opp, "each category led today is marked");
         const p = [...starters(side), ...starters(opp)].find(x => app.liveLines(day).has(x.nbaId));
         assert.ok(p, "someone in this matchup is playing today");
-        assert.ok(m.includes(`<b>${app.liveLines(day).get(p.nbaId).pts}</b> PTS`), "a starter's line");
+        const pl = app.liveLines(day).get(p.nbaId);
+        assert.ok(m.includes(`<b>${pl.pts}</b> PTS`), "a starter's line");
+        assert.ok(!/<b>0<\/b> |<b>0-0<\/b> /.test(m), "no bubble for a stat he didn't put up");
         assert.ok(m.includes('lv-dot'), 'a game still on shows its clock');
         app.ui.dashBench = true;
         const bench = Math.max(side.players.length - side.lineup.filter(Boolean).length - side.il.length, opp.players.length - opp.lineup.filter(Boolean).length - opp.il.length);
         assert.ok((app.dashMatchupCard().match(/class="mu-row bench"/g) || []).length >= bench, 'the bench, on request');
         app.ui.dashRange = 'week';
         m = app.dashMatchupCard();
-        assert.deepEqual(scores(m), [String(wk.me), String(wk.opp)], 'the week so far');
+        assert.deepEqual(scores(m), halves(wk), 'the week so far');
         assert.equal((m.match(/class="mu-lead"/g) || []).length, wk.me + wk.opp, "each category led this week is marked");
         assert.match(m, /\d G · \d left/);
       } finally { app.state.fxTeam = wasTeam; app.ui.dashBench = false; app.ui.dashRange = null; }
