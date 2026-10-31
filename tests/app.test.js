@@ -1002,3 +1002,11 @@ test("performances: today's games from ESPN's box scores, read in the browser as
     app.fetch = realFetch;
   }
 });
+
+test('popups scroll inside, without collapsing on older iPhone Safari', () => {
+  // flex-basis 0 on a popup's body made Safari before 16 size the popup from 0: a sliver between the header and footer
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  const rules = [...css.matchAll(/([^{}]*\.modal-body[^{}]*)\{([^}]*)\}/g)].filter(m => /flex\s*:/.test(m[2]));
+  assert.ok(rules.length >= 2, 'the player card and (i) popups both flex their body');
+  for (const [, sel, body] of rules) assert.match(body, /flex:\s*1 1 auto/, `${sel.trim()}: flex-basis auto, not 0`);
+});

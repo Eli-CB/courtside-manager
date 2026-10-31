@@ -413,7 +413,8 @@ button.link-btn.pname { color: var(--text); text-align: left; }
 button.link-btn.pname:hover { color: var(--accent); text-decoration: underline; }
 .modal-lg { width: min(860px, calc(100vw - 24px)); }
 .modal-lg[open] { display: flex; flex-direction: column; }
-.modal-lg .modal-body { flex: 1; min-height: 0; }
+/* flex-basis auto, not 0: older iPhone Safari sizes the card from the basis, so 0 collapsed it to a sliver */
+.modal-lg .modal-body { flex: 1 1 auto; min-height: 0; }
 .detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 /* player card on phones: averages with seasons across, recent games as short blocks */
 .show-sm { display: none; }
@@ -619,7 +620,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .info-modal { width: min(560px, calc(100vw - 24px)); }
 /* the header (and its close button) stays put; only the explanation scrolls */
 .info-modal[open] { display: flex; flex-direction: column; }
-.info-modal .modal-body { flex: 1; min-height: 0; overflow-y: auto; }
+.info-modal .modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 @media (max-width: 640px) {
   .modal, .info-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
   .info-modal .modal-head { padding: 10px 12px 10px 14px; }
