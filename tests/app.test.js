@@ -973,6 +973,14 @@ test("performances: today's games from ESPN's box scores, read in the browser as
     const asked = urls.filter(u => u.includes('/summary?')).map(u => u.split('event=')[1]).sort();
     assert.deepEqual(asked, app.espnGames(sb).filter(g => g.state !== 'pre').map(g => g.id).sort());
     assert.ok(['20261026', '20261027'].every(d => urls.some(u => u.endsWith(`scoreboard?dates=${d}`))), urls.join('\n'));
+    // the next update: the scoreboard again, but no box score whose game's score hasn't moved (and was read under a minute ago)
+    urls.length = 0;
+    live.at = 0;
+    await onDay(day, () => app.pollLive());
+    assert.ok(urls.some(u => u.endsWith('/scoreboard')) && !urls.some(u => u.includes('/summary?')), urls.join('\n'));
+    const g = app.espnGames(sb).find(x => x.state === 'in');
+    assert.ok(!app.boxDue(g));
+    assert.ok(app.boxDue({ ...g, hs: g.hs + 2 }), 'a basket: read it again');
 
     await onDay(day, () => {
       assert.equal(app.perfDays().today, day);
@@ -982,6 +990,18 @@ test("performances: today's games from ESPN's box scores, read in the browser as
       const html = app.topPerformancesCard();
       assert.ok(html.includes('class="on" data-action="perf-range" data-range="today"'), 'it opens on today once games have started');
       assert.ok(html.includes('lv-dot') && html.includes('Halftime') && html.includes('Q4 2:08') && html.includes('updated '), 'the clock of each game still on');
+      // a live update keeps the rows in place; anything else sorts them again
+      const order = h => [...h.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(m => m[1]);
+      const before = order(html);
+      const last = app.liveLines(day).get(+before[before.length - 1]);
+      const was = { ...last };
+      Object.assign(last, { pts: last.pts + 60, reb: last.reb + 20, ast: last.ast + 20 });
+      try {
+        live.hold = true;
+        assert.deepEqual(order(app.topPerformancesCard()), before, 'held in place');
+        live.hold = false;
+        assert.equal(order(app.topPerformancesCard())[0], before[before.length - 1], 'sorted again');
+      } finally { live.hold = false; Object.assign(last, was); }
     });
     // last night's games picked: no more updates
     app.ui.perfRange = 'day';
@@ -991,7 +1011,7 @@ test("performances: today's games from ESPN's box scores, read in the browser as
     app.ui.perfRange = null;
     clearTimeout(live.timer);
     live.timer = null;
-    live.lines.clear(); live.games = []; live.done.clear(); live.at = 0;
+    live.lines.clear(); live.games = []; live.done.clear(); live.read.clear(); live.at = 0;
     app.fetch = realFetch;
   }
 });

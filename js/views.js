@@ -174,6 +174,7 @@ function perfRows(dates) {
   return rows;
 }
 
+let perfOrder = { sig: '', ids: [] }; // the rows last shown, in order
 function topPerformancesCard() {
   const today = todayIso(), yesterday = addDays(today, -1);
   const card = (head, body) => `<div class="card"><div class="card-head"><h2>Performances ${infoBtn('perf')}</h2>${head}</div>${body}</div>`;
@@ -276,7 +277,16 @@ function topPerformancesCard() {
   const picked = owner.size ? rows.filter(r => { const t = teamOf(r); return (!t || ui.perfShow[t]) && ui.perfShow[statusOf(r.raw.id)]; }) : rows;
   const so = ui.perfSort;
   const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0 });
-  const shown = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; }).slice(0, 50);
+  const sorted = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
+  // a live update keeps the rows where they were (numbers and ranks change in place; anyone new goes below) so the
+  // table doesn't jump while it's read; anything you do sorts it again
+  const sig = [range, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine].join('|');
+  let shown = sorted.slice(0, 50);
+  if (live.hold && perfOrder.sig === sig) {
+    const byId = new Map(picked.map(r => [r.raw.id, r])), was = new Set(perfOrder.ids);
+    shown = [...perfOrder.ids.map(id => byId.get(id)).filter(Boolean), ...sorted.filter(r => !was.has(r.raw.id))].slice(0, 50);
+  }
+  perfOrder = { sig, ids: shown.map(r => r.raw.id) };
   const count = `${picked.length > shown.length ? `${shown.length} of ` : ''}${picked.length} player${picked.length === 1 ? '' : 's'}`;
   // today before tip-off: when the first game starts
   const first = live.games.filter(g => g.d === day && g.state === 'pre').sort((a, b) => a.start - b.start)[0];

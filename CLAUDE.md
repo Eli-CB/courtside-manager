@@ -40,7 +40,7 @@ saved leagues are lost). Owner's league:
     a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
     Fantrax only. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
   - live: live box scores for Performances' Today (and This week). The browser polls ESPN's site API
-    (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) about once a minute while the Dashboard is visible,
+    (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) every 30 s (60 s with Save-Data) while the Dashboard is visible,
     Performances isn't set to the last game day, and games are on: scoreboard + the box score of each game in progress
     (`live.lines`: date -> NBA id -> line). ESPN players matched by `espn` id (from the daily job) else initial + last
     name + team. Yesterday and this week's earlier days missing from `data/boxscores.json` are asked for once.

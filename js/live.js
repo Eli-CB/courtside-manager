@@ -3,15 +3,19 @@
 'use strict';
 
 /* ---------- Live box scores ---------- */
-// There's no server: the browser asks ESPN itself. While Performances shows today's games and is on screen, about
-// once a minute while games are on: the day's scoreboard, and the box score of each game in progress (once more
-// when it ends). Earlier days come from the saved box scores; days the daily data job hasn't saved yet (it runs at
+// There's no server: the browser asks ESPN itself. While Performances shows today's games and is on screen, every
+// 30 seconds while games are on (a minute with the browser's data saver on): the day's scoreboard (small), and the
+// box score of each game in progress whose score has changed, or that hasn't been read for a minute (once more when
+// it ends). Earlier days come from the saved box scores; days the daily data job hasn't saved yet (it runs at
 // 4 a.m. ET) are asked for once.
 const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/';
-const LIVE_EVERY = 60e3;
+const LIVE_EVERY = 30e3;
+const LIVE_STALE = 60e3; // a game's box score is read again after this even if its score hasn't moved
 const LIVE_IDLE = 30 * 60e3; // nothing on: look again in half an hour (or at the next tip-off)
-// games: the scoreboard's; lines: date -> NBA id -> stat line; done: finished games (and days) already read
-const live = { day: null, games: [], lines: new Map(), done: new Set(), at: 0, busy: false, error: '', timer: null };
+const liveEvery = () => (navigator.connection && navigator.connection.saveData ? 60e3 : LIVE_EVERY);
+// games: the scoreboard's; lines: date -> NBA id -> stat line; done: finished games (and days) already read;
+// read: game id -> { sc: its score when its box score was read, at }; hold: a live update is drawing (rows keep their order)
+const live = { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, busy: false, error: '', timer: null, hold: false };
 
 // ESPN lists tip-offs in UTC; 5 hours back always lands on the US game date (as the daily data job does)
 const usDay = t => new Date(t - 5 * 36e5).toISOString().slice(0, 10);
@@ -79,6 +83,7 @@ async function readBoxes(games) {
     const lines = espnLines(await getJson(`${ESPN_SITE}summary?event=${g.id}`, 'ESPN'));
     if (!live.lines.has(g.d)) live.lines.set(g.d, new Map());
     for (const [id, line] of lines) live.lines.get(g.d).set(id, line);
+    live.read.set(g.id, { sc: liveScore(g), at: Date.now() });
     if (g.state === 'post') live.done.add(g.id);
   }));
   const failed = res.filter(r => r.status === 'rejected');
@@ -96,7 +101,7 @@ async function pollLive() {
     const sb = await getJson(ESPN_SITE + 'scoreboard', 'ESPN');
     live.games = espnGames(sb);
     live.day = (sb.day && sb.day.date) || (live.games[0] && live.games[0].d) || live.day;
-    await readBoxes(live.games.filter(g => g.state !== 'pre' && !live.done.has(g.id) && !savedFinal(g)));
+    await readBoxes(live.games.filter(g => g.state !== 'pre' && !live.done.has(g.id) && !savedFinal(g) && boxDue(g)));
     // yesterday and earlier days of this week that the saved box scores don't have yet: once each (a miss is
     // tried next time)
     const today = todayIso();
@@ -116,10 +121,17 @@ async function pollLive() {
     live.busy = false;
   }
   scheduleLive();
-  if (ui.tab === 'dashboard') render();
+  if (ui.tab === 'dashboard') { live.hold = true; try { render(); } finally { live.hold = false; } }
 }
 
-// The next update: in a minute while a game is on (or due to start, or just finished), else at the next tip-off,
+// A game's box score is worth asking for again: its score (or state) moved since the last read, or that's a minute old
+const liveScore = g => `${g.as}-${g.hs} ${g.state}`;
+function boxDue(g) {
+  const r = live.read.get(g.id);
+  return !r || r.sc !== liveScore(g) || Date.now() - r.at >= LIVE_STALE;
+}
+
+// The next update: in 30 seconds while a game is on (or due to start, or just finished), else at the next tip-off,
 // at most half an hour away
 function scheduleLive() {
   clearTimeout(live.timer);
@@ -127,13 +139,13 @@ function scheduleLive() {
   if (!liveWanted()) return;
   const soon = live.games.filter(g => g.state === 'pre').map(g => g.start - Date.now());
   const on = live.error || live.games.some(g => g.state === 'in' || (g.state === 'post' && !live.done.has(g.id) && !savedFinal(g))) || soon.some(ms => ms <= 0);
-  live.timer = setTimeout(pollLive, on ? LIVE_EVERY : Math.max(Math.min(LIVE_IDLE, ...soon), LIVE_EVERY));
+  live.timer = setTimeout(pollLive, on ? liveEvery() : Math.max(Math.min(LIVE_IDLE, ...soon), liveEvery()));
 }
 
-// Showing today's games: update now if the last update is a minute old, else carry on with the schedule
+// Showing today's games: update now if the last update is due, else carry on with the schedule
 function startLive() {
   if (live.busy || !liveWanted()) return;
-  if (Date.now() - live.at >= LIVE_EVERY) pollLive();
+  if (Date.now() - live.at >= liveEvery()) pollLive();
   else if (!live.timer) scheduleLive();
 }
 document.addEventListener('visibilitychange', () => {
