@@ -35,8 +35,8 @@ saved leagues are lost). Owner's league:
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such
-  - recap: Recap tab: a finished week across the league (every final, Player/Game/Brick of the week, biggest win,
-    closest, bench regret, best all-play week) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends text +
+  - recap: Recap tab: a finished week across the league (Player/Game/Brick of the week with full lines in the league's cats,
+    bench regret, best all-play week, then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends the standouts +
     a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
     Fantrax only. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
   - live: live box scores for Performances' Today (and This week). The browser polls ESPN's site API

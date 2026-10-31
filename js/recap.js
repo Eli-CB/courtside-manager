@@ -9,11 +9,19 @@ const recaps = new Map(); // "league|period" -> recap, or null when the week's l
 
 const finishedPeriods = L => (L.periods || []).filter(p => fxTime(p.endAt) < Date.now() && ((L.matchups || {})[String(p.n)] || []).length);
 
-// A game or a week as a short line: points, rebounds, assists, then anything big
-function lineSummary(s, perGame) {
-  const g = perGame ? s.gp1 || 1 : 1, v = k => fmt((s[k] || 0) / g, perGame ? 1 : 0);
-  const extra = [['stl', 'stl', 3], ['blk', 'blk', 3], ['tpm', '3PM', 4]].filter(([k, , at]) => (s[k] || 0) / g >= at).map(([k, l]) => `${v(k)} ${l}`);
-  return [`${v('pts')} pts`, `${v('reb')} reb`, `${v('ast')} ast`, ...extra].join(', ');
+// A game's or a week's full line in the league's own categories (a week per game; shooting as makes-attempts, a
+// week's with its %), minutes first
+function fullLine(s, perGame) {
+  const g = perGame ? s.gp1 || 1 : 1, v = (k, d) => fmt(lineStat(s, k) / g, perGame ? 1 : d);
+  const parts = [`${v('min', 0)} MIN`];
+  for (const c of scoreCats()) {
+    if (c.fp) continue;
+    if (c.pct) {
+      const m = s[c.made] || 0, a = s[c.att] || 0;
+      parts.push(`${fmt(m / g, perGame ? 1 : 0)}-${fmt(a / g, perGame ? 1 : 0)} ${c.label.replace('%', '')}${perGame && a ? ` (${fmtPct(m / a)})` : ''}`);
+    } else parts.push(`${v(c.key, c.dec || 0)} ${c.label}`);
+  }
+  return parts;
 }
 
 function buildRecap(L, P, period) {
@@ -69,8 +77,6 @@ function buildRecap(L, P, period) {
     mvp: best(weeks, x => x.v),
     game: best(single, x => x.v),
     brick: !isPoints() && brick && brick.v < 0 ? brick : null,
-    blowout: order.length > 1 ? order[0] : null,
-    close: order.length > 1 ? order[order.length - 1] : null,
     regret,
     allPlay: best(allPlay, x => x.w + x.t / 2),
     teams: R.length,
@@ -79,29 +85,26 @@ function buildRecap(L, P, period) {
 
 const scoreLine = sc => (isPoints() ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
 
-// The standouts as [emoji, label, html, text for sharing]
+// The standouts as { emoji, label, html, text for sharing }. Names are plain links (no photo), so they sit on the
+// line with the text around them.
 function recapItems(X) {
   const team = tid => fxTeamName(tid);
   const out = [];
   const add = (e, label, html, text) => out.push({ e, label, html, text });
-  const who = x => `${inlinePlayer(x.p, `<b>${esc(x.p.name)}</b>`)} <span class="muted">${esc(team(x.tid))}</span>`;
-  if (X.mvp) add('🏆', 'Player of the week', `${who(X.mvp)}<br><span class="small">${lineSummary(X.mvp.line, true)} in ${X.mvp.line.gp1} G · <b>${fmtValue(X.mvp.v, 1)}</b> ${isPoints() ? 'FP' : 'value'}</span>`,
-    `${X.mvp.p.name} (${team(X.mvp.tid)}), ${lineSummary(X.mvp.line, true)} in ${X.mvp.line.gp1} games`);
-  if (X.game) add('🚀', 'Game of the week', `${who(X.game)}<br><span class="small">${lineSummary(X.game.line)} · <b>${fmtValue(X.game.v)}</b> ${isPoints() ? 'FP' : 'value'}</span>`,
-    `${X.game.p.name} (${team(X.game.tid)}), ${lineSummary(X.game.line)}`);
-  if (X.brick) {
-    const s = X.brick.line, shots = `${s.fgm}-${s.fga} FG${s.to ? `, ${s.to} TO` : ''}`;
-    add('🧱', 'Brick of the week', `${who(X.brick)}<br><span class="small">${shots}, ${s.pts} pts · <b class="pos-bad">${fmtValue(X.brick.v)}</b> value</span>`, `${X.brick.p.name} (${team(X.brick.tid)}), ${shots}`);
-  }
-  const final = g => `<b>${esc(team(g.a))}</b> over ${esc(team(g.b))} ${scoreLine(g.sc)}`;
-  if (X.blowout && X.blowout.margin > 0) add('💥', 'Biggest win', final(X.blowout), `${team(X.blowout.a)} over ${team(X.blowout.b)} ${scoreLine(X.blowout.sc)}`);
-  if (X.close && X.close !== X.blowout) add('🤏', 'Closest', X.close.margin ? final(X.close) : `<b>${esc(team(X.close.a))}</b> and <b>${esc(team(X.close.b))}</b> tied ${scoreLine(X.close.sc)}`,
-    X.close.margin ? `${team(X.close.a)} over ${team(X.close.b)} ${scoreLine(X.close.sc)}` : `${team(X.close.a)} and ${team(X.close.b)} tied ${scoreLine(X.close.sc)}`);
+  const name = (p, bold) => `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${bold ? `<b>${esc(p.name)}</b>` : esc(p.name)}</button>`;
+  const unit = isPoints() ? 'FP' : 'value';
+  const stand = (e, label, x, perGame, cls = '') => {
+    const parts = fullLine(x.line, perGame), head = perGame ? `${x.line.gp1} G, per game: ` : '';
+    add(e, label, `${name(x.p, true)} <span class="muted">${esc(team(x.tid))}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
+      `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`);
+  };
+  if (X.mvp) stand('🏆', 'Player of the week', X.mvp, true);
+  if (X.game) stand('🚀', 'Game of the week', X.game, false);
+  if (X.brick) stand('🧱', 'Brick of the week', X.brick, false, 'pos-bad');
   if (X.regret) {
-    const r = X.regret, res = outcome => (outcome > 0 ? 'won' : 'tied');
-    const o = Math.sign(Math.round((r.sc.me - r.sc.opp) * 10));
-    add('🪑', 'Bench regret', `<b>${esc(team(r.tid))}</b>: starting ${inlinePlayer(r.w.inP, esc(r.w.inP.name))} over ${inlinePlayer(r.w.outP, esc(r.w.outP.name))} would have ${res(o)} ${scoreLine(r.sc)}`,
-      `${team(r.tid)}, starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res(o)} ${scoreLine(r.sc)}`);
+    const r = X.regret, o = Math.sign(Math.round((r.sc.me - r.sc.opp) * 10)), res = o > 0 ? 'won' : 'tied';
+    add('🪑', 'Bench regret', `<b>${esc(team(r.tid))}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
+      `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`);
   }
   if (X.allPlay && X.teams > 2) {
     const a = X.allPlay, rec = `${a.w}-${a.l}${a.t ? `-${a.t}` : ''}`;
@@ -113,10 +116,9 @@ function recapItems(X) {
 // The address that opens this recap in the league: anyone in it can pick their team and land here
 const recapUrl = (L, n) => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}&week=${n}#recap`;
 
+// What Share sends: the standouts only (everyone already has the results in their league)
 function recapText(L, X) {
-  return [`🏀 ${L.name} · Week ${X.period.n} recap`, '',
-    ...X.games.map(g => (g.margin ? `${fxTeamName(g.a)} ${scoreLine(g.sc)} ${fxTeamName(g.b)}` : `${fxTeamName(g.a)} ${scoreLine(g.sc)} ${fxTeamName(g.b)} (tie)`)), '',
-    ...recapItems(X).map(x => `${x.e} ${x.label}: ${x.text}`)].join('\n');
+  return [`🏀 ${L.name} · Week ${X.period.n} standouts`, '', ...recapItems(X).map(x => `${x.e} ${x.label}: ${x.text}`)].join('\n\n');
 }
 
 function viewRecap() {
@@ -140,12 +142,12 @@ function viewRecap() {
   const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${esc(fxTeamName(g.a))}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${esc(fxTeamName(g.b))}</span></li>`).join('');
   const items = recapItems(X).map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div><div class="rc-label">${x.label}</div>${x.html}</div></li>`).join('');
   return `<div class="card">
-    <div class="card-head"><h2>Week ${period.n} recap ${infoBtn('recap')}</h2>${picker}<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button></div>
-    <p class="muted small rc-when">${esc(L.name)} · ${fmtDay(period.start)} – ${fmtDay(period.end)}</p>
-    <ul class="rc-finals">${finals}</ul>
-  </div>
-  <div class="card"><div class="card-head"><h2>Standouts</h2><span class="muted small">starters only</span></div>
+    <div class="card-head"><h2>Week ${period.n} standouts ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
+    <p class="muted small rc-when">${esc(L.name)} · ${fmtDay(period.start)} – ${fmtDay(period.end)} · starters only</p>
     ${items ? `<ul class="rc-items">${items}</ul>` : '<p class="muted small" style="margin:0">Nothing stood out.</p>'}
+  </div>
+  <div class="card"><div class="card-head"><h2>Results</h2></div>
+    <ul class="rc-finals">${finals}</ul>
   </div>`;
 }
 

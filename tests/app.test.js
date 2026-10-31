@@ -1042,7 +1042,7 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     app.viewRecap(); // starts loading the week's lineups and box scores
     await new Promise(r => setTimeout(r, 20));
     const html = app.viewRecap();
-    assert.match(html, /Week 1 recap/);
+    assert.match(html, /Week 1 standouts/);
     const X = app.get('recaps').get(`${L.id}|1`);
     assert.equal(X.games.length, L.matchups['1'].length, 'every matchup');
     // the finals agree with Fantrax's standings (week 1 is the only finished week)
@@ -1058,11 +1058,15 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     if (X.regret) assert.ok(X.regret.up > 0, 'a bench regret changes a result');
     assert.ok(X.allPlay.w + X.allPlay.l + X.allPlay.t === L.teams.length - 1);
     for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);
-    // the message: the league, each final, the standouts, and a link that opens this week in this league
+    // the message: the standouts only (everyone has the results), each with its full line in the league's categories
     const text = app.recapText(L, X);
-    assert.ok(text.startsWith(`🏀 ${L.name} · Week 1 recap`));
-    for (const g of X.games) assert.ok(text.includes(`${app.fxTeamName(g.a)} ${app.scoreLine(g.sc)} ${app.fxTeamName(g.b)}`));
+    assert.ok(text.startsWith(`🏀 ${L.name} · Week 1 standouts`));
+    assert.ok(!X.games.some(g => text.includes(`${app.fxTeamName(g.a)} ${app.scoreLine(g.sc)} ${app.fxTeamName(g.b)}`)), 'no results');
     assert.ok(text.includes('🏆 Player of the week: ') && !/<[a-z]/.test(text), 'plain text, no markup');
+    for (const c of app.scoreCats()) assert.ok(text.includes(` ${c.pct ? c.label.replace('%', '') : c.label}`), `${c.label} in the lines`);
+    assert.ok(text.includes(`${X.game.line.fgm}-${X.game.line.fga} FG`), 'shooting as makes-attempts');
+    assert.ok(!/Biggest win|Closest/.test(text + html), 'not the biggest win or the closest');
+    assert.ok(!html.includes('inl-p'), 'names without photos, in line with the text');
     assert.ok(app.recapUrl(L, 1).endsWith(`?league=${L.id}&week=1#recap`), app.recapUrl(L, 1));
     // the Dashboard points to it for three days
     assert.equal(app.freshRecap().n, 1);

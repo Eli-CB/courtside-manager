@@ -73,7 +73,7 @@ const actions = {
     if (!X) return;
     const text = recapText(L, X), url = recapUrl(L, X.period.n);
     if (navigator.share && matchMedia('(pointer: coarse)').matches) {
-      try { await navigator.share({ title: `${L.name} · Week ${X.period.n} recap`, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+      try { await navigator.share({ title: `${L.name} · Week ${X.period.n} standouts`, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
     }
     try { await navigator.clipboard.writeText(`${text}\n\nFull recap: ${url}`); toast('Recap copied: paste it in your league chat'); } catch (e) { toast("Couldn't copy the recap"); }
   },
