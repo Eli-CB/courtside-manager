@@ -1,4 +1,4 @@
-# Courtside Manager
+# League Layer
 
 A weekly matchup optimizer for 9-category head-to-head fantasy basketball. It pulls your Fantrax or public ESPN league, real NBA stats, injuries and the schedule, then shows:
 

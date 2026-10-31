@@ -1,4 +1,4 @@
-"""Pull real NBA data into data/players.json for Courtside Manager.
+"""Pull real NBA data into data/players.json for League Layer.
 
 Sources (all public, no API key):
   - NBA.com data server (cdn.nba.com): schedule, every finished game's box score

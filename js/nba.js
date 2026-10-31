@@ -1,4 +1,4 @@
-// Courtside Manager: NBA data, lineup logic, the weekly matchup engine.
+// League Layer: NBA data, lineup logic, the weekly matchup engine.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

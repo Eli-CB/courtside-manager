@@ -1,4 +1,4 @@
-// Courtside Manager: Alerts, page rendering, the league and season bar, past seasons.
+// League Layer: Alerts, page rendering, the league and season bar, past seasons.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

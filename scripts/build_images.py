@@ -1,4 +1,4 @@
-"""Build player headshots and team logos for Courtside Manager.
+"""Build player headshots and team logos for League Layer.
 
 Packs them into files that ship with the site, so a visit downloads one cached
 sprite instead of hundreds of separate images:

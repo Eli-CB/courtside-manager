@@ -1,4 +1,4 @@
-// Courtside Manager: Loading public ESPN leagues.
+// League Layer: Loading public ESPN leagues.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

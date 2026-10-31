@@ -1,4 +1,4 @@
-// Courtside Manager: Constants, saved state, helpers, headshots and team logos.
+// League Layer: Constants, saved state, helpers, headshots and team logos.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 
 'use strict';

@@ -1,4 +1,4 @@
-// Courtside Manager: The (i) explanations.
+// League Layer: The (i) explanations.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

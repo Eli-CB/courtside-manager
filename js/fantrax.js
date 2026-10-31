@@ -1,4 +1,4 @@
-// Courtside Manager: Loading leagues from Fantrax.
+// League Layer: Loading leagues from Fantrax.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

@@ -1,4 +1,4 @@
-// Courtside Manager: Matchups: the matchup projector, lineup boards and stat tables.
+// League Layer: Matchups: the matchup projector, lineup boards and stat tables.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

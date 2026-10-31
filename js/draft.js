@@ -1,4 +1,4 @@
-// Courtside Manager: Draft, saved leagues and the landing page.
+// League Layer: Draft, saved leagues and the landing page.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
@@ -276,7 +276,7 @@ function viewLanding() {
       <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const step1 = chosen ? '' : `
-      <p class="land-step">${ui.addingLeague && state.fxTeam ? 'Add a league' : 'Courtside Manager'}</p>
+      <p class="land-step">${ui.addingLeague && state.fxTeam ? 'Add a league' : 'League Layer'}</p>
       <h1>${ui.addingLeague && state.fxTeam ? 'Connect another league' : 'Plan your fantasy basketball week'}</h1>
       <p class="muted">${ui.addingLeague && state.fxTeam ? "Enter its league ID. Each league keeps its own team and notes, and you can switch between them from the menu at the top." : "Connect your Fantrax or ESPN league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
       <form class="land-form" data-form="land-league">

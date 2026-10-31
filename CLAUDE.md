@@ -1,8 +1,10 @@
-# Courtside Manager: notes for working on this repo
+# League Layer: notes for working on this repo
 
 Fantasy basketball (Fantrax, and public ESPN leagues) weekly matchup site. Static GitHub Pages site, no build step, no backend.
 Live: https://leaguelayer.com (domain on Cloudflare, DNS only, set in the repo's Pages settings; the old
-eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/courtside-manager). Owner's league:
+eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/courtside-manager:
+the site was Courtside Manager until Oct 2026; the repo and every `courtside-*` storage key keep the old name so nobody's
+saved leagues are lost). Owner's league:
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
 8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26).
 

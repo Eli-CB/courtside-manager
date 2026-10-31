@@ -1,4 +1,4 @@
-// Courtside Manager: live box scores: today's games on Performances, as they're played.
+// League Layer: live box scores: today's games on Performances, as they're played.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

@@ -1,4 +1,4 @@
-"""Local server for Courtside Manager.
+"""Local server for League Layer.
 
 Serves the site on http://localhost:5173 and refreshes NBA data:
   - on start, when data/players.json is missing or older than 6 hours
@@ -54,5 +54,5 @@ if __name__ == '__main__':
     if stale:
         print('NBA data is missing or stale, refreshing...', flush=True)
         refresh()
-    print(f'Courtside Manager running at http://localhost:{PORT}', flush=True)
+    print(f'League Layer running at http://localhost:{PORT}', flush=True)
     http.server.ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()

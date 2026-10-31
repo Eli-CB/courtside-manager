@@ -1,4 +1,4 @@
-// Courtside Manager: Button actions, event wiring and start-up.
+// League Layer: Button actions, event wiring and start-up.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
@@ -227,7 +227,7 @@ const actions = {
     try {
       restoreFrom(JSON.parse($('#backupText').value));
       $('#backupDialog').close();
-    } catch (e) { toast("That text isn't a Courtside backup"); }
+    } catch (e) { toast("That text isn't a League Layer backup"); }
   },
   'close-backup'() { $('#backupDialog').close(); },
   import() { $('#importFile').click(); },
@@ -370,7 +370,7 @@ $('#importFile').addEventListener('change', async e => {
   try {
     restoreFrom(JSON.parse(await file.text()));
   } catch (err) {
-    toast("That file doesn't look like a Courtside backup");
+    toast("That file doesn't look like a League Layer backup");
   }
 });
 

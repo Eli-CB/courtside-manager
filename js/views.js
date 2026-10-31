@@ -1,4 +1,4 @@
-// Courtside Manager: Dashboard, Roster, Standings, Trades, Free Agents.
+// League Layer: Dashboard, Roster, Standings, Trades, Free Agents.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 

@@ -1,4 +1,4 @@
-// Courtside Manager: Weekly lineups, archived seasons, game logs and awards.
+// League Layer: Weekly lineups, archived seasons, game logs and awards.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
