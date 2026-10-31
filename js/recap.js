@@ -107,8 +107,10 @@ function recapItems(X) {
       `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`);
   }
   if (X.allPlay && X.teams > 2) {
-    const a = X.allPlay, rec = `${a.w}-${a.l}${a.t ? `-${a.t}` : ''}`;
-    add('📈', 'Best week', `<b>${esc(team(a.tid))}</b> would have gone ${rec} against every team`, `${team(a.tid)}, ${rec} against every team`);
+    // matchups won against every other team's week, not categories
+    const a = X.allPlay, n = X.teams - 1;
+    const beat = `${a.w === n ? `every other team (${n} of ${n})` : `${a.w} of ${n} teams`}${a.t ? `, tied ${a.t}` : ''}`;
+    add('📈', 'Best week', `<b>${esc(team(a.tid))}</b> would have beaten ${beat}`, `${team(a.tid)} would have beaten ${beat}`);
   }
   return out;
 }

@@ -1078,6 +1078,7 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     if (X.regret) assert.ok(X.regret.up > 0, 'a bench regret changes a result');
     assert.ok(X.allPlay.w + X.allPlay.l + X.allPlay.t === L.teams.length - 1);
     for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);
+    assert.match(html, /would have beaten (every other team|\d+ of \d+ teams)/, 'Best week counts teams beaten, not categories');
     // the message: the standouts only (everyone has the results), each with its full line in the league's categories
     const text = app.recapText(L, X);
     assert.ok(text.startsWith(`🏀 ${L.name} · Week 1 standouts`));
