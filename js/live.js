@@ -73,13 +73,17 @@ const espnDate = d => d.replace(/-/g, '');
 // once games have started)
 const liveWanted = () => ui.tab === 'dashboard' && !document.hidden && ui.perfRange !== 'day';
 
+// each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {
-  await Promise.all(games.map(async g => {
+  const res = await Promise.allSettled(games.map(async g => {
     const lines = espnLines(await getJson(`${ESPN_SITE}summary?event=${g.id}`, 'ESPN'));
     if (!live.lines.has(g.d)) live.lines.set(g.d, new Map());
     for (const [id, line] of lines) live.lines.get(g.d).set(id, line);
     if (g.state === 'post') live.done.add(g.id);
   }));
+  const failed = res.filter(r => r.status === 'rejected');
+  if (failed.length && failed.length === res.length) throw failed[0].reason;
+  return failed.length;
 }
 
 async function pollLive() {
@@ -101,8 +105,7 @@ async function pollLive() {
       if (![...teamDates].some(([t, ds]) => ds.has(d) && !(BOX && BOX.finals.has(`${d} ${t}`)))) { live.done.add(d); continue; }
       try {
         const past = espnGames(await getJson(`${ESPN_SITE}scoreboard?dates=${espnDate(d)}`, 'ESPN', undefined, 1));
-        await readBoxes(past.filter(g => g.state === 'post' && !live.done.has(g.id) && !savedFinal(g)));
-        live.done.add(d);
+        if (!(await readBoxes(past.filter(g => g.state === 'post' && !live.done.has(g.id) && !savedFinal(g))))) live.done.add(d);
       } catch (e) { /* try again on the next update */ }
     }
     live.at = Date.now();
@@ -146,13 +149,4 @@ function liveStatus(p, d) {
   // ESPN's "4:12 - 3rd" as "Q3 4:12" ("2:00 - OT" as "OT 2:00"); Halftime, End of 3rd and the like as they are
   const clock = String(g.detail || '').replace(/^([\d:.]+) - (?:(\d)(?:st|nd|rd|th)|(\d*OT))$/, (m, t, q, ot) => `${q ? `Q${q}` : ot} ${t}`);
   return g.state === 'in' ? `<span class="lv-dot" aria-hidden="true"></span>${esc(clock)}` : 'Final';
-}
-
-// A game still on is measured against an average game's share for the minutes he's played (his minutes over an
-// average rostered player's), so a good start reads as good; a finished game against a whole one
-function liveZ(line, on) {
-  const z = lineZ(line);
-  const f = on && BASE.min ? Math.min(line.min / BASE.min[0], 1) : 1;
-  if (f < 1) for (const c of scoreCats()) if (!c.pct && !c.fp && BASE[c.key]) z[c.key] += (c.neg ? -1 : 1) * BASE[c.key][0] * (1 - f) / BASE[c.key][1];
-  return z;
 }

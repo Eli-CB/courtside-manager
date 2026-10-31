@@ -2,7 +2,7 @@
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
-// ----- Dashboard: category strengths vs your league -----
+// ----- Roster: category strengths vs your league -----
 const STR_KEY = 'courtside-strengths';
 const DRAFT_MODE_KEY = 'courtside-draft-mode';
 ui.draftMode = (() => { try { return localStorage.getItem(DRAFT_MODE_KEY) || 'game'; } catch (e) { return 'game'; } })();
@@ -15,7 +15,6 @@ function teamCatAvg(players) {
 
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 
-// "Viewing" picker shown on Dashboard and Roster: look at any league team, read-only
 // A team's real per-game numbers: counting stats per player, FG%/FT% from makes ÷ attempts
 function teamRaw(players) {
   const n = players.length || 1;
@@ -131,10 +130,9 @@ function viewDashboard() {
 
 // ----- Performances: every NBA stat line from today, the last game day or this week so far, in one sortable table -----
 // Today's games come from ESPN as they're played (live.js). Category leagues rank what the games added to winning a
-// week's categories against not playing (lineWins), so a week adds them up; points leagues use fantasy points.
+// week's categories against not playing (catWins), so a week adds them up; points leagues use fantasy points.
 const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
 const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
-const lineZ = line => catZ({ ...line, fgPct: line.fga ? line.fgm / line.fga : 0, ftPct: line.fta ? line.ftm / line.fta : 0 });
 // a game's value: fantasy points, or categories won against not playing (catWins), as player value counts an average game
 const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(catWins(line))));
 
@@ -154,8 +152,7 @@ function perfDays() {
 }
 
 // Each player's lines over those days (the saved box scores, else ESPN's), added up, with what they added: fantasy
-// points, or categories won (lineWins), so every game counts. z sorts each category: per game against an average
-// rostered player's game (a game still on: for the minutes played so far, liveZ).
+// points, or categories won (catWins), so every game counts. z: each category's share, which its column sorts by.
 function perfRows(dates) {
   const byId = new Map();
   const add = (id, d, line) => { if (!byId.has(id)) byId.set(id, []); byId.get(id).push([d, line]); };
@@ -170,8 +167,7 @@ function perfRows(dates) {
     for (const [d, line] of lines) {
       for (const [k, x] of Object.entries(line)) if (k !== 'margin') tot[k] = (tot[k] || 0) + x;
       if (isPoints()) { v += lineFp(line); continue; }
-      for (const [k, x] of Object.entries(liveZ(line, liveOn(raw, d)))) z[k] = (z[k] || 0) + x;
-      v += lineValue(line);
+      for (const [k, x] of Object.entries(catWins(line))) { z[k] = (z[k] || 0) + x; v += x; }
     }
     rows.push({ raw, g: lines.length, tot, z, v, on: lines.some(([d]) => liveOn(raw, d)) });
   }
@@ -250,16 +246,15 @@ function topPerformancesCard() {
   const badges = new Map();
   if (range === 'day') {
     const night = day === yesterday ? 'last night' : `on ${fmtDay(day)}`;
-    const wins = new Map(pts ? [] : rows.map(r => [r, lineWins(r.tot)]));
     const tiers = (list, f) => { const m = new Map(); for (const r of list) { const v = +f(r).toFixed(6); m.set(v, [...(m.get(v) || []), r]); } return [...m].sort((a, b) => b[0] - a[0]).map(x => x[1]); };
     const give = (rs, c, e, tip) => { if (rs && rs.length <= 3) for (const r of rs) badges.set(`${r.raw.id}|${c.key}`, [e, `${tip} ${night}`]); };
     for (const c of cats) {
       if (c.pct) {
-        const g = tiers(rows.filter(r => r.tot[c.att] && wins.has(r) && wins.get(r)[c.key] != null), r => wins.get(r)[c.key]);
+        const g = tiers(rows.filter(r => r.tot[c.att] && r.z[c.key] != null), r => r.z[c.key]);
         const low = g[g.length - 1];
-        if (low && g.length > 1 && wins.get(low[0])[c.key] < 0) give(low, c, '🧊', `Worst ${c.label} shooting`);
         give(g[0], c, '🚀', `Best ${c.label} shooting`);
         if (g[0] && g[0].length === 1) give(g[1], c, '🔥', `2nd best ${c.label} shooting`);
+        if (low && g.length > 1 && low[0].z[c.key] < 0) give(low, c, '🧊', `Worst ${c.label} shooting`);
         continue;
       }
       const g = tiers(rows.filter(r => lineStat(r.tot, c.key) > 0), r => lineStat(r.tot, c.key));
@@ -708,7 +703,8 @@ function recommendedAdds() {
     .filter(x => x.gp && (fxLeague() ? fxAvailable(nbaById.get(x.nbaId)) : !state.players.some(p => p.nbaId === x.nbaId)))
     .sort((a, b) => b.val - a.val).slice(0, 120)
     .map(x => playerFromRaw(nbaById.get(x.nbaId)));
-  const helps = p => (w && drop ? scoreCats().filter(c => (catWins(p)[c.key] || 0) - (catWins(drop)[c.key] || 0) > 0.01).map(c => c.label) : []);
+  const dropWins = drop && w ? catWins(drop) : null;
+  const helps = p => { if (!dropWins) return []; const pw = catWins(p); return scoreCats().filter(c => (pw[c.key] || 0) - (dropWins[c.key] || 0) > 0.01).map(c => c.label); };
   const adds = pool.filter(p => p.status !== 'Out')
     .map(p => ({ p, gain: worth(p) - base, helps: helps(p) }))
     .filter(x => x.gain > 0).sort((a, b) => b.gain - a.gain).slice(0, 3);

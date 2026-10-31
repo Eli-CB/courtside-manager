@@ -211,7 +211,6 @@ function fillSlots(cands, slots) {
 // for points leagues that score them (dd/td are per-game rates; gp1 is one per game played).
 const COUNT_KEYS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm', 'dd', 'td', 'min', 'gp1'];
 const EXTRA_KEYS = ['oreb', 'dreb', 'tpa', 'pf', 'pm', 'dd', 'td'];
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 let teamDates = new Map();
 
 const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -299,11 +298,11 @@ function computeBase(stats, n) {
 // shooting below the league's average take away.
 let winsMemo = null;
 function winWeights() {
-  scoreCats(); // the league's categories, and their baselines
-  if (winsMemo && winsMemo.BASE === BASE && winsMemo.n === state.slots.length) return winsMemo.w;
+  const cats = scoreCats(); // the league's categories, and their baselines
+  if (winsMemo && winsMemo.cats === cats && winsMemo.BASE === BASE && winsMemo.n === state.slots.length) return winsMemo.w;
   const S = state.slots.length || 8, G = S * WEEK_GAMES;
   const w = {};
-  for (const c of scoreCats()) {
+  for (const c of cats) {
     if (c.fp || !BASE[c.key]) continue;
     const b = BASE[c.key][1];
     if (c.pct) {
@@ -315,7 +314,7 @@ function winWeights() {
       w[c.key] = { sd: Math.sqrt(2 * (G * gameSd(c.key, m) ** 2 + G * G / S * b * b)) };
     }
   }
-  winsMemo = { BASE, n: state.slots.length, w };
+  winsMemo = { cats, BASE, n: state.slots.length, w };
   return w;
 }
 // a player's per-game stats (FG% × attempts for makes) or a game's line (makes as they are)
@@ -330,7 +329,6 @@ function catWins(s) {
   }
   return z;
 }
-const lineWins = catWins;
 
 // The per-game value of the best player a league leaves on waivers (the first past its teams × roster spots)
 function waiverValue() {

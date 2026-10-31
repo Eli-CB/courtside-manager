@@ -681,7 +681,7 @@ test("performances: this week adds up each player's games", async () => {
   assert.equal(r.g, lines.length);
   assert.equal(r.tot.pts, lines.reduce((t, l) => t + l.pts, 0));
   // categories won against not playing, so the week is just its games added up
-  const games = lines.reduce((t, l) => t + Object.values(app.lineWins(l)).reduce((a, b) => a + b, 0), 0);
+  const games = lines.reduce((t, l) => t + Object.values(app.catWins(l)).reduce((a, b) => a + b, 0), 0);
   assert.ok(Math.abs(r.v - games) < 1e-9);
   app.ui.perfRange = 'week';
   try {
@@ -693,16 +693,16 @@ test("performances: this week adds up each player's games", async () => {
 test('performances: value is categories won against not playing, every category weighing the same', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
-  const v = line => Object.values(app.lineWins(line)).reduce((a, b) => a + b, 0);
+  const v = line => Object.values(app.catWins(line)).reduce((a, b) => a + b, 0);
   const W = app.winWeights();
   assert.equal(v({}), 0, 'not playing adds nothing');
   // counting stats only add; a steal is worth several points (steals decide a category with far smaller totals)
-  const pt = app.lineWins({ pts: 1 }).pts, stl = app.lineWins({ stl: 1 }).stl;
+  const pt = app.catWins({ pts: 1 }).pts, stl = app.catWins({ stl: 1 }).stl;
   assert.ok(pt > 0 && stl / pt > 4 && stl / pt < 20, `a steal is worth ${(stl / pt).toFixed(1)} points`);
-  assert.ok(app.lineWins({ to: 1 }).to < 0, 'turnovers take away');
+  assert.ok(app.catWins({ to: 1 }).to < 0, 'turnovers take away');
   // shooting adds only above the league's average
-  assert.ok(Math.abs(app.lineWins({ fgm: W.fgPct.p * 10, fga: 10 }).fgPct) < 1e-12, 'average shooting: nothing either way');
-  assert.ok(app.lineWins({ ftm: 0, fta: 2 }).ftPct < 0 && app.lineWins({ ftm: 2, fta: 2 }).ftPct > 0);
+  assert.ok(Math.abs(app.catWins({ fgm: W.fgPct.p * 10, fga: 10 }).fgPct) < 1e-12, 'average shooting: nothing either way');
+  assert.ok(app.catWins({ ftm: 0, fta: 2 }).ftPct < 0 && app.catWins({ ftm: 2, fta: 2 }).ftPct > 0);
   // an ordinary starter's game helps; a brick-and-turnover night with little else hurts
   const ordinary = { min: 32, pts: 18, reb: 6, ast: 4, stl: 1, blk: 1, tpm: 2, to: 2, fgm: 7, fga: 15, ftm: 2, fta: 3 };
   assert.ok(v(ordinary) > 0.1 && v(ordinary) < 0.4, `an ordinary game adds ${v(ordinary).toFixed(2)} categories`);
@@ -983,13 +983,6 @@ test("performances: today's games from ESPN's box scores, read in the browser as
       assert.ok(html.includes('class="on" data-action="perf-range" data-range="today"'), 'it opens on today once games have started');
       assert.ok(html.includes('lv-dot') && html.includes('Halftime') && html.includes('Q4 2:08') && html.includes('updated '), 'the clock of each game still on');
     });
-    // a game still on is measured for the minutes played: half an average game, at half the minutes, is about even
-    const B = app.get('BASE');
-    const half = Object.fromEntries(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to'].map(k => [k, B[k][0] / 2]));
-    half.min = B.min[0] / 2;
-    const z = app.liveZ(half, true);
-    assert.ok(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to'].every(k => Math.abs(z[k]) < 1e-9), JSON.stringify(z));
-    assert.ok(app.liveZ(half, false).pts < -1, 'a finished game is measured against a whole one');
     // last night's games picked: no more updates
     app.ui.perfRange = 'day';
     app.scheduleLive();
@@ -1009,4 +1002,33 @@ test('popups scroll inside, without collapsing on older iPhone Safari', () => {
   const rules = [...css.matchAll(/([^{}]*\.modal-body[^{}]*)\{([^}]*)\}/g)].filter(m => /flex\s*:/.test(m[2]));
   assert.ok(rules.length >= 2, 'the player card and (i) popups both flex their body');
   for (const [, sel, body] of rules) assert.match(body, /flex:\s*1 1 auto/, `${sel.trim()}: flex-basis auto, not 0`);
+});
+
+test('value weights follow the league: two leagues of the same size with different categories', async () => {
+  const L = await app.useLeague(CATS9);
+  const keys = () => Object.keys(app.winWeights()).sort().join();
+  const before = keys();
+  // the same league without one of its categories: same teams and spots, so the same baselines
+  const L2 = { ...L, cats: L.cats.slice(1) };
+  app.get('NBA').league = L2;
+  app.applyLeagueRules(L2);
+  try {
+    assert.equal(keys(), app.scoreCats().filter(c => !c.fp).map(c => c.key).sort().join(), 'weights for exactly these categories');
+    assert.notEqual(keys(), before);
+  } finally { await app.useLeague(CATS9); }
+});
+
+test('live box scores: one game ESPN fails on is asked for again, the others still count', async () => {
+  const live = app.get('live');
+  const realGet = app.getJson;
+  const sm = JSON.parse(readFixture('espn/live/summary-401909882.json'));
+  await app.useLeague(CATS9);
+  app.getJson = async url => { if (url.includes('event=bad')) throw new Error('ESPN 500'); return sm; };
+  try {
+    const failed = await app.readBoxes([{ id: 'bad', d: '2026-10-28', state: 'post' }, { id: 'good', d: '2026-10-28', state: 'post' }]);
+    assert.equal(failed, 1);
+    assert.ok(live.lines.get('2026-10-28').size > 5, "the game that answered is read");
+    assert.ok(live.done.has('good') && !live.done.has('bad'), 'the failed one is tried again next time');
+    await assert.rejects(app.readBoxes([{ id: 'bad', d: '2026-10-28', state: 'post' }]), /ESPN 500/, 'all of them failing is an error');
+  } finally { app.getJson = realGet; live.lines.clear(); live.done.clear(); }
 });
