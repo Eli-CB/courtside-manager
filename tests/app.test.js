@@ -209,12 +209,13 @@ test('a matchup week covers the league period, and daily leagues still project',
 test("Matchups steps through the league's matchup weeks and its teams", async () => {
   const L = await app.useLeague(CATS9);
   useTeam(L.teams[0].id);
-  assert.deepEqual([...app.weekShifts()], [-1, 0, 1, 2, 3, 4], 'week 1 began Oct 20: no stepping back into the preseason');
+  assert.deepEqual([...app.weekShifts()].slice(0, 3), [-1, 0, 1], 'week 1 began Oct 20: no stepping back into the preseason');
   const ui = app.get('ui');
   ui.weekShift = -1;
   try {
     const nav = app.weekPicker();
-    assert.equal((nav.match(/<option /g) || []).length, 6);
+    assert.equal((nav.match(/<option /g) || []).length, L.periods.length, 'every matchup week');
+    assert.ok(nav.includes(`>Week ${L.periods.length} (playoffs)<`), nav);
     assert.ok(nav.includes('>Week 2 (this week)<') && nav.includes('selected>Week 1<'), nav);
     assert.ok(/data-step="-1"[^>]*disabled/.test(nav) && !/data-step="1"[^>]*disabled/.test(nav), 'the first week: only forward');
   } finally { ui.weekShift = 0; }
@@ -1164,5 +1165,25 @@ test('seasons: an earlier season entered as a league goes under its league, neve
     NBA.siteLeague = site;
     ui.season = null; ui.addingLeague = false; ui.tab = tab;
     await app.useLeague(CATS9);
+  }
+});
+
+test('Matchups steps through every week of the league, a two-week matchup once', async () => {
+  const L = await app.useLeague(CATS9);
+  const ui = app.get('ui');
+  const shifts = app.weekShifts();
+  const periods = shifts.map(s => app.fxPeriodFor(app.weekStartAt(s)).n);
+  assert.deepEqual([...periods], L.periods.map(p => p.n), 'each matchup week, in order, once');
+  assert.ok(shifts.includes(0));
+  // stepping past a two-week matchup takes one click
+  const long = L.periods.find(p => (Date.parse(p.end) - Date.parse(p.start)) / 864e5 > 7);
+  if (long) {
+    const at = shifts[periods.indexOf(long.n)], tab = ui.tab;
+    ui.weekShift = at;
+    ui.tab = 'week'; // (no live box scores in the background)
+    try {
+      app.actions['week-shift']({ dataset: { step: '1' } });
+      assert.equal(app.fxPeriodFor(app.weekStartAt(ui.weekShift)).n, long.n + 1);
+    } finally { ui.weekShift = 0; ui.tab = tab; }
   }
 });

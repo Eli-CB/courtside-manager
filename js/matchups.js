@@ -596,7 +596,8 @@ function weekPicker() {
   const shifts = weekShifts();
   const opts = shifts.map(s => {
     const p = fxLeague() && fxLeague().periods ? fxPeriodFor(weekStartAt(s)) : null;
-    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${s === 0 ? ' (this week)' : ''}</option>`;
+    const playoffs = p && fxLeague().playoffPeriod && p.n >= fxLeague().playoffPeriod;
+    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${s === 0 ? ' (this week)' : playoffs ? ' (playoffs)' : ''}</option>`;
   });
   return stepper('week-shift', 'week', `<select class="ctx-team" data-change="week-pick" aria-label="Week">${opts.join('')}</select>`,
     { first: ui.weekShift <= shifts[0], last: ui.weekShift >= shifts[shifts.length - 1] });

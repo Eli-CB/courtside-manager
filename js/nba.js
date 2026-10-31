@@ -227,14 +227,20 @@ function weekStartAt(shift) {
   const base = dayOffset(t) > Math.max(...state.matchDays) ? addDays(mondayOf(t), 7) : mondayOf(t);
   return addDays(base, 7 * shift);
 }
-const WEEK_SHIFTS = 4; // weeks back and ahead the Matchups tab goes
-// The weeks Matchups can show, as shifts from this week: up to WEEK_SHIFTS either way, within the league's
-// matchup weeks when it has them (this week always)
+const WEEK_SHIFTS = 4; // weeks back and ahead the Matchups tab goes for a league without matchup weeks
+// The weeks Matchups can show, as shifts from this week: every one of the league's matchup weeks (playoffs too),
+// a two-week matchup once (by its first week, or this week while it's on), this week always
 function weekShifts() {
   const L = fxLeague();
-  const out = [];
-  for (let s = -WEEK_SHIFTS; s <= WEEK_SHIFTS; s++) if (!s || !(L && L.periods && L.periods.length) || fxPeriodFor(weekStartAt(s))) out.push(s);
-  return out;
+  if (!(L && L.periods && L.periods.length)) return Array.from({ length: 2 * WEEK_SHIFTS + 1 }, (x, i) => i - WEEK_SHIFTS);
+  const base = weekStartAt(0), weeksTo = d => Math.round((Date.parse(mondayOf(d) + 'T12:00') - Date.parse(base + 'T12:00')) / (7 * 864e5));
+  const byPeriod = new Map();
+  for (let s = Math.min(0, weeksTo(L.periods[0].start)); s <= Math.max(0, weeksTo(L.periods[L.periods.length - 1].start)); s++) {
+    const p = fxPeriodFor(weekStartAt(s));
+    if (s === 0) byPeriod.set(p || 'now', 0);
+    else if (p && !byPeriod.has(p)) byPeriod.set(p, s);
+  }
+  return [...byPeriod.values()].sort((a, b) => a - b);
 }
 function matchDates(start = weekStart()) {
   const p = fxLeague() && fxLeague().periods ? fxPeriodFor(start) : null;

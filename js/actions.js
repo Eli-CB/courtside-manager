@@ -196,7 +196,11 @@ const actions = {
     state.lineup = fillSlots(chosen, state.slots);
     commit('Lineup updated for this week');
   },
-  'week-shift'(el) { goWeek(ui.weekShift + +el.dataset.step); },
+  // the next or previous week in the picker (a two-week matchup is one step)
+  'week-shift'(el) {
+    const s = weekShifts(), next = +el.dataset.step > 0 ? s.find(x => x > ui.weekShift) : s.filter(x => x < ui.weekShift).pop();
+    if (next != null) goWeek(next);
+  },
   'player-detail'(el) { showPlayerDetail(+el.dataset.nba); },
 
   'close-detail'() { $('#detailDialog').close(); },
