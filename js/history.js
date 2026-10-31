@@ -402,7 +402,7 @@ function matchInactive(league, A) {
 // The address names a past season as #<tab>/<that season's league id>, so a refresh stays on it
 const seasonHash = (tab, id) => `#${tab}${id ? '/' + id : ''}`;
 async function switchSeason(id, wantTab) {
-  ui.addingSeason = false; ui.pastTeam = null; ui.viewA = null; ui.viewB = null;
+  ui.pastTeam = null; ui.viewA = null; ui.viewB = null;
   if (id) {
     try {
       await loadSeason(id);

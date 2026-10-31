@@ -44,7 +44,10 @@ saved leagues are lost). Owner's league:
     Performances isn't set to the last game day, and games are on: scoreboard + the box score of each game in progress
     (`live.lines`: date -> NBA id -> line). ESPN players matched by `espn` id (from the daily job) else initial + last
     name + team. Yesterday and this week's earlier days missing from `data/boxscores.json` are asked for once.
-  - draft: Draft tab/board, saved leagues, landing page
+  - draft: Draft tab/board, saved leagues, landing page. Seasons: the league menu lists the current league's seasons
+    under it (`season-pick`/`season-add`); the bar under the tabs only picks a team. The league form (`connectLeague`)
+    files an earlier season (year < `NBA.season`, or a later season of the same Fantrax `historyId` is here) under its
+    league in `state.pastSeasons[historyId]`, never as a league; `foldPastSeasons` moves old duplicates there
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax. `scripts/build_images.py`: headshot sprite (80px)

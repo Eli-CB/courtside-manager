@@ -107,8 +107,16 @@ const actions = {
     ui.afterPick = null;
     if (location.hash === go) route(); else location.hash = go;
   },
-  'season-cancel'() { ui.addingSeason = false; render(); },
-  'land-back'() { state.leagueChosen = false; ui.addingLeague = true; commit(); },
+  'season-pick'(el) {
+    $('#leagueMenu details')?.removeAttribute('open');
+    switchSeason(el.dataset.id || null);
+  },
+  'season-add'() {
+    $('#leagueMenu details')?.removeAttribute('open');
+    ui.addingLeague = 'season';
+    render();
+  },
+  'land-back'() { state.leagueChosen = false; ui.addingLeague = true; ui.afterPick = null; commit(); },
   async 'land-cancel'() {
     ui.addingLeague = false;
     const back = (state.savedLeagues || [])[0];
@@ -131,9 +139,10 @@ const actions = {
     $('#leagueMenu details')?.removeAttribute('open');
     if (id === currentLeagueId() && state.fxTeam) return;
     try {
-      const league = await switchLeague(id);
-      ui.addingLeague = false;
-      commit(`Switched to ${league.name}`);
+      // (one saved before past seasons had their own place may turn out to be one)
+      const wait = await connectLeague(id);
+      if (wait) toast(`That's the ${wait.label} season of ${wait.name}. Add this season's league and ${wait.label} will be under it.`);
+      else if (!ui.season) toast(`Switched to ${fxLeague().name}`);
     } catch (e) { toast(e.message); }
   },
   async 'league-reload'(el) {
@@ -257,44 +266,23 @@ const actions = {
 };
 
 const forms = {
-  async 'add-season'(f) {
-    const id = f.sid.value.trim();
-    const L = fxLeague();
-    if (leagueSourceOf(id) !== 'fantrax' || !parseLeagueId(id)) return toast("That doesn't look like a Fantrax league ID. It's letters and numbers only.");
-    if (id === L.id) return toast("That's this season's league.");
-    const btn = f.querySelector('button[type=submit]');
-    btn.disabled = true; btn.textContent = 'Adding…';
-    try {
-      const P = await loadSeason(id);
-      if ((L.historyId && P.league.historyId !== L.historyId) || (L.year && P.league.year && P.league.year >= L.year)) {
-        delete pastCache[id];
-        throw new Error(`that league isn't an earlier season of ${L.name}`);
-      }
-      const key = L.historyId || L.id;
-      state.pastSeasons = state.pastSeasons || {};
-      const list = state.pastSeasons[key] = state.pastSeasons[key] || [];
-      if (!list.some(x => x.id === id)) list.push({ id, year: P.league.year });
-      save();
-      await switchSeason(id);
-      toast(`Added the ${P.label} season`);
-    } catch (e) {
-      toast(`Couldn't add that season: ${e.message}`);
-      btn.disabled = false; btn.textContent = 'Add';
-    }
-  },
+  // a league, or an earlier season of one (which goes under its league)
   async 'land-league'(f) {
     const id = f.leagueId.value.trim();
     const msg = $('#landMsg');
-    const btn = f.querySelector('button[type=submit]');
+    const btn = f.querySelector('button[type=submit]'), label = btn.textContent;
     btn.disabled = true; btn.textContent = 'Connecting…'; msg.textContent = '';
     try {
-      await switchLeague(id);
-      ui.addingLeague = false;
-      commit();
+      const wait = await connectLeague(id);
+      if (!wait) return;
+      msg.className = 'form-note';
+      msg.textContent = `That's the ${wait.label} season of ${wait.name}. Enter this season's league ID and ${wait.label} will be under it.`;
+      f.leagueId.value = '';
     } catch (e) {
+      msg.className = 'form-error';
       msg.textContent = e.message;
-      btn.disabled = false; btn.textContent = 'Connect league';
     }
+    btn.disabled = false; btn.textContent = label;
   },
 
 };
@@ -336,9 +324,6 @@ document.addEventListener('change', e => {
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
-  } else if (el.dataset.change === 'season') {
-    if (el.value === 'add') { ui.addingSeason = true; render(); $('.ctx-add input')?.focus(); return; }
-    switchSeason(el.value);
   } else if (el.dataset.change === 'past-team') {
     ui.pastTeam = el.value || null;
     if (ui.tab !== 'rosters') location.hash = '#rosters'; else render();

@@ -43,11 +43,22 @@ function leagueMenu() {
   const saved = state.savedLeagues || [];
   const site = NBA && NBA.siteLeague;
   const wasOpen = el.querySelector('details') && el.querySelector('details').open;
+  const P = pastSeason();
+  // the current league's seasons, under it (Fantrax leagues: the others don't share past seasons)
+  let seasons = '';
+  if (!state.demo && hasLineupHistory(L)) {
+    const past = seasonsFor(L);
+    const rows = past.length ? [{ id: '', year: L.year }, ...past] : [];
+    seasons = rows.map(x => {
+      const on = (x.id || null) === (ui.season || null);
+      return `<button type="button" class="lm-item lm-sub${on ? ' on' : ''}" data-action="season-pick" data-id="${esc(x.id)}">${on ? '✓ ' : ''}${x.year ? seasonLabel(x.year) : x.id ? 'Past season' : 'This season'}</button>`;
+    }).join('') + '<button type="button" class="lm-item lm-sub" data-action="season-add">+ Add an earlier season</button>';
+  }
   el.innerHTML = `<details class="lm"${wasOpen ? ' open' : ''}>
-    <summary aria-label="League menu"><span class="lm-name">${esc(L.name)}</span><span class="lm-caret" aria-hidden="true">▾</span></summary>
+    <summary aria-label="League menu"><span class="lm-name">${esc(L.name)}${P ? ` · ${esc(P.label)}` : ''}</span><span class="lm-caret" aria-hidden="true">▾</span></summary>
     <div class="lm-pop">
       <div class="lm-sec">Leagues</div>
-      ${saved.map(l => `<div class="lm-row"><button type="button" class="lm-item${l.id === cur ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${l.id === cur ? '✓ ' : ''}${esc(l.name)}</button>${l.id !== cur ? `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>` : ''}</div>`).join('')}
+      ${saved.map(l => `<div class="lm-row"><button type="button" class="lm-item${l.id === cur ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${l.id === cur ? '✓ ' : ''}${esc(l.name)}</button>${l.id !== cur ? `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>` : ''}</div>${l.id === cur ? seasons : ''}`).join('')}
       ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)} <span class="muted">(demo)</span></span></div>` : ''}
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
@@ -62,8 +73,9 @@ function leagueMenu() {
 }
 
 // ----- Past seasons -----
-// Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
-// (keyed by Fantrax's league history id); a past season gets its own tabs. Fantrax leagues only, so far.
+// Each Fantrax season is its own league. Past seasons are added by league ID (the league menu, or the league form,
+// which knows one) and kept per league (keyed by Fantrax's league history id); a past season gets its own tabs.
+// Fantrax leagues only, so far.
 const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
@@ -79,9 +91,9 @@ function seasonsFor(L) {
   return all.filter(x => x.id !== L.id && !seen.has(x.id) && seen.add(x.id)).sort((a, b) => (b.year || 0) - (a.year || 0));
 }
 
-async function loadSeason(id) {
+async function loadSeason(id, fetched) {
   if (pastCache[id]) return pastCache[id];
-  const { league, idMap } = await fetchFantraxLeague(id, { opening: true });
+  const { league, idMap } = fetched || await fetchFantraxLeague(id, { opening: true });
   // that season's NBA stats, if saved, grade its draft, awards and rosters
   const season = league.year ? seasonOf(league.year) : null;
   const A = season ? await loadArchive(season) : null;
@@ -107,13 +119,6 @@ function ctxBar() {
   bar.hidden = !L || needsLanding();
   if (bar.hidden) return;
   const P = pastSeason();
-  const seasons = seasonsFor(L);
-  const seasonSel = `<select class="ctx-team ctx-season" data-change="season" aria-label="Season">
-      <option value="">${esc(L.year ? seasonLabel(L.year) : NBA ? NBA.season : 'This season')}</option>${seasons.map(x => `<option value="${esc(x.id)}" ${x.id === ui.season ? 'selected' : ''}>${x.year ? seasonLabel(x.year) : 'Past season'}</option>`).join('')}
-      ${hasLineupHistory(L) ? '<option value="add">+ Add season…</option>' : ''}</select>`;
-  const addForm = ui.addingSeason ? `<form class="ctx-add" data-form="add-season">
-      <input name="sid" placeholder="Past season's league ID" autocomplete="off" spellcheck="false" aria-label="Past season's Fantrax league ID" title="Open that season on Fantrax; the ID is the part of the address after /league/">
-      <button class="btn sm primary" type="submit">Add</button><button class="btn sm ghost" type="button" data-action="season-cancel">Cancel</button></form>` : '';
   let teamSel;
   if (P) {
     const myName = fxTeamName(state.fxTeam);
@@ -128,13 +133,10 @@ function ctxBar() {
       ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
     </select>${viewing ? '<span class="badge">Viewing only</span><button class="link-btn small" data-action="fx-view-mine">Back to my team</button>' : ''}`;
   }
-  $('#ctxTeam').innerHTML = `${seasonSel}<span class="ctx-sep" aria-hidden="true">/</span>${teamSel}${addForm}`;
+  $('#ctxTeam').innerHTML = teamSel;
   document.body.classList.toggle('past', !!P);
   if (P) {
-    $('#ctxMeta').innerHTML = [
-      '<span class="badge accent">Past season</span>',
-      'standings and weekly lineups from Fantrax',
-    ].join(' · ');
+    $('#ctxMeta').innerHTML = `<span class="badge accent">${esc(P.label)} season</span><button class="link-btn" data-action="season-pick" data-id="">Back to ${esc(L.year ? seasonLabel(L.year) : 'this season')}</button>`;
     $('#ctxMeta').hidden = false;
     return;
   }

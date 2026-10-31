@@ -104,8 +104,9 @@ async function loadNba(fresh = false) {
     if (state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
     if (state.fxTeam) syncLeagueRules();
     const migrate = state.fxTeam && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
-    if (migrate) rememberLeague(NBA.league.id, NBA.league.name);
-    if (syncLinked() || migrate) commit(); else render();
+    if (migrate) rememberLeague(NBA.league.id, NBA.league);
+    const folded = foldPastSeasons();
+    if (syncLinked() || migrate || folded) commit(); else render();
     if (ui.pendingSeason) route(); // a refresh on a past season waited for this data
     return true;
   } catch (e) {

@@ -351,6 +351,7 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .stat-grid .field { margin: 0; }
 .sub { margin: 4px 0 8px; font-size: .9rem; }
 .form-error { color: var(--bad); margin: 0; min-height: 1.2em; font-size: .9rem; }
+.form-note { color: var(--text); margin: 0; min-height: 1.2em; font-size: .9rem; }
 .inline-form { display: grid; gap: 10px; grid-template-columns: 90px 1fr 110px 110px 90px auto; align-items: end; }
 .inline-form .field { margin: 0; }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -799,10 +800,6 @@ tr.me-row td { background: var(--accent-soft); }
 .step-btn:disabled { color: var(--muted); opacity: .45; cursor: default; }
 .ctx-meta { color: var(--muted); font-size: .82rem; padding-left: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .ctx-meta .btn.sm { padding: 2px 10px; font-size: .78rem; }
-.ctx-season { font-weight: 600; }
-body.past .ctx-season { color: var(--accent); }
-.ctx-add { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.ctx-add input { font: inherit; font-size: .9rem; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); width: 210px; max-width: 100%; }
 #leagueMenu { position: relative; }
 .lm summary { list-style: none; display: flex; align-items: center; max-width: 320px; }
 .lm summary::-webkit-details-marker { display: none; }
@@ -815,6 +812,7 @@ body.past .ctx-season { color: var(--accent); }
 .lm-item:hover, .lm-item:focus-visible { background: var(--surface-2); }
 .lm-item.on { font-weight: 700; color: var(--accent); }
 .lm-item.danger { color: var(--bad); }
+.lm-item.lm-sub { padding: 6px 10px 6px 26px; font-size: .86rem; }
 @media (max-width: 640px) {
   .ctx-inner { padding-top: 8px; }
   .ctx-sep { display: none; }
@@ -886,8 +884,7 @@ body.past .ctx-season { color: var(--accent); }
   .top-right .icon-btn { width: 40px; height: 40px; }
 
   .ctx-inner { padding: 10px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); gap: 8px; }
-  .ctx-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; width: 100%; }
-  .ctx-row > #leagueMenu, .ctx-team-wrap > .ctx-add, .ctx-team-wrap > .badge, .ctx-team-wrap > .link-btn { grid-column: 1 / -1; }
+  .ctx-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; width: 100%; }
   .ctx-team-wrap { display: contents; }
   .lm summary { max-width: none; width: 100%; }
   .lm-pop { width: 100%; }

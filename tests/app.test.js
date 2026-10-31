@@ -1107,3 +1107,41 @@ test('a shared recap link: connects the league, asks for the team, then shows th
     await app.useLeague(CATS9);
   }
 });
+
+test('seasons: an earlier season entered as a league goes under its league, never in the league list', async () => {
+  const PAST = 'czqgnyozmf2tbr93'; // 2025-26 of CATS9
+  const L = await app.useLeague(CATS9);
+  const state = app.get('state'), ui = app.get('ui'), NBA = app.get('NBA');
+  const was = JSON.parse(JSON.stringify(state)), site = NBA.siteLeague, tab = ui.tab;
+  ui.tab = 'standings'; // no live box scores in the background
+  NBA.siteLeague = null; // a visitor with nothing connected yet
+  Object.assign(state, { fxTeam: null, fxLeagueId: null, leagueStates: {}, savedLeagues: [], pastSeasons: {}, leagueChosen: false, demo: false });
+  try {
+    // the past season first: kept, not opened as this season's league
+    const wait = await app.connectLeague(PAST);
+    assert.equal(wait.label, '2025-26');
+    assert.equal(state.savedLeagues.length, 0);
+    assert.equal(state.fxLeagueId, null);
+    // then this season's league: the past season is under it
+    await app.connectLeague(CATS9);
+    app.actions['land-team']({ dataset: { id: L.teams[2].id } });
+    assert.deepEqual([...state.savedLeagues.map(l => l.id)], [CATS9]);
+    assert.deepEqual([...app.seasonsFor(app.fxLeague()).map(x => x.id)], [PAST]);
+    // entered again with its league here: opens it
+    assert.equal(await app.connectLeague(PAST), null);
+    assert.equal(ui.season, PAST);
+    ui.season = null;
+    // one added as a league before all this moves under its league
+    state.pastSeasons = {};
+    state.savedLeagues.unshift({ id: PAST, name: L.name, hid: app.fxLeague().historyId, year: 2025 });
+    assert.ok(app.foldPastSeasons());
+    assert.deepEqual([...state.savedLeagues.map(l => l.id)], [CATS9]);
+    assert.deepEqual([...app.seasonsFor(app.fxLeague()).map(x => x.id)], [PAST]);
+  } finally {
+    for (const k of Object.keys(state)) delete state[k];
+    Object.assign(state, was);
+    NBA.siteLeague = site;
+    ui.season = null; ui.addingLeague = false; ui.tab = tab;
+    await app.useLeague(CATS9);
+  }
+});

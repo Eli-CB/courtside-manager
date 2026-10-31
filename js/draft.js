@@ -174,11 +174,90 @@ const LEAGUE_FIELDS = ['fxTeam', 'players', 'il', 'lineup', 'opp', 'teamName', '
 const emptyOpp = () => ({ name: '', week: null, players: [], starters: null, fxId: null });
 const currentLeagueId = () => state.fxLeagueId || (NBA && NBA.siteLeague && NBA.siteLeague.id) || null;
 
-function rememberLeague(id, name) {
+function rememberLeague(id, lg) {
   const list = (state.savedLeagues || []).filter(l => l.id !== id);
   const at = (state.savedLeagues || []).findIndex(l => l.id === id);
-  list.splice(at === -1 ? list.length : at, 0, { id, name });
+  list.splice(at === -1 ? list.length : at, 0, { id, name: lg.name, hid: lg.historyId || null, year: lg.year || null });
   state.savedLeagues = list;
+}
+
+// ----- Seasons -----
+// Each Fantrax season is its own league with its own ID; Fantrax's league history id ties a league's seasons together.
+// A season before the NBA season on now (or before a later season of the same league) is a past season: it goes
+// under its league in the league menu, never in the league list.
+const nowYear = () => (NBA && NBA.season ? +String(NBA.season).slice(0, 4) : null);
+// What's known of a league without asking its site: { hid, year }
+function leagueFacts(id) {
+  if (NBA && NBA.league && NBA.league.id === id) return { hid: NBA.league.historyId || null, year: NBA.league.year || null };
+  const s = (state.savedLeagues || []).find(l => l.id === id);
+  if (s && s.year) return { hid: s.hid || null, year: s.year };
+  const c = readLeagueCache()[id];
+  return c ? { hid: c.res.league.historyId || null, year: c.res.league.year || null } : { hid: null, year: null };
+}
+function isPastSeason(f, others = (state.savedLeagues || []).map(l => leagueFacts(l.id))) {
+  if (!f.year) return false;
+  return !!(nowYear() && f.year < nowYear()) || (!!f.hid && others.some(o => o.hid === f.hid && o.year > f.year));
+}
+// The league a past season goes under: the latest season of its league that's here
+function homeLeague(hid) {
+  if (!hid) return null;
+  const ids = [...new Set([currentLeagueId(), ...(state.savedLeagues || []).map(l => l.id)])].filter(Boolean);
+  const all = ids.map(id => ({ id, ...leagueFacts(id) }));
+  const home = all.filter(f => f.hid === hid && !isPastSeason(f, all)).sort((a, b) => (b.year || 0) - (a.year || 0))[0];
+  return home ? home.id : null;
+}
+// Keep a past season with its league's other seasons, and out of the league list
+function fileSeason(id, lg) {
+  const key = lg.historyId || id;
+  state.pastSeasons = state.pastSeasons || {};
+  const list = state.pastSeasons[key] = state.pastSeasons[key] || [];
+  if (!list.some(x => x.id === id)) list.push({ id, year: lg.year || null });
+  state.savedLeagues = (state.savedLeagues || []).filter(l => l.id !== id);
+  if (state.leagueStates) delete state.leagueStates[id];
+}
+// Past seasons added as leagues (before seasons had their own place) move under their league once it's here
+function foldPastSeasons() {
+  const all = (state.savedLeagues || []).map(l => ({ id: l.id, ...leagueFacts(l.id) }));
+  let moved = false;
+  for (const f of all) {
+    if (f.id === currentLeagueId() || !isPastSeason(f, all) || !homeLeague(f.hid)) continue;
+    fileSeason(f.id, { historyId: f.hid, year: f.year });
+    moved = true;
+  }
+  return moved;
+}
+
+// What the league form connects: a league, or an earlier season of one, opened under its league. A past season
+// whose league isn't here yet is kept for when it is, and returned as { label, name } so the form can ask for it.
+async function connectLeague(input) {
+  const id = parseLeagueId(input);
+  if (!id) throw new Error(BAD_LEAGUE_ID);
+  if (leagueSourceOf(id) === 'fantrax') {
+    await needNba();
+    let f = pastCache[id] ? { hid: pastCache[id].league.historyId, year: pastCache[id].league.year } : leagueFacts(id), fetched = null;
+    if (!f.year) {
+      // one fetch serves either way: as the league, or as the season
+      fetched = await fetchFantraxLeague(id, { opening: true }).catch(e => { throw leagueError(id, e); });
+      f = { hid: fetched.league.historyId || null, year: fetched.league.year || null };
+    }
+    if (isPastSeason(f)) {
+      const P = await loadSeason(id, fetched).catch(e => { throw leagueError(id, e); });
+      fileSeason(id, P.league);
+      const home = homeLeague(P.league.historyId);
+      if (!home) { commit(); return { label: P.label, name: P.league.name }; }
+      if (home !== currentLeagueId() || !state.leagueChosen) await switchLeague(home);
+      ui.addingLeague = false;
+      if (!state.fxTeam) { ui.afterPick = seasonHash('standings', id); commit(); return null; } // your team first, then the season
+      commit(`Added the ${P.label} season`);
+      await switchSeason(id);
+      return null;
+    }
+    if (fetched) saveLeague(id, fetched);
+  }
+  await switchLeague(id);
+  ui.addingLeague = false;
+  commit();
+  return null;
 }
 
 function stashLeague() {
@@ -210,21 +289,29 @@ function leagueLineupMode(league) {
 }
 
 // Switch the whole app to a Fantrax or ESPN league by ID (or the league's address). Throws a readable message.
+async function needNba() {
+  if (!NBA) await nbaLoading;
+  if (!NBA) throw new Error("Couldn't load NBA data. Check your connection and try again.");
+}
+// A league that didn't load, as a readable message
+function leagueError(id, e) {
+  const site = SOURCE_NAME[leagueSourceOf(id)];
+  if (e.message === 'private league') return new Error("That ESPN league is private, so ESPN won't share it. Only public ESPN leagues can be loaded; the league manager can make it viewable to the public in the league's settings.");
+  return new Error(`${site} didn't find that league (${e.message}). Check the ID in your league's address.${site === 'ESPN' ? ' Only public ESPN leagues can be loaded.' : ''}`);
+}
+
 async function switchLeague(input) {
   const id = parseLeagueId(input);
   if (!id) throw new Error(BAD_LEAGUE_ID);
-  if (!NBA) await nbaLoading;
-  if (!NBA) throw new Error("Couldn't load NBA data. Check your connection and try again.");
+  await needNba();
   let res;
   try {
     res = await getLeague(id);
   } catch (e) {
-    const site = SOURCE_NAME[leagueSourceOf(id)];
-    if (e.message === 'private league') throw new Error("That ESPN league is private, so ESPN won't share it. Only public ESPN leagues can be loaded; the league manager can make it viewable to the public in the league's settings.");
-    throw new Error(`${site} didn't find that league (${e.message}). Check the ID in your league's address.${site === 'ESPN' ? ' Only public ESPN leagues can be loaded.' : ''}`);
+    throw leagueError(id, e);
   }
   const wasCurrent = currentLeagueId() === id;
-  ui.season = null; ui.addingSeason = false; ui.pastTeam = null;
+  ui.season = null; ui.pastTeam = null;
   if (!wasCurrent) stashLeague();
   applyFantraxLeague(withSiteExtras(res));
   state.fxLeagueId = NBA.siteLeague && NBA.siteLeague.id === id ? null : id;
@@ -239,7 +326,8 @@ async function switchLeague(input) {
       applyLeagueRules(res.league);
     }
   }
-  if (state.fxTeam) { rememberLeague(id, res.league.name); syncLeagueRules(); }
+  if (state.fxTeam) { rememberLeague(id, res.league); syncLeagueRules(); }
+  foldPastSeasons();
   syncLinked();
   validateLineup();
   return res.league;
@@ -249,7 +337,7 @@ async function switchLeague(input) {
 function adoptTeam(teamId) {
   const side = fxTeamSide(teamId);
   state.fxTeam = teamId;
-  if (fxLeague()) rememberLeague(currentLeagueId(), fxLeague().name);
+  if (fxLeague()) rememberLeague(currentLeagueId(), fxLeague());
   state.players = side.players;
   state.il = side.il;
   state.lineup = side.lineup;
@@ -268,22 +356,26 @@ const needsLanding = () => ui.addingLeague || (!state.fxTeam && !state.demo);
 
 function viewLanding() {
   const chosen = !ui.addingLeague && state.leagueChosen && fxLeague() && !state.fxTeam;
+  const afterSeason = ui.afterPick && pastCache[ui.afterPick.split('/')[1]];
   const step2 = chosen ? `
       <p class="land-step">Step 2 of 2</p>
       <h1>Which team is yours?</h1>
-      <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. ${ui.afterPick === '#recap' ? `Pick your team to see the week${ui.recapWeek ? ` ${ui.recapWeek}` : ''} recap a league mate shared.` : "Pick your team to load your roster and this week's matchup."}</p>
+      <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. ${ui.afterPick === '#recap' ? `Pick your team to see the week${ui.recapWeek ? ` ${ui.recapWeek}` : ''} recap a league mate shared.` : afterSeason ? `Pick your team to see the ${afterSeason.label} season.` : "Pick your team to load your roster and this week's matchup."}</p>
       ${preDraft() ? `<p class="land-note">This league hasn't drafted yet${draftWhen(fxLeague()) ? ` (draft: ${esc(draftWhen(fxLeague()))})` : ''}, so rosters are empty for now.</p>` : ''}
       <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
+  const adding = ui.addingLeague && state.fxTeam, forSeason = adding && ui.addingLeague === 'season' && fxLeague();
   const step1 = chosen ? '' : `
-      <p class="land-step">${ui.addingLeague && state.fxTeam ? 'Add a league' : 'League Layer'}</p>
-      <h1>${ui.addingLeague && state.fxTeam ? 'Connect another league' : 'Plan your fantasy basketball week'}</h1>
-      <p class="muted">${ui.addingLeague && state.fxTeam ? "Enter its league ID. Each league keeps its own team and notes, and you can switch between them from the menu at the top." : "Connect your Fantrax or ESPN league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
+      <p class="land-step">${forSeason ? 'Add a season' : adding ? 'Add a league' : 'League Layer'}</p>
+      <h1>${forSeason ? 'Add an earlier season' : adding ? 'Connect another league' : 'Plan your fantasy basketball week'}</h1>
+      <p class="muted">${forSeason ? `Each season of <b>${esc(forSeason.name)}</b> has its own Fantrax league ID: open that season on Fantrax and copy the part of the address after <b>/league/</b>.`
+        : adding ? 'Enter its league ID. Each league keeps its own team and notes, and earlier seasons go under their league in the menu at the top.'
+        : "Connect your Fantrax or ESPN league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
       <form class="land-form" data-form="land-league">
-        <label class="field" for="landLeague">League ID or address
-          <input id="landLeague" name="leagueId" placeholder="Fantrax or ESPN league ID" autocomplete="off" spellcheck="false" autofocus>
+        <label class="field" for="landLeague">${forSeason ? "That season's league ID or address" : 'League ID or address'}
+          <input id="landLeague" name="leagueId" placeholder="${forSeason ? 'Fantrax league ID' : 'Fantrax or ESPN league ID'}" autocomplete="off" spellcheck="false" autofocus>
         </label>
-        <button class="btn primary" type="submit">Connect league</button>
+        <button class="btn primary" type="submit">${forSeason ? 'Add season' : 'Connect league'}</button>
       </form>
       <p class="form-error" id="landMsg" role="alert"></p>
       <details class="land-help">
@@ -295,6 +387,6 @@ function viewLanding() {
         Only public ESPN leagues can be loaded.</p>
         <p>Pasting the whole address works too.</p>
       </details>
-      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax and ESPN. ${ui.addingLeague && state.fxTeam ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
+      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax and ESPN. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
 }
