@@ -26,6 +26,8 @@ function buildAlerts() {
     if (better) a.push({ lvl: 'warn', msg: `A better lineup for this week takes you from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> to win.`, action: 'go-week', label: 'See it' });
   }
   if (!a.length) a.push({ lvl: 'good', msg: 'Lineup is set and everyone starting is healthy.' });
+  const fresh = freshRecap();
+  if (fresh) a.push({ lvl: 'good', msg: `The <b>week ${fresh.n} recap</b> is in: every result and the week's standouts, ready to share.`, action: 'go-recap', label: 'See it' });
   return a;
 }
 
@@ -62,7 +64,7 @@ function leagueMenu() {
 // ----- Past seasons -----
 // Each Fantrax season is its own league. Past seasons are added by league ID and kept per league
 // (keyed by Fantrax's league history id); a past season gets its own tabs. Fantrax leagues only, so far.
-const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
+const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Free Agents'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
@@ -198,7 +200,7 @@ function render() {
   }
   const early = preDraft();
   if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
-  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade };
+  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade, recap: viewRecap };
   // keep scroll position of inner lists (e.g. trade picker, performances) across re-renders
   const inner = '.pick-list, .perf-wrap.scroll';
   const scrolls = [...document.querySelectorAll(inner)].map(el => [el.scrollTop, el.scrollLeft]);

@@ -11,7 +11,7 @@ saved leagues are lost). Owner's league:
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
   scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, render, history, views,
-  matchups, live, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
+  matchups, recap, live, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo)
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
@@ -35,6 +35,10 @@ saved leagues are lost). Owner's league:
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such
+  - recap: Recap tab: a finished week across the league (every final, Player/Game/Brick of the week, biggest win,
+    closest, bench regret, best all-play week) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends text +
+    a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
+    Fantrax only. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
   - live: live box scores for Performances' Today (and This week). The browser polls ESPN's site API
     (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) about once a minute while the Dashboard is visible,
     Performances isn't set to the last game day, and games are on: scoreboard + the box score of each game in progress

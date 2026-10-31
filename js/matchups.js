@@ -502,6 +502,18 @@ function pickupsCard() {
 // The weekly rosters and box scores load once (shared with Season totals and Awards); each matchup's replay is kept
 const pastWeeks = {}; // league id -> { state, weeks, G } ; replays: "league|period|team" -> result
 const pastReplays = new Map();
+// The league's weekly rosters and this season's box scores, loading the first time (Matchups and Recap redraw when in)
+function pastWeeksOf(L) {
+  let P = pastWeeks[L.id];
+  if (!P) {
+    P = pastWeeks[L.id] = { state: 'loading' };
+    Promise.all([loadRosterWeeks(L), loadGameLog('cur')])
+      .then(([weeks, G]) => { pastWeeks[L.id] = { state: 'ready', weeks, G }; })
+      .catch(e => { pastWeeks[L.id] = { state: 'error', msg: e.message }; })
+      .finally(() => { if (ui.tab === 'week' || ui.tab === 'recap') render(); });
+  }
+  return P;
+}
 function pastWeekCard(start) {
   const L = fxLeague(), period = fxPeriodFor(start);
   if (!L || !period || !hasLineupHistory(L) || !(fxTime(period.endAt) < Date.now())) return '';
@@ -510,14 +522,7 @@ function pastWeekCard(start) {
   if (!pair) return '';
   const head = `<div class="card-head"><h2>How week ${period.n} ended ${infoBtn('benchswaps')}</h2><span class="muted small">the week's real lineups and box scores</span></div>`;
   const note = msg => `<div class="card">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
-  let P = pastWeeks[L.id];
-  if (!P) {
-    P = pastWeeks[L.id] = { state: 'loading' };
-    Promise.all([loadRosterWeeks(L), loadGameLog('cur')])
-      .then(([weeks, G]) => { pastWeeks[L.id] = { state: 'ready', weeks, G }; })
-      .catch(e => { pastWeeks[L.id] = { state: 'error', msg: e.message }; })
-      .finally(() => { if (ui.tab === 'week') render(); });
-  }
+  const P = pastWeeksOf(L);
   if (P.state === 'loading') return note(`Loading the week's lineups from ${sourceName(L)}…`);
   if (P.state === 'error') return note(`Couldn't load the week's lineups (${esc(P.msg)}).`);
   const key = `${L.id}|${period.n}|${leftId}`;

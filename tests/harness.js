@@ -61,7 +61,7 @@ function loadApp() {
     addEventListener() {}, createElement: () => new El(),
   };
   const ctx = {
-    document, console, setTimeout, clearTimeout, URL, Intl, Math, JSON, Promise, Map, Set,
+    document, console, setTimeout, clearTimeout, URL, URLSearchParams, Intl, Math, JSON, Promise, Map, Set,
     Date: FixedDate,
     location: { hostname: 'example.test', hash: '', search: '', reload() {} },
     localStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },

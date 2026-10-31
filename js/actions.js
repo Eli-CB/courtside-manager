@@ -66,6 +66,17 @@ const actions = {
     if (!d.open) d.showModal();
   },
   'go-week'() { location.hash = '#week'; },
+  'go-recap'() { ui.recapWeek = null; location.hash = '#recap'; },
+  // on phones the share sheet (the league chat is one tap away); elsewhere the text and link, copied
+  async 'recap-share'(el) {
+    const L = fxLeague(), X = L && recaps.get(`${L.id}|${+el.dataset.week}`);
+    if (!X) return;
+    const text = recapText(L, X), url = recapUrl(L, X.period.n);
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+      try { await navigator.share({ title: `${L.name} · Week ${X.period.n} recap`, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(`${text}\n\nFull recap: ${url}`); toast('Recap copied: paste it in your league chat'); } catch (e) { toast("Couldn't copy the recap"); }
+  },
   'cs-toggle'(el) {
     const open = !ui.csOpen.delete(el.dataset.cat);
     if (open) ui.csOpen.add(el.dataset.cat);
@@ -92,7 +103,9 @@ const actions = {
   'land-team'(el) {
     adoptTeam(el.dataset.id);
     commit(`Welcome, ${state.teamName}`);
-    location.hash = '#week';
+    const go = ui.afterPick || '#week'; // a shared link: where it pointed
+    ui.afterPick = null;
+    if (location.hash === go) route(); else location.hash = go;
   },
   'season-cancel'() { ui.addingSeason = false; render(); },
   'land-back'() { state.leagueChosen = false; ui.addingLeague = true; commit(); },
@@ -315,6 +328,9 @@ document.addEventListener('change', e => {
     ui.viewB = null;
     if (ui.viewA && !VIEW_TABS.includes(ui.tab)) location.hash = '#dashboard';
     else render();
+  } else if (el.dataset.change === 'recap-week') {
+    ui.recapWeek = +el.value;
+    render();
   } else if (el.dataset.change === 'week-pick') {
     goWeek(+el.value);
   } else if (el.dataset.change === 'fx-opp') {
@@ -374,6 +390,23 @@ $('#importFile').addEventListener('change', async e => {
   }
 });
 
+// A link someone shared (?league=<id>&week=<n>#recap): open that league, or connect it and ask for the team first
+async function openSharedLink() {
+  if (!location.search) return;
+  const q = new URLSearchParams(location.search), id = q.get('league');
+  if (!id) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (+q.get('week')) ui.recapWeek = +q.get('week');
+  ui.afterPick = location.hash || '#recap';
+  if (currentLeagueId() === id && state.fxTeam) { ui.afterPick = null; route(); return; }
+  try {
+    await switchLeague(id);
+    ui.addingLeague = false;
+    commit();
+    if (state.fxTeam) { ui.afterPick = null; route(); }
+  } catch (e) { ui.afterPick = null; toast(e.message); }
+}
+
 function route() {
   const [hashTab, sid] = location.hash.replace('#', '').split('/');
   // a past season in the address (after a refresh, or a shared link): load it, once the NBA data it needs is in
@@ -409,4 +442,5 @@ window.addEventListener('resize', fitPerfLists);
   route();
   nbaLoading = loadNba();
   loadImages();
+  openSharedLink();
 })();

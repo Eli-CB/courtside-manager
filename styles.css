@@ -176,6 +176,19 @@ a { color: var(--accent); }
 .perf-when { margin: -6px 0 10px; }
 .perf-table .pf-emo { margin-right: 2px; font-size: .9em; }
 .pf-legend { margin: 8px 0 0; }
+/* weekly recap */
+.rc-when { margin: -6px 0 10px; }
+.rc-finals { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rc-final { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); font-size: .92rem; }
+.rc-final.me { box-shadow: inset 3px 0 0 var(--accent); }
+.rc-final .rc-t { min-width: 0; overflow-wrap: anywhere; }
+.rc-final .rc-t:last-child { text-align: right; }
+.rc-final .rc-t.won { font-weight: 800; }
+.rc-score { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.rc-item { display: flex; gap: 12px; align-items: flex-start; font-size: .92rem; }
+.rc-e { font-size: 1.4rem; line-height: 1.2; width: 1.6rem; text-align: center; flex: none; }
+.rc-label { font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 2px; }
 .perf-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
 .pill { font: inherit; font-size: .8rem; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
 .pill:hover { background: var(--surface-2); }

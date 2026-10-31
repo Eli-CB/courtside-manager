@@ -1032,3 +1032,74 @@ test('live box scores: one game ESPN fails on is asked for again, the others sti
     await assert.rejects(app.readBoxes([{ id: 'bad', d: '2026-10-28', state: 'post' }]), /ESPN 500/, 'all of them failing is an error');
   } finally { app.getJson = realGet; live.lines.clear(); live.done.clear(); }
 });
+
+test('weekly recap: every final of a finished week, the standouts, and a message to share', async () => {
+  const L = await app.useLeague(CATS9);
+  const ui = app.get('ui');
+  useTeam(L.teams[0].id);
+  ui.tab = 'recap';
+  try {
+    app.viewRecap(); // starts loading the week's lineups and box scores
+    await new Promise(r => setTimeout(r, 20));
+    const html = app.viewRecap();
+    assert.match(html, /Week 1 recap/);
+    const X = app.get('recaps').get(`${L.id}|1`);
+    assert.equal(X.games.length, L.matchups['1'].length, 'every matchup');
+    // the finals agree with Fantrax's standings (week 1 is the only finished week)
+    for (const g of X.games) {
+      const ra = L.standings.find(r => r.id === g.a);
+      assert.equal(g.margin > 0 ? 'win' : 'tie', ra.w ? 'win' : ra.l ? 'loss' : 'tie', `${app.fxTeamName(g.a)} ${app.scoreLine(g.sc)} ${app.fxTeamName(g.b)}`);
+    }
+    assert.ok(X.games.every((g, i) => !i || g.margin <= X.games[i - 1].margin), 'biggest margin first');
+    // the standouts are starters' numbers, valued as Performances values them
+    assert.ok(X.mvp && X.mvp.v > 0 && X.game && X.game.line.gp1 === 1);
+    assert.ok(X.game.v >= X.mvp.v / X.mvp.line.gp1, 'the best game beats the best week per game');
+    if (X.brick) assert.ok(X.brick.v < 0);
+    if (X.regret) assert.ok(X.regret.up > 0, 'a bench regret changes a result');
+    assert.ok(X.allPlay.w + X.allPlay.l + X.allPlay.t === L.teams.length - 1);
+    for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);
+    // the message: the league, each final, the standouts, and a link that opens this week in this league
+    const text = app.recapText(L, X);
+    assert.ok(text.startsWith(`🏀 ${L.name} · Week 1 recap`));
+    for (const g of X.games) assert.ok(text.includes(`${app.fxTeamName(g.a)} ${app.scoreLine(g.sc)} ${app.fxTeamName(g.b)}`));
+    assert.ok(text.includes('🏆 Player of the week: ') && !/<[a-z]/.test(text), 'plain text, no markup');
+    assert.ok(app.recapUrl(L, 1).endsWith(`?league=${L.id}&week=1#recap`), app.recapUrl(L, 1));
+    // the Dashboard points to it for three days
+    assert.equal(app.freshRecap().n, 1);
+    assert.ok(app.buildAlerts().some(a => a.action === 'go-recap'));
+  } finally { ui.tab = 'dashboard'; }
+  // leagues that don't share past lineups say so
+  await app.useLeague(ESPN);
+  assert.match(app.viewRecap(), /No recaps for ESPN leagues/);
+  assert.equal(app.freshRecap(), null);
+  await app.useLeague(CATS9);
+});
+
+test('a shared recap link: connects the league, asks for the team, then shows the recap', async () => {
+  const L = await app.useLeague(CATS9);
+  const state = app.get('state'), ui = app.get('ui');
+  const was = { ...state }, loc = { search: app.location.search, hash: app.location.hash };
+  app.history = { replaceState() { app.location.search = ''; } };
+  Object.assign(state, { fxTeam: null, fxLeagueId: null, leagueStates: {}, savedLeagues: [], leagueChosen: false, demo: false });
+  app.location.search = `?league=${L.id}&week=1`;
+  app.location.hash = '#recap';
+  app.route(); // as the page does on load, before the link is read
+  try {
+    await app.openSharedLink();
+    assert.equal(app.location.search, '', 'the link is tidied away');
+    assert.equal(ui.recapWeek, 1);
+    assert.equal(app.currentLeagueId(), L.id);
+    assert.ok(app.needsLanding(), 'pick your team first');
+    assert.match(app.viewLanding(), /week 1 recap a league mate shared/);
+    app.actions['land-team']({ dataset: { id: L.teams[2].id } });
+    assert.equal(state.fxTeam, L.teams[2].id);
+    assert.equal(ui.tab, 'recap', 'then the recap');
+    assert.equal(ui.afterPick, null);
+  } finally {
+    Object.assign(state, was);
+    Object.assign(app.location, loc);
+    ui.recapWeek = null; ui.tab = 'dashboard';
+    const live = app.get('live'); clearTimeout(live.timer); live.timer = null;
+    await app.useLeague(CATS9);
+  }
+});
