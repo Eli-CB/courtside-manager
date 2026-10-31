@@ -173,14 +173,13 @@ a { color: var(--accent); }
 .dash-side > .card + .card { margin-top: 0; }
 @media (max-width: 900px) { .dash-side { grid-template-columns: minmax(0, 1fr); } }
 /* the Dashboard's matchup: a scoreboard, who leads each category, then both lineups slot by slot (you on the left) */
-.mu-board { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 10px; }
+.mu-board { margin-bottom: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 10px; }
 .mu-team { min-width: 0; }
 .mu-team.right { text-align: right; }
 .mu-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-team:not(.right) .mu-name { color: var(--accent); }
 .mu-score { font-size: 2.2rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.mu-mid { color: var(--muted); font-size: .8rem; padding-bottom: 8px; text-align: center; }
-.mu-when { margin: 4px 0 10px; }
+.mu-when { margin: -4px 0 10px; }
 .mu-cats-wrap { overflow-x: auto; margin: 0 0 12px; }
 .mu-cats { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; table-layout: fixed; }
 .mu-cats th, .mu-cats td { padding: 4px 2px; text-align: center; border-bottom: 1px solid var(--border); }

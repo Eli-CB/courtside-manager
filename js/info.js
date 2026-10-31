@@ -43,8 +43,8 @@ const INFO = {
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
   dashmatch: ['Matchup', `
     <p>Your matchup this week, slot by slot: each team's lineup as your league has it now, and each starter's game and stat line in your league's categories.</p>
-    <p><b>Today</b> updates while games are on (from ESPN, every 30 seconds). <b>Yesterday</b> is this matchup's last game day. <b>This week</b> adds up the matchup's days so far; each player shows games played and left.</p>
-    <p>The big numbers are categories won over those days (fantasy points in points leagues), counted from the starters' games. The table shows who leads each category. Bench games don't count.</p>
+    <p><b>Today</b> updates while games are on (from ESPN, every 30 seconds). <b>Yesterday</b> is this matchup's last game day. <b>This period</b> adds up the matchup period so far (your league's own, from its schedule: usually a week, sometimes two around the All-Star break); each player shows games played and left.</p>
+    <p>The big numbers are the matchup so far: categories won this period, a tied one counting half to each side (fantasy points in points leagues), counted from the starters' games. The table shows who leads each category on the days picked. Bench games don't count.</p>
     <p>Leagues with daily lineups show today's lineup for every day, since the site doesn't keep each day's.</p>`],
   perf: ['Performances', `
     <p><b>Value</b> is categories won: how much a game added to winning a week's categories, compared with not playing at all. A typical starter's game adds about +0.2; a monster night +0.7. It's greener the more it added, and red only when the team would have been better off without the game: very poor shooting and turnovers with little else. A week is colored against an average starter's games over the same days.</p>

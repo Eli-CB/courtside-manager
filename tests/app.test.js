@@ -1047,8 +1047,8 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         const week = app.dashDays().week;
         assert.deepEqual([...week], ['2026-10-26', '2026-10-27', day]);
         const wk = app.weekScore(total(side, week), total(opp, week));
-        assert.deepEqual(scores(m), halves(wk), 'the big numbers: the week so far');
-        assert.ok(m.includes(`<b>${halves(sc).join('–')}</b> today`), "and today's");
+        assert.deepEqual(scores(m), halves(wk), 'the big numbers: the period so far');
+        assert.ok(m.includes(`title="${app.fmtDay('2026-10-26')} – ${app.fmtDay('2026-11-01')}">This period<`), "the league's whole matchup period, from its schedule");
         assert.ok(!/tied/.test(m), 'ties only as halves');
         assert.equal((m.match(/class="mu-lead"/g) || []).length, sc.me + sc.opp, "each category led today is marked");
         const p = [...starters(side), ...starters(opp)].find(x => app.liveLines(day).has(x.nbaId));
@@ -1062,7 +1062,7 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         assert.ok((app.dashMatchupCard().match(/class="mu-row bench"/g) || []).length >= bench, 'the bench, on request');
         app.ui.dashRange = 'week';
         m = app.dashMatchupCard();
-        assert.deepEqual(scores(m), halves(wk), 'the week so far');
+        assert.deepEqual(scores(m), halves(wk), 'the period so far');
         assert.equal((m.match(/class="mu-lead"/g) || []).length, wk.me + wk.opp, "each category led this week is marked");
         assert.match(m, /\d G · \d left/);
       } finally { app.state.fxTeam = wasTeam; app.ui.dashBench = false; app.ui.dashRange = null; }

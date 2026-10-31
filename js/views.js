@@ -176,12 +176,12 @@ function dashMatchupCard() {
   if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');
   if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
   const D = dashDays();
-  // Today, the last game day before it, the week so far. Until one is picked: today once its games have started,
+  // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Until one is picked: today once its games have started,
   // else the last game day
-  const opts = [D.today && ['today', 'Today'], D.day && ['day', D.day === yesterday ? 'Yesterday' : fmtDay(D.day)], ['week', 'This week']].filter(Boolean);
+  const opts = [D.today && ['today', 'Today'], D.day && ['day', D.day === yesterday ? 'Yesterday' : fmtDay(D.day)], ['week', 'This period', `${fmtDay(D.all[0])} – ${fmtDay(D.all[D.all.length - 1])}`]].filter(Boolean);
   const range = opts.some(([k]) => k === ui.dashRange) ? ui.dashRange : D.today && (D.started || !D.day) ? 'today' : D.day ? 'day' : 'week';
   const dates = range === 'week' ? D.week : [range === 'today' ? today : D.day];
-  const toggle = `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="dash-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>`;
+  const toggle = `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l, tip]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="dash-range" data-range="${k}" aria-pressed="${k === range}"${tip ? ` title="${tip}"` : ''}>${l}</button>`).join('')}</div>`;
 
   const opp = ui.viewing && ui.viewB ? { id: ui.viewB } : fxOpponentFor(weekStartAt(0), me);
   const side = tid => {
@@ -198,25 +198,21 @@ function dashMatchupCard() {
   const pts = isPoints(), cats = scoreCats().filter(c => !c.fp);
   // a tied category counts half to each side: 7.5–1.5
   const half = (sc, k) => sc[k] + sc.ties / 2;
-  const scoreTxt = sc => (pts ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${half(sc, 'me')}–${half(sc, 'opp')}`);
-  // the big numbers are the matchup's: the week so far; the table and the players, the days picked
+  // the big numbers are the matchup's: the period so far; the table and the players, the days picked
   const sc = B ? weekScore(A.tot, B.tot) : null, wk = B ? weekScore(A.week, B.week) : null;
-  const period = fxPeriodFor(weekStartAt(0));
-  const when = range === 'week' ? `${fmtDay(D.all[0])} – ${fmtDay(D.all[D.all.length - 1])}` : `${dates[0] === today ? 'Today' : dates[0] === yesterday ? 'Yesterday' : ''} ${fmtDay(dates[0])}`.trim();
-  const updated = range !== 'day' && live.at ? ` · updated ${new Date(live.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : range !== 'day' && live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>` : '';
   const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div></div>`;
   const head = `<div class="mu-board">
       ${big(A, wk && (pts ? wk.me : half(wk, 'me')))}
-      <div class="mu-mid">${B ? `${pts ? 'FP' : 'cats'}<br>this week` : ''}</div>
+      <div class="mu-mid"></div>
       ${B ? big(B, pts ? wk.opp : half(wk, 'opp')) : `<div class="mu-team right"><div class="mu-name muted">No opponent this week</div></div>`}
     </div>
-    <p class="muted small mu-when">${period ? `Week ${period.n} · ` : ''}${when}${B && range !== 'week' ? ` · <b>${scoreTxt(sc)}</b> ${dates[0] === today ? 'today' : 'that day'}` : ''}${updated}${state.lineupMode !== 'weekly' && range !== 'today' ? " · today's lineups" : ''}</p>`;
+    ${range !== 'day' && live.error ? `<p class="small pos-bad mu-when">ESPN: ${esc(live.error)}</p>` : ''}`;
 
   // who leads each category over these days
   const catVal = (t, c) => (c.pct ? (t[c.att] ? fmtPct(t[c.made] / t[c.att]) : '—') : fmt(lineStat(t, c.key), c.dec || 0));
   // phones: the row's color says whose it is (orange: the left team, as in the scoreboard), no name
   const catRow = (S, i) => `<tr class="${S === A ? 'pf-me' : 'mu-opp'}"><th scope="row" title="${esc(S.name)}"><span class="mu-tn">${esc(S.name)}</span></th>${cats.map((c, j) => `<td class="${sc.lead[j] === i ? 'mu-lead' : ''}">${catVal(S.tot, c)}</td>`).join('')}</tr>`;
-  const catTable = B && !pts ? `<div class="mu-cats-wrap"><table class="mu-cats"><thead><tr><th><span class="mu-tn">${range === 'week' ? 'This week' : dates[0] === today ? 'Today' : fmtDay(dates[0])}</span></th>${cats.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
+  const catTable = B && !pts ? `<div class="mu-cats-wrap"><table class="mu-cats"><thead><tr><th><span class="mu-tn">${range === 'week' ? 'This period' : dates[0] === today ? 'Today' : fmtDay(dates[0])}</span></th>${cats.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
       <tbody>${catRow(A, 1)}${catRow(B, -1)}</tbody></table></div>` : '';
 
   // one player's cell: who, his game (or the week's games), and what he's put up
