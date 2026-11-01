@@ -214,12 +214,15 @@ function draftImpact(L, G, picks) {
   const out = {};
   for (const p of picks) {
     const f = p.nbaId && fidOf.get(p.nbaId);
-    const P = { nba: p.nbaId, name: p.name, v: 0, games: 0 };
+    // dropped: the week he was first on nobody's roster (null: never dropped, or never on one)
+    const P = { nba: p.nbaId, name: p.name, round: p.round, pick: p.pick, v: 0, games: 0, dropped: null };
     if (f) {
       const rows = G.players.get(p.nbaId) || [];
-      for (let k = 0; k < L.weeks.length && L.weeks[k].owner.has(f); k++) {
+      let k = 0;
+      for (; k < L.weeks.length && L.weeks[k].owner.has(f); k++) {
         for (const r of rows) if (weekDays[k].has(r[0])) { P.v += lineValue(gameLine(G, r)) - repl; P.games++; }
       }
+      if (k && k < L.weeks.length) P.dropped = L.weeks[k].n || k + 1;
     }
     (out[p.teamId] = out[p.teamId] || []).push(P);
   }
@@ -571,6 +574,17 @@ function waiverDetail(T, txt) {
     ${down.length ? `<h3 class="sub">Hurt or did nothing</h3>${awardRows(down.slice(0, 10), amount, meta)}` : ''}
     <p class="muted small">Games in the weeks each pickup started (G · weeks started).</p>`;
 }
+function draftDetail(T, txt) {
+  const ps = [...(T.draftList || [])].sort((a, b) => b.v - a.v);
+  if (!ps.length) return '<p class="muted">No picks to grade.</p>';
+  const amount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
+  const meta = p => `Rd ${p.round}, #${p.pick} · ${p.games} G${p.dropped ? ` · dropped wk ${p.dropped}` : ''}`;
+  const best = ps.filter(p => p.v > 0).slice(0, 10), worst = ps.filter(p => p.v <= 0 && !best.includes(p)).reverse().slice(0, 5);
+  return `<p class="aw-break-total"><b>${esc(txt)}</b> from ${ps.length} pick${ps.length === 1 ? '' : 's'}</p>
+    ${best.length ? `<h3 class="sub">Best picks</h3>${awardRows(best, amount, meta)}` : ''}
+    ${worst.length ? `<h3 class="sub">Worst picks</h3>${awardRows(worst, amount, meta)}` : ''}
+    <p class="muted small">${isPoints() ? 'Fantasy points' : "Value above a replacement-level starter"} from each pick's games until he was first dropped, through trades (round and pick · games).</p>`;
+}
 function streetDetail(T, txt) {
   const ps = [...(T.missedList || [])].sort((a, b) => b.games - a.games || a.sched - b.sched).slice(0, 10);
   if (!ps.length) return '<p class="muted">No starter has missed a game yet.</p>';
@@ -647,7 +661,7 @@ function seasonAwards() {
     return `${T.waiverN} pickup${T.waiverN === 1 ? '' : 's'}, best: ${b.name} (${isPoints() ? `${fmt(b.v, 0)} FP` : signed(b.v, 1)} in ${b.weeks} wk${b.weeks === 1 ? '' : 's'})`;
   };
   return [
-    { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => total(T.draft), T => (T.draftTop ? `best: ${T.draftTop.name} (${total(T.draftTop.v)} over ${T.draftTop.games} games)` : '')) },
+    { title: 'Best draft', info: 'awDraft', detail: draftDetail, list: ranked('draft', 1, T => total(T.draft), T => (T.draftTop ? `best: ${T.draftTop.name} (${total(T.draftTop.v)} over ${T.draftTop.games} games)` : '')) },
     { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} ${each ? 'cats' : 'wins'}`, T => `${T.record}, all-play ${Math.round(T.allPct * 100)}% (${fmt(T.expW, 1)} expected)`) },
     { title: 'Waiver Wire Wizard', info: 'awWaiver', detail: waiverDetail, list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) },
     { title: 'Street Clothes', info: 'awStreet', detail: streetDetail, list: ranked('missed', 1, T => `${T.missed} game${T.missed === 1 ? '' : 's'}`, T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },

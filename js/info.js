@@ -92,7 +92,8 @@ const INFO = {
   awDraft: ['Best draft', `
     <p>Everything a team's draft picks produced over the season: every game each pick played from the draft until he was first <b>dropped</b> to free agency, whether he was starting or on the bench. A pick who's <b>traded</b> keeps counting for the team that drafted him; one who's dropped stops counting (if someone picks him up later, that's their Waiver Wire Wizard).</p>
     <p>In category leagues each game is valued against a <b>replacement-level starter</b> (the per-game value of the last player who'd start in your league), so every game by a player worth starting adds to the total and staying healthy pays. Points leagues add up fantasy points.</p>
-    <p>Totals don't adjust for draft slot, so a great first-round pick usually out-produces a late-round steal. The Draft tab grades each pick against its slot (+/−).</p>`],
+    <p>Totals don't adjust for draft slot, so a great first-round pick usually out-produces a late-round steal. The Draft tab grades each pick against its slot (+/−).</p>
+    <p>Tap a team's name to see its best and worst picks.</p>`],
   awManager: ['Best manager', `
     <p>Who won more than their team's play deserved: <b>actual wins</b> (from Fantrax's standings, ties counting half) minus <b>expected wins</b> from an <b>all-play record</b>.</p>
     <p><b>All-play.</b> Each finished regular-season week, a team's real totals (every game its starters played that week, from Fantrax's weekly lineups and the NBA box scores) are matched against <b>every</b> other team's, not just that week's opponent. A team that would have beaten 8 of 9 teams gets 0.89 of a win for the week; one that would have beaten 2 of 9 gets 0.22. Ties count half.</p>

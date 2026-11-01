@@ -405,7 +405,10 @@ test('Awards: a team name in Waiver Wire Wizard and Unc Status opens its breakdo
   const keys = [...html.matchAll(/data-action="award-team" data-key="([^"]+)"/g)].map(m => m[1].replace(/&#39;/g, "'").replace(/&amp;/g, '&'));
   assert.ok(keys.some(k => k.startsWith('Waiver Wire Wizard|')) && keys.some(k => k.startsWith('Unc Status|')));
   assert.ok(keys.some(k => k.startsWith('Street Clothes|')));
-  assert.ok(!keys.some(k => k.startsWith('Best draft|')), 'only those three, for now');
+  const dr = [...app.get('awardDetails').entries()].find(([k]) => k.startsWith('Best draft|'));
+  assert.ok(dr, 'Best draft has one');
+  assert.ok(/Best picks/.test(dr[1].html) && /Rd \d+, #\d+ · \d+ G/.test(dr[1].html), 'the picks that did most, with round and pick');
+  assert.ok(!keys.some(k => k.startsWith('Best manager|')), 'not every award has one yet');
   const D = app.get('awardDetails');
   const w = [...D.entries()].find(([k]) => k.startsWith('Waiver Wire Wizard|'))[1];
   assert.match(w.title, /^Waiver Wire Wizard: 1\. /);

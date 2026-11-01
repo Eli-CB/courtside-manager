@@ -30,7 +30,7 @@ saved leagues are lost). Owner's league:
     address `#tab/<seasonLeagueId>`), `viewLeague`/`myTeamId()` override
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
-    all awards (Waiver Wire Wizard, Street Clothes and Unc Status team names open a breakdown: `awardDetails`, `award-team`), past Rosters
+    all awards (Best draft, Waiver Wire Wizard, Street Clothes and Unc Status team names open a breakdown: `awardDetails`, `award-team`), past Rosters
   - views: Dashboard (`dashMatchupCard`: Today / Yesterday show only who plays that day, each side one gapless column: starters, bench (tagged), Out/DNP;
     This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then action items and injuries), Roster,
     Standings + Season totals, Trades, Players tab (`#players`, was Free Agents: Performances, every NBA stat line of
