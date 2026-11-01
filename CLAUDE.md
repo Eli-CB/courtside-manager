@@ -31,8 +31,8 @@ saved leagues are lost). Owner's league:
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards, past Rosters
-  - views: Dashboard (`dashMatchupCard`: this matchup slot by slot for today / this matchup's last game day / the week so far,
-    big score = week so far, category table + each starter's game and line; then action items and injuries), Roster,
+  - views: Dashboard (`dashMatchupCard`: Today / Yesterday show only who plays that day, starters then bench, side by side;
+    This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then action items and injuries), Roster,
     Standings + Season totals, Trades, Players tab (`#players`, was Free Agents: Performances, every NBA stat line of
     today / last game day / this week with team and Active/Bench/Waivers filters, ranked by value; recommended adds; player list)
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
@@ -85,6 +85,9 @@ saved leagues are lost). Owner's league:
   transactions (`mTransactions2`). ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
 - `python serve.py` (preview config "site", port 5173) refreshes `data/` locally: never commit
   `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
+- cdn.nba.com answers GitHub runners 403: `get_json` falls back to the same files on NBA's S3 storage (`CDN_MIRROR`), so box
+  scores stay NBA.com's (official; ESPN keeps stats the NBA later takes away, Fantrax follows the NBA). The last 3 days'
+  games are downloaded again each run for stat corrections; ESPN copies are dropped once the NBA copy is cached.
 - stats.nba.com blocks GitHub runners. Past seasons live in `data/seasons/<season>.json` + `-games.json`
   (2016-17..2025-26), made on the owner's PC. Each fall archive the season just ended:
   `python scripts/archive_season.py 2026-27`.

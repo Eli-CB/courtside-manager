@@ -191,6 +191,9 @@ a { color: var(--accent); }
 .mu-cats td.mu-lead { font-weight: 800; color: var(--good); background: var(--good-soft); }
 .mu-rows { border-top: 1px solid var(--border); }
 .mu-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); border-bottom: 1px solid var(--border); }
+.mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.mu-sep { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 10px 4px 4px; border-bottom: 1px solid var(--border); }
+.mu-none { margin: 10px 0 0; }
 .mu-slot { display: grid; place-items: center; }
 .mu-slot .slot-label { min-width: 0; padding: 2px 4px; font-size: .7rem; }
 .mu-p { min-width: 0; padding: 8px 4px; display: flex; flex-direction: column; gap: 4px; }
@@ -210,6 +213,7 @@ a { color: var(--accent); }
 @media (max-width: 640px) {
   .mu-score { font-size: 1.8rem; }
   .mu-row { grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); }
+  .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
   .mu-slot .slot-label { font-size: .62rem; padding: 2px 2px; }
   .mu-p { padding: 7px 2px; }
   .mu-cats { font-size: .74rem; }

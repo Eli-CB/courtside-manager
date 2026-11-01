@@ -232,6 +232,16 @@ function dashMatchupCard() {
       ${lines.length ? `<div class="mu-chips">${lineChips(tot)}</div>` : ''}
     </div>`;
   };
+  // one day: just who's playing (or played), starters then the bench (its games didn't count), side by side
+  if (range !== 'week') {
+    const d = dates[0], plays = list => list.filter(p => p && playsOn(p, d));
+    const pair = (a, b, counts) => Array.from({ length: Math.max(a.length, b.length) }, (x, i) =>
+      `<div class="mu-row day${counts ? '' : ' bench'}">${a[i] ? cell(a[i], false, counts) : '<div></div>'}${b[i] ? cell(b[i], true, counts) : '<div></div>'}</div>`).join('');
+    const on = S => (S ? plays(S.starters) : []), off = S => (S ? plays([...S.bench, ...S.ir]) : []);
+    const starters = pair(on(A), on(B), true), bench = pair(off(A), off(B), false);
+    const none = !starters && !bench ? `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>` : '';
+    return card(toggle, `${head}${catTable}<div class="mu-rows">${starters}${bench ? `<div class="mu-sep">Bench</div>${bench}` : ''}</div>${none}`);
+  }
   const row = (slot, a, b, counts) => `<div class="mu-row${counts ? '' : ' bench'}">${cell(a, false, counts)}<div class="mu-slot">${slotBadge(slot)}</div>${B ? cell(b, true, counts) : '<div></div>'}</div>`;
   const rows = state.slots.map((s, i) => row(s, A.starters[i], B && B.starters[i], true)).join('');
   const nb = Math.max(A.bench.length, B ? B.bench.length : 0), ni = Math.max(A.ir.length, B ? B.ir.length : 0);

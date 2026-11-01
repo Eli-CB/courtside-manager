@@ -1042,7 +1042,14 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         const halves = x => [String(x.me + x.ties / 2), String(x.opp + x.ties / 2)]; // a tie counts half to each
         let m = app.dashMatchupCard();
         assert.ok(m.includes('class="on" data-action="dash-range" data-range="today"') && m.includes('>Yesterday<') && m.includes('data-range="week"'), 'today, yesterday, the week; on today');
-        assert.equal((m.match(/class="mu-row"/g) || []).length, app.state.slots.length, 'one row per starting slot; the bench hidden');
+        // one day: only who plays that day, each side's starters then its bench (always), no slot column
+        const playing = list => list.filter(p => app.playsOn(p, day));
+        const benchOf = S => S.players.filter(p => !S.lineup.includes(p.id));
+        assert.equal((m.match(/class="mu-row day"/g) || []).length, Math.max(playing(starters(side)).length, playing(starters(opp)).length));
+        assert.equal((m.match(/class="mu-row day bench"/g) || []).length, Math.max(playing(benchOf(side)).length, playing(benchOf(opp)).length));
+        const shown = [...m.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(x => +x[1]);
+        assert.ok(shown.length && shown.every(id => app.playsOn(app.playerFromRaw(app.nbaById.get(id)), day)), 'nobody without a game');
+        assert.ok(!m.includes('mu-slot') && !m.includes('dash-bench'), 'no slot column, no bench button');
         const sc = app.weekScore(total(side, [day]), total(opp, [day]));
         const week = app.dashDays().week;
         assert.deepEqual([...week], ['2026-10-26', '2026-10-27', day]);
@@ -1057,11 +1064,12 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         assert.ok(m.includes(`<b>${pl.pts}</b> PTS`), "a starter's line");
         assert.ok(!/<b>0<\/b> |<b>0-0<\/b> /.test(m), "no bubble for a stat he didn't put up");
         assert.ok(m.includes('lv-dot'), 'a game still on shows its clock');
+        app.ui.dashRange = 'week';
+        m = app.dashMatchupCard();
+        assert.equal((m.match(/class="mu-row"/g) || []).length, app.state.slots.length, 'the period: one row per starting slot; the bench hidden');
         app.ui.dashBench = true;
         const bench = Math.max(side.players.length - side.lineup.filter(Boolean).length - side.il.length, opp.players.length - opp.lineup.filter(Boolean).length - opp.il.length);
         assert.ok((app.dashMatchupCard().match(/class="mu-row bench"/g) || []).length >= bench, 'the bench, on request');
-        app.ui.dashRange = 'week';
-        m = app.dashMatchupCard();
         assert.deepEqual(scores(m), halves(wk), 'the period so far');
         assert.equal((m.match(/class="mu-lead"/g) || []).length, wk.me + wk.opp, "each category led this week is marked");
         assert.match(m, /\d G · \d left/);

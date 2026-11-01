@@ -27,6 +27,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'data', 'players.json')
 BOX_CACHE = os.path.join(ROOT, 'data', 'boxscores.json')
 CDN = 'https://cdn.nba.com/static/json/'
+# The same files at the storage the NBA data server serves from. The data server answers GitHub's runners 403; this
+# doesn't, so the box scores stay NBA.com's (official, with stat corrections) rather than ESPN's, which keep some
+# credited stats the NBA has since taken away (Fantrax follows the NBA's)
+CDN_MIRROR = 'https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA/'
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/'
 ESPN_TEAMS = {'GS': 'GSW', 'NY': 'NYK', 'NO': 'NOP', 'SA': 'SAS', 'UTAH': 'UTA', 'WSH': 'WAS'}
 NBA_TEAMS = {'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW', 'HOU', 'IND', 'LAC', 'LAL', 'MEM',
@@ -65,8 +69,17 @@ def log(msg):
 def get_json(url, params=None, tries=3, timeout=40):
     if params:
         url += '?' + urllib.parse.urlencode(params)
-    if os.environ.get('SKIP_NBA_CDN') and 'cdn.nba.com' in url:  # simulate a server the NBA data server blocks
-        raise RuntimeError('skipped by SKIP_NBA_CDN')
+    if url.startswith(CDN):  # the NBA data server, else the storage behind it
+        try:
+            if os.environ.get('SKIP_NBA_CDN'):  # simulate a server the NBA data server blocks
+                raise RuntimeError('skipped by SKIP_NBA_CDN')
+            return fetch_json(url, min(tries, 2), timeout)
+        except Exception:
+            url = CDN_MIRROR + url[len(CDN):]
+    return fetch_json(url, tries, timeout)
+
+
+def fetch_json(url, tries, timeout):
     last = None
     for i in range(tries):
         try:
@@ -381,7 +394,8 @@ def _try(fn, *a):
 
 
 def box_scores(season, finals, name_to_id):
-    """All finished games this season, cached in data/boxscores.json so each game downloads once."""
+    """All finished games this season, cached in data/boxscores.json. Each game downloads once, and again for three
+    days after it's played: the NBA corrects stats (a steal taken away) a day or two later."""
     import concurrent.futures
     cache = {'season': season, 'games': {}}
     if os.path.exists(BOX_CACHE):
@@ -390,15 +404,19 @@ def box_scores(season, finals, name_to_id):
         if saved.get('season') == season and saved.get('v') == BOX_VERSION:
             cache = saved
     cache['v'] = BOX_VERSION
-    todo = [g for g in finals if g['id'] not in cache['games']]
+    recent = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+    todo = [g for g in finals if g['id'] not in cache['games'] or g['date'] >= recent]
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         fetch = lambda g: _try(espn_box, g, name_to_id) if g['id'].startswith('espn:') else _try(box_score, g)
         for game, res in zip(todo, pool.map(fetch, todo)):
             if res:
                 cache['games'][game['id']] = res
+    # an ESPN copy goes once the NBA's copy of the same game is in
+    nba = {(g['d'], g['home'], g['away']) for gid, g in cache['games'].items() if not gid.startswith('espn:')}
+    cache['games'] = {gid: g for gid, g in cache['games'].items() if not gid.startswith('espn:') or (g['d'], g['home'], g['away']) not in nba}
     with open(BOX_CACHE, 'w', encoding='utf-8') as f:
         json.dump(cache, f, separators=(',', ':'))
-    log(f'  {len(todo)} new game(s) downloaded')
+    log(f'  {len(todo)} game(s) downloaded (new, or from the last three days)')
     return cache['games']
 
 
