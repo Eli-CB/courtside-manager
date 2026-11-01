@@ -159,14 +159,31 @@ function dashGame(p, d) {
 
 // A line in the league's own categories: makes-attempts for the percentages, fantasy points first in points leagues;
 // nothing for a stat he didn't put up (no attempts, 0 blocks)
-function lineChips(line) {
-  const out = isPoints() ? [`<span class="mu-chip fp"><b>${fmt(lineFp(line), 1)}</b> FP</span>`] : [];
+// flash(key, value, makes): a class for a bubble whose number just changed (a live update)
+function lineChips(line, flash = () => '') {
+  const out = isPoints() ? [`<span class="mu-chip fp${flash('fp', lineFp(line))}"><b>${fmt(lineFp(line), 1)}</b> FP</span>`] : [];
   for (const c of scoreCats()) {
     if (c.fp || !(c.pct ? line[c.att] : Math.round(lineStat(line, c.key) * 100))) continue;
-    out.push(c.pct ? `<span class="mu-chip"><b>${line[c.made] || 0}-${line[c.att] || 0}</b> ${c.label.replace('%', '')}</span>`
-      : `<span class="mu-chip"><b>${fmt(lineStat(line, c.key), c.dec || 0)}</b> ${c.label}</span>`);
+    out.push(c.pct ? `<span class="mu-chip${flash(c.key, line[c.att] || 0, line[c.made] || 0)}"><b>${line[c.made] || 0}-${line[c.att] || 0}</b> ${c.label.replace('%', '')}</span>`
+      : `<span class="mu-chip${flash(c.key, lineStat(line, c.key))}"><b>${fmt(lineStat(line, c.key), c.dec || 0)}</b> ${c.label}</span>`);
   }
   return out.join('');
+}
+
+// Today's lines as last drawn (NBA id -> stat -> [number, makes]): a live update flashes each bubble that moved,
+// green for what helps (a make, a rebound) and red for what hurts (a miss, a turnover)
+let chipWas = new Map();
+function chipFlash(id, line) {
+  const was = chipWas.get(id);
+  const now = { fp: [isPoints() ? lineFp(line) : 0, 0] };
+  for (const c of scoreCats()) if (!c.fp) now[c.key] = c.pct ? [line[c.att] || 0, line[c.made] || 0] : [lineStat(line, c.key), 0];
+  const flash = (k, v, made = 0) => {
+    if (!live.hold || !was || !was[k] || Math.abs(was[k][0] - v) < 1e-9) return '';
+    const c = scoreCats().find(x => x.key === k);
+    const good = c && c.pct ? made > was[k][1] : c && c.neg ? v < was[k][0] : v > was[k][0];
+    return good ? ' flash-good' : ' flash-bad';
+  };
+  return { now, flash };
 }
 
 function dashMatchupCard() {
@@ -239,6 +256,9 @@ function dashMatchupCard() {
   const catTable = B && !pts ? `<div class="mu-cats-wrap"><table class="mu-cats"><thead><tr>${cats.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
       <tbody>${catRow(A, 1)}${catRow(B, -1)}</tbody></table></div>` : '';
 
+  // Today: each bubble flashes when a live update moves it
+  const isToday = range === 'today', chipNext = new Map();
+  const chipsNow = (p, tot) => { const f = chipFlash(p.nbaId, tot); chipNext.set(p.nbaId, f.now); return f.flash; };
   // one player's cell: who, his game (or the week's games), and what he's put up
   const cell = (p, right, counts, tag = '', cls = '') => {
     if (!p) return `<div class="mu-p${right ? ' right' : ''}"><span class="muted small">${B || !right ? 'Empty' : ''}</span></div>`;
@@ -253,7 +273,7 @@ function dashMatchupCard() {
     return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
       <div class="bplayer">${headshot(p, 32)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
       <div class="mu-game">${game}</div>
-      ${lines.length ? `<div class="mu-chips">${lineChips(tot)}</div>` : ''}
+      ${lines.length ? `<div class="mu-chips">${lineChips(tot, isToday ? chipsNow(p, tot) : undefined)}</div>` : ''}
     </div>`;
   };
   // one day: just who's playing (or played), each side in one column with no gaps: starters, then the bench (its
@@ -273,6 +293,7 @@ function dashMatchupCard() {
     const one = (x, right) => (x ? cell(x[0], right, x[1] === 'start', x[1].endsWith('bench') ? BENCH_TAG : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
     const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${one(a[i], false)}${one(b[i], true)}</div>`).join('');
     const none = !rows ? `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>` : '';
+    chipWas = isToday ? chipNext : new Map();
     return card(toggle, `${head}${catTable}<div class="mu-rows">${rows}</div>${none}`);
   }
   const row = (slot, a, b, counts) => `<div class="mu-row${counts ? '' : ' bench'}">${cell(a, false, counts)}<div class="mu-slot">${slotBadge(slot)}</div>${B ? cell(b, true, counts) : '<div></div>'}</div>`;
@@ -281,6 +302,7 @@ function dashMatchupCard() {
   const bench = ui.dashBench ? Array.from({ length: nb }, (x, i) => row('BN', A.bench[i], B && B.bench[i], false)).join('')
     + Array.from({ length: ni }, (x, i) => row('IL', A.ir[i], B && B.ir[i], false)).join('') : '';
   const benchBtn = nb + ni ? `<button type="button" class="link-btn mu-bench-btn" data-action="dash-bench" aria-expanded="${!!ui.dashBench}">${ui.dashBench ? 'Hide the bench' : `Show the bench (${nb + ni})`}</button>` : '';
+  chipWas = new Map();
   return card(toggle, `${head}${catTable}<div class="mu-rows">${rows}${bench}</div>${benchBtn}`);
 }
 

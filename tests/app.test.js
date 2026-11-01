@@ -1230,6 +1230,21 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         assert.ok(m.includes(`<b>${pl.pts}</b> PTS`), "a starter's line");
         assert.ok(!/<b>0<\/b> |<b>0-0<\/b> /.test(m), "no bubble for a stat he didn't put up");
         assert.ok(m.includes('lv-dot'), 'a game still on shows its clock');
+        // a live update flashes the bubbles that moved: green for a basket, red for a turnover or a missed free throw
+        const pl2 = app.liveLines(day).get(p.nbaId), was2 = { ...pl2 };
+        try {
+          Object.assign(pl2, { pts: pl2.pts + 2, fgm: pl2.fgm + 1, fga: pl2.fga + 1, to: pl2.to + 1, fta: pl2.fta + 1 });
+          live.hold = true;
+          const f = app.dashMatchupCard();
+          const chip = label => (f.match(new RegExp(`<span class="mu-chip([^"]*)"><b>[^<]*</b> ${label}<`)) || [])[1];
+          assert.equal(chip('PTS'), ' flash-good', 'points up');
+          assert.equal(chip('FG'), ' flash-good', 'a make');
+          assert.equal(chip('TO'), ' flash-bad', 'a turnover');
+          assert.equal(chip('FT'), ' flash-bad', 'a missed free throw');
+          assert.ok(!chip('REB'), "rebounds didn't move: no flash");
+          live.hold = false;
+          assert.ok(!app.dashMatchupCard().includes('flash-'), 'only on a live update');
+        } finally { live.hold = false; Object.assign(pl2, was2); }
         // Hide game scores: the clock and the opponent, no score
         const g0 = app.espnGames(sb).find(g => g.state === 'in');
         const scoreTxt = `${g0.away} ${g0.as} @ ${g0.home} ${g0.hs}`;
