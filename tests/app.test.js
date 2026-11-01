@@ -1045,8 +1045,14 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         // one day: only who plays that day, each side's starters then its bench (always), no slot column
         const playing = list => list.filter(p => app.playsOn(p, day));
         const benchOf = S => S.players.filter(p => !S.lineup.includes(p.id));
-        assert.equal((m.match(/class="mu-row day"/g) || []).length, Math.max(playing(starters(side)).length, playing(starters(opp)).length));
-        assert.equal((m.match(/class="mu-row day bench"/g) || []).length, Math.max(playing(benchOf(side)).length, playing(benchOf(opp)).length));
+        // anyone Out, or who sat out a finished game, goes last
+        const sits = p => !app.lineOn(p, day) && (p.status === 'Out' || app.gameFinal(p, day) || (app.liveGame(p, day) || {}).state === 'post');
+        const count = (list, out) => playing(list).filter(p => sits(p) === out).length;
+        assert.equal((m.match(/class="mu-row day"/g) || []).length, Math.max(count(starters(side), false), count(starters(opp), false)));
+        assert.equal((m.match(/class="mu-row day bench"/g) || []).length, Math.max(count(benchOf(side), false), count(benchOf(opp), false)));
+        const outs = S => count(starters(S), true) + count(benchOf(S), true);
+        assert.equal((m.match(/class="mu-row day bench out"/g) || []).length, Math.max(outs(side), outs(opp)));
+        if (outs(side) || outs(opp)) assert.ok(m.indexOf('Out / DNP') > m.lastIndexOf('class="mu-row day bench"'), 'at the bottom');
         const shown = [...m.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(x => +x[1]);
         assert.ok(shown.length && shown.every(id => app.playsOn(app.playerFromRaw(app.nbaById.get(id)), day)), 'nobody without a game');
         assert.ok(!m.includes('mu-slot') && !m.includes('dash-bench'), 'no slot column, no bench button');
