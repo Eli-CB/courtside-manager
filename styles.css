@@ -190,10 +190,8 @@ a { color: var(--accent); }
 .mu-cats { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; table-layout: fixed; }
 .mu-cats th, .mu-cats td { padding: 4px 2px; text-align: center; border-bottom: 1px solid var(--border); }
 .mu-cats thead th { color: var(--muted); font-weight: 700; font-size: .72rem; }
-.mu-cats tbody th { text-align: left; width: 22%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; padding-left: 6px; }
-.mu-cats tr.pf-me th { box-shadow: inset 3px 0 0 var(--accent); }
-.mu-cats tr.mu-opp th { box-shadow: inset 3px 0 0 var(--muted); }
-.mu-cats thead th:first-child { text-align: left; padding-left: 6px; }
+.mu-cats tr.pf-me td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.mu-cats tr.mu-opp td:first-child { box-shadow: inset 3px 0 0 var(--muted); }
 .mu-cats td.mu-lead { font-weight: 800; color: var(--good); background: var(--good-soft); }
 .mu-rows { border-top: 1px solid var(--border); }
 .mu-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); border-bottom: 1px solid var(--border); }
@@ -225,8 +223,6 @@ a { color: var(--accent); }
   .mu-p { padding: 7px 2px; }
   .mu-cats { font-size: .74rem; }
   .mu-cats thead th { font-size: .64rem; }
-  .mu-cats tbody th, .mu-cats thead th:first-child { width: 6px; padding: 0; }
-  .mu-cats .mu-tn { display: none; }
 }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */

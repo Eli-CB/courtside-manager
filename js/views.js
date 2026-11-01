@@ -234,9 +234,9 @@ function dashMatchupCard() {
 
   // who leads each category over these days
   const catVal = (t, c) => (c.pct ? (t[c.att] ? fmtPct(t[c.made] / t[c.att]) : '—') : fmt(lineStat(t, c.key), c.dec || 0));
-  // phones: the row's color says whose it is (orange: the left team, as in the scoreboard), no name
-  const catRow = (S, i) => `<tr class="${S === A ? 'pf-me' : 'mu-opp'}"><th scope="row" title="${esc(S.name)}"><span class="mu-tn">${esc(S.name)}</span></th>${cats.map((c, j) => `<td class="${sc.lead[j] === i ? 'mu-lead' : ''}">${catVal(S.tot, c)}</td>`).join('')}</tr>`;
-  const catTable = B && !pts ? `<div class="mu-cats-wrap"><table class="mu-cats"><thead><tr><th><span class="mu-tn">${range === 'week' ? 'This period' : dates[0] === today ? 'Today' : fmtDay(dates[0])}</span></th>${cats.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
+  // the row's color says whose it is (orange: the left team, as in the scoreboard); the toggle says which days
+  const catRow = (S, i) => `<tr class="${S === A ? 'pf-me' : 'mu-opp'}" title="${esc(S.name)}">${cats.map((c, j) => `<td class="${sc.lead[j] === i ? 'mu-lead' : ''}">${catVal(S.tot, c)}</td>`).join('')}</tr>`;
+  const catTable = B && !pts ? `<div class="mu-cats-wrap"><table class="mu-cats"><thead><tr>${cats.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
       <tbody>${catRow(A, 1)}${catRow(B, -1)}</tbody></table></div>` : '';
 
   // one player's cell: who, his game (or the week's games), and what he's put up
