@@ -8,12 +8,15 @@
 // through. Each visitor's tokens stay in their own browser. A league becomes the shape fetchFantraxLeague
 // returns, so every tab works the same. League IDs are Yahoo's league keys: "nba.l.12345" (this season's game)
 // or "466.l.12345".
-// proxy: the helper's address; empty until it's set up, which hides the Yahoo sign-in
-const yahoo = { proxy: '', leagues: null };
+// proxy: the helper's address (empty hides Yahoo). While Yahoo is being tried out, the sign-in shows only on a
+// device that opened the site with ?yahoo=1 once (or is already signed in)
+const yahoo = { proxy: 'https://api.leaguelayer.com', leagues: null, beta: true };
 const YAHOO_KEY = 'courtside-yahoo'; // { access, refresh, until } on this device
+const YAHOO_BETA_KEY = 'courtside-yahoo-beta';
+try { if (/[?&]yahoo=1/.test(location.search)) localStorage.setItem(YAHOO_BETA_KEY, '1'); } catch (e) { /* blocked */ }
 const yahooTokens = () => { try { return JSON.parse(localStorage.getItem(YAHOO_KEY)); } catch (e) { return null; } };
 const yahooSave = t => { try { if (t) localStorage.setItem(YAHOO_KEY, JSON.stringify(t)); else localStorage.removeItem(YAHOO_KEY); } catch (e) { /* blocked */ } };
-const yahooOn = () => !!yahoo.proxy;
+const yahooOn = () => !!yahoo.proxy && (!yahoo.beta || yahooSignedIn() || (() => { try { return localStorage.getItem(YAHOO_BETA_KEY) === '1'; } catch (e) { return false; } })());
 const yahooSignedIn = () => !!(yahooTokens() || {}).refresh;
 
 // Back from Yahoo's sign-in: the helper puts the tokens after #yahoo= (never sent to any server); keep them and
