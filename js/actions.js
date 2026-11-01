@@ -360,6 +360,9 @@ document.addEventListener('change', e => {
   } else if (el.dataset.change === 'perf-pos') {
     ui.perfPos = el.value;
     render();
+  } else if (el.dataset.change === 'perf-team') {
+    ui.perfTeam = el.value;
+    render();
   } else if (el.dataset.change === 'trade-team') {
     ui.tradeTeam = el.value;
     ui.tradeGet.clear();

@@ -227,9 +227,10 @@ a { color: var(--accent); }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: -6px 0 10px; }
-.perf-find { display: flex; gap: 8px; margin: 0 0 10px; }
-.perf-find input { flex: 1; min-width: 0; }
-.perf-find select { flex: none; width: auto; }
+.perf-find { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.perf-find input { flex: 1 1 200px; min-width: 0; }
+.perf-find select { flex: 0 1 auto; width: auto; min-width: 0; }
+@media (max-width: 640px) { .perf-find input { flex-basis: 100%; } .perf-find select { flex: 1 1 0; } } /* phones: search on its own row */
 .perf-table .pf-emo { margin-right: 2px; font-size: .9em; }
 .pf-legend { margin: 8px 0 0; }
 /* weekly recap */
@@ -657,7 +658,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .alert > .hs { margin-top: 1px; }
 .detail-id { display: flex; align-items: center; gap: 12px; }
 .seg-sm { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.seg-sm button { font: inherit; font-size: .8rem; font-weight: 600; padding: 5px 10px; border: 0; background: var(--surface); color: var(--muted); cursor: pointer; }
+.seg-sm button { font: inherit; font-size: .8rem; font-weight: 600; padding: 5px 10px; border: 0; background: var(--surface); color: var(--muted); cursor: pointer; white-space: nowrap; }
+@media (max-width: 400px) { .seg-sm button { padding: 5px 5px; font-size: .74rem; letter-spacing: -.01em; } } /* five ranges fit a phone */
 .seg-sm button + button { border-left: 1px solid var(--border); }
 .seg-sm button.on { background: var(--accent); color: var(--accent-text); }
 .board-legend { margin: -4px 0 10px; }

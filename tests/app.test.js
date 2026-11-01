@@ -685,9 +685,9 @@ test('performances: today, the last game day before it, and this week once it ha
   await app.loadBoxes();
   await app.useLeague(CATS9);
   const days = async iso => JSON.parse(JSON.stringify(await onDay(iso, () => app.perfDays())));
-  assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
+  assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'], year: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
   // Monday at noon (the same date in any US time zone and UTC)
-  assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: null }, "Monday before tip-off: last night was last week's");
+  assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: null, year: ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'] }, "Monday before tip-off: last night was last week's");
   await onDay('2026-10-26', () => {
     const html = app.topPerformancesCard();
     assert.ok(html.includes('data-range="today"') && html.includes('>Yesterday<') && !html.includes('data-range="week"'), 'Today and Yesterday; no week yet');
@@ -942,8 +942,9 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
   const count = html => +html.match(/· (?:\d+ of )?(\d+) players?</)[1];
   try {
     let html = app.topPerformancesCard();
-    assert.ok(html.includes('data-range="season"') && html.includes('>Per game<'), 'Per game is one of the ranges');
-    ui.perfRange = 'season';
+    assert.ok(html.includes('data-range="avg"') && html.includes('>Per game<'), 'Per game is one of the ranges');
+    assert.ok(html.indexOf('>This week<') < html.indexOf('>This season<') && html.indexOf('>This season<') < html.indexOf('>Per game<'), 'This season after This week');
+    ui.perfRange = 'avg';
     html = app.topPerformancesCard();
     const rows = app.seasonRows();
     assert.equal(count(html), rows.length, 'every NBA player with stats');
@@ -964,10 +965,27 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     ui.perfPos = 'C';
     html = app.topPerformancesCard();
     assert.ok(ids(html).length && ids(html).every(id => app.nbaById.get(id).pos.includes('C')), 'centers only');
+    ui.perfPos = '';
+    // NBA team
+    ui.perfTeam = 'OKC';
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).length && ids(html).every(id => app.nbaById.get(id).team === 'OKC'), 'one NBA team');
+    ui.perfTeam = '';
+    // This season: every game so far, added up
+    ui.perfRange = 'year';
+    html = app.topPerformancesCard();
+    const year = app.perfDays().year;
+    assert.ok(year.length >= 5, 'the season so far');
+    const tot = app.perfRows([...year]);
+    assert.equal(count(html), tot.length);
+    const top = tot.reduce((x, y) => (y.v > x.v ? y : x));
+    assert.equal(ids(html)[0], top.raw.id, 'the most value over the season on top');
+    assert.ok(new RegExp(`${top.g} G · `).test(html));
     // no live updates for averages
+    ui.perfRange = 'avg';
     ui.tab = 'players';
     assert.equal(app.liveWanted(), false);
-  } finally { ui.perfRange = null; ui.perfQ = ''; ui.perfPos = ''; ui.tab = 'standings'; }
+  } finally { ui.perfRange = null; ui.perfQ = ''; ui.perfPos = ''; ui.perfTeam = ''; ui.tab = 'standings'; }
 });
 
 test('performances: Active and Bench filters, and an Active badge', async () => {
