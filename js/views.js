@@ -368,12 +368,13 @@ function topPerformancesCard() {
   const lineupBadge = id => {
     const x = spot.get(id);
     if (x.st === 'ACTIVE') return `<span class="badge active" title="In the starting lineup${x.slot ? ` at ${esc(x.slot)}` : ''}">Active</span>`;
-    return x.st === 'INJURED_RESERVE' ? '<span class="badge bench" title="On injured reserve">IR</span>' : '<span class="badge bench" title="On the bench">Bench</span>';
+    return x.st === 'INJURED_RESERVE' ? '<span class="badge bad" title="On injured reserve">IR</span>' : '<span class="badge bench" title="On the bench">Bench</span>';
   };
-  // your players and the opponent's are tinted rows instead (see the row classes), so they only need the lineup badge
+  // your players and the opponent's are tinted rows instead (see the row classes), so they only need the lineup badge,
+  // except on IR (out of the lineup, so whose he is helps)
   const who = id => {
     const tid = owner.get(id);
-    if (tid === mine || (opp && tid === opp.id)) return lineupBadge(id);
+    if ((tid === mine || (opp && tid === opp.id)) && spot.get(id).st !== 'INJURED_RESERVE') return lineupBadge(id);
     if (tid) return `<span class="perf-owner">${esc(fxTeamName(tid))}</span> ${lineupBadge(id)}`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';

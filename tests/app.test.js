@@ -999,7 +999,18 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
     const rowsOf = h => h.split('<tbody>')[1].split('</tr>').slice(0, -1);
     const stOf = tr => spot.get(+tr.match(/data-nba="(\d+)"/)[1]);
     assert.ok(rowsOf(html).every(tr => tr.includes('badge active') === (stOf(tr) === 'ACTIVE')), 'Active badge on exactly the active players');
-    assert.ok(rowsOf(html).every(tr => tr.includes('badge bench') === (!!stOf(tr) && stOf(tr) !== 'ACTIVE')), 'Bench or IR badge on the rest of the rostered players');
+    assert.ok(rowsOf(html).every(tr => tr.includes('badge bench') === (!!stOf(tr) && stOf(tr) !== 'ACTIVE' && stOf(tr) !== 'INJURED_RESERVE')), 'Bench badge on the rest of the rostered players');
+    // IR: a red badge and always the fantasy team's name, even on your team or the opponent's
+    const owners = new Map(Object.entries(L.rosters).flatMap(([tid, r]) => r.filter(x => x.nba).map(x => [x.nba, tid])));
+    app.ui.perfRange = 'avg';
+    const avg = rowsOf(app.topPerformancesCard()).filter(tr => stOf(tr) === 'INJURED_RESERVE');
+    app.ui.perfRange = null;
+    assert.ok(avg.length, 'IR players in Per game');
+    for (const tr of avg) {
+      const tid = owners.get(+tr.match(/data-nba="(\d+)"/)[1]);
+      assert.ok(tr.includes('<span class="badge bad" title="On injured reserve">IR</span>'), 'red IR badge');
+      assert.ok(tr.includes(`<span class="perf-owner">${app.esc(app.fxTeamName(tid))}</span>`), `${app.fxTeamName(tid)}'s IR player shows the team`);
+    }
     assert.ok(html.indexOf('data-group="other"') < html.indexOf('pf-sep') && html.indexOf('pf-sep') < html.indexOf('data-group="fa"'), 'Waivers sits with Active and Bench');
     app.ui.perfShow.bench = false;
     html = app.topPerformancesCard();
