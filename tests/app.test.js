@@ -412,6 +412,13 @@ test('Awards: a team name in Waiver Wire Wizard and Unc Status opens its breakdo
   const mg = [...app.get('awardDetails').entries()].find(([k]) => k.startsWith('Best manager|'));
   assert.ok(mg && /Week \d+/.test(mg[1].html) && /would have beaten \d/.test(mg[1].html), 'Best manager: each week, the result and the all-play');
   assert.ok(!keys.some(k => k.startsWith('Even Steven|')), 'not every award has one yet');
+  // the newer awards, each with its breakdown
+  for (const t of ['Steal of the Draft', 'Bust of the Draft', 'Week of the Year', 'Heartbreak Hotel', 'Benchwarmer Blues', 'Fan Boy']) assert.ok(keys.some(k => k.startsWith(t + '|')), t);
+  const detail = t => [...app.get('awardDetails').entries()].find(([k]) => k.startsWith(t + '|'))[1].html;
+  assert.match(detail('Steal of the Draft'), /Rd \d+, pick \d+ · ranked \d+(st|nd|rd|th)/);
+  assert.match(detail('Week of the Year'), /would have beaten <b>\d+(\.5)? of \d+<\/b> teams/);
+  assert.match(detail('Heartbreak Hotel'), /L \d(\.5)?–\d(\.5)? vs /);
+  assert.match(detail('Fan Boy'), /%<\/b> of \d+ starts were [A-Z]{3} players/);
   const D = app.get('awardDetails');
   const w = [...D.entries()].find(([k]) => k.startsWith('Waiver Wire Wizard|'))[1];
   assert.match(w.title, /^Waiver Wire Wizard: 1\. /);
@@ -1531,4 +1538,29 @@ test('a Yahoo league becomes the same league as the others', async () => {
     assert.equal(app.fxOpponentFor('2026-10-26', '466.l.777.t.1').name, 'Gamma Rays');
     assert.ok(app.viewWeek().includes('Gamma Rays'), 'Matchups draws');
   } finally { app.get('yahoo').proxy = ''; app.state.fxTeam = null; await app.useLeague(CATS9); }
+});
+
+test('the newer awards add up: Steal and Bust are each pick against its rank, Fan Boy shares, close losses', async () => {
+  await app.useLeague(CATS9);
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const G = await app.loadGameLog('2025-26');
+  const ui = app.get('ui');
+  ui.season = 'czqgnyozmf2tbr93';
+  let aw, steals, fans, bench;
+  try { app.withSeason(() => { aw = app.seasonAwards(); steals = app.draftSteals(); fans = app.startsByNbaTeam(P.league, G); bench = app.benchValue(P.league, G); }); } finally { ui.season = null; }
+  const award = t => aw.find(a => a.title === t);
+  const all = Object.values(steals).flat();
+  const best = all.reduce((a, b) => (b.gain > a.gain ? b : a)), worst = all.reduce((a, b) => (b.gain < a.gain ? b : a));
+  assert.equal(award('Steal of the Draft').list[0].T.steal.gain, best.gain);
+  assert.equal(award('Bust of the Draft').list[0].T.bust.gain, worst.gain);
+  assert.ok(all.every(p => p.gain === p.pick - p.rank));
+  for (const F of Object.values(fans)) {
+    assert.equal(app.sum(F.teams.map(x => x.n)), F.n, 'every start counted once');
+    assert.ok(F.teams.every((x, i) => !i || x.n <= F.teams[i - 1].n), 'biggest share first');
+  }
+  assert.ok(Object.values(bench).flat().every(p => p.games > 0 && p.weeks > 0));
+  const heart = award('Heartbreak Hotel').list[0].T;
+  assert.ok(heart.heart.every(x => x.wb - x.wa > 0 && x.wb - x.wa <= 1), 'losses by one category');
+  const week = award('Week of the Year').list[0].T.bestWeek;
+  assert.ok(week.beat <= week.of && week.cats.length === app.scoreCats().length);
 });

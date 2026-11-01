@@ -107,6 +107,24 @@ const INFO = {
     <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. Only games that hurt the team (below 0: very poor shooting and turnovers with little else) lower the total.</p>
     <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>
     <p>Tap a team's name to see which pickups helped and hurt.</p>`],
+  awSteal: ['Steal of the Draft', `
+    <p>The single pick that beat its draft slot by the most: where he was taken against where he ranks among all the draft's players over the season, as the Draft tab's Season totals ranks them (value above a replacement-level starter times games played; fantasy points in points leagues). Pick 98 ranking 10th is +88. Keepers aren't picks, so they don't count.</p>
+    <p>Tap a team's name to see its best picks.</p>`],
+  awBust: ['Bust of the Draft', `
+    <p>The single pick that fell furthest short of its draft slot: where he was taken against where he ranks among all the draft's players over the season. A player who hasn't played ranks below everyone who has, so an early pick lost to injury lands here.</p>
+    <p>Tap a team's name to see its worst picks.</p>`],
+  awWeek: ['Week of the Year', `
+    <p>Each team's best single week: its starters' totals that week against every other team's, as if it had played them all (the all-play behind Best manager). The most teams beaten wins; a tie goes to the bigger average margin. Finished regular-season weeks only.</p>
+    <p>Tap a team's name to see that week's numbers and where each ranked in the league.</p>`],
+  awHeart: ['Heartbreak Hotel', `
+    <p>The most matchups lost by a single category (4-5, or 4-4-1 counts as a tie, not a loss). Points leagues: losses by less than 5% of the winning score. Counted from the box scores, so a week can differ slightly from your league site's.</p>
+    <p>Tap a team's name to see each close loss.</p>`],
+  awBench: ['Benchwarmer Blues', `
+    <p>The most value left on the bench: every game a player played in a week he wasn't in the team's starting lineup, valued like a single game on the Dashboard (fantasy points in points leagues). Not every bench game could have counted (someone had to sit), so it's how much a team's bench did, not how much it lost.</p>
+    <p>Tap a team's name to see whose games sat.</p>`],
+  awFan: ['Fan Boy', `
+    <p>The biggest share of a team's starts from players on one NBA team. A start is a player in the starting lineup for a week, counted for the NBA team he played for that week, so a player traded mid-season counts for both.</p>
+    <p>Tap a team's name to see its five NBA teams.</p>`],
   awStreet: ['Street Clothes', `
     <p>Games a team lost to players sitting while they were in its <b>starting lineup</b>. For each week, Fantrax's rosters say who started; for each starter, every game his NBA team played that week without him counts one.</p>
     <p>Bench and IR players don't count, and neither do games before a player joined the team or after he left it, so a player traded or dropped mid-season counts only for the weeks a team started him. Injuries, rest and coach's decisions all count the same: the game logs can't tell them apart.</p>

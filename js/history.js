@@ -253,16 +253,20 @@ function allPlayRecords(L, G, each) {
         const x = val(tot[a], c), y = val(tot[b], c);
         if (Math.abs(x - y) < 1e-9) { wa += 0.5; wb += 0.5; } else if (c.neg ? x < y : x > y) wa++; else wb++;
       }
-      return { wa, wb, share: each && !sc ? wa : wa > wb ? 1 : wa < wb ? 0 : 0.5 };
+      // edge: categories won minus lost, or the fantasy points margin
+      const fa = sc ? val(tot[a], { fp: true }) : 0, fb = sc ? val(tot[b], { fp: true }) : 0;
+      const edge = sc ? fa - fb : wa - wb;
+      return { wa, wb, edge, fb, share: each && !sc ? wa : wa > wb ? 1 : wa < wb ? 0 : 0.5 };
     };
     const pairs = L.matchups[String(w.n)] || [];
     for (const a of ids) {
-      let share = 0, beat = 0;
+      let share = 0, beat = 0, edge = 0;
       const opp = ids.filter(b => b !== a);
       for (const b of opp) {
         const f = face(a, b);
         share += f.share;
         beat += f.wa > f.wb ? 1 : f.wa < f.wb ? 0 : 0.5;
+        edge += f.edge / opp.length;
       }
       const per = each && !sc ? cats.length : 1;
       out[a].exp += share / opp.length;
@@ -270,11 +274,76 @@ function allPlayRecords(L, G, each) {
       const pair = pairs.find(m => m.length === 2 && m.includes(a));
       if (pair) {
         const o = pair[0] === a ? pair[1] : pair[0], f = face(a, o);
-        out[a].list.push({ n: w.n, opp: o, res: f.share / per, exp: share / opp.length / per, wa: f.wa, wb: f.wb, beat, of: opp.length });
+        // margin: against the real opponent; edge: on average against everyone; s: the week's totals
+        out[a].list.push({ n: w.n, opp: o, res: f.share / per, exp: share / opp.length / per, wa: f.wa, wb: f.wb, beat, of: opp.length, margin: f.edge, theirs: f.fb, edge, s: (tot[a] || { s: {} }).s });
       }
     }
   }
   for (const A of Object.values(out)) A.pct = A.games ? A.won / A.games : 0;
+  return out;
+}
+
+// Benchwarmer Blues: every game a player played in a week he sat on a team's bench (IR included: an injured player
+// has no games), valued like a single game on the Dashboard. Team id -> [{ nba, name, v, games, weeks }]
+function benchValue(L, G) {
+  if (!L.weeks || !G) return null;
+  const out = {};
+  for (const w of L.weeks) {
+    const wd = periodDays(G, w);
+    for (const [f, o] of w.owner) {
+      if (o.on) continue;
+      const nba = L.fidNba(f);
+      const games = ((nba && G.players.get(nba)) || []).filter(r => wd.has(r[0]));
+      if (!games.length) continue;
+      const team = out[o.tid] = out[o.tid] || new Map();
+      const P = team.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', v: 0, games: 0, weeks: 0 };
+      P.v += sum(games.map(r => lineValue(gameLine(G, r))));
+      P.games += games.length;
+      P.weeks++;
+      team.set(nba, P);
+    }
+  }
+  return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()]]));
+}
+
+// Fan Boy: each team's starts (a starter for a week) by the NBA team he played for that week.
+// Team id -> { n, teams: [{ team, n, share, players: [{ nba, name, weeks }] }] }, biggest share first
+function startsByNbaTeam(L, G) {
+  if (!L.weeks || !G) return null;
+  const out = {};
+  for (const w of L.weeks) {
+    const day = Math.min(...periodDays(G, w));
+    for (const [f, o] of w.owner) {
+      if (!o.on) continue;
+      const nba = L.fidNba(f);
+      if (!nba) continue;
+      const team = teamOn(G, G.players.get(nba) || [], day) || (nbaById.get(nba) || {}).team;
+      if (!team) continue;
+      const T = out[o.tid] = out[o.tid] || { n: 0, by: {} };
+      T.n++;
+      const B = T.by[team] = T.by[team] || { n: 0, players: new Map() };
+      B.n++;
+      const P = B.players.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', weeks: 0 };
+      P.weeks++;
+      B.players.set(nba, P);
+    }
+  }
+  return Object.fromEntries(Object.entries(out).map(([tid, T]) => [tid, {
+    n: T.n,
+    teams: Object.entries(T.by).map(([team, B]) => ({ team, n: B.n, share: B.n / T.n, players: [...B.players.values()].sort((a, b) => b.weeks - a.weeks) })).sort((a, b) => b.n - a.n),
+  }]));
+}
+
+// Steal and Bust of the Draft: every pick against where he ranks among the draft's players over the season
+// (as the Draft tab's Season totals ranks them). Team id -> [{ nba, name, round, pick, rank, gain }]
+function draftSteals() {
+  const was = ui.draftMode;
+  ui.draftMode = 'total';
+  let d;
+  try { d = draftData(); } finally { ui.draftMode = was; }
+  if (!d || !d.graded || !d.played) return null;
+  const out = {};
+  for (const p of d.picks) (out[p.teamId] = out[p.teamId] || []).push({ nba: p.nbaId, name: p.name, round: p.round, pick: p.pick, rank: p.rank, gain: p.gain });
   return out;
 }
 
@@ -587,6 +656,46 @@ function waiverDetail(T, txt) {
     ${down.length ? `<h3 class="sub">Hurt or did nothing</h3>${awardRows(down.slice(0, 10), amount, meta)}` : ''}
     <p class="muted small">Games in the weeks each pickup started (G · weeks started).</p>`;
 }
+function heartDetail(T, txt) {
+  const ws = T.heart || [];
+  if (!ws.length) return '<p class="muted">No close losses yet.</p>';
+  const score = x => (isPoints() ? `${fmt(-x.margin, 1)} FP short` : `L ${x.wa}–${x.wb}`);
+  return `<p class="aw-break-total"><b>${esc(txt)}</b> ${isPoints() ? 'by less than 5% of the winning score' : 'by a single category'}</p>
+    <ul class="aw-break">${ws.map(x => `<li><div class="bmain"><b>Week ${x.n}</b> <span class="muted">${score(x)} vs ${esc(fxTeamName(x.opp))}</span>
+      <div class="muted small">would have beaten ${fmt(x.beat, x.beat % 1 ? 1 : 0)} of ${x.of} teams that week</div></div></li>`).join('')}</ul>
+    <p class="muted small">From the box scores, so a week can differ slightly from ${sourceName()}'s.</p>`;
+}
+function weekDetail(T, txt) {
+  const W = T.bestWeek;
+  if (!W) return '<p class="muted">No finished weeks yet.</p>';
+  const rows = W.cats.map(c => `<li><div class="bmain"><b>${c.label}</b> <span class="muted">${c.rank === 1 ? 'best in the league' : `${ordinal(c.rank)} of ${W.of + 1}`}</span></div><b class="aw-break-v">${c.val}</b></li>`).join('');
+  return `<p class="aw-break-total">Week ${W.n}: would have beaten <b>${fmt(W.beat, W.beat % 1 ? 1 : 0)} of ${W.of}</b> teams${isPoints() ? '' : `, ${signed(W.edge, 1)} categories a matchup on average`}. The real result: ${W.wa > W.wb ? 'won' : W.wa < W.wb ? 'lost' : 'tied'}${isPoints() ? '' : ` ${W.wa}–${W.wb}`} vs ${esc(fxTeamName(W.opp))}.</p>
+    ${rows ? `<ul class="aw-break">${rows}</ul>` : ''}`;
+}
+function benchDetail(T, txt) {
+  const ps = [...(T.benchList || [])].sort((a, b) => b.v - a.v).slice(0, 10);
+  if (!ps.length) return '<p class="muted">No bench games yet.</p>';
+  return `<p class="aw-break-total"><b>${esc(txt)}</b> from games played on the bench</p>
+    ${awardRows(ps, p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1)), p => `${p.games} G · ${p.weeks} wk${p.weeks === 1 ? '' : 's'} benched`)}
+    <p class="muted small">Every game a player played in a week he wasn't in the starting lineup (games · weeks benched).</p>`;
+}
+function fanDetail(T) {
+  const F = T.fan;
+  if (!F) return '<p class="muted">No starts yet.</p>';
+  const top = F.teams[0];
+  return `<p class="aw-break-total"><b>${Math.round(top.share * 100)}%</b> of ${F.n} starts were ${esc(top.team)} players</p>
+    <ul class="aw-break">${F.teams.slice(0, 5).map(x => `<li><div class="bplayer">${teamLogo(x.team, 24)}<div class="bmain"><b>${esc(x.team)}</b><div class="muted small">${x.players.slice(0, 3).map(p => esc(p.name)).join(', ')}${x.players.length > 3 ? ` +${x.players.length - 3}` : ''}</div></div></div><b class="aw-break-v">${Math.round(x.share * 100)}%</b></li>`).join('')}</ul>
+    <p class="muted small">A start is a player in the starting lineup for a week, counted for the NBA team he played for that week.</p>`;
+}
+const pickRows = list => awardRows(list, p => signed(p.gain, 0), p => `Rd ${p.round}, pick ${p.pick} · ranked ${ordinal(p.rank)}`);
+function stealDetail(T) {
+  const ps = [...(T.picksList || [])].sort((a, b) => b.gain - a.gain).slice(0, 5);
+  return ps.length ? `<p class="aw-break-total">Its best picks against where each ranks among the draft's players over the season</p>${pickRows(ps)}` : '<p class="muted">No picks.</p>';
+}
+function bustDetail(T) {
+  const ps = [...(T.picksList || [])].sort((a, b) => a.gain - b.gain).slice(0, 5);
+  return ps.length ? `<p class="aw-break-total">Its worst picks against where each ranks among the draft's players over the season</p>${pickRows(ps)}` : '<p class="muted">No picks.</p>';
+}
 function managerDetail(T, txt) {
   const ws = T.weeksPlayed || [];
   if (!ws.length) return '<p class="muted">No finished weeks yet.</p>';
@@ -644,6 +753,23 @@ function seasonAwards() {
     T.luck = r.w + r.t / 2 - A.exp;
     T.weeksPlayed = A.list;
   }
+  // Week of the Year: each team's best week against everyone; Heartbreak Hotel: its losses by one category
+  // (points leagues: by under 5% of the winning score)
+  for (const T of teams) {
+    const ws = (allPlay && allPlay[T.id] && allPlay[T.id].list) || [];
+    if (!ws.length) continue;
+    const b = ws.reduce((x, y) => (y.beat > x.beat || (y.beat === x.beat && y.edge > x.edge) ? y : x));
+    const rivals = Object.values(allPlay).map(A => (A.list.find(x => x.n === b.n) || {}).s).filter(Boolean);
+    const catRank = c => {
+      const v = s => (c.pct ? (s[c.att] ? s[c.made] / s[c.att] : 0) : lineStat(s, c.key));
+      const mine = v(b.s);
+      return { label: c.label, val: c.pct ? fmtPct(mine) : fmt(mine, 0), rank: 1 + rivals.filter(s => (c.neg ? v(s) < mine : v(s) > mine) && Math.abs(v(s) - mine) > 1e-9).length };
+    };
+    T.bestWeek = { ...b, cats: isPoints() ? [] : scoreCats().map(catRank) };
+    T.weekBeat = b.beat + b.edge / 100; // ranks by teams beaten, then the margin
+    T.heart = ws.filter(x => (isPoints() ? x.margin < 0 && -x.margin < 0.05 * x.theirs : x.wb - x.wa > 0 && x.wb - x.wa <= 1));
+    T.heartN = T.heart.length || null; // no close loss: not in the running
+  }
 
   // Biggest punt and Even Steven: each category of the real season totals vs the league, in team-to-team spreads
   const real = pastSeasonTotals(L, G);
@@ -677,6 +803,18 @@ function seasonAwards() {
   tally(d && d.graded ? draftImpact(L, G, d.picks) : null, 'draft', p => p.v);
   tally(pickupImpact(L, G), 'waiver', p => p.v);
   tally(startersMissed(L, G), 'missed', p => p.games);
+  tally(benchValue(L, G), 'bench', p => p.v);
+  const fans = startsByNbaTeam(L, G) || {};
+  for (const T of teams) { const F = fans[T.id]; T.fan = F && F.teams.length ? F : null; T.fanShare = T.fan ? T.fan.teams[0].share : null; }
+  const steals = draftSteals();
+  for (const T of teams) {
+    const ps = (steals && steals[T.id]) || [];
+    T.picksList = ps;
+    T.steal = ps.length ? ps.reduce((a, b) => (b.gain > a.gain ? b : a)) : null;
+    T.bust = ps.length ? ps.reduce((a, b) => (b.gain < a.gain ? b : a)) : null;
+    T.stealGain = T.steal ? T.steal.gain : null;
+    T.bustGain = T.bust ? T.bust.gain : null;
+  }
   const olds = startersAge(L) || {};
   for (const T of teams) { const O = olds[T.id]; T.age = O ? O.age : null; T.oldest = O ? O.oldest : null; T.ageList = O ? O.players : []; }
 
@@ -689,11 +827,18 @@ function seasonAwards() {
   };
   return [
     { title: 'Best draft', info: 'awDraft', detail: draftDetail, list: ranked('draft', 1, T => total(T.draft), T => (T.draftTop ? `best: ${T.draftTop.name} (${total(T.draftTop.v)} over ${T.draftTop.games} games)` : '')) },
+    ...(steals ? [
+      { title: 'Steal of the Draft', info: 'awSteal', detail: stealDetail, list: ranked('stealGain', 1, T => signed(T.stealGain, 0), T => `${T.steal.name}: pick ${T.steal.pick}, ranked ${ordinal(T.steal.rank)}`) },
+      { title: 'Bust of the Draft', info: 'awBust', detail: bustDetail, list: ranked('bustGain', -1, T => signed(T.bustGain, 0), T => `${T.bust.name}: pick ${T.bust.pick}, ranked ${ordinal(T.bust.rank)}`) }] : []),
     { title: 'Best manager', info: 'awManager', detail: managerDetail, list: ranked('luck', 1, T => `${signed(T.luck, 1)} ${each ? 'cats' : 'wins'}`, T => `${T.record}, all-play ${Math.round(T.allPct * 100)}% (${fmt(T.expW, 1)} expected)`) },
+    { title: 'Week of the Year', info: 'awWeek', detail: weekDetail, list: ranked('weekBeat', 1, T => `week ${T.bestWeek.n}: beat ${fmt(T.bestWeek.beat, T.bestWeek.beat % 1 ? 1 : 0)} of ${T.bestWeek.of}`, T => (isPoints() ? `${signed(T.bestWeek.edge, 1)} FP a matchup on average` : `${signed(T.bestWeek.edge, 1)} categories a matchup on average`)) },
+    { title: 'Heartbreak Hotel', info: 'awHeart', detail: heartDetail, list: ranked('heartN', 1, T => `${T.heartN} close loss${T.heartN === 1 ? '' : 'es'}`, T => (T.heartN ? `weeks ${T.heart.map(x => x.n).join(', ')}` : '')) },
     { title: 'Waiver Wire Wizard', info: 'awWaiver', detail: waiverDetail, list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) },
+    { title: 'Benchwarmer Blues', info: 'awBench', detail: benchDetail, list: ranked('bench', 1, T => total(T.bench), T => (T.benchTop ? `most: ${T.benchTop.name} (${total(T.benchTop.v)} in ${T.benchTop.games} games)` : '')) },
     { title: 'Street Clothes', info: 'awStreet', detail: streetDetail, list: ranked('missed', 1, T => `${T.missed} game${T.missed === 1 ? '' : 's'}`, T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },
     ...(cats.length ? [{ title: 'Biggest punt', info: 'awPunt', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
       { title: 'Even Steven', info: 'awSteven', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`, T => { const order = [...cats].sort((a, b) => T.z[b.key] - T.z[a.key]); return `best: ${order[0].label} · worst: ${order[order.length - 1].label}`; }) }] : []),
+    { title: 'Fan Boy', info: 'awFan', detail: fanDetail, list: ranked('fanShare', 1, T => `${Math.round(T.fanShare * 100)}% ${T.fan.teams[0].team}`, T => `${T.fan.teams[0].n} of ${T.fan.n} starts`) },
     { title: 'Unc Status', info: 'awUnc', detail: uncDetail, list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`, T => (T.oldest ? `oldest regular: ${T.oldest.name} (${Math.floor(T.oldest.age)}, ${T.oldest.weeks} wks)` : '')) },
   ].filter(a => a.list.length);
 }

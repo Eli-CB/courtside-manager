@@ -36,7 +36,7 @@ saved leagues are lost). Owner's league:
     address `#tab/<seasonLeagueId>`), `viewLeague`/`myTeamId()` override
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
-    all awards (Best draft, Best manager, Waiver Wire Wizard, Street Clothes and Unc Status team names open a breakdown: `awardDetails`, `award-team`), past Rosters
+    all awards (every award but Biggest punt and Even Steven: a team's name opens a breakdown: `awardDetails`, `award-team`), past Rosters
   - views: Dashboard (`dashMatchupCard`: Today / Yesterday show only who plays that day, each side one gapless column: starters, bench (tagged), Out/DNP;
     This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then action items and injuries), Roster,
     Standings + Season totals, Trades, Players tab (`#players`, was Free Agents): one table (`topPerformancesCard`) of every NBA stat line of
@@ -77,7 +77,10 @@ saved leagues are lost). Owner's league:
   Best draft (picks' games until first dropped, through trades, above replacement in cats), Best manager
   (actual wins vs all-play record), Waiver Wire Wizard (pickups' games while starting; trades excluded),
   Street Clothes (games starters missed while starting), Biggest punt / Even Steven (real season totals),
-  Unc Status (starters' ages, week-weighted). Seasons never mix.
+  Unc Status (starters' ages, week-weighted), Steal / Bust of the Draft (one pick vs its rank over the season, Draft
+  tab's Season totals; keepers excluded), Week of the Year (best all-play week), Heartbreak Hotel (losses by one
+  category; points: under 5% of the winner), Benchwarmer Blues (bench players' games), Fan Boy (biggest share of
+  starts from one NBA team). Seasons never mix.
 - Static explanations go in (i) popups; on-screen text stays short and specific.
 - Mobile matters: check phone width (375px); no page-level sideways scroll.
 
