@@ -89,6 +89,15 @@ const actions = {
     el.nextElementSibling.hidden = !open;
   },
   'close-info'() { $('#infoDialog').close(); },
+  // an award's breakdown for one team, in the popup the (i) buttons use
+  'award-team'(el) {
+    const D = awardDetails.get(el.dataset.key);
+    if (!D) return;
+    $('#infoTitle').textContent = D.title;
+    $('#infoBody').innerHTML = D.html;
+    const d = $('#infoDialog');
+    if (!d.open) d.showModal();
+  },
   'past-roster-mode'(el) { ui.pastRosterMode = el.dataset.mode; render(); },
   'past-roster-sort'(el) {
     const k = el.dataset.key;

@@ -387,7 +387,29 @@ test('Unc Status averages the ages of the players each team started', async () =
   for (const T of teams) {
     assert.ok(T.age > 21 && T.age < 34, `average age ${T.age}`);
     assert.ok(T.n > P.league.weeks.length * 4, `${T.n} starter-weeks with a birth date`);
+    // each player's pull on the average: the average with him minus without him
+    const old = T.players.reduce((a, b) => (b.moved > a.moved ? b : a));
+    assert.ok(old.moved > 0 && old.age > T.age, `${old.name} (${old.age.toFixed(1)}) makes the team older`);
+    assert.equal(app.sum(T.players.map(x => x.weeks)), T.n);
   }
+});
+
+test('Awards: a team name in Waiver Wire Wizard and Unc Status opens its breakdown', async () => {
+  await app.loadSeason('czqgnyozmf2tbr93');
+  await app.loadGameLog('2025-26');
+  const ui = app.get('ui');
+  ui.season = 'czqgnyozmf2tbr93';
+  let html;
+  try { html = app.withSeason(() => app.viewAwards()); } finally { ui.season = null; }
+  const keys = [...html.matchAll(/data-action="award-team" data-key="([^"]+)"/g)].map(m => m[1].replace(/&#39;/g, "'").replace(/&amp;/g, '&'));
+  assert.ok(keys.some(k => k.startsWith('Waiver Wire Wizard|')) && keys.some(k => k.startsWith('Unc Status|')));
+  assert.ok(!keys.some(k => k.startsWith('Best draft|')), 'only those two, for now');
+  const D = app.get('awardDetails');
+  const w = [...D.entries()].find(([k]) => k.startsWith('Waiver Wire Wizard|'))[1];
+  assert.match(w.title, /^Waiver Wire Wizard: 1\. /);
+  assert.ok(/Helped/.test(w.html) && /data-action="player-detail"/.test(w.html), 'the pickups that helped, each a player link');
+  const u = [...D.entries()].find(([k]) => k.startsWith('Unc Status|'))[1];
+  assert.ok((u.html.match(/<li>/g) || []).length <= 10 && /\+\d\.\d\d yrs/.test(u.html), 'up to 10 players and how much each moved the average');
 });
 
 test('Best draft credits picks until first dropped, through trades', async () => {

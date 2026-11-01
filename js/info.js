@@ -101,7 +101,8 @@ const INFO = {
   awWaiver: ['Waiver Wire Wizard', `
     <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Dashboard (fantasy points in points leagues), added up.</p>
     <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. Only games that hurt the team (below 0: very poor shooting and turnovers with little else) lower the total.</p>
-    <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>`],
+    <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>
+    <p>Tap a team's name to see which pickups helped and hurt.</p>`],
   awStreet: ['Street Clothes', `
     <p>Games a team lost to players sitting while they were in its <b>starting lineup</b>. For each week, Fantrax's rosters say who started; for each starter, every game his NBA team played that week without him counts one.</p>
     <p>Bench and IR players don't count, and neither do games before a player joined the team or after he left it, so a player traded or dropped mid-season counts only for the weeks a team started him. Injuries, rest and coach's decisions all count the same: the game logs can't tell them apart.</p>
@@ -112,7 +113,8 @@ const INFO = {
     <p>Each team's season totals (every game its starters played, week by week, the same numbers as the Standings tab's Season totals), compared with the league's other teams category by category, in team-to-team spreads. The most balanced team has the smallest spread between its best and worst categories.</p>`],
   awUnc: ['Unc Status', `
     <p>The oldest <b>starting lineups</b>. Every week, Fantrax's rosters say who each team started; each starter's age that week is averaged over all of the team's starter-weeks, so a player who started 20 weeks counts 20 times as much as one who started once. Bench and IR players don't count.</p>
-    <p>Ages come from ESPN birth dates. Players without one on record (mostly those no longer in the NBA) are left out.</p>`],
+    <p>Ages come from ESPN birth dates. Players without one on record (mostly those no longer in the NBA) are left out.</p>
+    <p>Tap a team's name to see the players who moved its average most.</p>`],
   draft: ['How draft picks are graded', `
     <p><b>Now.</b> Every drafted player is ranked using only this season's stats (see Player value). Players who haven't played yet rank below everyone who has.</p>
     <p><b>Per game or season totals.</b> The toggle at the top re-ranks the whole tab. <b>Per game</b> ranks by value per game, so a player who's missed time isn't held against his pick. <b>Season totals</b> also counts games played: in points leagues it's total fantasy points; in category leagues it's value above a replacement-level starter (the last player who'd start in your league) times games played, so playing more only helps players worth starting.</p>

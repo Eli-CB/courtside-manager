@@ -161,7 +161,8 @@ function pickupImpact(L, G) {
 
 // How old each team's starters were: every week, each starter's age that week, averaged over all of a
 // team's starter-weeks (so a player who started 20 weeks counts 20 times as much as one who started one).
-// Players without a birth date on record are left out. Team id -> { age, n }
+// Players without a birth date on record are left out. Team id -> { age, n, oldest, players: [{ nba, name, age,
+// weeks, moved }] }, moved = how much older the team's average is with him than without him
 function startersAge(L) {
   if (!L.weeks) return null;
   const out = {};
@@ -175,15 +176,20 @@ function startersAge(L) {
       const age = (day - new Date(raw.born + 'T12:00:00')) / (365.25 * 864e5);
       T.total += age;
       T.n++;
-      const P = T.players.get(raw.id) || { name: raw.name, age, weeks: 0 };
+      const P = T.players.get(raw.id) || { nba: raw.id, name: raw.name, age, weeks: 0, sum: 0 };
       P.age = Math.max(P.age, age);
       P.weeks++;
+      P.sum += age;
       T.players.set(raw.id, P);
     }
   }
   // the oldest player a team started regularly (3+ weeks)
   const oldest = T => [...T.players.values()].filter(p => p.weeks >= 3).sort((a, b) => b.age - a.age)[0] || null;
-  return Object.fromEntries(Object.entries(out).map(([tid, T]) => [tid, { age: T.total / T.n, n: T.n, oldest: oldest(T) }]));
+  const moved = (T, P) => (T.n > P.weeks ? T.total / T.n - (T.total - P.sum) / (T.n - P.weeks) : 0);
+  return Object.fromEntries(Object.entries(out).map(([tid, T]) => [tid, {
+    age: T.total / T.n, n: T.n, oldest: oldest(T),
+    players: [...T.players.values()].map(P => ({ ...P, moved: moved(T, P) })),
+  }]));
 }
 
 // What each team's draft produced: every game a drafted player played from the draft until he was first
@@ -545,6 +551,30 @@ function pastStarters(L, G, tid, r, teams) {
 // ----- Season awards -----
 // Every award comes from Fantrax's weekly lineups and the season's games (a past season's archived game
 // log, or this season's box scores). Without both there are no awards.
+// ----- What made a team's award number (Waiver Wire Wizard, Unc Status), opened from its name -----
+const awardDetails = new Map(); // "award|team" -> { title, html }, written as the awards draw
+function awardRows(list, val, meta) {
+  return `<ul class="aw-break">${list.map(p => `<li><div class="bplayer">${headshot({ nbaId: p.nba, name: p.name }, 28)}<div class="bmain"><button type="button" class="link-btn pname" data-action="player-detail" data-nba="${p.nba}">${esc(p.name)}</button><div class="muted small">${meta(p)}</div></div></div><b class="aw-break-v">${val(p)}</b></li>`).join('')}</ul>`;
+}
+function waiverDetail(T, txt) {
+  const ps = [...(T.waiverList || [])].sort((a, b) => b.v - a.v);
+  if (!ps.length) return '<p class="muted">No pickups started yet.</p>';
+  const amount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
+  const meta = p => `${p.games} G · ${p.weeks} wk${p.weeks === 1 ? '' : 's'}`;
+  const up = ps.filter(p => p.v > 0), down = ps.filter(p => p.v <= 0).reverse();
+  return `<p class="aw-break-total"><b>${esc(txt)}</b> from ${ps.length} pickup${ps.length === 1 ? '' : 's'} who started</p>
+    ${up.length ? `<h3 class="sub">Helped</h3>${awardRows(up.slice(0, 10), amount, meta)}` : ''}
+    ${down.length ? `<h3 class="sub">Hurt or did nothing</h3>${awardRows(down.slice(0, 10), amount, meta)}` : ''}
+    <p class="muted small">Games in the weeks each pickup started (G · weeks started).</p>`;
+}
+function uncDetail(T, txt) {
+  const ps = [...(T.ageList || [])].sort((a, b) => b.moved - a.moved).slice(0, 10);
+  if (!ps.length) return '<p class="muted">No starters with a birth date on record.</p>';
+  return `<p class="aw-break-total">Starters' average age <b>${esc(txt)}</b>. These moved it most:</p>
+    ${awardRows(ps, p => `${p.moved >= 0 ? '+' : '−'}${fmt(Math.abs(p.moved), 2)} yrs`, p => `age ${Math.floor(p.age)} · ${p.weeks} wk${p.weeks === 1 ? '' : 's'}`)}
+    <p class="muted small">How much older (+) or younger (−) the team's average is with each player than without him (age · weeks started).</p>`;
+}
+
 function seasonAwards() {
   const L = fxLeague();
   const G = L.season ? gameLogs[L.season] : null;
@@ -588,6 +618,7 @@ function seasonAwards() {
       T[key] = sum(ps.map(amount));
       T[key + 'N'] = ps.length;
       T[key + 'Top'] = ps.length ? ps.reduce((a, b) => (amount(b) > amount(a) ? b : a)) : null;
+      T[key + 'List'] = ps;
     }
   };
   const d = draftData();
@@ -595,7 +626,7 @@ function seasonAwards() {
   tally(pickupImpact(L, G), 'waiver', p => p.v);
   tally(startersMissed(L, G), 'missed', p => p.games);
   const olds = startersAge(L) || {};
-  for (const T of teams) { T.age = olds[T.id] ? olds[T.id].age : null; T.oldest = olds[T.id] ? olds[T.id].oldest : null; }
+  for (const T of teams) { const O = olds[T.id]; T.age = O ? O.age : null; T.oldest = O ? O.oldest : null; T.ageList = O ? O.players : []; }
 
   const total = v => (isPoints() ? `${Math.round(v).toLocaleString()} FP` : `${signed(v, 1)} value`);
   const ranked = (key, dir, fmtFn, note) => teams.filter(T => T[key] != null).sort((a, b) => (b[key] - a[key]) * dir).map(T => ({ T, txt: fmtFn(T), note: note ? note(T) : '' }));
@@ -607,11 +638,11 @@ function seasonAwards() {
   return [
     { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => total(T.draft), T => (T.draftTop ? `best: ${T.draftTop.name} (${total(T.draftTop.v)} over ${T.draftTop.games} games)` : '')) },
     { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} ${each ? 'cats' : 'wins'}`, T => `${T.record}, all-play ${Math.round(T.allPct * 100)}% (${fmt(T.expW, 1)} expected)`) },
-    { title: 'Waiver Wire Wizard', info: 'awWaiver', list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) },
+    { title: 'Waiver Wire Wizard', info: 'awWaiver', detail: waiverDetail, list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) },
     { title: 'Street Clothes', info: 'awStreet', list: ranked('missed', 1, T => `${T.missed} games`, T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },
     ...(cats.length ? [{ title: 'Biggest punt', info: 'awPunt', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
       { title: 'Even Steven', info: 'awSteven', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`, T => { const order = [...cats].sort((a, b) => T.z[b.key] - T.z[a.key]); return `best: ${order[0].label} · worst: ${order[order.length - 1].label}`; }) }] : []),
-    { title: 'Unc Status', info: 'awUnc', list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`, T => (T.oldest ? `oldest regular: ${T.oldest.name} (${Math.floor(T.oldest.age)}, ${T.oldest.weeks} wks)` : '')) },
+    { title: 'Unc Status', info: 'awUnc', detail: uncDetail, list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`, T => (T.oldest ? `oldest regular: ${T.oldest.name} (${Math.floor(T.oldest.age)}, ${T.oldest.weeks} wks)` : '')) },
   ].filter(a => a.list.length);
 }
 
@@ -650,15 +681,23 @@ function viewAwards() {
   }
   const me = myTeamId();
   const awards = seasonAwards();
+  awardDetails.clear();
   if (!awards) return `<div class="card"><div class="empty"><strong>No awards for this season</strong>Awards need Fantrax's weekly lineups and that season's NBA game logs (the site has 2016-17 on).</div></div>`;
+  // awards with a breakdown: each team's name opens what made its number (written now, in this season's context)
+  const name = (a, x, place) => {
+    if (!a.detail) return esc(x.T.name);
+    const key = `${a.title}|${x.T.id}`;
+    awardDetails.set(key, { title: `${a.title}: ${place}. ${x.T.name}`, html: a.detail(x.T, x.txt) });
+    return `<button type="button" class="link-btn aw-team" data-action="award-team" data-key="${esc(key)}">${esc(x.T.name)}</button>`;
+  };
   return `
   <div class="awards">${awards.map(a => {
     const [win, ...rest] = a.list;
     return `<div class="card award">
       <div class="aw-title">${a.title} ${infoBtn(a.info)}</div>
-      <div class="aw-win${win.T.id === me ? ' me' : ''}"><span class="aw-name">${esc(win.T.name)}${win.T.id === me ? ' <span class="badge accent">you</span>' : ''}</span><span class="aw-val">${esc(win.txt)}</span></div>
+      <div class="aw-win${win.T.id === me ? ' me' : ''}"><span class="aw-name">${name(a, win, 1)}${win.T.id === me ? ' <span class="badge accent">you</span>' : ''}</span><span class="aw-val">${esc(win.txt)}</span></div>
       ${win.note ? `<div class="small muted">${esc(win.note)}</div>` : ''}
-      <ol class="aw-list" start="2">${rest.map(x => `<li class="${x.T.id === me ? 'me' : ''}" title="${esc(x.note)}"><span>${esc(x.T.name)}</span><span class="muted">${esc(x.txt)}</span></li>`).join('')}</ol>
+      <ol class="aw-list" start="2">${rest.map((x, i) => `<li class="${x.T.id === me ? 'me' : ''}" title="${esc(x.note)}"><span>${name(a, x, i + 2)}</span><span class="muted">${esc(x.txt)}</span></li>`).join('')}</ol>
     </div>`;
   }).join('')}</div>`;
 }
