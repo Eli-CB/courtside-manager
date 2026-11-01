@@ -37,7 +37,8 @@ export default {
     if (url.pathname === '/yahoo/login') {
       const state = btoa(safeReturn(url.searchParams.get('return') || ''));
       const to = new URL(AUTH + 'request_auth');
-      to.search = new URLSearchParams({ client_id: env.YAHOO_CLIENT_ID, redirect_uri: callback, response_type: 'code', language: 'en-us', state }).toString();
+      // fspt-r: read Fantasy Sports (without it Yahoo's API answers 403, "not authorized")
+      to.search = new URLSearchParams({ client_id: env.YAHOO_CLIENT_ID, redirect_uri: callback, response_type: 'code', scope: 'fspt-r', language: 'en-us', state }).toString();
       return Response.redirect(to.toString(), 302);
     }
 
