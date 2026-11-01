@@ -408,7 +408,9 @@ test('Awards: a team name in Waiver Wire Wizard and Unc Status opens its breakdo
   const dr = [...app.get('awardDetails').entries()].find(([k]) => k.startsWith('Best draft|'));
   assert.ok(dr, 'Best draft has one');
   assert.ok(/Best picks/.test(dr[1].html) && /Rd \d+, #\d+ · \d+ G/.test(dr[1].html), 'the picks that did most, with round and pick');
-  assert.ok(!keys.some(k => k.startsWith('Best manager|')), 'not every award has one yet');
+  const mg = [...app.get('awardDetails').entries()].find(([k]) => k.startsWith('Best manager|'));
+  assert.ok(mg && /Week \d+/.test(mg[1].html) && /would have beaten \d/.test(mg[1].html), 'Best manager: each week, the result and the all-play');
+  assert.ok(!keys.some(k => k.startsWith('Even Steven|')), 'not every award has one yet');
   const D = app.get('awardDetails');
   const w = [...D.entries()].find(([k]) => k.startsWith('Waiver Wire Wizard|'))[1];
   assert.match(w.title, /^Waiver Wire Wizard: 1\. /);

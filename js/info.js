@@ -98,7 +98,8 @@ const INFO = {
     <p>Who won more than their team's play deserved: <b>actual wins</b> (from Fantrax's standings, ties counting half) minus <b>expected wins</b> from an <b>all-play record</b>.</p>
     <p><b>All-play.</b> Each finished regular-season week, a team's real totals (every game its starters played that week, from Fantrax's weekly lineups and the NBA box scores) are matched against <b>every</b> other team's, not just that week's opponent. A team that would have beaten 8 of 9 teams gets 0.89 of a win for the week; one that would have beaten 2 of 9 gets 0.22. Ties count half.</p>
     <p><b>Expected wins</b> are those weekly shares added up. Winning more than that means drawing weak opponents in good weeks and avoiding strong ones in bad weeks, mostly schedule luck. In leagues where every category counts, it's the same with categories: the share of categories won against every team.</p>
-    <p>The week still underway doesn't count, and neither do playoff weeks. The totals come from box scores, which can differ slightly from Fantrax's (stat corrections, the odd game counted in a different week), so expect small gaps.</p>`],
+    <p>The week still underway doesn't count, and neither do playoff weeks. The totals come from box scores, which can differ slightly from Fantrax's (stat corrections, the odd game counted in a different week), so expect small gaps.</p>
+    <p>Tap a team's name to see its luck week by week.</p>`],
   awWaiver: ['Waiver Wire Wizard', `
     <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Dashboard (fantasy points in points leagues), added up.</p>
     <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. Only games that hurt the team (below 0: very poor shooting and turnovers with little else) lower the total.</p>

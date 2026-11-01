@@ -232,7 +232,9 @@ function draftImpact(L, G, picks) {
 // All-play record: every finished regular-season week, each team's real totals (its starters' games)
 // against every other team's, as if it had played them all. Expected wins = the weekly share of those
 // matchups won (ties half), added up; in leagues where each category counts, the share of categories.
-// Team id -> { exp, pct, weeks }
+// Team id -> { exp, pct, weeks, list: [{ n, opp, res, exp, wa, wb, beat, of }] }: each week, the result against the
+// real opponent (res: 1, 0.5 or 0, or the share of categories; wa-wb: categories, or 1-0 on points) and the
+// all-play share expected (beat: teams beaten, ties half, of of)
 function allPlayRecords(L, G, each) {
   if (!L.weeks || !G) return null;
   const now = Date.now();
@@ -242,23 +244,34 @@ function allPlayRecords(L, G, each) {
   const sc = leaguePoints();
   const val = (R, c) => (!R ? 0 : c.fp ? sum(Object.entries(sc).map(([k, v]) => lineStat(R.s, k) * v)) : c.pct ? (R.s[c.att] ? R.s[c.made] / R.s[c.att] : 0) : lineStat(R.s, c.key));
   const ids = fxPickable().map(t => t.id);
-  const out = Object.fromEntries(ids.map(id => [id, { exp: 0, won: 0, games: 0, weeks: weeks.length }]));
+  const out = Object.fromEntries(ids.map(id => [id, { exp: 0, won: 0, games: 0, weeks: weeks.length, list: [] }]));
   for (const w of weeks) {
     const tot = pastSeasonTotals({ ...L, weeks: [w] }, G);
+    const face = (a, b) => {
+      let wa = 0, wb = 0;
+      for (const c of sc ? [{ fp: true }] : cats) {
+        const x = val(tot[a], c), y = val(tot[b], c);
+        if (Math.abs(x - y) < 1e-9) { wa += 0.5; wb += 0.5; } else if (c.neg ? x < y : x > y) wa++; else wb++;
+      }
+      return { wa, wb, share: each && !sc ? wa : wa > wb ? 1 : wa < wb ? 0 : 0.5 };
+    };
+    const pairs = L.matchups[String(w.n)] || [];
     for (const a of ids) {
-      let share = 0;
+      let share = 0, beat = 0;
       const opp = ids.filter(b => b !== a);
       for (const b of opp) {
-        let wa = 0, wb = 0, n = 0;
-        for (const c of sc ? [{ fp: true }] : cats) {
-          const x = val(tot[a], c), y = val(tot[b], c);
-          n++;
-          if (Math.abs(x - y) < 1e-9) { wa += 0.5; wb += 0.5; } else if (c.neg ? x < y : x > y) wa++; else wb++;
-        }
-        share += each && !sc ? wa : wa > wb ? 1 : wa < wb ? 0 : 0.5;
+        const f = face(a, b);
+        share += f.share;
+        beat += f.wa > f.wb ? 1 : f.wa < f.wb ? 0 : 0.5;
       }
+      const per = each && !sc ? cats.length : 1;
       out[a].exp += share / opp.length;
-      out[a].won += share; out[a].games += opp.length * (each && !sc ? cats.length : 1);
+      out[a].won += share; out[a].games += opp.length * per;
+      const pair = pairs.find(m => m.length === 2 && m.includes(a));
+      if (pair) {
+        const o = pair[0] === a ? pair[1] : pair[0], f = face(a, o);
+        out[a].list.push({ n: w.n, opp: o, res: f.share / per, exp: share / opp.length / per, wa: f.wa, wb: f.wb, beat, of: opp.length });
+      }
     }
   }
   for (const A of Object.values(out)) A.pct = A.games ? A.won / A.games : 0;
@@ -574,6 +587,19 @@ function waiverDetail(T, txt) {
     ${down.length ? `<h3 class="sub">Hurt or did nothing</h3>${awardRows(down.slice(0, 10), amount, meta)}` : ''}
     <p class="muted small">Games in the weeks each pickup started (G · weeks started).</p>`;
 }
+function managerDetail(T, txt) {
+  const ws = T.weeksPlayed || [];
+  if (!ws.length) return '<p class="muted">No finished weeks yet.</p>';
+  const each = matchupScoring() === 'each' || !mostCatsWins(fxLeague().scoring);
+  const res = x => (isPoints() ? (x.wa > x.wb ? 'W' : x.wa < x.wb ? 'L' : 'T') : `${x.wa > x.wb ? 'W' : x.wa < x.wb ? 'L' : 'T'} ${x.wa}–${x.wb}`); // a tied category counts half, as on the Dashboard
+  const luck = x => x.res - x.exp; // a week's share of a win (or of the categories) above what the all-play said
+  const rows = [...ws].reverse().map(x => `<li><div class="bmain"><b>Week ${x.n}</b> <span class="muted">${res(x)} vs ${esc(fxTeamName(x.opp))}</span>
+      <div class="muted small">${each ? `${Math.round(x.exp * 100)}% of categories against everyone` : `would have beaten ${fmt(x.beat, x.beat % 1 ? 1 : 0)} of ${x.of}`}</div></div>
+      <b class="aw-break-v ${luck(x) > 0.05 ? 'pos-good' : luck(x) < -0.05 ? 'pos-bad' : ''}">${signed(luck(x), 2)}</b></li>`).join('');
+  return `<p class="aw-break-total"><b>${esc(txt)}</b>: ${esc(T.record)} against ${fmt(T.expW, 1)} expected from the all-play record</p>
+    <ul class="aw-break">${rows}</ul>
+    <p class="muted small">Each week: the real result, then how the team's totals did against every team. + is luck (won more than the week deserved), − bad luck. Results come from the box scores, so a week can differ slightly from ${sourceName()}'s.</p>`;
+}
 function draftDetail(T, txt) {
   const ps = [...(T.draftList || [])].sort((a, b) => b.v - a.v);
   if (!ps.length) return '<p class="muted">No picks to grade.</p>';
@@ -616,6 +642,7 @@ function seasonAwards() {
     T.expW = A.exp;
     T.allPct = A.pct;
     T.luck = r.w + r.t / 2 - A.exp;
+    T.weeksPlayed = A.list;
   }
 
   // Biggest punt and Even Steven: each category of the real season totals vs the league, in team-to-team spreads
@@ -662,7 +689,7 @@ function seasonAwards() {
   };
   return [
     { title: 'Best draft', info: 'awDraft', detail: draftDetail, list: ranked('draft', 1, T => total(T.draft), T => (T.draftTop ? `best: ${T.draftTop.name} (${total(T.draftTop.v)} over ${T.draftTop.games} games)` : '')) },
-    { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} ${each ? 'cats' : 'wins'}`, T => `${T.record}, all-play ${Math.round(T.allPct * 100)}% (${fmt(T.expW, 1)} expected)`) },
+    { title: 'Best manager', info: 'awManager', detail: managerDetail, list: ranked('luck', 1, T => `${signed(T.luck, 1)} ${each ? 'cats' : 'wins'}`, T => `${T.record}, all-play ${Math.round(T.allPct * 100)}% (${fmt(T.expW, 1)} expected)`) },
     { title: 'Waiver Wire Wizard', info: 'awWaiver', detail: waiverDetail, list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) },
     { title: 'Street Clothes', info: 'awStreet', detail: streetDetail, list: ranked('missed', 1, T => `${T.missed} game${T.missed === 1 ? '' : 's'}`, T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },
     ...(cats.length ? [{ title: 'Biggest punt', info: 'awPunt', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
