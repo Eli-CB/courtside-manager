@@ -106,7 +106,8 @@ const INFO = {
   awStreet: ['Street Clothes', `
     <p>Games a team lost to players sitting while they were in its <b>starting lineup</b>. For each week, Fantrax's rosters say who started; for each starter, every game his NBA team played that week without him counts one.</p>
     <p>Bench and IR players don't count, and neither do games before a player joined the team or after he left it, so a player traded or dropped mid-season counts only for the weeks a team started him. Injuries, rest and coach's decisions all count the same: the game logs can't tell them apart.</p>
-    <p>A team's schedule comes from that season's NBA game logs (every day any of its players played). A player who didn't play at all that season is placed on his current team.</p>`],
+    <p>A team's schedule comes from that season's NBA game logs (every day any of its players played). A player who didn't play at all that season is placed on his current team.</p>
+    <p>Tap a team's name to see which starters missed the most.</p>`],
   awPunt: ['Biggest punt', `
     <p>Each team's season totals (every game its starters played, week by week, the same numbers as the Standings tab's Season totals), compared with the league's other teams category by category, in team-to-team spreads. The award goes to the single category furthest below the league average.</p>`],
   awSteven: ['Even Steven', `

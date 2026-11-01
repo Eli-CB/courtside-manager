@@ -277,20 +277,24 @@ function startersMissed(L, G) {
       const rows = G.players.get(nba) || [];
       const played = new Set(rows.map(r => r[0]));
       const now = (nbaById.get(nba) || {}).team;
-      let n = 0;
+      let n = 0, sched = 0;
       for (const day of wd) {
-        if (played.has(day)) continue;
         const team = teamOn(G, rows, day) || now;
-        if (team && G.days.has(team) && G.days.get(team).has(day)) n++;
+        if (!(team && G.days.has(team) && G.days.get(team).has(day))) continue;
+        sched++;
+        if (!played.has(day)) n++;
       }
-      if (!n) continue;
+      if (!sched) continue;
       const team = out[o.tid] = out[o.tid] || new Map();
-      const P = team.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', games: 0 };
+      // games: missed while starting; sched: his team's games while he started; weeks: weeks he missed any
+      const P = team.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', games: 0, sched: 0, weeks: 0 };
       P.games += n;
+      P.sched += sched;
+      if (n) P.weeks++;
       team.set(nba, P);
     }
   }
-  return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()]]));
+  return Object.fromEntries(Object.entries(out).map(([tid, m]) => [tid, [...m.values()].filter(P => P.games)]));
 }
 
 // ----- A finished matchup replayed: bench swaps that would have changed it -----
@@ -567,6 +571,13 @@ function waiverDetail(T, txt) {
     ${down.length ? `<h3 class="sub">Hurt or did nothing</h3>${awardRows(down.slice(0, 10), amount, meta)}` : ''}
     <p class="muted small">Games in the weeks each pickup started (G · weeks started).</p>`;
 }
+function streetDetail(T, txt) {
+  const ps = [...(T.missedList || [])].sort((a, b) => b.games - a.games || a.sched - b.sched).slice(0, 10);
+  if (!ps.length) return '<p class="muted">No starter has missed a game yet.</p>';
+  return `<p class="aw-break-total"><b>${esc(txt)}</b> missed by ${T.missedN} starter${T.missedN === 1 ? '' : 's'}. ${T.missedN > 10 ? 'The 10 who missed most:' : ''}</p>
+    ${awardRows(ps, p => `${p.games} G`, p => `out ${p.games} of ${p.sched} · ${p.weeks} wk${p.weeks === 1 ? '' : 's'}`)}
+    <p class="muted small">Games his NBA team played without him in weeks he was in the starting lineup (out of his team's games those weeks · weeks he missed any).</p>`;
+}
 function uncDetail(T, txt) {
   const ps = [...(T.ageList || [])].sort((a, b) => b.moved - a.moved).slice(0, 10);
   if (!ps.length) return '<p class="muted">No starters with a birth date on record.</p>';
@@ -639,7 +650,7 @@ function seasonAwards() {
     { title: 'Best draft', info: 'awDraft', list: ranked('draft', 1, T => total(T.draft), T => (T.draftTop ? `best: ${T.draftTop.name} (${total(T.draftTop.v)} over ${T.draftTop.games} games)` : '')) },
     { title: 'Best manager', info: 'awManager', list: ranked('luck', 1, T => `${signed(T.luck, 1)} ${each ? 'cats' : 'wins'}`, T => `${T.record}, all-play ${Math.round(T.allPct * 100)}% (${fmt(T.expW, 1)} expected)`) },
     { title: 'Waiver Wire Wizard', info: 'awWaiver', detail: waiverDetail, list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) },
-    { title: 'Street Clothes', info: 'awStreet', list: ranked('missed', 1, T => `${T.missed} games`, T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },
+    { title: 'Street Clothes', info: 'awStreet', detail: streetDetail, list: ranked('missed', 1, T => `${T.missed} game${T.missed === 1 ? '' : 's'}`, T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },
     ...(cats.length ? [{ title: 'Biggest punt', info: 'awPunt', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
       { title: 'Even Steven', info: 'awSteven', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`, T => { const order = [...cats].sort((a, b) => T.z[b.key] - T.z[a.key]); return `best: ${order[0].label} · worst: ${order[order.length - 1].label}`; }) }] : []),
     { title: 'Unc Status', info: 'awUnc', detail: uncDetail, list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`, T => (T.oldest ? `oldest regular: ${T.oldest.name} (${Math.floor(T.oldest.age)}, ${T.oldest.weeks} wks)` : '')) },
