@@ -227,10 +227,13 @@ a { color: var(--accent); }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: -6px 0 10px; }
-.perf-find { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
-.perf-find input { flex: 1 1 200px; min-width: 0; }
-.perf-find select { flex: 0 1 auto; width: auto; min-width: 0; }
-@media (max-width: 640px) { .perf-find input { flex-basis: 100%; } .perf-find select { flex: 1 1 0; } } /* phones: search on its own row */
+.perf-q { display: block; width: 100%; margin: 0 0 8px; }
+/* position and team menus look like the pills beside them, with a caret */
+.pill.pill-menu, .pill.pill-menu.on { appearance: none; -webkit-appearance: none; width: auto; height: auto; line-height: inherit; padding-right: 24px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 12px center, right 8px center; background-size: 4px 4px; background-repeat: no-repeat; }
+.pill.pill-menu { background-color: var(--surface); }
+.pill.pill-menu.on { background-color: var(--accent-soft); border-color: var(--accent); color: var(--text); }
 .perf-table .pf-emo { margin-right: 2px; font-size: .9em; }
 .pf-legend { margin: 8px 0 0; }
 /* weekly recap */

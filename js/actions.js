@@ -240,6 +240,10 @@ const actions = {
     ui.perfRange = el.dataset.range;
     render();
   },
+  'perf-only'(el) {
+    ui.perfOnly[el.dataset.key] = !ui.perfOnly[el.dataset.key];
+    render();
+  },
   'perf-show'(el) {
     ui.perfShow[el.dataset.group] = !ui.perfShow[el.dataset.group];
     render();

@@ -442,22 +442,31 @@ function topPerformancesCard() {
   const pill = ([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${k === 'me' || k === 'opp' ? `<span class="pf-swatch pf-${k}"></span>` : ''}${l}</button>`;
   const teams = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['other', 'Other teams']];
   const where = [['active', 'Active', 'In their team\'s starting lineup'], ['bench', 'Bench', 'On their team\'s bench or IR'], ['fa', 'Waivers', 'Not on a roster in your league']];
-  const find = `<div class="perf-find"><input id="perfQ" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(ui.perfQ)}" data-input="perf-q" autocomplete="off">
-    <select data-change="perf-pos" aria-label="Position"><option value="">All positions</option>${POSITIONS.map(x => `<option ${ui.perfPos === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-    <select data-change="perf-team" aria-label="NBA team"><option value="">All teams</option>${[...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort().map(t => `<option ${ui.perfTeam === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+  // search, then pill buttons: position and NBA team (menus dressed as pills), only rookies, only injured; then
+  // the fantasy teams and where players are
+  const menu = (action, label, val, opts) => `<select class="pill pill-menu${val ? ' on' : ''}" data-change="${action}" aria-label="${label}"><option value="">${label === 'Position' ? 'All positions' : 'All teams'}</option>${opts.map(x => `<option ${val === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
+  const only = (k, l, title) => `<button type="button" class="pill${ui.perfOnly[k] ? ' on' : ''}" data-action="perf-only" data-key="${k}" aria-pressed="${!!ui.perfOnly[k]}" title="${title}">${l}</button>`;
+  const find = `<input id="perfQ" class="perf-q" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(ui.perfQ)}" data-input="perf-q" autocomplete="off">
+    <div class="perf-filters" role="group" aria-label="Narrow the list">${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', 'NBA team', ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}</div>`;
   const filters = find + (!owner.size || !rows.length ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${teams.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${where.map(pill).join('')}</div>`);
   const q = normName(ui.perfQ);
-  const picked = rows.filter(r => { const t = teamOf(r); return (!owner.size || ((!t || ui.perfShow[t]) && ui.perfShow[statusOf(r.raw.id)])) && (!q || normName(r.raw.name).includes(q)) && (!ui.perfPos || (r.raw.pos || []).includes(ui.perfPos)) && (!ui.perfTeam || r.raw.team === ui.perfTeam); });
+  const picked = rows.filter(r => {
+    const t = teamOf(r);
+    return (!owner.size || ((!t || ui.perfShow[t]) && ui.perfShow[statusOf(r.raw.id)])) && (!q || normName(r.raw.name).includes(q))
+      && (!ui.perfPos || (r.raw.pos || []).includes(ui.perfPos)) && (!ui.perfTeam || r.raw.team === ui.perfTeam)
+      && (!ui.perfOnly.rookie || !r.raw.exp) && (!ui.perfOnly.inj || !!r.raw.inj);
+  });
   const so = ui.perfSort;
   const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0 });
   const sorted = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
   // a live update keeps the rows where they were (numbers and ranks change in place; anyone new goes below) so the
   // table doesn't jump while it's read; anything you do sorts it again
-  const sig = [range, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine, ui.perfQ, ui.perfPos, ui.perfTeam].join('|');
-  let shown = sorted.slice(0, 50);
+  const sig = [range, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine, ui.perfQ, ui.perfPos, ui.perfTeam, JSON.stringify(ui.perfOnly)].join('|');
+  const cap = avg || range === 'year' ? 300 : 100; // rows shown: the top 300 over the season, 100 for a day or week
+  let shown = sorted.slice(0, cap);
   if (live.hold && perfOrder.sig === sig) {
     const byId = new Map(picked.map(r => [r.raw.id, r])), was = new Set(perfOrder.ids);
-    shown = [...perfOrder.ids.map(id => byId.get(id)).filter(Boolean), ...sorted.filter(r => !was.has(r.raw.id))].slice(0, 50);
+    shown = [...perfOrder.ids.map(id => byId.get(id)).filter(Boolean), ...sorted.filter(r => !was.has(r.raw.id))].slice(0, cap);
   }
   perfOrder = { sig, ids: shown.map(r => r.raw.id) };
   const count = `${picked.length > shown.length ? `${shown.length} of ` : ''}${picked.length} player${picked.length === 1 ? '' : 's'}`;

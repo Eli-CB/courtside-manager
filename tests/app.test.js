@@ -855,7 +855,7 @@ test('performances: the last game day marks each category leader with an emoji',
   } finally { app.ui.perfRange = null; app.ui.perfShow = show; app.ui.perfSort = { key: 'v', dir: -1 }; }
 });
 
-test('performances: everyone who played in one table, top 50 by the sorted column, ranked by value', async () => {
+test('performances: everyone who played in one table, top 100 by the sorted column, ranked by value', async () => {
   await app.loadBoxes();
   const cell = (tr, i) => [...tr.matchAll(/<td class="sc"[^>]*>(?:<span[^>]*>[^<]*<\/span>)?([^<]*)</g)][i][1];
   const bodyRows = html => html.split('<tbody>')[1].split('</tr>').slice(0, -1);
@@ -864,7 +864,7 @@ test('performances: everyone who played in one table, top 50 by the sorted colum
     await app.useLeague(id);
     const all = app.perfRows([app.perfDays().day]);
     let rows = bodyRows(app.topPerformancesCard());
-    assert.equal(rows.length, Math.min(50, all.length), `${id}: up to 50 rows`);
+    assert.equal(rows.length, Math.min(100, all.length), `${id}: up to 100 rows`);
     assert.ok(!app.topPerformancesCard().includes('<h3 class="sub">'), 'no separate Best and Worst lists');
     const vals = rows.map(val);
     assert.ok(vals.every((v, i) => !i || v <= vals[i - 1]), `${id}: best first`);
@@ -971,6 +971,19 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     html = app.topPerformancesCard();
     assert.ok(ids(html).length && ids(html).every(id => app.nbaById.get(id).team === 'OKC'), 'one NBA team');
     ui.perfTeam = '';
+    // the top 300 over a season
+    assert.equal((app.topPerformancesCard().split('<tbody>')[1].match(/<\/tr>/g) || []).length, Math.min(300, rows.length), 'Per game: the top 300');
+    // position and team are pill-style menus, then Rookies and Injured
+    html = app.topPerformancesCard();
+    assert.ok(/<select class="pill pill-menu" data-change="perf-pos"/.test(html) && /<select class="pill pill-menu" data-change="perf-team"/.test(html));
+    assert.ok(html.indexOf('data-change="perf-team"') < html.indexOf('data-key="rookie"') && html.indexOf('data-key="rookie"') < html.indexOf('data-key="inj"'));
+    ui.perfOnly.rookie = true;
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).length && ids(html).every(id => !app.nbaById.get(id).exp), 'rookies only');
+    ui.perfOnly.rookie = false; ui.perfOnly.inj = true;
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).length && ids(html).every(id => app.nbaById.get(id).inj), 'injured only');
+    ui.perfOnly.inj = false;
     // This season: every game so far, added up
     ui.perfRange = 'year';
     html = app.topPerformancesCard();
@@ -985,7 +998,7 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     ui.perfRange = 'avg';
     ui.tab = 'players';
     assert.equal(app.liveWanted(), false);
-  } finally { ui.perfRange = null; ui.perfQ = ''; ui.perfPos = ''; ui.perfTeam = ''; ui.tab = 'standings'; }
+  } finally { ui.perfRange = null; ui.perfQ = ''; ui.perfPos = ''; ui.perfTeam = ''; Object.assign(ui.perfOnly, { rookie: false, inj: false }); ui.tab = 'standings'; }
 });
 
 test('performances: Active and Bench filters, and an Active badge', async () => {
