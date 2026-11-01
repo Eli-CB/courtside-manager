@@ -288,6 +288,22 @@ function leagueLineupMode(league) {
   return days >= 5 ? 'weekly' : 'daily';
 }
 
+// Yahoo leagues come through a Yahoo login (js/yahoo.js): a sign-in button, then the visitor's leagues to pick from
+function yahooLanding() {
+  if (!yahooOn()) return '';
+  if (!yahooSignedIn()) return `<div class="land-yahoo"><button type="button" class="btn yahoo-btn" data-action="yahoo-signin">Sign in with Yahoo</button><span class="small muted">for a Yahoo league</span></div>`;
+  if (yahoo.leagues == null) {
+    yahoo.leagues = 'loading';
+    yahooLeagues().then(l => { yahoo.leagues = l; }).catch(e => { yahoo.leagues = { error: e.message }; }).finally(() => { if (needsLanding()) render(); });
+  }
+  const L = yahoo.leagues;
+  const body = L === 'loading' ? '<p class="small muted">Loading your Yahoo leagues…</p>'
+    : L.error ? `<p class="form-error">${L.error === 'yahoo sign-in' ? 'Yahoo signed you out. Sign in again.' : `Couldn't load your Yahoo leagues (${esc(L.error)}).`}</p>`
+    : !L.length ? '<p class="small muted">No Yahoo basketball leagues this season on that account.</p>'
+    : `<div class="land-teams">${L.map(l => `<button type="button" class="land-team" data-action="yahoo-pick" data-id="${esc(l.key)}">${esc(l.name)} <span class="muted small">${l.teams} teams</span></button>`).join('')}</div>`;
+  return `<div class="land-yahoo"><p class="small"><b>Your Yahoo leagues</b> · <button type="button" class="link-btn" data-action="yahoo-signout">Sign out of Yahoo</button></p>${body}</div>`;
+}
+
 // Switch the whole app to a Fantrax or ESPN league by ID (or the league's address). Throws a readable message.
 async function needNba() {
   if (!NBA) await nbaLoading;
@@ -296,6 +312,7 @@ async function needNba() {
 // A league that didn't load, as a readable message
 function leagueError(id, e) {
   const site = SOURCE_NAME[leagueSourceOf(id)];
+  if (e.message === 'yahoo sign-in') return new Error('Sign in with Yahoo to load Yahoo leagues.');
   if (e.message === 'private league') return new Error("That ESPN league is private, so ESPN won't share it. Only public ESPN leagues can be loaded; the league manager can make it viewable to the public in the league's settings.");
   return new Error(`${site} didn't find that league (${e.message}). Check the ID in your league's address.${site === 'ESPN' ? ' Only public ESPN leagues can be loaded.' : ''}`);
 }
@@ -378,6 +395,7 @@ function viewLanding() {
         <button class="btn primary" type="submit">${forSeason ? 'Add season' : 'Connect league'}</button>
       </form>
       <p class="form-error" id="landMsg" role="alert"></p>
+      ${forSeason ? '' : yahooLanding()}
       <details class="land-help">
         <summary>Where do I find my league ID?</summary>
         <p><b>Fantrax:</b> open your league on fantrax.com. The ID is the part of the address right after <b>/league/</b>:<br>

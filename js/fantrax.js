@@ -11,13 +11,17 @@ const FX_API = 'https://www.fantrax.com/fxea/general/';
 const NBA_POS_MAP = { G: ['PG', 'SG'], F: ['SF', 'PF'], C: ['C'], 'G-F': ['SG', 'SF'], 'F-G': ['SG', 'SF'], 'F-C': ['PF', 'C'], 'C-F': ['PF', 'C'] };
 const FX_SLOT_MAP = { PG: 'PG', SG: 'SG', G: 'G', SF: 'SF', PF: 'PF', F: 'F', C: 'C', Flx: 'FLX', Util: 'FLX', UT: 'FLX' };
 
-// Which site a league is on. ESPN league IDs are all digits; Fantrax's mix letters and digits.
-const SOURCE_NAME = { fantrax: 'Fantrax', espn: 'ESPN' };
-const leagueSourceOf = id => (/^\d+$/.test(String(id || '')) ? 'espn' : 'fantrax');
+// Which site a league is on. ESPN league IDs are all digits; Yahoo's are league keys ("nba.l.12345");
+// Fantrax's mix letters and digits.
+const SOURCE_NAME = { fantrax: 'Fantrax', espn: 'ESPN', yahoo: 'Yahoo' };
+const leagueSourceOf = id => (/^(nba|\d+)\.l\.\d+$/.test(String(id || '')) ? 'yahoo' : /^\d+$/.test(String(id || '')) ? 'espn' : 'fantrax');
 const sourceName = (L = fxLeague()) => SOURCE_NAME[(L && L.source) || 'fantrax'];
 // A league ID from what someone typed or pasted: the ID itself, or the league's address on either site
 function parseLeagueId(text) {
   const s = String(text || '').trim();
+  const y = s.match(/fantasysports\.yahoo\.com\/nba\/(\d+)/i);
+  if (y) return `nba.l.${y[1]}`;
+  if (/^(nba|\d+)\.l\.\d+$/.test(s)) return s;
   const m = s.match(/[?&]leagueId=(\d+)/i) || s.match(/fantrax\.com\/fantasy\/league\/([A-Za-z0-9]+)/i);
   const id = m ? m[1] : s;
   return /^\d{3,12}$/.test(id) || /^[A-Za-z0-9]{6,32}$/.test(id) ? id : null;
@@ -429,7 +433,8 @@ function saveLeague(id, res) {
 async function getLeague(id, force) {
   const kept = force ? null : cachedLeague(id);
   if (kept) return kept;
-  const res = await (leagueSourceOf(id) === 'espn' ? fetchEspnLeague(id) : fetchFantraxLeague(id));
+  const src = leagueSourceOf(id);
+  const res = await (src === 'espn' ? fetchEspnLeague(id) : src === 'yahoo' ? fetchYahooLeague(id) : fetchFantraxLeague(id));
   saveLeague(id, res);
   delete rosterWeeksLoad[id]; // the current period's lineups may have changed
   return res;

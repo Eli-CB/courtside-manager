@@ -1,0 +1,13 @@
+# League Layer's Yahoo helper (see yahoo.js and README.md). Deploy from this folder: npx wrangler deploy
+name = "leaguelayer-yahoo"
+main = "yahoo.js"
+compatibility_date = "2026-10-01"
+
+# served at api.leaguelayer.com (the domain is already on Cloudflare)
+routes = [{ pattern = "api.leaguelayer.com", custom_domain = true }]
+
+[vars]
+# the pages allowed to use it: the site, and the local preview
+SITE_ORIGINS = "https://leaguelayer.com,http://localhost:5173"
+
+# YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET are secrets: npx wrangler secret put YAHOO_CLIENT_ID (and _SECRET)

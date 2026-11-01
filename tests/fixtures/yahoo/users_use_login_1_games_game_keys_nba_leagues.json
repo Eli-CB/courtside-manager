@@ -1,0 +1,57 @@
+{
+ "fantasy_content": {
+  "users": {
+   "0": {
+    "user": [
+     {
+      "guid": "TESTGUID"
+     },
+     {
+      "games": {
+       "0": {
+        "game": [
+         {
+          "game_key": "466",
+          "game_id": "466",
+          "name": "Basketball",
+          "code": "nba",
+          "type": "full",
+          "season": "2026"
+         },
+         {
+          "leagues": {
+           "0": {
+            "league": [
+             {
+              "league_key": "466.l.777",
+              "league_id": "777",
+              "name": "Test Hoops",
+              "url": "https://basketball.fantasysports.yahoo.com/nba/777",
+              "draft_status": "postdraft",
+              "num_teams": 4,
+              "scoring_type": "head",
+              "league_type": "private",
+              "current_week": 2,
+              "start_week": "1",
+              "start_date": "2026-10-20",
+              "end_week": "3",
+              "end_date": "2026-11-08",
+              "game_code": "nba",
+              "season": "2026"
+             }
+            ]
+           },
+           "count": 1
+          }
+         }
+        ]
+       },
+       "count": 1
+      }
+     }
+    ]
+   },
+   "count": 1
+  }
+ }
+}

@@ -1,0 +1,985 @@
+{
+ "fantasy_content": {
+  "league": [
+   {
+    "league_key": "466.l.777",
+    "league_id": "777",
+    "name": "Test Hoops",
+    "url": "https://basketball.fantasysports.yahoo.com/nba/777",
+    "draft_status": "postdraft",
+    "num_teams": 4,
+    "scoring_type": "head",
+    "league_type": "private",
+    "current_week": 2,
+    "start_week": "1",
+    "start_date": "2026-10-20",
+    "end_week": "3",
+    "end_date": "2026-11-08",
+    "game_code": "nba",
+    "season": "2026"
+   },
+   {
+    "teams": {
+     "0": {
+      "team": [
+       [
+        {
+         "team_key": "466.l.777.t.1"
+        },
+        {
+         "team_id": "1"
+        },
+        {
+         "name": "Alpha Dogs"
+        },
+        [],
+        {
+         "url": "https://basketball.fantasysports.yahoo.com/nba/777/1"
+        }
+       ],
+       {
+        "roster": {
+         "coverage_type": "date",
+         "date": "2026-10-26",
+         "is_editable": 0,
+         "0": {
+          "players": {
+           "0": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.1"
+              },
+              {
+               "player_id": "1"
+              },
+              {
+               "name": {
+                "full": "LaMelo Ball",
+                "first": "LaMelo",
+                "last": "Ball"
+               }
+              },
+              {
+               "editorial_team_abbr": "MIN"
+              },
+              {
+               "display_position": "PG,G"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PG"
+                },
+                {
+                 "position": "G"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "PG"
+               }
+              ]
+             }
+            ]
+           },
+           "1": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.2"
+              },
+              {
+               "player_id": "2"
+              },
+              {
+               "name": {
+                "full": "OG Anunoby",
+                "first": "OG",
+                "last": "Anunoby"
+               }
+              },
+              {
+               "editorial_team_abbr": "NY"
+              },
+              {
+               "display_position": "SF,PF,F"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "SF"
+                },
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "F"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "SF"
+               }
+              ]
+             }
+            ]
+           },
+           "2": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.3"
+              },
+              {
+               "player_id": "3"
+              },
+              {
+               "name": {
+                "full": "Bam Adebayo",
+                "first": "Bam",
+                "last": "Adebayo"
+               }
+              },
+              {
+               "editorial_team_abbr": "MIA"
+              },
+              {
+               "display_position": "PF,C,F"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "C"
+                },
+                {
+                 "position": "F"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "Util"
+               }
+              ]
+             }
+            ]
+           },
+           "3": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.4"
+              },
+              {
+               "player_id": "4"
+              },
+              {
+               "name": {
+                "full": "Steven Adams",
+                "first": "Steven",
+                "last": "Adams"
+               }
+              },
+              {
+               "editorial_team_abbr": "HOU"
+              },
+              {
+               "display_position": "C"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "C"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "BN"
+               }
+              ]
+             }
+            ]
+           },
+           "4": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.5"
+              },
+              {
+               "player_id": "5"
+              },
+              {
+               "name": {
+                "full": "Ace Bailey",
+                "first": "Ace",
+                "last": "Bailey"
+               }
+              },
+              {
+               "editorial_team_abbr": "UTA"
+              },
+              {
+               "display_position": "SG,SF"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "SG"
+                },
+                {
+                 "position": "SF"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "IL"
+               }
+              ]
+             }
+            ]
+           },
+           "count": 5
+          }
+         }
+        }
+       }
+      ]
+     },
+     "1": {
+      "team": [
+       [
+        {
+         "team_key": "466.l.777.t.2"
+        },
+        {
+         "team_id": "2"
+        },
+        {
+         "name": "Beta Ballers"
+        },
+        [],
+        {
+         "url": "https://basketball.fantasysports.yahoo.com/nba/777/2"
+        }
+       ],
+       {
+        "roster": {
+         "coverage_type": "date",
+         "date": "2026-10-26",
+         "is_editable": 0,
+         "0": {
+          "players": {
+           "0": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.6"
+              },
+              {
+               "player_id": "6"
+              },
+              {
+               "name": {
+                "full": "Jose Alvarado",
+                "first": "Jose",
+                "last": "Alvarado"
+               }
+              },
+              {
+               "editorial_team_abbr": "NY"
+              },
+              {
+               "display_position": "PG,G"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PG"
+                },
+                {
+                 "position": "G"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "PG"
+               }
+              ]
+             }
+            ]
+           },
+           "1": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.7"
+              },
+              {
+               "player_id": "7"
+              },
+              {
+               "name": {
+                "full": "Kyle Anderson",
+                "first": "Kyle",
+                "last": "Anderson"
+               }
+              },
+              {
+               "editorial_team_abbr": "TOR"
+              },
+              {
+               "display_position": "SF,PF"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "SF"
+                },
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "SF"
+               }
+              ]
+             }
+            ]
+           },
+           "2": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.8"
+              },
+              {
+               "player_id": "8"
+              },
+              {
+               "name": {
+                "full": "Giannis Antetokounmpo",
+                "first": "Giannis",
+                "last": "Antetokounmpo"
+               }
+              },
+              {
+               "editorial_team_abbr": "MIA"
+              },
+              {
+               "display_position": "PF,C"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "C"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "Util"
+               }
+              ]
+             }
+            ]
+           },
+           "3": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.9"
+              },
+              {
+               "player_id": "9"
+              },
+              {
+               "name": {
+                "full": "Jarrett Allen",
+                "first": "Jarrett",
+                "last": "Allen"
+               }
+              },
+              {
+               "editorial_team_abbr": "CLE"
+              },
+              {
+               "display_position": "C"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "C"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "BN"
+               }
+              ]
+             }
+            ]
+           },
+           "count": 4
+          }
+         }
+        }
+       }
+      ]
+     },
+     "2": {
+      "team": [
+       [
+        {
+         "team_key": "466.l.777.t.3"
+        },
+        {
+         "team_id": "3"
+        },
+        {
+         "name": "Gamma Rays"
+        },
+        [],
+        {
+         "url": "https://basketball.fantasysports.yahoo.com/nba/777/3"
+        }
+       ],
+       {
+        "roster": {
+         "coverage_type": "date",
+         "date": "2026-10-26",
+         "is_editable": 0,
+         "0": {
+          "players": {
+           "0": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.10"
+              },
+              {
+               "player_id": "10"
+              },
+              {
+               "name": {
+                "full": "Nickeil Alexander-Walker",
+                "first": "Nickeil",
+                "last": "Alexander-Walker"
+               }
+              },
+              {
+               "editorial_team_abbr": "ATL"
+              },
+              {
+               "display_position": "PG,SG,SF"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PG"
+                },
+                {
+                 "position": "SG"
+                },
+                {
+                 "position": "SF"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "PG"
+               }
+              ]
+             }
+            ]
+           },
+           "1": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.11"
+              },
+              {
+               "player_id": "11"
+              },
+              {
+               "name": {
+                "full": "Deni Avdija",
+                "first": "Deni",
+                "last": "Avdija"
+               }
+              },
+              {
+               "editorial_team_abbr": "POR"
+              },
+              {
+               "display_position": "SG,SF,PF"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "SG"
+                },
+                {
+                 "position": "SF"
+                },
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "SF"
+               }
+              ]
+             }
+            ]
+           },
+           "2": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.12"
+              },
+              {
+               "player_id": "12"
+              },
+              {
+               "name": {
+                "full": "Deandre Ayton",
+                "first": "Deandre",
+                "last": "Ayton"
+               }
+              },
+              {
+               "editorial_team_abbr": "WAS"
+              },
+              {
+               "display_position": "C"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "C"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "Util"
+               }
+              ]
+             }
+            ]
+           },
+           "3": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.13"
+              },
+              {
+               "player_id": "13"
+              },
+              {
+               "name": {
+                "full": "Precious Achiuwa",
+                "first": "Precious",
+                "last": "Achiuwa"
+               }
+              },
+              {
+               "editorial_team_abbr": "SAC"
+              },
+              {
+               "display_position": "PF,C"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "C"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "BN"
+               }
+              ]
+             }
+            ]
+           },
+           "count": 4
+          }
+         }
+        }
+       }
+      ]
+     },
+     "3": {
+      "team": [
+       [
+        {
+         "team_key": "466.l.777.t.4"
+        },
+        {
+         "team_id": "4"
+        },
+        {
+         "name": "Delta Force"
+        },
+        [],
+        {
+         "url": "https://basketball.fantasysports.yahoo.com/nba/777/4"
+        }
+       ],
+       {
+        "roster": {
+         "coverage_type": "date",
+         "date": "2026-10-26",
+         "is_editable": 0,
+         "0": {
+          "players": {
+           "0": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.14"
+              },
+              {
+               "player_id": "14"
+              },
+              {
+               "name": {
+                "full": "Grayson Allen",
+                "first": "Grayson",
+                "last": "Allen"
+               }
+              },
+              {
+               "editorial_team_abbr": "CHO"
+              },
+              {
+               "display_position": "PG,SG,SF"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PG"
+                },
+                {
+                 "position": "SG"
+                },
+                {
+                 "position": "SF"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "PG"
+               }
+              ]
+             }
+            ]
+           },
+           "1": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.15"
+              },
+              {
+               "player_id": "15"
+              },
+              {
+               "name": {
+                "full": "Nate Ament",
+                "first": "Nate",
+                "last": "Ament"
+               }
+              },
+              {
+               "editorial_team_abbr": "MIL"
+              },
+              {
+               "display_position": "SF"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "SF"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "SF"
+               }
+              ]
+             }
+            ]
+           },
+           "2": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.16"
+              },
+              {
+               "player_id": "16"
+              },
+              {
+               "name": {
+                "full": "Marvin Bagley III",
+                "first": "Marvin",
+                "last": "III"
+               }
+              },
+              {
+               "editorial_team_abbr": "DEN"
+              },
+              {
+               "display_position": "PF,C"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "C"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "Util"
+               }
+              ]
+             }
+            ]
+           },
+           "3": {
+            "player": [
+             [
+              {
+               "player_key": "466.p.17"
+              },
+              {
+               "player_id": "17"
+              },
+              {
+               "name": {
+                "full": "Tobe Awaka",
+                "first": "Tobe",
+                "last": "Awaka"
+               }
+              },
+              {
+               "editorial_team_abbr": "CHI"
+              },
+              {
+               "display_position": "PF"
+              },
+              {
+               "eligible_positions": [
+                {
+                 "position": "PF"
+                },
+                {
+                 "position": "Util"
+                }
+               ]
+              }
+             ],
+             {
+              "selected_position": [
+               {
+                "coverage_type": "date",
+                "date": "2026-10-26"
+               },
+               {
+                "position": "BN"
+               }
+              ]
+             }
+            ]
+           },
+           "count": 4
+          }
+         }
+        }
+       }
+      ]
+     },
+     "count": 4
+    }
+   }
+  ]
+ }
+}

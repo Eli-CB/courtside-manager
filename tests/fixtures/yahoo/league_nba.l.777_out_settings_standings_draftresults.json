@@ -1,0 +1,421 @@
+{
+ "fantasy_content": {
+  "league": [
+   {
+    "league_key": "466.l.777",
+    "league_id": "777",
+    "name": "Test Hoops",
+    "url": "https://basketball.fantasysports.yahoo.com/nba/777",
+    "draft_status": "postdraft",
+    "num_teams": 4,
+    "scoring_type": "head",
+    "league_type": "private",
+    "current_week": 2,
+    "start_week": "1",
+    "start_date": "2026-10-20",
+    "end_week": "3",
+    "end_date": "2026-11-08",
+    "game_code": "nba",
+    "season": "2026"
+   },
+   {
+    "settings": [
+     {
+      "draft_type": "live",
+      "scoring_type": "head",
+      "uses_playoff": "1",
+      "playoff_start_week": "3",
+      "num_playoff_teams": "2",
+      "roster_positions": [
+       {
+        "roster_position": {
+         "position": "PG",
+         "position_type": "P",
+         "count": 1
+        }
+       },
+       {
+        "roster_position": {
+         "position": "SF",
+         "position_type": "P",
+         "count": 1
+        }
+       },
+       {
+        "roster_position": {
+         "position": "Util",
+         "position_type": "P",
+         "count": 1
+        }
+       },
+       {
+        "roster_position": {
+         "position": "BN",
+         "position_type": "",
+         "count": 1
+        }
+       },
+       {
+        "roster_position": {
+         "position": "IL",
+         "position_type": "",
+         "count": 1
+        }
+       }
+      ],
+      "stat_categories": {
+       "stats": [
+        {
+         "stat": {
+          "stat_id": 9004003,
+          "enabled": "1",
+          "name": "FGM/A",
+          "display_name": "FGM/A",
+          "sort_order": "1",
+          "position_type": "P",
+          "is_only_display_stat": "1"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 5,
+          "enabled": "1",
+          "name": "FG%",
+          "display_name": "FG%",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 9007006,
+          "enabled": "1",
+          "name": "FTM/A",
+          "display_name": "FTM/A",
+          "sort_order": "1",
+          "position_type": "P",
+          "is_only_display_stat": "1"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 8,
+          "enabled": "1",
+          "name": "FT%",
+          "display_name": "FT%",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 10,
+          "enabled": "1",
+          "name": "3PTM",
+          "display_name": "3PTM",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 12,
+          "enabled": "1",
+          "name": "PTS",
+          "display_name": "PTS",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 15,
+          "enabled": "1",
+          "name": "REB",
+          "display_name": "REB",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 16,
+          "enabled": "1",
+          "name": "AST",
+          "display_name": "AST",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 17,
+          "enabled": "1",
+          "name": "ST",
+          "display_name": "ST",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 18,
+          "enabled": "1",
+          "name": "BLK",
+          "display_name": "BLK",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        },
+        {
+         "stat": {
+          "stat_id": 19,
+          "enabled": "1",
+          "name": "TO",
+          "display_name": "TO",
+          "sort_order": "1",
+          "position_type": "P"
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "standings": [
+     {
+      "teams": {
+       "0": {
+        "team": [
+         [
+          {
+           "team_key": "466.l.777.t.1"
+          },
+          {
+           "team_id": "1"
+          },
+          {
+           "name": "Alpha Dogs"
+          },
+          [],
+          {
+           "url": "https://basketball.fantasysports.yahoo.com/nba/777/1"
+          }
+         ],
+         {
+          "team_standings": {
+           "rank": "1",
+           "outcome_totals": {
+            "wins": "3",
+            "losses": "0",
+            "ties": 0,
+            "percentage": ""
+           },
+           "games_back": "-"
+          }
+         }
+        ]
+       },
+       "1": {
+        "team": [
+         [
+          {
+           "team_key": "466.l.777.t.2"
+          },
+          {
+           "team_id": "2"
+          },
+          {
+           "name": "Beta Ballers"
+          },
+          [],
+          {
+           "url": "https://basketball.fantasysports.yahoo.com/nba/777/2"
+          }
+         ],
+         {
+          "team_standings": {
+           "rank": "2",
+           "outcome_totals": {
+            "wins": "2",
+            "losses": "1",
+            "ties": 0,
+            "percentage": ""
+           },
+           "games_back": "1"
+          }
+         }
+        ]
+       },
+       "2": {
+        "team": [
+         [
+          {
+           "team_key": "466.l.777.t.3"
+          },
+          {
+           "team_id": "3"
+          },
+          {
+           "name": "Gamma Rays"
+          },
+          [],
+          {
+           "url": "https://basketball.fantasysports.yahoo.com/nba/777/3"
+          }
+         ],
+         {
+          "team_standings": {
+           "rank": "3",
+           "outcome_totals": {
+            "wins": "1",
+            "losses": "2",
+            "ties": 0,
+            "percentage": ""
+           },
+           "games_back": "2"
+          }
+         }
+        ]
+       },
+       "3": {
+        "team": [
+         [
+          {
+           "team_key": "466.l.777.t.4"
+          },
+          {
+           "team_id": "4"
+          },
+          {
+           "name": "Delta Force"
+          },
+          [],
+          {
+           "url": "https://basketball.fantasysports.yahoo.com/nba/777/4"
+          }
+         ],
+         {
+          "team_standings": {
+           "rank": "4",
+           "outcome_totals": {
+            "wins": "0",
+            "losses": "3",
+            "ties": 0,
+            "percentage": ""
+           },
+           "games_back": "3"
+          }
+         }
+        ]
+       },
+       "count": 4
+      }
+     }
+    ]
+   },
+   {
+    "draft_results": {
+     "0": {
+      "draft_result": {
+       "pick": 1,
+       "round": 1,
+       "team_key": "466.l.777.t.1",
+       "player_key": "466.p.1"
+      }
+     },
+     "1": {
+      "draft_result": {
+       "pick": 2,
+       "round": 1,
+       "team_key": "466.l.777.t.2",
+       "player_key": "466.p.6"
+      }
+     },
+     "2": {
+      "draft_result": {
+       "pick": 3,
+       "round": 1,
+       "team_key": "466.l.777.t.3",
+       "player_key": "466.p.10"
+      }
+     },
+     "3": {
+      "draft_result": {
+       "pick": 4,
+       "round": 1,
+       "team_key": "466.l.777.t.4",
+       "player_key": "466.p.14"
+      }
+     },
+     "4": {
+      "draft_result": {
+       "pick": 5,
+       "round": 2,
+       "team_key": "466.l.777.t.1",
+       "player_key": "466.p.2"
+      }
+     },
+     "5": {
+      "draft_result": {
+       "pick": 6,
+       "round": 2,
+       "team_key": "466.l.777.t.2",
+       "player_key": "466.p.7"
+      }
+     },
+     "6": {
+      "draft_result": {
+       "pick": 7,
+       "round": 2,
+       "team_key": "466.l.777.t.3",
+       "player_key": "466.p.11"
+      }
+     },
+     "7": {
+      "draft_result": {
+       "pick": 8,
+       "round": 2,
+       "team_key": "466.l.777.t.4",
+       "player_key": "466.p.15"
+      }
+     },
+     "8": {
+      "draft_result": {
+       "pick": 9,
+       "round": 3,
+       "team_key": "466.l.777.t.1",
+       "player_key": "466.p.3"
+      }
+     },
+     "9": {
+      "draft_result": {
+       "pick": 10,
+       "round": 3,
+       "team_key": "466.l.777.t.2",
+       "player_key": "466.p.8"
+      }
+     },
+     "10": {
+      "draft_result": {
+       "pick": 11,
+       "round": 3,
+       "team_key": "466.l.777.t.3",
+       "player_key": "466.p.12"
+      }
+     },
+     "11": {
+      "draft_result": {
+       "pick": 12,
+       "round": 3,
+       "team_key": "466.l.777.t.4",
+       "player_key": "466.p.16"
+      }
+     },
+     "count": 12
+    }
+   }
+  ]
+ }
+}

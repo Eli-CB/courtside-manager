@@ -10,7 +10,7 @@ saved leagues are lost). Owner's league:
 
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
-  scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, render, history, views,
+  scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, yahoo, render, history, views,
   matchups, recap, live, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo)
@@ -26,6 +26,12 @@ saved leagues are lost). Owner's league:
     (`matchPlayers`), which site an ID is on (`leagueSourceOf`, `parseLeagueId`, `sourceName`), `getJson` (shared retries)
   - espn: `fetchEspnLeague` turns a public ESPN league into the same league shape (`source: 'espn'`), so every
     tab works unchanged. "fx" names (`fxLeague`, `raw.fx`, `fxTeamSide`) mean "the league's site", either one.
+  - yahoo: Yahoo leagues through a Yahoo login (OAuth): the helper server `worker/yahoo.js` (Cloudflare Worker at
+    api.leaguelayer.com, setup in `worker/README.md`) runs the sign-in and passes API requests through (Yahoo's API isn't
+    CORS-open); tokens stay in the browser (`courtside-yahoo`). `yahoo.proxy` empty = Yahoo hidden. `yflat` turns Yahoo's
+    JSON ("0","1"…+count objects, arrays of one-key objects) into plain lists/objects; `fetchYahooLeague` maps to the league
+    shape (`source: 'yahoo'`, ids = league keys `nba.l.N`). Test fixtures are made up in Yahoo's layout
+    (`tests/make_yahoo_fixtures.py`): check against a real league once signed in.
   - render: `render()`, league/season bar (`ctxBar`), gear menu, past-season switching (`withSeason`,
     address `#tab/<seasonLeagueId>`), `viewLeague`/`myTeamId()` override
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season

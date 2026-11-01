@@ -415,6 +415,9 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .stat-grid .field { margin: 0; }
 .sub { margin: 4px 0 8px; font-size: .9rem; }
 .form-error { color: var(--bad); margin: 0; min-height: 1.2em; font-size: .9rem; }
+.land-yahoo { margin: 4px 0 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.land-yahoo p { margin: 0; }
+.yahoo-btn { background: #6001d2; border-color: #6001d2; color: #fff; }
 .form-note { color: var(--text); margin: 0; min-height: 1.2em; font-size: .9rem; }
 .inline-form { display: grid; gap: 10px; grid-template-columns: 90px 1fr 110px 110px 90px auto; align-items: end; }
 .inline-form .field { margin: 0; }

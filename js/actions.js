@@ -89,6 +89,12 @@ const actions = {
     el.nextElementSibling.hidden = !open;
   },
   'close-info'() { $('#infoDialog').close(); },
+  'yahoo-signin'() { yahooSignIn(); },
+  'yahoo-signout'() { yahooSignOut(); render(); },
+  async 'yahoo-pick'(el) {
+    el.disabled = true;
+    try { await connectLeague(el.dataset.id); } catch (e) { toast(e.message); el.disabled = false; }
+  },
   // an award's breakdown for one team, in the popup the (i) buttons use
   'award-team'(el) {
     const D = awardDetails.get(el.dataset.key);
@@ -452,6 +458,8 @@ window.addEventListener('resize', fitPerfLists);
   } catch (e) { /* ignore */ }
   state = load();
   validateLineup();
+  const back = yahooFromAddress(); // just signed in with Yahoo: show the leagues to pick from
+  if (back === 'in') { yahoo.leagues = null; if (state.fxTeam) ui.addingLeague = true; } else if (back) setTimeout(() => toast(back), 500);
   route();
   nbaLoading = loadNba();
   loadImages();

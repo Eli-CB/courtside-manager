@@ -40,6 +40,10 @@ function fakeFetch(url) {
     const ep = u.pathname.split('/').pop();
     if (ep === 'scoreboard') body = readFixture(`espn/live/scoreboard${u.searchParams.get('dates') ? '-' + u.searchParams.get('dates') : ''}.json`);
     else if (ep === 'summary') body = readFixture(`espn/live/summary-${u.searchParams.get('event')}.json`);
+  } else if (u.hostname === 'yahoo.test') {
+    // the Yahoo helper: /yahoo/api/<path> answers from tests/fixtures/yahoo/<path with ; = , / as _>.json
+    const p = u.pathname.replace(/^\/yahoo\/api\//, '').replace(/[;=,\/]/g, '_');
+    body = u.pathname.startsWith('/yahoo/api/') ? readFixture(`yahoo/${p}.json`) : u.pathname === '/yahoo/refresh' ? JSON.stringify({ access: 'new', refresh: 'r', until: NOW + 36e5 }) : null;
   } else if (u.hostname === 'lm-api-reads.fantasy.espn.com') {
     const league = u.pathname.match(/\/leagues\/(\d+)$/);
     body = league ? readFixture(`espn/${league[1]}/league.json`) : u.pathname.endsWith('/players') ? readFixture('espn/players.json') : null;
@@ -70,6 +74,7 @@ function loadApp() {
     navigator: { clipboard: { writeText: async () => {} } },
     requestAnimationFrame: f => setTimeout(f, 0),
     structuredClone: v => JSON.parse(JSON.stringify(v)),
+    atob: s => Buffer.from(s, 'base64').toString('binary'), btoa: s => Buffer.from(s, 'binary').toString('base64'),
     confirm: () => true,
     addEventListener() {}, scrollTo() {},
   };
@@ -95,7 +100,8 @@ function loadApp() {
   app.ready = () => ctx.__get('nbaLoading');
   // load a Fantrax or ESPN league from the fixtures and make it the current one
   app.useLeague = async id => {
-    const res = await (ctx.__get('leagueSourceOf')(id) === 'espn' ? ctx.fetchEspnLeague(id) : ctx.fetchFantraxLeague(id));
+    const src = ctx.__get('leagueSourceOf')(id);
+    const res = await (src === 'espn' ? ctx.fetchEspnLeague(id) : src === 'yahoo' ? ctx.fetchYahooLeague(id) : ctx.fetchFantraxLeague(id));
     const L = res.league;
     ctx.__get('NBA').league = L;
     ctx.applyLeagueRules(L);
