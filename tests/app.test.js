@@ -842,7 +842,7 @@ test('player card: a fantasy team with its lineup spot', async () => {
   if (fa) assert.match(app.cardOwner(fa), /badge good">(Waivers|Free agent|Available)</);
 });
 
-test('performances: the last game day marks each category leader with an emoji', async () => {
+test('performances: every range marks each category leader with an emoji', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
   const day = app.perfDays().day;
@@ -874,8 +874,20 @@ test('performances: the last game day marks each category leader with an emoji',
     const fg = cats.findIndex(c => c.key === 'fgPct');
     const marks = Object.keys(cells).map(id => emo(id, fg)).filter(Boolean).map(m => m[1]);
     assert.ok(marks.includes('\u{1F680}') && marks.includes('\u{1F9CA}'), `FG%: best and worst shooting marked (${marks})`);
-    app.ui.perfRange = 'week';
-    if (app.perfDays().week) assert.ok(!app.topPerformancesCard().includes('pf-emo'), 'only for a single finished day');
+    // every other range marks its own leaders too: the season's points leader, per game's among regulars
+    app.ui.perfRange = 'year';
+    const year = app.perfRows([...app.perfDays().year]);
+    const pts = cats.findIndex(c => c.key === 'pts');
+    const yLead = year.reduce((x, y) => (app.lineStat(y.tot, 'pts') > app.lineStat(x.tot, 'pts') ? y : x));
+    app.ui.perfSort = { key: 'pts', dir: -1 };
+    let yc = cellsOf(app.topPerformancesCard());
+    assert.equal((((yc[yLead.raw.id] || [])[pts] || '').match(/pf-emo[^>]*>([^<]+)</) || [])[1], '\u{1F680}', `this season: ${yLead.raw.name} leads in points`);
+    app.ui.perfRange = 'avg';
+    const reg = app.seasonRows().filter(r => r.g >= 3 && r.tot.min >= 15);
+    const aLead = reg.reduce((x, y) => (app.lineStat(y.tot, 'pts') > app.lineStat(x.tot, 'pts') ? y : x));
+    yc = cellsOf(app.topPerformancesCard());
+    assert.equal((((yc[aLead.raw.id] || [])[pts] || '').match(/pf-emo[^>]*>([^<]+)</) || [])[1], '\u{1F680}', `per game: ${aLead.raw.name} leads in points among regulars`);
+    assert.match(app.topPerformancesCard(), /title="Most PTS per game"/);
   } finally { app.ui.perfRange = null; app.ui.perfShow = show; app.ui.perfSort = { key: 'v', dir: -1 }; }
 });
 

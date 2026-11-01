@@ -393,7 +393,7 @@ function topPerformancesCard() {
     const emo = b ? `<span class="pf-emo" aria-hidden="true">${b[0]}</span>` : '', tip = b ? ` · ${b[1]}` : '';
     if (c.pct) {
       const [m, a] = [r.tot[c.made] || 0, r.tot[c.att] || 0];
-      if (r.per) return `<td class="sc" title="${c.label}: ${fmt(m, 1)}-${fmt(a, 1)} a game">${a ? fmtPct(m / a) : '—'}</td>`;
+      if (r.per) return `<td class="sc" title="${c.label}: ${fmt(m, 1)}-${fmt(a, 1)} a game${tip}">${emo}${a ? fmtPct(m / a) : '—'}</td>`;
       return `<td class="sc" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}${tip}">${emo}${m}-${a}</td>`;
     }
     return `<td class="sc"${b ? ` title="${b[1]}"` : ''}>${emo}${fmt(lineStat(r.tot, c.key), r.per ? 1 : 0)}</td>`;
@@ -410,24 +410,26 @@ function topPerformancesCard() {
 
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
   const rows = avg ? seasonRows() : perfRows(dates);
-  // a finished day, among everyone who played: 🚀 the best in each category and 🔥 the second best (as many as 3
-  // tied), 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's
-  // average, so volume counts), everything else by the number.
+  // every range, among everyone in it: 🚀 the best in each category and 🔥 the second best (as many as 3 tied),
+  // 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's average, so
+  // volume counts), everything else by the number. Per game only counts regulars (3+ games, 15+ minutes a game).
   const badges = new Map();
-  if (range === 'day') {
-    const night = day === yesterday ? 'last night' : `on ${fmtDay(day)}`;
+  {
+    const night = range === 'avg' ? 'per game' : range === 'year' ? 'this season' : range === 'week' ? 'this week'
+      : day === today ? 'today' : day === yesterday ? 'last night' : `on ${fmtDay(day)}`;
+    const pool = avg ? rows.filter(r => r.g >= 3 && r.tot.min >= 15) : rows;
     const tiers = (list, f) => { const m = new Map(); for (const r of list) { const v = +f(r).toFixed(6); m.set(v, [...(m.get(v) || []), r]); } return [...m].sort((a, b) => b[0] - a[0]).map(x => x[1]); };
     const give = (rs, c, e, tip) => { if (rs && rs.length <= 3) for (const r of rs) badges.set(`${r.raw.id}|${c.key}`, [e, `${tip} ${night}`]); };
     for (const c of cats) {
       if (c.pct) {
-        const g = tiers(rows.filter(r => r.tot[c.att] && r.z[c.key] != null), r => r.z[c.key]);
+        const g = tiers(pool.filter(r => r.tot[c.att] && r.z[c.key] != null), r => r.z[c.key]);
         const low = g[g.length - 1];
         give(g[0], c, '🚀', `Best ${c.label} shooting`);
         if (g[0] && g[0].length === 1) give(g[1], c, '🔥', `2nd best ${c.label} shooting`);
         if (low && g.length > 1 && low[0].z[c.key] < 0) give(low, c, '🧊', `Worst ${c.label} shooting`);
         continue;
       }
-      const g = tiers(rows.filter(r => lineStat(r.tot, c.key) > 0), r => lineStat(r.tot, c.key));
+      const g = tiers(pool.filter(r => lineStat(r.tot, c.key) > 0), r => lineStat(r.tot, c.key));
       if (c.neg) { give(g[0], c, '🧈', `Most ${c.label}`); continue; }
       give(g[0], c, '🚀', `Most ${c.label}`);
       if (g[0] && g[0].length === 1) give(g[1], c, '🔥', `2nd most ${c.label}`);
