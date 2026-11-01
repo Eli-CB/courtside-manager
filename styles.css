@@ -178,6 +178,12 @@ a { color: var(--accent); }
 .mu-team.right { text-align: right; }
 .mu-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-team:not(.right) .mu-name { color: var(--accent); }
+.mu-line { display: flex; align-items: center; gap: 8px; }
+.mu-team.right .mu-line { flex-direction: row-reverse; }
+.mu-pace { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.mu-team.right .mu-pace { align-items: flex-end; }
+.mu-pc { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mu-pc svg { color: var(--muted); }
 .mu-score { font-size: 2.2rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .mu-when { margin: -4px 0 10px; }
 .mu-cats-wrap { overflow-x: auto; margin: 0 0 12px; }

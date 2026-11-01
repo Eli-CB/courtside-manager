@@ -200,7 +200,30 @@ function dashMatchupCard() {
   const half = (sc, k) => sc[k] + sc.ties / 2;
   // the big numbers are the matchup's: the period so far; the table and the players, the days picked
   const sc = B ? weekScore(A.tot, B.tot) : null, wk = B ? weekScore(A.week, B.week) : null;
-  const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div></div>`;
+  // each side's starter games this period: played, on now, still to come; and the game minutes still to be played
+  // (48 a game to come, what's left of each game on now)
+  const pace = S => {
+    const n = { played: 0, now: 0, left: 0, min: 0 };
+    for (const p of S.starters) if (p) for (const d of D.all) {
+      if (!playsOn(p, d)) continue;
+      const g = d === today ? liveGame(p, d) : null, line = lineOn(p, d);
+      if (g && g.state === 'in') { if (line || p.status !== 'Out') { n.now++; n.min += gameMinLeft(g); } continue; }
+      if (d < today || gameFinal(p, d) || (g && g.state === 'post')) { if (line) n.played++; continue; }
+      if (p.status !== 'Out') { n.left++; n.min += 48; }
+    }
+    n.min = Math.round(n.min);
+    return n;
+  };
+  const ICON_GAMES = '<svg viewBox="0 0 20 16" width="15" height="12" aria-hidden="true"><circle cx="7" cy="4.5" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M1.5 15c0-3.2 2.5-5.3 5.5-5.3s5.5 2.1 5.5 5.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M13 1.8a3 3 0 0 1 0 5.6M15.5 10.2c1.8.7 3 2.4 3 4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  const ICON_CLOCK = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="9" r="6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 5.8V9l2 1.6M6 1.2h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  const paceChips = S => {
+    const n = pace(S);
+    return `<div class="mu-pace">
+      <span class="mu-pc" title="Starter games this period: ${n.played} played, ${n.now} on now, ${n.left} to come">${ICON_GAMES}<b>${n.played}</b><span class="${n.now ? 'pos-good' : ''}">${n.now}</span><span class="muted">${n.left}</span></span>
+      <span class="mu-pc" title="Game minutes left for your starters this period: 48 a game to come, less what's been played of games on now">${ICON_CLOCK}<b>${n.min}</b></span>
+    </div>`;
+  };
+  const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div>${paceChips(S)}</div></div>`;
   const head = `<div class="mu-board">
       ${big(A, wk && (pts ? wk.me : half(wk, 'me')))}
       <div class="mu-mid"></div>

@@ -1056,6 +1056,17 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         const shown = [...m.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(x => +x[1]);
         assert.ok(shown.length && shown.every(id => app.playsOn(app.playerFromRaw(app.nbaById.get(id)), day)), 'nobody without a game');
         assert.ok(!m.includes('mu-slot') && !m.includes('dash-bench'), 'no slot column, no bench button');
+        // beside each score: starter games this period played / on now / to come, and game minutes left
+        const games = app.espnGames(sb);
+        assert.equal(app.gameMinLeft(games.find(g => g.detail === 'Halftime')), 24);
+        assert.equal(+app.gameMinLeft(games.find(g => g.detail === '2:08 - 4th')).toFixed(2), 2.13);
+        assert.equal(app.gameMinLeft({ state: 'pre' }), 48);
+        const pc = [...m.matchAll(/<b>(\d+)<\/b><span class="(?:pos-good)?">(\d+)<\/span><span class="muted">(\d+)<\/span>/g)].map(x => x.slice(1).map(Number));
+        assert.equal(pc.length, 2, 'one for each side');
+        const period = app.dashDays().all;
+        const scheduled = S => starters(S).reduce((n, p) => n + period.filter(d => app.playsOn(p, d)).length, 0);
+        pc.forEach(([played, now, left], i) => assert.ok(played + now + left <= scheduled([side, opp][i]) && now > 0 === pc[i][1] > 0));
+        assert.ok(pc.some(x => x[1] > 0), 'someone is on now');
         const sc = app.weekScore(total(side, [day]), total(opp, [day]));
         const week = app.dashDays().week;
         assert.deepEqual([...week], ['2026-10-26', '2026-10-27', day]);
