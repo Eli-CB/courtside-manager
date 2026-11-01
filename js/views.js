@@ -239,7 +239,7 @@ function dashMatchupCard() {
       <tbody>${catRow(A, 1)}${catRow(B, -1)}</tbody></table></div>` : '';
 
   // one player's cell: who, his game (or the week's games), and what he's put up
-  const cell = (p, right, counts) => {
+  const cell = (p, right, counts, tag = '', cls = '') => {
     if (!p) return `<div class="mu-p${right ? ' right' : ''}"><span class="muted small">${B || !right ? 'Empty' : ''}</span></div>`;
     const lines = dates.map(d => lineOn(p, d)).filter(Boolean);
     const tot = lines.reduce(addLine, {});
@@ -249,26 +249,30 @@ function dashMatchupCard() {
       game = `${lines.length} G${left && p.status !== 'Out' ? ` · ${left} left` : ''}${liveOn(p, today) && lineOn(p, today) ? ` · ${liveStatus(p, today)}` : ''}`;
     } else game = dashGame(p, dates[0]);
     const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
-    return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}">
-      <div class="bplayer">${headshot(p, 32)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}</div></div></div>
+    return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
+      <div class="bplayer">${headshot(p, 32)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
       <div class="mu-game">${game}</div>
       ${lines.length ? `<div class="mu-chips">${lineChips(tot)}</div>` : ''}
     </div>`;
   };
-  // one day: just who's playing (or played), starters then the bench (its games didn't count), side by side; anyone
-  // Out or who sat out a finished game goes last
+  // one day: just who's playing (or played), each side in one column with no gaps: starters, then the bench (its
+  // games didn't count, tagged), then anyone Out or who sat out a finished game
   if (range !== 'week') {
     const d = dates[0];
     const sits = p => !lineOn(p, d) && (p.status === 'Out' || gameFinal(p, d) || !!(liveGame(p, d) && liveGame(p, d).state === 'post'));
     const plays = (list, out = false) => list.filter(p => p && playsOn(p, d) && sits(p) === out);
-    const pair = (a, b, counts, cls = counts ? '' : ' bench') => Array.from({ length: Math.max(a.length, b.length) }, (x, i) =>
-      `<div class="mu-row day${cls}">${a[i] ? cell(a[i], false, counts) : '<div></div>'}${b[i] ? cell(b[i], true, counts) : '<div></div>'}</div>`).join('');
-    const on = S => (S ? S.starters : []), off = S => (S ? [...S.bench, ...S.ir] : []);
-    const out = S => [...plays(on(S), true), ...plays(off(S), true)];
-    const starters = pair(plays(on(A)), plays(on(B)), true), bench = pair(plays(off(A)), plays(off(B)), false);
-    const sat = pair(out(A), out(B), false, ' bench out');
-    const none = !starters && !bench && !sat ? `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>` : '';
-    return card(toggle, `${head}${catTable}<div class="mu-rows">${starters}${bench ? `<div class="mu-sep">Bench</div>${bench}` : ''}${sat ? `<div class="mu-sep">Out / DNP</div>${sat}` : ''}</div>${none}`);
+    const BENCH_TAG = ' <span class="badge bench">Bench</span>';
+    const column = S => {
+      if (!S) return [];
+      const bench = [...S.bench, ...S.ir];
+      return [...plays(S.starters).map(p => [p, 'start']), ...plays(bench).map(p => [p, 'bench']),
+        ...plays(S.starters, true).map(p => [p, 'out']), ...plays(bench, true).map(p => [p, 'out bench'])];
+    };
+    const a = column(A), b = column(B);
+    const one = (x, right) => (x ? cell(x[0], right, x[1] === 'start', x[1].endsWith('bench') ? BENCH_TAG : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
+    const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${one(a[i], false)}${one(b[i], true)}</div>`).join('');
+    const none = !rows ? `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>` : '';
+    return card(toggle, `${head}${catTable}<div class="mu-rows">${rows}</div>${none}`);
   }
   const row = (slot, a, b, counts) => `<div class="mu-row${counts ? '' : ' bench'}">${cell(a, false, counts)}<div class="mu-slot">${slotBadge(slot)}</div>${B ? cell(b, true, counts) : '<div></div>'}</div>`;
   const rows = state.slots.map((s, i) => row(s, A.starters[i], B && B.starters[i], true)).join('');

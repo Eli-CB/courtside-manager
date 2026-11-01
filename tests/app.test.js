@@ -1048,11 +1048,14 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         // anyone Out, or who sat out a finished game, goes last
         const sits = p => !app.lineOn(p, day) && (p.status === 'Out' || app.gameFinal(p, day) || (app.liveGame(p, day) || {}).state === 'post');
         const count = (list, out) => playing(list).filter(p => sits(p) === out).length;
-        assert.equal((m.match(/class="mu-row day"/g) || []).length, Math.max(count(starters(side), false), count(starters(opp), false)));
-        assert.equal((m.match(/class="mu-row day bench"/g) || []).length, Math.max(count(benchOf(side), false), count(benchOf(opp), false)));
-        const outs = S => count(starters(S), true) + count(benchOf(S), true);
-        assert.equal((m.match(/class="mu-row day bench out"/g) || []).length, Math.max(outs(side), outs(opp)));
-        if (outs(side) || outs(opp)) assert.ok(m.indexOf('Out / DNP') > m.lastIndexOf('class="mu-row day bench"'), 'at the bottom');
+        // each side one column with no gaps: starters, then the bench (tagged), then Out / DNP; rows pair them up
+        const col = S => [...playing(starters(S)).filter(p => !sits(p)), ...playing(benchOf(S)).filter(p => !sits(p)), ...playing(starters(S)).filter(sits), ...playing(benchOf(S)).filter(sits)];
+        assert.equal((m.match(/class="mu-row day"/g) || []).length, Math.max(col(side).length, col(opp).length), 'as many rows as the longer side');
+        const left = [...m.matchAll(/<div class="mu-row day"><div class="mu-p([^"]*)"[\s\S]*?data-nba="(\d+)"/g)].map(x => +x[2]);
+        const group = id => { const p = col(side).find(x => x.nbaId === id); return (sits(p) ? 2 : 0) + (starters(side).includes(p) ? 0 : 1); };
+        assert.deepEqual([...left].sort(), col(side).map(p => p.nbaId).sort(), 'my side: everyone who plays, no gaps');
+        assert.deepEqual(left.map(group), left.map(group).sort(), 'starters, bench, then out');
+        assert.equal((m.match(/badge bench">Bench</g) || []).length, playing(benchOf(side)).length + playing(benchOf(opp)).length, 'bench players tagged');
         const shown = [...m.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(x => +x[1]);
         assert.ok(shown.length && shown.every(id => app.playsOn(app.playerFromRaw(app.nbaById.get(id)), day)), 'nobody without a game');
         assert.ok(!m.includes('mu-slot') && !m.includes('dash-bench'), 'no slot column, no bench button');

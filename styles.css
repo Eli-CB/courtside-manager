@@ -198,7 +198,6 @@ a { color: var(--accent); }
 .mu-rows { border-top: 1px solid var(--border); }
 .mu-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); border-bottom: 1px solid var(--border); }
 .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-.mu-sep { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 10px 4px 4px; border-bottom: 1px solid var(--border); }
 .mu-none { margin: 10px 0 0; }
 .mu-slot { display: grid; place-items: center; }
 .mu-slot .slot-label { min-width: 0; padding: 2px 4px; font-size: .7rem; }
@@ -207,7 +206,7 @@ a { color: var(--accent); }
 .mu-p.right .bplayer { flex-direction: row-reverse; }
 .mu-p .bname .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .mu-p.live { background: color-mix(in srgb, var(--good) 7%, var(--surface)); }
-.mu-row.bench .mu-p { opacity: .62; }
+.mu-row.bench .mu-p, .mu-p.bench, .mu-p.out { opacity: .62; }
 .mu-game { font-size: .78rem; color: var(--muted); }
 .mu-game b { color: var(--bad); }
 .mu-chips { display: flex; flex-wrap: wrap; gap: 3px; }
