@@ -1084,6 +1084,16 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         assert.ok(m.includes(`<b>${pl.pts}</b> PTS`), "a starter's line");
         assert.ok(!/<b>0<\/b> |<b>0-0<\/b> /.test(m), "no bubble for a stat he didn't put up");
         assert.ok(m.includes('lv-dot'), 'a game still on shows its clock');
+        // Hide game scores: the clock and the opponent, no score
+        const g0 = app.espnGames(sb).find(g => g.state === 'in');
+        const scoreTxt = `${g0.away} ${g0.as} @ ${g0.home} ${g0.hs}`;
+        assert.ok(m.includes(scoreTxt), 'scores by default');
+        app.ui.hideScores = true;
+        try {
+          const hidden = app.dashMatchupCard();
+          assert.ok(!hidden.includes(scoreTxt) && !/[A-Z]{3} \d+ @ [A-Z]{3} \d+/.test(hidden), 'no score anywhere');
+          assert.ok(hidden.includes('lv-dot'), 'still the clock');
+        } finally { app.ui.hideScores = false; }
         app.ui.dashRange = 'week';
         m = app.dashMatchupCard();
         assert.equal((m.match(/class="mu-row"/g) || []).length, app.state.slots.length, 'the period: one row per starting slot; the bench hidden');

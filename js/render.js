@@ -174,6 +174,7 @@ function gearMenu() {
       <button type="button" class="lm-item" data-action="clear-saved">Clear saved league data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
+      <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers in the Dashboard's matchup</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
     </div>
   </details>`;
 }

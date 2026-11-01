@@ -34,6 +34,11 @@ const actions = {
     try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
     gearMenu();
   },
+  'toggle-scores'() {
+    ui.hideScores = !ui.hideScores;
+    try { localStorage.setItem(SCORES_KEY, ui.hideScores ? '1' : '0'); } catch (e) { /* ignore */ }
+    render();
+  },
   'fx-load-opp'() {
     const opp = fxOpponentFor(weekStart());
     if (!opp) return toast(`No ${sourceName()} matchup found for this week`);

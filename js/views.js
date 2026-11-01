@@ -142,16 +142,17 @@ function dashDays() {
   return { today: all.includes(today) && P.today ? today : null, started: P.started, day, week: all.filter(d => d <= today), all };
 }
 
-// A player's game that day: tip-off, the score and clock while it's on, the final score
+// A player's game that day: tip-off, the score and clock while it's on, the final score (just the opponent with
+// Hide game scores on)
 function dashGame(p, d) {
   if (!playsOn(p, d)) return '<span class="muted">No game</span>';
   const g = liveGame(p, d), s = g || (BOX.scores && BOX.scores.get(`${d} ${p.team}`));
   const vs = x => (x.home === p.team ? `vs ${x.away}` : `@${x.home}`);
   if (g && g.state === 'pre') return `${vs(g)} ${g.start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-  const score = s ? `${s.away} ${s.as} @ ${s.home} ${s.hs}` : '';
+  const score = !s ? '' : ui.hideScores ? vs(s) : `${s.away} ${s.as} @ ${s.home} ${s.hs}`;
   if (g && g.state === 'in') return `${liveStatus(p, d)} · ${score}`;
   const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
-  if (s) return `${score} F${dnp}`;
+  if (s) return `${score}${ui.hideScores ? ' · Final' : ' F'}${dnp}`;
   const nx = NBA.teams && NBA.teams[p.team] && NBA.teams[p.team].next;
   return nx && nx.date === d ? (nx.home ? `vs ${nx.opp}` : `@${nx.opp}`) : `Final${dnp}`;
 }

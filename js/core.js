@@ -8,6 +8,7 @@
    ========================================================= */
 const STORAGE_KEY = 'courtside-manager-v1';
 const THEME_KEY = 'courtside-theme';
+const SCORES_KEY = 'courtside-hide-scores'; // this device hides game scores (no spoilers)
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const SLOT_TYPES = ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'];
 const ELIG = {
@@ -72,6 +73,7 @@ let state = null;
 const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'fa', sort: 'val', limit: 50 }, tab: 'dashboard', recapWeek: null, afterPick: null, rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
   dashRange: null, dashBench: false, perfRange: null, perfSort: { key: 'v', dir: -1 },
   perfShow: { me: true, opp: true, fa: true, other: true, active: true, bench: true } };
+ui.hideScores = (() => { try { return localStorage.getItem(SCORES_KEY) === '1'; } catch (e) { return false; } })();
 
 function load() {
   let s = null;
