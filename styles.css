@@ -180,8 +180,8 @@ a { color: var(--accent); }
 .mu-team:not(.right) .mu-name { color: var(--accent); }
 .mu-line { display: flex; align-items: center; gap: 8px; }
 .mu-team.right .mu-line { flex-direction: row-reverse; }
-.mu-pace { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
-.mu-team.right .mu-pace { align-items: flex-end; }
+.mu-pace { display: flex; gap: 6px; align-items: center; }
+.mu-team.right .mu-pace { flex-direction: row-reverse; }
 .mu-pc { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mu-pc svg { color: var(--muted); }
 .mu-score { font-size: 2.2rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -218,6 +218,8 @@ a { color: var(--accent); }
 .mu-bench-btn { margin-top: 10px; }
 @media (max-width: 640px) {
   .mu-score { font-size: 1.8rem; }
+  .mu-pace { flex-direction: column; gap: 3px; align-items: flex-start; } /* phones: stacked beside the score */
+  .mu-team.right .mu-pace { flex-direction: column; align-items: flex-end; }
   .mu-row { grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); }
   .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
   .mu-slot .slot-label { font-size: .62rem; padding: 2px 2px; }
