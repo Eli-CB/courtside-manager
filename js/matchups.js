@@ -449,7 +449,7 @@ function lineupSection(ctx) {
     ? `<p class="small muted" style="margin:-6px 0 12px">${swing.length ? `Swing: <b>${swing.join(', ')}</b>` : 'No category is close'}${punt.length ? ` · Punt: <b>${punt.join(', ')}</b>` : ''}${locked.length ? ` · Locked: <b>${locked.join(', ')}</b>` : ''}</p>` : '';
   return `
     <div class="card">
-      <div class="card-head"><h2>${ui.viewing ? `Best lineup for ${esc(state.teamName)}` : ui.weekShift === 1 ? 'Lineup for next week' : ui.weekShift ? 'Lineup for that week' : 'Lineup for this week'} ${infoBtn('suggest')}</h2>${changed && !ui.viewing ? '<button class="btn sm primary" data-action="apply-best">Use suggested lineup</button>' : ''}</div>
+      <div class="card-head"><h2>${ui.viewing ? `Best lineup for ${esc(state.teamName)}` : ui.weekShift === 1 ? 'Lineup for next week' : ui.weekShift ? 'Lineup for that week' : 'Lineup for this week'} ${infoBtn('suggest')}</h2></div>
       <p class="small" style="margin:0 0 12px">${intro}</p>
       ${how}
       ${changed ? `<h3 class="sub">Suggested changes</h3>${steps.map(ex => swapBlock(ex, ctx, 'suggested')).join('')}${rest ? swapBlock(rest, ctx, 'suggested') : ''}` : ''}
@@ -611,7 +611,6 @@ function viewWeek() {
   if (!BOX && matchDates()[0] <= todayIso()) loadBoxes().then(() => { if (ui.tab === 'week') render(); }).catch(() => {});
   const ctx = weekContext();
   const { start, dates, weekly, hasOpp, asSet, best, oSet, oBest, mine } = ctx;
-  ui.bestIds = ctx.bestIds ? [...ctx.bestIds] : null;
   const today = todayIso();
   const staleOpp = hasOpp && state.opp.week && state.opp.week !== start;
   const range = `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}`;

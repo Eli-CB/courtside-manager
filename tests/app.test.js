@@ -814,8 +814,32 @@ test("player profile: value per game (each game, each season's averages) and thi
     for (const o of games) assert.ok(html.includes(app.signed(app.lineValue(o), 2)), `${o.date}: its value`);
     const avg = Object.fromEntries(['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta'].map(k => [k, games.reduce((t, o) => t + o[k], 0) / games.length]));
     assert.ok(Math.abs(app.lineValue(avg) - games.reduce((t, o) => t + app.lineValue(o), 0) / games.length) < 1e-9);
-    assert.match(html, /<th class="num">Value<\/th><\/tr><\/thead><tbody><tr><td><b>Projection/, 'a Value column for each season');
+    assert.ok(html.includes(`<th class="num">Value</th></tr></thead><tbody><tr><td><b>${app.NBA.season}</b>`), 'a Value column for each season, this one first');
+    assert.ok(!html.includes('Projection') && !html.includes('(NBA:'), 'no projection row, no NBA position');
+    // the header: age, flag, and whose he is in the league
+    if (raw.born) assert.match(html, / · age \d\d/);
+    if (raw.nat) assert.ok(html.includes(`flagcdn.com/w20/${raw.nat.toLowerCase()}.png`));
+    assert.ok(html.includes('class="pc-owner"'), 'his fantasy team, or free agent');
+    // Games: the whole season from the box scores, newest first, scrolling past five
+    await app.loadBoxes();
+    app.showPlayerDetail(raw.id);
+    const full = els['#detailBody'].innerHTML;
+    const box = app.get('BOX').byPlayer.get(raw.id) || [];
+    assert.ok(full.includes(`Games <span class="muted small">${box.length}</span>`), `all ${box.length} games`);
+    assert.ok(full.includes('pc-games-wrap'));
+    const dates = [...full.split('pc-games-wrap"><table>')[1].matchAll(/<tr><td>([^<]+)<\/td>/g)].map(m => m[1]);
+    assert.equal(dates.length, box.length);
   } finally { doc.querySelector = before; }
+});
+
+test('player card: a fantasy team with its lineup spot', async () => {
+  const L = await app.useLeague(CATS9);
+  const [tid, roster] = Object.entries(L.rosters).find(([, r]) => r.some(x => x.nba && x.st === 'INJURED_RESERVE'));
+  const x = roster.find(y => y.nba && y.st === 'INJURED_RESERVE');
+  const html = app.cardOwner(app.nbaById.get(x.nba));
+  assert.ok(html.includes(app.esc(app.fxTeamName(tid))) && html.includes('badge bad">IR'), 'team and a red IR badge');
+  const fa = app.NBA.players.find(r => r.fx && r.fx.st !== 'T' && !Object.values(L.rosters).flat().some(y => y.nba === r.id));
+  if (fa) assert.match(app.cardOwner(fa), /badge good">(Waivers|Free agent|Available)</);
 });
 
 test('performances: the last game day marks each category leader with an emoji', async () => {

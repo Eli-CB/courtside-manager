@@ -204,12 +204,6 @@ const actions = {
     try { localStorage.setItem(BOARD_KEY, ui.boardMode); } catch (e) { /* ignore */ }
     render();
   },
-  'apply-best'() {
-    if (!ui.bestIds) return;
-    const chosen = state.players.filter(p => ui.bestIds.includes(p.id)).sort((a, b) => value(b) - value(a));
-    state.lineup = fillSlots(chosen, state.slots);
-    commit('Lineup updated for this week');
-  },
   // the next or previous week in the picker (a two-week matchup is one step)
   'week-shift'(el) {
     const s = weekShifts(), next = +el.dataset.step > 0 ? s.find(x => x > ui.weekShift) : s.filter(x => x < ui.weekShift).pop();

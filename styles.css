@@ -227,7 +227,11 @@ a { color: var(--accent); }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: -6px 0 10px; }
-.perf-q { display: block; width: 100%; margin: 0 0 8px; }
+.flag { vertical-align: -2px; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
+.pc-owner { margin: 4px 0 0; font-size: .9rem; }
+/* the season's games: five show, the rest scroll */
+.pc-games-wrap { max-height: 300px; overflow-y: auto; }
+.perf-q { display: block; width: 100%; max-width: 280px; margin: 0 0 8px; }
 /* position and team menus look like the pills beside them, with a caret */
 .pill.pill-menu, .pill.pill-menu.on { appearance: none; -webkit-appearance: none; width: auto; height: auto; line-height: inherit; padding-right: 24px;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);

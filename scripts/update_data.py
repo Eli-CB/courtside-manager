@@ -36,6 +36,27 @@ ESPN_TEAMS = {'GS': 'GSW', 'NY': 'NYK', 'NO': 'NOP', 'SA': 'SAS', 'UTAH': 'UTA',
 NBA_TEAMS = {'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW', 'HOU', 'IND', 'LAC', 'LAL', 'MEM',
              'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS'}
 LEAGUE_CFG = os.path.join(ROOT, 'league.json')
+# NBA.com's COUNTRY (the country a player represents) as ISO 3166 codes, for the player card's flag
+COUNTRY_ISO = {
+    'USA': 'US', 'France': 'FR', 'Canada': 'CA', 'Australia': 'AU', 'Nigeria': 'NG', 'Germany': 'DE', 'Spain': 'ES',
+    'Serbia': 'RS', 'United Kingdom': 'GB', 'Great Britain': 'GB', 'England': 'GB', 'Scotland': 'GB', 'Israel': 'IL',
+    'Bosnia and Herzegovina': 'BA', 'Switzerland': 'CH', 'Senegal': 'SN', 'Cameroon': 'CM', 'Netherlands': 'NL',
+    'Bahamas': 'BS', 'Georgia': 'GE', 'Belgium': 'BE', 'Russia': 'RU', 'Italy': 'IT', 'Croatia': 'HR',
+    'Dominican Republic': 'DO', 'Lithuania': 'LT', 'DRC': 'CD', 'Democratic Republic of the Congo': 'CD',
+    'Republic of the Congo': 'CG', 'Congo': 'CG', 'South Sudan': 'SS', 'Sudan': 'SD', 'New Zealand': 'NZ', 'Greece': 'GR',
+    'Guinea': 'GN', 'Slovenia': 'SI', 'Japan': 'JP', 'China': 'CN', 'Uganda': 'UG', 'Czech Republic': 'CZ',
+    'Czechia': 'CZ', 'Sweden': 'SE', 'Mexico': 'MX', 'Finland': 'FI', 'Ukraine': 'UA', 'Austria': 'AT', 'Latvia': 'LV',
+    'Portugal': 'PT', 'Jamaica': 'JM', 'Brazil': 'BR', 'Turkey': 'TR', 'Turkiye': 'TR', 'Estonia': 'EE',
+    'Montenegro': 'ME', 'Argentina': 'AR', 'Angola': 'AO', 'Mali': 'ML', 'Egypt': 'EG', 'Poland': 'PL',
+    'Puerto Rico': 'PR', 'Venezuela': 'VE', 'Haiti': 'HT', 'Ghana': 'GH', 'South Africa': 'ZA', 'Philippines': 'PH',
+    'Iran': 'IR', 'Tunisia': 'TN', 'Denmark': 'DK', 'Norway': 'NO', 'Lebanon': 'LB', 'Iceland': 'IS', 'Hungary': 'HU',
+    'Bulgaria': 'BG', 'Romania': 'RO', 'North Macedonia': 'MK', 'Macedonia': 'MK', 'Cape Verde': 'CV', 'Gabon': 'GA',
+    'Saint Lucia': 'LC', 'U.S. Virgin Islands': 'VI', 'Ivory Coast': 'CI', "Cote d'Ivoire": 'CI', 'South Korea': 'KR',
+    'Korea': 'KR', 'Taiwan': 'TW', 'Qatar': 'QA', 'Cuba': 'CU', 'Panama': 'PA', 'Colombia': 'CO', 'Uruguay': 'UY',
+    'Chile': 'CL', 'Belize': 'BZ', 'Trinidad and Tobago': 'TT', 'Kenya': 'KE', 'Rwanda': 'RW', 'Tanzania': 'TZ',
+    'Ethiopia': 'ET', 'Chad': 'TD', 'Central African Republic': 'CF', 'Slovakia': 'SK', 'Belarus': 'BY',
+    'Kazakhstan': 'KZ', 'Armenia': 'AM', 'Ireland': 'IE', 'Guadeloupe': 'GP', 'Martinique': 'MQ', 'Lithuania ': 'LT',
+}
 FX = 'https://www.fantrax.com/fxea/general/'
 BASE_POS = ['PG', 'SG', 'SF', 'PF', 'C']
 
@@ -714,6 +735,8 @@ def main():
             p['fx'] = {'id': fx['id'], 'st': fx['st']}
             if fx.get('adp'): p['fx']['adp'] = fx['adp']
         was = old.get(pid, {})
+        nat = COUNTRY_ISO.get((r.get('COUNTRY') or '').strip()) or was.get('nat')
+        if nat: p['nat'] = nat
         if games:
             if pid in cur: p['cur'] = cur[pid]
             if pid in l10: p['l10'] = l10[pid]

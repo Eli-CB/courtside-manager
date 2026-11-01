@@ -790,10 +790,6 @@ function viewTrade() {
 }
 
 /* ---------- NBA players ---------- */
-function ownedNbaIds() {
-  return { roster: new Set(state.players.map(p => p.nbaId).filter(Boolean)) };
-}
-
 function viewPlayers() {
   if (!NBA) {
     return `<div class="card"><div class="empty"><strong>Loading player data…</strong>If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.</div></div>`;
@@ -884,12 +880,46 @@ function recommendedCard() {
   </div>`;
 }
 
+// A country's flag (ISO code from the daily data job), named on hover
+const flag = iso => {
+  if (!iso) return '';
+  let name = iso;
+  try { name = new Intl.DisplayNames(['en'], { type: 'region' }).of(iso); } catch (e) { /* the code, then */ }
+  const c = iso.toLowerCase();
+  return ` · <img class="flag" src="https://flagcdn.com/w20/${c}.png" srcset="https://flagcdn.com/w40/${c}.png 2x" width="20" height="15" alt="${esc(name)}" title="${esc(name)}" loading="lazy">`;
+};
+// Whose he is in the league: the fantasy team and where in its lineup, else free agent or waivers
+function cardOwner(raw) {
+  const L = fxLeague();
+  if (!L || !L.rosters) return '';
+  for (const [tid, r] of Object.entries(L.rosters)) {
+    const x = r.find(y => y.nba === raw.id);
+    if (x) return `<p class="pc-owner"><b>${esc(fxTeamName(tid))}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span></p>`;
+  }
+  return raw.fx ? `<p class="pc-owner"><span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span></p>` : '';
+}
+// Every game he's played this season, newest first: the saved box scores (and today's, as they're played), else
+// the few the daily file keeps (preseason ones too, before the season starts)
+function cardGames(raw) {
+  const box = BOX && BOX.byPlayer.get(raw.id);
+  if (!box || !box.length) return (raw.log || []).map(g => { const o = {}; NBA.logKeys.forEach((k, i) => { o[k] = g[i]; }); return o; });
+  const out = box.map(([d, st, margin, team]) => {
+    const s = BOX.scores && BOX.scores.get(`${d} ${team}`);
+    const matchup = s ? (s.home === team ? `vs ${s.away}` : `@ ${s.home}`) : '';
+    return { ...st, date: d, matchup, wl: margin > 0 ? 'W' : margin < 0 ? 'L' : '' };
+  });
+  for (const [d, lines] of live.lines) if (lines.has(raw.id) && !box.some(g => g[0] === d)) out.push({ ...lines.get(raw.id), date: d, matchup: 'live', wl: '' });
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+let cardOpen = null; // the player whose card is showing
 function showPlayerDetail(nbaId) {
+  // the season's box scores, the first time a card needs them
+  if (!BOX && NBA) loadBoxes().then(() => { if ($('#detailDialog').open && cardOpen === nbaId) showPlayerDetail(nbaId); }).catch(() => {});
   const raw = nbaById.get(nbaId);
   if (!raw) return;
-  const owned = ownedNbaIds();
   const t = teamInfo(raw.team);
-  const lines = [['Projection', 'Proj', nbaStats(raw)], [NBA.season, String(NBA.season).slice(2), statObj(raw.cur)], ['Last 10', 'L10', statObj(raw.l10)], [NBA.prevSeason, String(NBA.prevSeason).slice(2), statObj(raw.prev)]]
+  const lines = [[NBA.season, String(NBA.season).slice(2), statObj(raw.cur)], ['Last 10', 'L10', statObj(raw.l10)], [NBA.prevSeason, String(NBA.prevSeason).slice(2), statObj(raw.prev)]]
     .filter(([, , s]) => s && s.gp);
   // value as Performances counts it (categories won against not playing, or fantasy points): per game, and this season's games added up
   const VAL = isPoints() ? 'FP' : 'Value';
@@ -905,17 +935,16 @@ function showPlayerDetail(nbaId) {
     <tr><td><b>${VAL}</b></td>${lines.map(([, , st]) => valCell(perGameVal(st))).join('')}</tr></tbody></table>` : '';
   const rows = lines.map(([l, , s]) => [l, s])
     .map(([l, s]) => `<tr><td><b>${l}</b></td><td class="num">${Math.round(s.gp)}</td><td class="num">${fmt(s.min, 1)}</td><td class="num">${fmt(s.pts)}</td><td class="num">${fmt(s.reb)}</td><td class="num">${fmt(s.ast)}</td><td class="num">${fmt(s.stl)}</td><td class="num">${fmt(s.blk)}</td><td class="num">${fmt(s.tpm)}</td><td class="num">${fmt(s.to)}</td><td class="num">${fmtPct(s.fga ? s.fgm / s.fga : 0)}</td><td class="num">${fmtPct(s.fta ? s.ftm / s.fta : 0)}</td>${valCell(perGameVal(s))}</tr>`).join('');
-  const games = (raw.log || []).map(g => { const o = {}; NBA.logKeys.forEach((k, i) => { o[k] = g[i]; }); return o; });
+  const games = cardGames(raw);
   // phones: each game as a short block
-  const gamesNarrow = games.length ? `<ul class="pc-games show-sm">${games.map(o => { const v = lineValue(o); return `<li>
+  const gamesNarrow = games.length ? `<ul class="pc-games show-sm pc-games-wrap">${games.map(o => { const v = lineValue(o); return `<li>
       <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min · <span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtValue(v)} ${isPoints() ? 'FP' : 'value'}</span></span></div>
       <div>${[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`].map(x => `<span>${x}</span>`).join(' · ')}</div>
       <div class="muted">${o.fgm}-${o.fga} FG · ${o.ftm}-${o.fta} FT</div></li>`; }).join('')}</ul>` : '';
-  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${o.min}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td>${valCell(lineValue(o))}</tr>`).join('');
-  const onRoster = owned.roster.has(raw.id);
+  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${Math.round(o.min)}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td>${valCell(lineValue(o))}</tr>`).join('');
   $('#detailBody').innerHTML = `
     <div class="detail-head">
-      <div class="detail-id">${headshot({ nbaId: raw.id, name: raw.name }, 64)}<div><h2>${esc(raw.name)}</h2><p class="muted" style="margin:2px 0 0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)} (NBA: ${esc(raw.nbaPos || '—')}) · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}</p></div></div>
+      <div class="detail-id">${headshot({ nbaId: raw.id, name: raw.name }, 64)}<div><h2>${esc(raw.name)}</h2><p class="muted" style="margin:2px 0 0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)} · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}</p>${cardOwner(raw)}</div></div>
       <div>${raw.inj ? `<span class="badge ${raw.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(raw.inj.label)}</span>` : '<span class="badge good">Healthy</span>'}</div>
     </div>
     ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small">${esc(raw.inj.note)} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
@@ -927,11 +956,11 @@ function showPlayerDetail(nbaId) {
     </div>
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
     ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}
-    <h3 class="sub" style="margin-top:16px">Recent games</h3>
-    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th><th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
+    <h3 class="sub" style="margin-top:16px">Games${games.length ? ` <span class="muted small">${games.length}</span>` : ''}</h3>
+    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th><th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   $('#detailFoot').innerHTML = `
-    <button type="button" class="btn ghost" data-action="close-detail">Close</button>
-    ${onRoster ? '<span class="badge accent">On your roster</span>' : ''}`;
+    <button type="button" class="btn ghost" data-action="close-detail">Close</button>`;
   const d = $('#detailDialog');
+  cardOpen = nbaId;
   if (!d.open) d.showModal();
 }
