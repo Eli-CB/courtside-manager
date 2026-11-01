@@ -301,6 +301,11 @@ async function loadImages() {
     if (!r.ok) return;
     IMG = await r.json();
     IMG.ids.forEach((id, i) => IMG_INDEX.set(id, i));
+    // the sheet's address carries its layout, so a browser never pairs a cached old sheet with a new index (every
+    // face shifted after the monthly rebuild)
+    let h = 2166136261;
+    for (const c of IMG.ids.join()) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    document.documentElement.style.setProperty('--hs-sheet', `url(data/headshots.webp?v=${h.toString(36)})`);
     cropLogos(IMG.logos);
     render();
   } catch (e) { /* images are optional */ }
