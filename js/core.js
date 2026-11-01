@@ -70,8 +70,8 @@ function emptyState() {
    State + persistence
    ========================================================= */
 let state = null;
-const ui = { weekShift: 0, pf: { q: '', pos: '', team: '', show: 'fa', sort: 'val', limit: 50 }, tab: 'dashboard', recapWeek: null, afterPick: null, rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
-  dashRange: null, dashBench: false, perfRange: null, perfSort: { key: 'v', dir: -1 },
+const ui = { weekShift: 0, tab: 'dashboard', recapWeek: null, afterPick: null, rosterSort: { key: 'value', dir: -1 }, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
+  dashRange: null, dashBench: false, perfRange: null, perfQ: '', perfPos: '', perfSort: { key: 'v', dir: -1 },
   perfShow: { me: true, opp: true, fa: true, other: true, active: true, bench: true } };
 ui.hideScores = (() => { try { return localStorage.getItem(SCORES_KEY) === '1'; } catch (e) { return false; } })();
 

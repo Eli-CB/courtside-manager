@@ -330,23 +330,29 @@ function perfRows(dates) {
   return rows;
 }
 
+// Per game: every NBA player's average game (the stats chosen under Stats used), valued as one game
+function seasonRows() {
+  return nbaPlayers().filter(p => p.min).map(p => ({ raw: nbaById.get(p.nbaId), g: p.gp || 0, tot: statLine(p), z: isPoints() ? {} : catWins(p), v: value(p), per: true }))
+    .filter(r => r.raw);
+}
+
 let perfOrder = { sig: '', ids: [] }; // the rows last shown, in order
 function topPerformancesCard() {
   const today = todayIso(), yesterday = addDays(today, -1);
-  const card = (head, body) => `<div class="card"><div class="card-head"><h2>Performances ${infoBtn('perf')}</h2>${head}</div>${body}</div>`;
+  const card = (head, body) => `<div class="card"><div class="card-head"><h2>Players ${infoBtn('perf')}</h2>${head}${LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : ''}</div>${body}</div>`;
   if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
   const P = perfDays();
   // the buttons: Today, the last game day before it, This week. Until one is picked: today once its games have
   // started, else the last game day
-  const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This week']].filter(Boolean);
-  if (!opts.length) return card('', '<p class="muted small" style="margin:0">No games have been played yet.</p>');
+  // ... and Per game: everyone's average game, for finding anyone (a free agent, a trade target)
+  const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This week'], ['season', 'Per game']].filter(Boolean);
   const range = opts.some(([k]) => k === ui.perfRange) ? ui.perfRange : P.started || !P.day ? opts[0][0] : 'day';
-  const weekly = range === 'week';
-  const dates = weekly ? P.week : [range === 'today' ? today : P.day];
+  const weekly = range === 'week', season = range === 'season';
+  const dates = season ? [] : weekly ? P.week : [range === 'today' ? today : P.day];
   const day = dates[0];
-  const updated = range === 'day' ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
+  const updated = range === 'day' || season ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
     : live.at ? ` · updated ${new Date(live.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
-  const when = (weekly ? `${fmtDay(P.week[0])} – ${fmtDay(P.week[P.week.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
+  const when = season ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly ? `${fmtDay(P.week[0])} – ${fmtDay(P.week[P.week.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
   const toggle = opts.length > 1 ? `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="perf-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>` : '';
 
   // who rosters each player, and where in that team's lineup he is now (active or on the bench)
@@ -354,7 +360,7 @@ function topPerformancesCard() {
   const L = fxLeague();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) { owner.set(x.nba, tid); spot.set(x.nba, x); }
   const mine = ui.viewing ? ui.viewA : state.fxTeam;
-  const opp = owner.size && mine ? fxOpponentFor(dates[0], mine) : null; // this matchup's opponent
+  const opp = owner.size && mine ? fxOpponentFor(dates[0] || today, mine) : null; // this matchup's opponent
   // where a player is: in a team's starting lineup (active), on its bench (IR included), or on no roster (waivers)
   const statusOf = id => (!spot.has(id) ? 'fa' : spot.get(id).st === 'ACTIVE' ? 'active' : 'bench');
   const lineupBadge = id => {
@@ -372,7 +378,7 @@ function topPerformancesCard() {
   };
 
   const pts = leaguePoints();
-  const expected = weekly ? WEEK_GAMES * dates.length / 7 : 1; // an average starter's games over these days
+  const expected = weekly ? WEEK_GAMES * dates.length / 7 : 1; // an average starter's games over these days (Per game: one)
   const par = pts ? fpBase()[0] * expected : 0;
   const cats = scoreCats().filter(c => !c.fp);
   // a column sorts by what it adds: its category contribution, or its fantasy points, so best-first works for TO too
@@ -382,9 +388,10 @@ function topPerformancesCard() {
     const emo = b ? `<span class="pf-emo" aria-hidden="true">${b[0]}</span>` : '', tip = b ? ` · ${b[1]}` : '';
     if (c.pct) {
       const [m, a] = [r.tot[c.made] || 0, r.tot[c.att] || 0];
+      if (r.per) return `<td class="sc" title="${c.label}: ${fmt(m, 1)}-${fmt(a, 1)} a game">${a ? fmtPct(m / a) : '—'}</td>`;
       return `<td class="sc" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}${tip}">${emo}${m}-${a}</td>`;
     }
-    return `<td class="sc"${b ? ` title="${b[1]}"` : ''}>${emo}${fmt(lineStat(r.tot, c.key), 0)}</td>`;
+    return `<td class="sc"${b ? ` title="${b[1]}"` : ''}>${emo}${fmt(lineStat(r.tot, c.key), r.per ? 1 : 0)}</td>`;
   };
   // only Value is colored: greener up to a monster night (+0.7 a game, over an average starter's games on these days),
   // red below 0 (the team was better off without it: rare, so −0.25 is full red); points leagues around an average
@@ -393,10 +400,11 @@ function topPerformancesCard() {
   const e = +expected.toFixed(1);
   const over = weekly ? `${e} game${e === 1 ? '' : 's'} over these days` : 'a game';
   const valTip = esc(pts ? `Fantasy points in your league; an average starter scores ${fmt(par, 1)} in ${over}`
+    : season ? "Categories won by his average game: what it adds to winning a week's categories, against not playing"
     : `Categories won: what ${weekly ? 'his games' : 'the game'} added to winning a week's categories, against not playing (an even matchup). Below 0: his team would have done better without ${weekly ? 'them' : 'it'}`);
 
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
-  const rows = perfRows(dates);
+  const rows = season ? seasonRows() : perfRows(dates);
   // a finished day, among everyone who played: 🚀 the best in each category and 🔥 the second best (as many as 3
   // tied), 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's
   // average, so volume counts), everything else by the number.
@@ -429,14 +437,17 @@ function topPerformancesCard() {
   const pill = ([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${k === 'me' || k === 'opp' ? `<span class="pf-swatch pf-${k}"></span>` : ''}${l}</button>`;
   const teams = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['other', 'Other teams']];
   const where = [['active', 'Active', 'In their team\'s starting lineup'], ['bench', 'Bench', 'On their team\'s bench or IR'], ['fa', 'Waivers', 'Not on a roster in your league']];
-  const filters = !owner.size || !rows.length ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${teams.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${where.map(pill).join('')}</div>`;
-  const picked = owner.size ? rows.filter(r => { const t = teamOf(r); return (!t || ui.perfShow[t]) && ui.perfShow[statusOf(r.raw.id)]; }) : rows;
+  const find = `<div class="perf-find"><input id="perfQ" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(ui.perfQ)}" data-input="perf-q" autocomplete="off">
+    <select data-change="perf-pos" aria-label="Position"><option value="">All positions</option>${POSITIONS.map(x => `<option ${ui.perfPos === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>`;
+  const filters = find + (!owner.size || !rows.length ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${teams.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${where.map(pill).join('')}</div>`);
+  const q = normName(ui.perfQ);
+  const picked = rows.filter(r => { const t = teamOf(r); return (!owner.size || ((!t || ui.perfShow[t]) && ui.perfShow[statusOf(r.raw.id)])) && (!q || normName(r.raw.name).includes(q)) && (!ui.perfPos || (r.raw.pos || []).includes(ui.perfPos)); });
   const so = ui.perfSort;
   const th = (key, label, cls) => sortTh('perf-sort', key, label, so, { cls, down: so.dir < 0 });
   const sorted = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
   // a live update keeps the rows where they were (numbers and ranks change in place; anyone new goes below) so the
   // table doesn't jump while it's read; anything you do sorts it again
-  const sig = [range, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine].join('|');
+  const sig = [range, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine, ui.perfQ, ui.perfPos].join('|');
   let shown = sorted.slice(0, 50);
   if (live.hold && perfOrder.sig === sig) {
     const byId = new Map(picked.map(r => [r.raw.id, r])), was = new Set(perfOrder.ids);
@@ -452,7 +463,7 @@ function topPerformancesCard() {
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 28)}<div class="bmain">
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button></div>
-          <div class="pmeta">${weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${Math.round(r.tot.min || 0)} min · ${who(r.raw.id)}</div></div></div></td>
+          <div class="pmeta">${season ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${Math.round(r.tot.min || 0)} min${season ? '/g' : ''} · ${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
@@ -764,74 +775,20 @@ function viewTrade() {
 }
 
 /* ---------- NBA players ---------- */
-const PF_SORTS = { val: 'Value', pts: 'PTS', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK', tpm: '3PM', min: 'MIN', games: 'Games left this week' };
-
 function ownedNbaIds() {
   return { roster: new Set(state.players.map(p => p.nbaId).filter(Boolean)) };
-}
-
-function filteredPlayers() {
-  const f = ui.pf;
-  const q = normName(f.q);
-  const owned = ownedNbaIds();
-  let list = nbaPlayers().filter(p =>
-    (!q || normName(p.name).includes(q)) &&
-    (!f.pos || p.pos.includes(f.pos)) &&
-    (!f.team || p.team === f.team) &&
-    (f.show !== 'available' || !owned.roster.has(p.nbaId)) &&
-    (f.show !== 'fa' || (fxLeague() ? fxAvailable(nbaById.get(p.nbaId)) : !owned.roster.has(p.nbaId))) &&
-    (f.show !== 'injured' || p.inj) &&
-    (f.show !== 'healthy' || !p.inj));
-  const k = f.sort;
-  list = [...list].sort((a, b) => (b[k] - a[k]) || (b.val - a.val));
-  return list;
-}
-
-function playerRows() {
-  const owned = ownedNbaIds();
-  const all = filteredPlayers();
-  const list = all.slice(0, ui.pf.limit);
-  if (!all.length) return `<div class="empty"><strong>No players match</strong>Try a different name or clear the filters.</div>`;
-  const rows = list.map((p, i) => {
-    const onRoster = owned.roster.has(p.nbaId);
-    return `<tr>
-      <td class="num muted">${i + 1}</td>
-      <td class="player">${playerCell(p, true, false)}</td>
-      <td>${statusBadge(p)}</td>
-      <td class="num">${p.gp || '—'}</td>${p.gp ? statCells(p) : `<td class="num muted" colspan="11">No NBA stats yet</td>`}
-      <td class="num">${p.games}</td>
-      <td class="row-actions">${(() => { const raw = nbaById.get(p.nbaId); return raw && raw.fx && !onRoster ? `<span class="badge ${raw.fx.st === 'T' ? '' : 'good'}">${FX_STATUS[raw.fx.st] || raw.fx.st}</span> ` : ''; })()}${onRoster ? '<span class="badge accent">On roster</span>' : ''}</td>
-    </tr>`;
-  }).join('');
-  return `<div class="table-wrap"><table>
-    <thead><tr><th class="num">#</th><th>Player</th><th>Status</th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">${valueLabel()}</th><th class="num" title="Games left this week">Wk G</th><th></th></tr></thead>
-    <tbody>${rows}</tbody></table></div>
-    <div class="list-foot"><span class="muted small">Showing ${list.length} of ${all.length}</span>${all.length > list.length ? '<button class="btn sm" data-action="more-players">Show 50 more</button>' : ''}</div>`;
 }
 
 function viewPlayers() {
   if (!NBA) {
     return `<div class="card"><div class="empty"><strong>Loading player data…</strong>If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.</div></div>`;
   }
-  const f = ui.pf;
-  const teams = [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort();
   // the latest games come from the box scores, loaded on first need; today's as they're played
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'players') render(); }).catch(() => {});
   startLive();
   return `
   ${topPerformancesCard()}
-  ${ui.viewing ? '' : recommendedCard()}
-  <div class="card">
-    <div class="card-head"><h2>${f.show === 'fa' ? 'Available players' : 'NBA players'} ${infoBtn('projection')}</h2><span class="muted small">${BASIS_LABELS[state.basis]} stats</span>${LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : ''}</div>
-    <div class="filters">
-      <label class="field grow" for="pfQ">Search<input id="pfQ" type="search" placeholder="Player name" value="${esc(f.q)}" data-input="pf" data-key="q" autocomplete="off"></label>
-      <label class="field" for="pfPos">Position<select id="pfPos" data-change="pf" data-key="pos"><option value="">All</option>${POSITIONS.map(x => `<option ${f.pos === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
-      <label class="field" for="pfTeam">Team<select id="pfTeam" data-change="pf" data-key="team"><option value="">All</option>${teams.map(t => `<option ${f.team === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label class="field" for="pfShow">Show<select id="pfShow" data-change="pf" data-key="show">${[['fa', 'Available'], ['all', 'Every NBA player'], ['available', 'Not on my roster'], ['healthy', 'Healthy only'], ['injured', 'Injured only']].map(([v, l]) => `<option value="${v}" ${f.show === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-      <label class="field" for="pfSort">Sort by<select id="pfSort" data-change="pf" data-key="sort">${Object.entries(PF_SORTS).map(([v, l]) => `<option value="${v}" ${f.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-    </div>
-    <div id="playerResults">${playerRows()}</div>
-  </div>`;
+  ${ui.viewing ? '' : recommendedCard()}`;
 }
 
 // ----- Recommended adds -----

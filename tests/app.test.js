@@ -934,6 +934,42 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
   }
 });
 
+test('Players: one table; Per game ranks every NBA player, with search and position', async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const ui = app.get('ui');
+  const ids = html => [...(html.split('<tbody>')[1] || '').matchAll(/data-nba="(\d+)"/g)].map(m => +m[1]);
+  const count = html => +html.match(/· (?:\d+ of )?(\d+) players?</)[1];
+  try {
+    let html = app.topPerformancesCard();
+    assert.ok(html.includes('data-range="season"') && html.includes('>Per game<'), 'Per game is one of the ranges');
+    ui.perfRange = 'season';
+    html = app.topPerformancesCard();
+    const rows = app.seasonRows();
+    assert.equal(count(html), rows.length, 'every NBA player with stats');
+    assert.ok(rows.length > 300 && rows.every(r => r.per));
+    assert.ok(/\d+ GP · \d+ min\/g/.test(html), 'games played and minutes a game');
+    if (app.state.fxTeam && app.fxOpponentFor(app.todayIso(), app.state.fxTeam)) assert.ok(html.includes('data-group="opp"'), "this week's opponent filter too");
+    assert.ok(/<td class="sc" title="FG%: [\d.]+-[\d.]+ a game">\.\d{3}<\/td>/.test(html), 'percentages per game');
+    // the top row is the best average game
+    const best = rows.reduce((x, y) => (y.v > x.v ? y : x));
+    assert.equal(ids(html)[0], best.raw.id);
+    // search by name, any range
+    const name = best.raw.name;
+    ui.perfQ = name.split(' ').pop().toLowerCase();
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).includes(best.raw.id) && ids(html).every(id => app.normName(app.nbaById.get(id).name).includes(app.normName(ui.perfQ))));
+    ui.perfQ = '';
+    // position
+    ui.perfPos = 'C';
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).length && ids(html).every(id => app.nbaById.get(id).pos.includes('C')), 'centers only');
+    // no live updates for averages
+    ui.tab = 'players';
+    assert.equal(app.liveWanted(), false);
+  } finally { ui.perfRange = null; ui.perfQ = ''; ui.perfPos = ''; ui.tab = 'standings'; }
+});
+
 test('performances: Active and Bench filters, and an Active badge', async () => {
   await app.loadBoxes();
   const L = await app.useLeague(CATS9);

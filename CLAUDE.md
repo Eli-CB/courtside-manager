@@ -33,8 +33,9 @@ saved leagues are lost). Owner's league:
     all awards (Best draft, Best manager, Waiver Wire Wizard, Street Clothes and Unc Status team names open a breakdown: `awardDetails`, `award-team`), past Rosters
   - views: Dashboard (`dashMatchupCard`: Today / Yesterday show only who plays that day, each side one gapless column: starters, bench (tagged), Out/DNP;
     This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then action items and injuries), Roster,
-    Standings + Season totals, Trades, Players tab (`#players`, was Free Agents: Performances, every NBA stat line of
-    today / last game day / this week with team and Active/Bench/Waivers filters, ranked by value; recommended adds; player list)
+    Standings + Season totals, Trades, Players tab (`#players`, was Free Agents): one table (`topPerformancesCard`) of every NBA stat line of
+    today / last game day / this week, or Per game (`seasonRows`: averages from the Stats used basis), with search, position and
+    team / Active / Bench / Waivers filters, ranked by value; then recommended adds
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such

@@ -227,6 +227,9 @@ a { color: var(--accent); }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: -6px 0 10px; }
+.perf-find { display: flex; gap: 8px; margin: 0 0 10px; }
+.perf-find input { flex: 1; min-width: 0; }
+.perf-find select { flex: none; width: auto; }
 .perf-table .pf-emo { margin-right: 2px; font-size: .9em; }
 .pf-legend { margin: 8px 0 0; }
 /* weekly recap */

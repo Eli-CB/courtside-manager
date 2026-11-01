@@ -252,7 +252,7 @@ function viewPreDraft(L) {
   const past = draftTime(L) && draftTime(L) < new Date();
   return `<div class="card"><div class="empty"><strong>${past ? 'Waiting on the draft' : "This league hasn't drafted yet"}</strong>
       ${when ? `${past ? 'The draft was set for' : 'The draft is set for'} <b>${esc(when)}</b>. ` : ''}Rosters, matchups and the draft board fill in here once teams have players.
-      In the meantime, the <a href="#players">Players</a> tab ranks every NBA player (set Show to Every NBA player).</div></div>`;
+      In the meantime, the <a href="#players">Players</a> tab ranks every NBA player (Per game).</div></div>`;
 }
 
 function standingOf(teamId) {

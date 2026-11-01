@@ -218,7 +218,6 @@ const actions = {
   'player-detail'(el) { showPlayerDetail(+el.dataset.nba); },
 
   'close-detail'() { $('#detailDialog').close(); },
-  'more-players'() { ui.pf.limit += 50; $('#playerResults').innerHTML = playerRows(); },
   async 'refresh-data'(el) {
     el.disabled = true;
     el.textContent = 'Refreshing…';
@@ -358,10 +357,9 @@ document.addEventListener('change', e => {
     adoptTeam(el.value);
     state.demo = false;
     commit(`Welcome, ${state.teamName}`);
-  } else if (el.dataset.change === 'pf') {
-    ui.pf[el.dataset.key] = el.value;
-    ui.pf.limit = 50;
-    $('#playerResults').innerHTML = playerRows();
+  } else if (el.dataset.change === 'perf-pos') {
+    ui.perfPos = el.value;
+    render();
   } else if (el.dataset.change === 'trade-team') {
     ui.tradeTeam = el.value;
     ui.tradeGet.clear();
@@ -375,10 +373,13 @@ document.addEventListener('change', e => {
 
 document.addEventListener('input', e => {
   const el = e.target;
-  if (el.dataset.input === 'pf') {
-    ui.pf[el.dataset.key] = el.value;
-    ui.pf.limit = 50;
-    $('#playerResults').innerHTML = playerRows();
+  if (el.dataset.input === 'perf-q') {
+    // the whole tab redraws; the search box keeps focus and the caret
+    ui.perfQ = el.value;
+    const at = el.selectionStart;
+    render();
+    const box = $('#perfQ');
+    if (box) { box.focus(); box.setSelectionRange(at, at); }
   }
 });
 
