@@ -1349,7 +1349,13 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     // the standouts are starters' numbers, valued as Performances values them
     assert.ok(X.mvp && X.mvp.v > 0 && X.game && X.game.line.gp1 === 1);
     assert.ok(X.game.v >= X.mvp.v / X.mvp.line.gp1, 'the best game beats the best week per game');
-    if (X.brick) assert.ok(X.brick.v < 0);
+    // the brick did the least over the week, the dud had the worst single game
+    assert.ok(X.brick && X.dud);
+    assert.ok(X.brick.line.gp1 >= 2 && X.brick.v / X.brick.line.gp1 <= X.mvp.v / X.mvp.line.gp1 && X.dud.v <= X.game.v && X.dud.line.gp1 === 1);
+    assert.ok(html.includes('Brick of the week') && html.includes('Dud of the week'));
+    // Street clothes: games missed while starting, never more than his team played
+    assert.ok(X.missed.every(x => x.games > 0 && x.games <= x.sched));
+    if (X.missed.length) assert.ok(html.includes('Street clothes') && html.includes('while starting'));
     if (X.regret) assert.ok(X.regret.up > 0, 'a bench regret changes a result');
     assert.ok(X.allPlay.w + X.allPlay.l + X.allPlay.t === L.teams.length - 1);
     for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);

@@ -72,12 +72,18 @@ function buildRecap(L, P, period) {
     const rec = R.filter(O => O !== S).map(O => outcome(weekScore(S.tot, O.tot)));
     return { tid: S.tid, w: rec.filter(x => x > 0).length, l: rec.filter(x => x < 0).length, t: rec.filter(x => !x).length };
   });
-  const brick = best(single, x => -x.v);
+  // the starters who missed the most of their NBA team's games while in a starting lineup that week
+  const missedBy = Object.entries(startersMissed({ ...L, weeks: rps, fidNba: currentFidNba() }, P.G) || {}).flatMap(([tid, ps]) => ps.filter(x => x.games).map(x => ({ ...x, tid })));
+  const most = Math.max(0, ...missedBy.map(x => x.games));
   return {
     period, games: order,
     mvp: best(weeks, x => x.v),
     game: best(single, x => x.v),
-    brick: !isPoints() && brick && brick.v < 0 ? brick : null,
+    // the least a starter did a game over the week, among those with 2 or more games (one short night isn't a week)
+    brick: best(weeks.filter(x => x.line.gp1 >= 2), x => -x.v / x.line.gp1),
+    dud: best(single, x => -x.v), // the single worst game
+    // the most games missed; a tie lists up to three (the ones whose team played least first) and counts the rest
+    missed: most ? missedBy.filter(x => x.games === most).sort((a, b) => a.sched - b.sched) : [],
     regret,
     allPlay: best(allPlay, x => x.w + x.t / 2),
     teams: R.length,
@@ -101,7 +107,16 @@ function recapItems(X) {
   };
   if (X.mvp) stand('🏆', 'Player of the week', X.mvp, true);
   if (X.game) stand('🚀', 'Game of the week', X.game, false);
-  if (X.brick) stand('🧱', 'Brick of the week', X.brick, false, 'pos-bad');
+  if (X.brick) stand('🧱', 'Brick of the week', X.brick, true, X.brick.v < 0 ? 'pos-bad' : '');
+  if (X.dud) stand('🗑️', 'Dud of the week', X.dud, false, X.dud.v < 0 ? 'pos-bad' : '');
+  if (X.missed && X.missed.length) {
+    // nobody's photo: names in line with the text, as the others
+    const who = (x, html) => (html ? `${name({ nbaId: x.nba, name: x.name }, true)} <span class="muted">${esc(team(x.tid))}</span>` : `${x.name} (${team(x.tid)})`);
+    const g = X.missed[0].games, shown = X.missed.slice(0, 3), more = X.missed.length - shown.length;
+    const list = html => shown.map(x => who(x, html)).join(', ') + (more ? ` and ${more} other${more === 1 ? '' : 's'}` : '');
+    const tail = X.missed.length > 1 ? `each missed ${g} game${g === 1 ? '' : 's'} while starting` : `missed ${g} of ${X.missed[0].sched} games while starting`;
+    add('🤕', 'Street clothes', `${list(true)} ${tail}`, `${list(false)} ${tail}`);
+  }
   if (X.regret) {
     const r = X.regret, o = Math.sign(Math.round((r.sc.me - r.sc.opp) * 10)), res = o > 0 ? 'won' : 'tied';
     add('🪑', 'Bench regret', `<b>${esc(team(r.tid))}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,

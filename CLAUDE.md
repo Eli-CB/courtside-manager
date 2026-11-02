@@ -48,7 +48,7 @@ saved leagues are lost). Owner's league:
     leagues without weekly lineups (ESPN) show today's lineups labelled as such
   - A week is over (`periodOver`) at its end or once its last game day's box scores are all in: Fantrax ends a weekly
     period Monday evening when the next locks, a day after its last games. Recap, awards, past-week cards use it.
-  - recap: Recap tab: a finished week across the league (Player/Game/Brick of the week with full lines in the league's cats,
+  - recap: Recap tab: a finished week across the league (Player/Game of the week, Brick (worst per game, 2+ G), Dud (worst game), Street clothes (most games missed while starting), with full lines in the league's cats,
     bench regret, best all-play week, then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends the standouts +
     a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
     Fantrax only. The Dashboard offers it for 3 days after a week ends (`freshRecap`)

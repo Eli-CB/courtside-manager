@@ -37,7 +37,10 @@ const INFO = {
   recap: ['Weekly recap', `
     <p>A finished week's standouts across the league, counted from that week's real lineups and the NBA box scores (as How week N ended counts one matchup), then every matchup's result. Only starters count. Stat lines show your league's categories.</p>
     <ul><li><b>Player of the week:</b> the most value from a starter's games that week (categories won, or fantasy points in points leagues), with his per-game line.</li>
-    <li><b>Game of the week</b> and <b>Brick of the week:</b> the best and worst single games by a starter. A brick only shows when a game did the team more harm than good.</li>
+    <li><b>Game of the week:</b> the best single game by a starter.</li>
+    <li><b>Brick of the week:</b> the starter who did the least a game over the week (2 or more games), with his per-game line.</li>
+    <li><b>Dud of the week:</b> the worst single game by a starter.</li>
+    <li><b>Street clothes:</b> the starter who missed the most of his NBA team's games while in a starting lineup that week (injury, rest or coach's decision; the box scores can't tell which).</li>
     <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Matchups).</li>
     <li><b>Best week:</b> the team whose week would have beaten the most others.</li></ul>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
