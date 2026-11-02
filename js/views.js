@@ -983,6 +983,21 @@ function cardGames(raw) {
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+// Where each player's season ranks among everyone's, by value per game and by this season's value added up. Per game
+// counts regulars only: half the games of whoever has played the most. Kept until the stats or the scoring change.
+let rankMemo = { key: null };
+function valueRanks() {
+  const key = `${NBA.updated}|${JSON.stringify(leaguePoints() || scoreCats().map(c => c.key))}`;
+  if (rankMemo.key === key) return rankMemo;
+  const rows = NBA.players.map(raw => ({ id: raw.id, s: statObj(raw.cur) })).filter(x => x.s && x.s.gp)
+    .map(x => ({ id: x.id, gp: Math.round(x.s.gp), per: lineValue(statLine(x.s)) }));
+  const minGp = Math.max(1, Math.floor(Math.max(0, ...rows.map(x => x.gp)) / 2));
+  const order = (list, f) => new Map([...list].sort((a, b) => f(b) - f(a)).map((x, i) => [x.id, i + 1]));
+  const regulars = rows.filter(x => x.gp >= minGp);
+  rankMemo = { key, minGp, per: order(regulars, x => x.per), perN: regulars.length, tot: order(rows, x => x.per * x.gp), totN: rows.length };
+  return rankMemo;
+}
+
 let cardOpen = null; // the player whose card is showing
 function showPlayerDetail(nbaId) {
   // the season's box scores, the first time a card needs them
@@ -1024,6 +1039,12 @@ function showPlayerDetail(nbaId) {
       <div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>
       <div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div></div>
       <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div></div>
+      ${(() => {
+        const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
+        const tipPer = esc(`Among the ${R.perN} players with ${R.minGp}+ games this season, by ${VAL.toLowerCase()} per game`), tipTot = esc(`Among the ${R.totN} players who've played this season, by ${VAL.toLowerCase()} added up`);
+        return `<div class="proj" data-tip="${tipPer}"><div class="k">Rank per game</div><div class="v">${per ? `#${per} <span class="muted small">of ${R.perN}</span>` : season ? `— <span class="muted small">${R.minGp}+ G</span>` : '—'}</div></div>
+      <div class="proj" data-tip="${tipTot}"><div class="k">Rank this season</div><div class="v">${tot ? `#${tot} <span class="muted small">of ${R.totN}</span>` : '—'}</div></div>`;
+      })()}
     </div>
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
     ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}

@@ -824,6 +824,13 @@ test("player profile: value per game (each game, each season's averages) and thi
     assert.ok(Math.abs(app.lineValue(avg) - games.reduce((t, o) => t + app.lineValue(o), 0) / games.length) < 1e-9);
     assert.ok(html.includes(`<th class="num">Value</th></tr></thead><tbody><tr><td><b>${app.NBA.season}</b>`), 'a Value column for each season, this one first');
     assert.ok(!html.includes('Projection') && !html.includes('(NBA:'), 'no projection row, no NBA position');
+    // his rank among everyone this season: per game (regulars) and added up
+    const R = app.valueRanks();
+    const better = app.NBA.players.map(r => app.statObj(r.cur)).filter(s => s && s.gp && app.lineValue(app.statLine(s)) * Math.round(s.gp) > per * Math.round(cur.gp)).length;
+    assert.equal(R.tot.get(raw.id), better + 1);
+    assert.ok(html.includes(`Rank this season</div><div class="v">#${better + 1} <span class="muted small">of ${R.totN}</span>`));
+    assert.ok(html.includes('Rank per game'));
+    if (Math.round(cur.gp) >= R.minGp) assert.ok(html.includes(`#${R.per.get(raw.id)} <span class="muted small">of ${R.perN}</span>`));
     // the header: age, flag, and whose he is in the league
     if (raw.born) assert.match(html, / · age \d\d/);
     if (raw.nat) assert.ok(html.includes(`flagcdn.com/w20/${raw.nat.toLowerCase()}.png`));
