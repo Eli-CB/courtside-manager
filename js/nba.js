@@ -253,6 +253,16 @@ function matchDates(start = weekStart()) {
   }
   return [...state.matchDays].sort((a, b) => a - b).map(o => addDays(start, o));
 }
+// A matchup period whose games are all played: its end has passed, or every game of its last game day is in the
+// saved box scores. Fantrax ends a weekly period when the next one locks (Monday evening), though its last games
+// were the night before. p: a league period ({ start, endAt }) or a weekly roster period ({ start, end }).
+function periodOver(p) {
+  if (fxTime(p.endAt || p.end) < Date.now()) return true;
+  const days = matchDates(String(p.start || '').slice(0, 10));
+  const last = days[days.length - 1];
+  if (!last || !(last < todayIso()) || !BOX) return false;
+  return [...teamDates].every(([t, ds]) => !ds.has(last) || BOX.finals.has(`${last} ${t}`));
+}
 const playsOn = (p, d) => !!(teamDates.get(p.team) && teamDates.get(p.team).has(d));
 const gamesIn = (p, dates) => dates.filter(d => playsOn(p, d)).length;
 

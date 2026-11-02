@@ -7,7 +7,8 @@
 // counts one matchup: every final, then the standouts. Fantrax leagues only (the others don't share past lineups).
 const recaps = new Map(); // "league|period" -> recap, or null when the week's lineups aren't there
 
-const finishedPeriods = L => (L.periods || []).filter(p => fxTime(p.endAt) < Date.now() && ((L.matchups || {})[String(p.n)] || []).length);
+// weeks whose games are all played (a Fantrax week ends officially when the next locks, a day after its last games)
+const finishedPeriods = L => (L.periods || []).filter(p => periodOver(p) && ((L.matchups || {})[String(p.n)] || []).length);
 
 // A game's or a week's full line in the league's own categories (a week per game; shooting as makes-attempts, a
 // week's with its %), minutes first
@@ -128,6 +129,8 @@ function viewRecap() {
   if (!L || !NBA) return '';
   const empty = (t, m) => `<div class="card"><div class="empty"><strong>${t}</strong>${m}</div></div>`;
   if (!hasLineupHistory(L)) return empty(`No recaps for ${esc(sourceName(L))} leagues yet`, "Recaps come from each week's real lineups, which the site reads from Fantrax only for now.");
+  // the last game day's box scores tell whether a week is over before Fantrax says so
+  if (!BOX) loadBoxes().then(() => { if (ui.tab === 'recap') render(); }).catch(() => {});
   const done = finishedPeriods(L);
   if (!done.length) return empty('No finished weeks yet', 'The first recap appears once week 1 is over.');
   const period = done.find(p => p.n === ui.recapWeek) || done[done.length - 1];
@@ -140,12 +143,14 @@ function viewRecap() {
   if (!X) return empty(`Week ${period.n} recap`, `${sourceName(L)} hasn't shared this week's lineups.`);
 
   const me = myTeamId();
-  const picker = done.length > 1 ? `<select class="ctx-team" data-change="recap-week" aria-label="Week">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Week ${p.n}</option>`).join('')}</select>` : '';
+  // every finished week, newest by default: ‹ Week 2 › steps back through the earlier ones
+  const picker = done.length > 1 ? stepper('recap-step', 'week', `<select class="ctx-team" data-change="recap-week" aria-label="Week">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Week ${p.n}</option>`).join('')}</select>`,
+    { first: period.n === done[0].n, last: period.n === done[done.length - 1].n }) : '';
   const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${esc(fxTeamName(g.a))}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${esc(fxTeamName(g.b))}</span></li>`).join('');
   const items = recapItems(X).map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div><div class="rc-label">${x.label}</div>${x.html}</div></li>`).join('');
   return `<div class="card">
     <div class="card-head"><h2>Week ${period.n} standouts ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
-    <p class="muted small rc-when">${esc(L.name)} · ${fmtDay(period.start)} – ${fmtDay(period.end)} · starters only</p>
+    <p class="muted small rc-when">${esc(L.name)} · ${fmtDay(period.start)} – ${fmtDay(matchDates(period.start).slice(-1)[0] || period.end)} · starters only</p>
     ${items ? `<ul class="rc-items">${items}</ul>` : '<p class="muted small" style="margin:0">Nothing stood out.</p>'}
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>

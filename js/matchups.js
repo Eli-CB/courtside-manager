@@ -516,7 +516,7 @@ function pastWeeksOf(L) {
 }
 function pastWeekCard(start) {
   const L = fxLeague(), period = fxPeriodFor(start);
-  if (!L || !period || !hasLineupHistory(L) || !(fxTime(period.endAt) < Date.now())) return '';
+  if (!L || !period || !hasLineupHistory(L) || !periodOver(period)) return '';
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const pair = (L.matchups[String(period.n)] || []).find(m => m.includes(leftId));
   if (!pair) return '';

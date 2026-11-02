@@ -72,6 +72,13 @@ const actions = {
   },
   'go-week'() { location.hash = '#week'; },
   'go-recap'() { ui.recapWeek = null; location.hash = '#recap'; },
+  // the previous or next finished week's recap
+  'recap-step'(el) {
+    const done = finishedPeriods(fxLeague()).map(p => p.n);
+    const at = done.indexOf(ui.recapWeek != null && done.includes(ui.recapWeek) ? ui.recapWeek : done[done.length - 1]);
+    const n = done[at + +el.dataset.step];
+    if (n != null) { ui.recapWeek = n; render(); }
+  },
   // on phones the share sheet (the league chat is one tap away); elsewhere the text and link, copied
   async 'recap-share'(el) {
     const L = fxLeague(), X = L && recaps.get(`${L.id}|${+el.dataset.week}`);

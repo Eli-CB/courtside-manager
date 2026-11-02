@@ -1564,3 +1564,30 @@ test('the newer awards add up: Steal and Bust are each pick against its rank, Fa
   const week = award('Week of the Year').list[0].T.bestWeek;
   assert.ok(week.beat <= week.of && week.cats.length === app.scoreCats().length);
 });
+
+test("a week is over once its last game day's box scores are in, before Fantrax ends it Monday evening", async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(CATS9);
+  const wk1 = L.periods[0]; // Oct 20-25, ends on Fantrax Monday Oct 26 at 6:59 PM
+  assert.equal(await onDay('2026-10-25', () => app.periodOver(wk1)), false, 'Sunday: its last games still to come');
+  assert.equal(await onDay('2026-10-26', () => app.periodOver(wk1)), true, "Monday noon: Sunday's games are in");
+  assert.ok(await onDay('2026-10-26', () => app.finishedPeriods(L).some(p => p.n === 1)), 'its recap is ready');
+  assert.equal(await onDay('2026-10-26', () => app.periodOver(L.periods[1])), false, 'week 2 just starting');
+});
+
+test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
+  const L = await app.useLeague(CATS9);
+  const fid = id => app.NBA.players.find(r => r.id === id).fx.id;
+  const withFx = app.NBA.players.filter(r => r.fx).slice(0, 4);
+  const [a, b, c, d] = withFx.map(r => r.fx.id);
+  const [t1, t2] = L.teams.map(t => t.id);
+  const owner = entries => new Map(entries.map(([f, tid]) => [f, { tid, on: true }]));
+  const weeks = [{ n: 1, owner: owner([[a, t1], [b, t1], [c, t2]]) }, { n: 2, owner: owner([[a, t1], [d, t1], [b, t2]]) }];
+  const moves = app.periodMoves({ ...L, rosterPeriod: 2 }, weeks);
+  const kinds = tid => JSON.parse(JSON.stringify((moves[tid] || []).map(m => [m.kind, m.nba]))).sort();
+  assert.deepEqual(kinds(t1), [['add', withFx[3].id], ['away', withFx[1].id]].sort(), `${app.fxTeamName(t1)} added one and traded one away`);
+  assert.deepEqual(kinds(t2), [['drop', withFx[2].id], ['trade', withFx[1].id]].sort(), `${app.fxTeamName(t2)} traded for one and dropped one`);
+  assert.equal(moves[t2].find(m => m.kind === 'trade').from, t1);
+  assert.equal(app.periodMoves({ ...L, rosterPeriod: 1 }, weeks), null, 'week 1 has no week before it');
+  assert.ok(fid(withFx[0].id));
+});

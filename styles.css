@@ -218,6 +218,19 @@ a { color: var(--accent); }
 @keyframes chip-good { 0%, 35% { background: var(--good-soft); border-color: var(--good); color: var(--good); } }
 @keyframes chip-bad { 0%, 35% { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); } }
 .mu-bench-btn { margin-top: 10px; }
+/* this week's waiver moves, team by team */
+.mv-teams { display: grid; gap: 10px 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.mv-name { font-weight: 700; font-size: .9rem; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mv-team.me .mv-name { color: var(--accent); }
+.mv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: .88rem; }
+.mv { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mv .inl-p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mv-k { width: 16px; flex: none; text-align: center; font-weight: 800; }
+.mv-add .mv-k { color: var(--good); }
+.mv-drop .mv-k { color: var(--bad); }
+.mv-drop .pname, .mv-away .pname { color: var(--muted); }
+.mv-when { margin: 10px 0 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 640px) {
   .mu-score { font-size: 1.8rem; }
   .mu-pace { flex-direction: column; gap: 3px; align-items: flex-start; } /* phones: stacked beside the score */

@@ -116,6 +116,7 @@ function viewDashboard() {
   return `
   <div class="dash-grid">
     ${NBA ? dashMatchupCard() : ''}
+    ${NBA ? movesCard() : ''}
     <div class="dash-side">
       <div class="card">
         <div class="card-head"><h2>Action items</h2></div>
@@ -516,6 +517,52 @@ function newsCard() {
   const body = mine.length ? `<ul class="alerts">${mine.slice(0, 6).map(p => `<li class="alert ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${headshot(p, 32)}<span class="grow"><b>${esc(p.name)}</b> <span class="badge ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(p.inj.label)}</span><br><span class="small">${esc(p.inj.note)}</span> <span class="muted small">${p.inj.date ? fmtDay(p.inj.date) : ''}</span></span></li>`).join('')}</ul>`
     : `<p class="muted small" style="margin:0">${NBA ? 'None of your players are on the injury report.' : 'Injury news appears here when live NBA data is available.'}</p>`;
   return `<div class="card"><div class="card-head"><h2>Injury news</h2><span class="muted small">your players · ESPN</span></div>${body}</div>`;
+}
+
+// ----- This week's waiver moves: who joined and left each team since last week's rosters -----
+// Fantrax shares each period's rosters but no transaction log, so a move is a difference between the last period's
+// rosters and this one's as they are now: on no roster before = added, on no roster now = dropped, on another team
+// before = traded (on both teams). A player added and dropped in between isn't seen.
+// Team id -> [{ kind: 'add' | 'drop' | 'trade' (in) | 'away' (traded out), nba, name, from / to }]
+function periodMoves(L, weeks) {
+  const cur = L.rosterPeriod;
+  const now = cur && weeks && weeks.find(w => w.n === cur), before = now && weeks.find(w => w.n === cur - 1);
+  if (!now || !before) return null;
+  const fidNba = currentFidNba();
+  const names = new Map(Object.values(L.rosters || {}).flat().map(x => [x.fid, x.name]));
+  const who = f => { const nba = fidNba(f), raw = nba && nbaById.get(nba); return { nba, name: raw ? raw.name : names.get(f) || 'A player' }; };
+  const out = {};
+  const add = (tid, m) => (out[tid] = out[tid] || []).push(m);
+  for (const [f, o] of now.owner) {
+    const b = before.owner.get(f);
+    if (!b) add(o.tid, { kind: 'add', ...who(f) });
+    else if (b.tid !== o.tid) { add(o.tid, { kind: 'trade', from: b.tid, ...who(f) }); add(b.tid, { kind: 'away', to: o.tid, ...who(f) }); }
+  }
+  for (const [f, b] of before.owner) if (!now.owner.has(f)) add(b.tid, { kind: 'drop', ...who(f) });
+  return out;
+}
+const movesLoad = new WeakMap(); // league -> its weekly rosters, once loaded
+function movesCard() {
+  const L = fxLeague();
+  if (!L || !hasLineupHistory(L) || !(L.rosterPeriod > 1)) return '';
+  if (!movesLoad.has(L)) {
+    movesLoad.set(L, null);
+    loadRosterWeeks(L).then(w => movesLoad.set(L, w || [])).catch(() => movesLoad.set(L, [])).finally(() => { if (ui.tab === 'dashboard') render(); });
+  }
+  const weeks = movesLoad.get(L);
+  const head = `<div class="card-head"><h2>Waiver wire · week ${L.rosterPeriod} ${infoBtn('moves')}</h2></div>`;
+  if (!weeks) return `<div class="card">${head}<p class="muted small" style="margin:0">Loading last week's rosters…</p></div>`;
+  const moves = periodMoves(L, weeks);
+  if (!moves) return '';
+  const me = ui.viewing ? ui.viewA : state.fxTeam;
+  const order = { add: 0, trade: 1, away: 2, drop: 3 };
+  const tids = Object.keys(moves).sort((a, b) => (b === me) - (a === me) || moves[b].length - moves[a].length);
+  const at = (readLeagueCache()[L.id] || {}).at;
+  const move = m => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${m.kind === 'add' ? '+' : m.kind === 'drop' ? '−' : '⇄'}</span>${m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${m.nba}">${esc(m.name)}</button>`) : esc(m.name)}${m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>` : ''}<span class="sr-only">${m.kind === 'add' ? 'added' : m.kind === 'drop' ? 'dropped' : m.kind === 'trade' ? 'traded for' : 'traded away'}</span></li>`;
+  const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${esc(fxTeamName(tid))}</div>
+      <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
+    : '<p class="muted small" style="margin:0">No adds or drops since last week.</p>';
+  return `<div class="card">${head}${body}${at ? `<p class="muted small mv-when">Rosters as of ${new Date(at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · ↻ Reload in ⚙ for the latest</p>` : ''}</div>`;
 }
 
 function slotBadge(slot) {

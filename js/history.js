@@ -238,7 +238,7 @@ function draftImpact(L, G, picks) {
 function allPlayRecords(L, G, each) {
   if (!L.weeks || !G) return null;
   const now = Date.now();
-  const weeks = L.weeks.filter(w => (!L.playoffPeriod || w.n < L.playoffPeriod) && fxTime(w.end) < now && (L.matchups[String(w.n)] || []).length);
+  const weeks = L.weeks.filter(w => (!L.playoffPeriod || w.n < L.playoffPeriod) && periodOver(w) && (L.matchups[String(w.n)] || []).length);
   if (!weeks.length) return null;
   const cats = scoreCats();
   const sc = leaguePoints();
@@ -860,7 +860,7 @@ function viewAwardsSoFar() {
   if (!C.weeks || !gameLogs.cur) return '<div class="card"><div class="empty"><strong>No awards yet</strong>They start once the season’s first week of lineups and games is in.</div></div>';
   // run the awards on a copy of the league that carries this season's weeks
   const L2 = { ...L, weeks: C.weeks, season: 'cur', fidNba: C.fidNba };
-  const done = C.weeks.filter(w => fxTime(w.end) < Date.now()).length;
+  const done = C.weeks.filter(periodOver).length;
   return viewingLeague(L2, state.fxTeam, () => {
     return `<p class="page-sub">So far: ${done} finished week${done === 1 ? '' : 's'}${done < 3 ? ', so these will move a lot' : ''} (the week underway counts toward everything but Best manager)</p>${viewAwards()}`;
   });

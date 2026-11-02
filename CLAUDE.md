@@ -38,13 +38,16 @@ saved leagues are lost). Owner's league:
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards (every award but Biggest punt and Even Steven: a team's name opens a breakdown: `awardDetails`, `award-team`), past Rosters
   - views: Dashboard (`dashMatchupCard`: Today / Yesterday show only who plays that day, each side one gapless column: starters, bench (tagged), Out/DNP;
-    This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then action items and injuries), Roster,
+    This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then
+    this week's waiver moves (`periodMoves`: last period's rosters vs this one's, Fantrax only), action items and injuries), Roster,
     Standings + Season totals, Trades, Players tab (`#players`, was Free Agents): one table (`topPerformancesCard`) of every NBA stat line of
     today / last game day / this week / this season (added up), or Per game (`seasonRows`: averages from the Stats used basis); top 300 for the season ranges, 100 otherwise; search, position and NBA team (pill-style menus), Rookies / Injured toggles,
     team / Active / Bench / Waivers filters, ranked by value; then recommended adds
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such
+  - A week is over (`periodOver`) at its end or once its last game day's box scores are all in: Fantrax ends a weekly
+    period Monday evening when the next locks, a day after its last games. Recap, awards, past-week cards use it.
   - recap: Recap tab: a finished week across the league (Player/Game/Brick of the week with full lines in the league's cats,
     bench regret, best all-play week, then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends the standouts +
     a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).

@@ -41,6 +41,9 @@ const INFO = {
     <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Matchups).</li>
     <li><b>Best week:</b> the team whose week would have beaten the most others.</li></ul>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
+  moves: ['Waiver wire', `
+    <p>Who each team added and dropped since last week's rosters: this week's moves so far, including the ones made before its first game. A player on no roster last week is an add (+), one on no roster now a drop (−), one who was on another team a trade (⇄).</p>
+    <p>Fantrax shares each week's rosters but no list of transactions, so a player added and dropped again in between doesn't show. Rosters are as of the last time the league loaded; ↻ Reload in the settings menu brings the latest.</p>`],
   dashmatch: ['Matchup', `
     <p>Your matchup this week, slot by slot: each team's lineup as your league has it now, and each starter's game and stat line in your league's categories.</p>
     <p><b>Today</b> and <b>Yesterday</b> (this matchup's last game day) show only who plays that day: starters, then bench players, whose games don't count. Today updates while games are on (from ESPN, every 30 seconds), and each stat bubble that changes flashes green when it helps (a make, a rebound) or red when it hurts (a miss, a turnover); finished games are the NBA's official box scores, with its stat corrections, from the site's overnight update. <b>This period</b> adds up the matchup period so far (your league's own, from its schedule: usually a week, sometimes two around the All-Star break); each player shows games played and left.</p>
