@@ -70,6 +70,25 @@ function draftRow(p, mine) {
 
 const draftValueLabel = () => (ui.draftMode === 'total' ? (isPoints() ? 'Total FP' : 'Total value') : valueLabel());
 
+// ----- One team's draft: its keepers and every pick, opened from its name in Team drafts -----
+const draftTeamCards = new Map(); // team id -> { title, html }, written as the Draft tab draws
+function draftTeamCard(d, tid, ps) {
+  const L = fxLeague();
+  const year = seasonCtx ? seasonCtx.label : L && L.year ? seasonLabel(L.year) : '';
+  const gain = (g, gp) => (!d.graded ? '' : gp ? `<b class="aw-break-v ${g > 0 ? 'pos-good' : g < 0 ? 'pos-bad' : 'muted'}">${signed(g, 0)}</b>` : '<b class="aw-break-v muted">DNP</b>');
+  const row = (p, meta, right) => `<li><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, 28)}<div class="bmain">${p.nbaId ? `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`}<div class="muted small">${meta}</div></div></div>${right}</li>`;
+  const ks = d.keepers[tid] || [];
+  const keepers = ks.map(k => row(k, k.past ? 'Keeper' : `Keeper · graded as pick #${k.slot}${k.like ? ` · ${seasonCtx ? 'finished as' : 'playing like'} #${k.like}` : ''}`, k.past ? '' : gain(k.gain, k.gp))).join('');
+  const picks = [...ps].sort((a, b) => a.pick - b.pick).map(p => row(p, `R${p.round} · pick #${p.pick}${d.graded && p.gp ? ` · ${seasonCtx ? 'finished as' : 'playing like'} #${p.rank}` : ''}`, gain(p.gain, p.gp))).join('');
+  const avg = sum(ps.map(p => p.gain)) / ps.length;
+  return {
+    title: `${fxTeamName(tid)}: ${year ? `${year} ` : ''}draft`,
+    html: `${d.graded ? `<p class="aw-break-total"><b class="${avg > 0 ? 'pos-good' : avg < 0 ? 'pos-bad' : ''}">${signed(avg, 1)}</b> a pick on average, from ${ps.length} pick${ps.length === 1 ? '' : 's'}</p>` : ''}
+      ${keepers ? `<h3 class="sub">Keepers</h3><ul class="aw-break">${keepers}</ul>` : ''}
+      <h3 class="sub">Picks</h3><ul class="aw-break">${picks}</ul>`,
+  };
+}
+
 function draftList(title, list, mine, info) {
   return `<div class="card">
     <div class="card-head"><h2>${title} ${info ? infoBtn('draft') : ''}</h2></div>
@@ -99,6 +118,8 @@ function viewDraft() {
     const total = sum(ps.filter(p => p.score != null).map(p => p.score));
     return { id, name: fxTeamName(id), n: ps.length, avg, top, low, total };
   }).sort((a, b) => b.avg - a.avg);
+  draftTeamCards.clear();
+  for (const [id, ps] of Object.entries(byTeam)) draftTeamCards.set(id, draftTeamCard(d, id, ps));
 
   // board: one column per draft slot (round-1 order), one row per round. Traded picks stay in
   // their original slot, marked with the team that made them; keepers fill two rows on top.
@@ -151,7 +172,7 @@ function viewDraft() {
     <div class="card-head"><h2>Team drafts</h2><span class="muted small">ranked by average +/− per pick</span></div>
     <div class="table-wrap"><table class="dr-teams">
       <thead><tr><th class="num">#</th><th>Team</th><th class="num">Avg +/−</th><th class="num">${d.totals ? draftValueLabel() : `Total ${valueLabel()}`}</th><th>Best pick</th><th>Worst pick</th></tr></thead>
-      <tbody>${teamRows.map((t, i) => `<tr class="${t.id === mine ? 'dr-mine' : ''}"><td class="num">${i + 1}</td><td><b>${esc(t.name)}</b>${t.id === mine ? ' <span class="badge accent">you</span>' : ''}</td>
+      <tbody>${teamRows.map((t, i) => `<tr class="${t.id === mine ? 'dr-mine' : ''}"><td class="num">${i + 1}</td><td><button type="button" class="link-btn aw-team" data-action="draft-team" data-team="${esc(t.id)}" title="See ${esc(t.name)}'s picks and keepers"><b>${esc(t.name)}</b></button>${t.id === mine ? ' <span class="badge accent">you</span>' : ''}</td>
         <td class="num"><b class="${t.avg > 0 ? 'pos-good' : t.avg < 0 ? 'pos-bad' : ''}">${signed(t.avg, 1)}</b></td><td class="num">${fmtValue(t.total)}</td>
         <td>${inlinePlayer(t.top, esc(lastName(t.top.name)))} <span class="muted small">#${t.top.pick}</span> <span class="pos-good small">${t.top.gp ? signed(t.top.gain, 0) : ''}</span></td>
         <td>${inlinePlayer(t.low, esc(lastName(t.low.name)))} <span class="muted small">#${t.low.pick}</span> <span class="pos-bad small">${t.low.gp ? signed(t.low.gain, 0) : 'DNP'}</span></td></tr>`).join('')}</tbody>

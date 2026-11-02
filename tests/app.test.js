@@ -498,6 +498,19 @@ test('a past season shows its keepers without grading them', async () => {
   const ks = d.keepers[team.id];
   assert.ok(ks.every(k => k.past && k.gain === undefined && k.slot === undefined), 'listed, not graded');
   assert.ok(!d.picks.some(p => names.includes(p.name)), 'keepers are not draft picks');
+  // Team drafts: a team's name opens its keepers and every pick, in draft order, for that season
+  let card;
+  app.get('ui').season = 'czqgnyozmf2tbr93';
+  try {
+    app.withSeason(() => {
+      const ps = d.picks.filter(p => p.teamId === team.id);
+      card = app.draftTeamCard(d, team.id, ps);
+      const at = ps.sort((a, b) => a.pick - b.pick).map(p => card.html.indexOf(`>${p.name}<`));
+      assert.ok(at.every((x, i) => x > 0 && (!i || x > at[i - 1])), 'every pick, in draft order');
+    });
+  } finally { app.get('ui').season = null; }
+  assert.equal(card.title, "Eli's SGAteam: 2025-26 draft");
+  assert.ok(names.every(n => card.html.indexOf(`>${n}<`) > 0 && card.html.indexOf(`>${n}<`) < card.html.indexOf('Picks</h3>')), 'keepers first');
 });
 
 test('past Rosters mark keepers', async () => {

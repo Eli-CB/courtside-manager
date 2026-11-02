@@ -111,6 +111,15 @@ const actions = {
     const d = $('#infoDialog');
     if (!d.open) d.showModal();
   },
+  // one team's keepers and picks from the Draft tab's Team drafts
+  'draft-team'(el) {
+    const D = draftTeamCards.get(el.dataset.team);
+    if (!D) return;
+    $('#infoTitle').textContent = D.title;
+    $('#infoBody').innerHTML = D.html;
+    const d = $('#infoDialog');
+    if (!d.open) d.showModal();
+  },
   'past-roster-mode'(el) { ui.pastRosterMode = el.dataset.mode; render(); },
   'past-roster-sort'(el) {
     const k = el.dataset.key;
