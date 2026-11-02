@@ -1037,13 +1037,12 @@ function showPlayerDetail(nbaId) {
     <div class="proj-grid" style="margin-top:12px">
       <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div></div>
       <div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>
-      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div></div>
-      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div></div>
       ${(() => {
+        // his value, and under it his rank among every NBA player this season (per game: regulars only)
         const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
-        const tipPer = esc(`Among the ${R.perN} players with ${R.minGp}+ games this season, by ${VAL.toLowerCase()} per game`), tipTot = esc(`Among the ${R.totN} players who've played this season, by ${VAL.toLowerCase()} added up`);
-        return `<div class="proj" data-tip="${tipPer}"><div class="k">Rank per game</div><div class="v">${per ? `#${per} <span class="muted small">of ${R.perN}</span>` : season ? `— <span class="muted small">${R.minGp}+ G</span>` : '—'}</div></div>
-      <div class="proj" data-tip="${tipTot}"><div class="k">Rank this season</div><div class="v">${tot ? `#${tot} <span class="muted small">of ${R.totN}</span>` : '—'}</div></div>`;
+        const rank = (n, of, tip) => `<div class="pc-rank" data-tip="${esc(tip)}">${n ? `#${n} of ${of}` : season ? `ranked with ${R.minGp}+ G` : ''}</div>`;
+        return `<div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div>${rank(per, R.perN, `Among the ${R.perN} NBA players with ${R.minGp}+ games this season, keepers and free agents included (the Draft tab ranks only the league's draft picks)`)}</div>
+      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div>${tot ? rank(tot, R.totN, `Among the ${R.totN} NBA players who've played this season, by ${VAL.toLowerCase()} added up`) : ''}</div>`;
       })()}
     </div>
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
