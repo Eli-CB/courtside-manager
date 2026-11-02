@@ -1617,3 +1617,14 @@ test("Dashboard: this week's waiver moves, from last week's rosters to this week
   assert.equal(app.periodMoves({ ...L, rosterPeriod: 1 }, weeks), null, 'week 1 has no week before it');
   assert.ok(fid(withFx[0].id));
 });
+
+test('times follow the 24-hour setting', () => {
+  const ui = app.get('ui'), was = ui.clock24;
+  try {
+    ui.clock24 = true;
+    assert.match(app.fmtTime('2026-11-02T19:05:00'), /^19:05$/);
+    assert.match(app.fmtTime('2026-11-02T09:05:00'), /^09:05$/);
+    ui.clock24 = false;
+    assert.match(app.fmtTime('2026-11-02T19:05:00'), /^7:05\s?p\.?m\.?$/i);
+  } finally { ui.clock24 = was; }
+});

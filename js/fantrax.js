@@ -513,7 +513,7 @@ function fxStrip(ctx) {
 // Weekly lineups locked: when, and a jump to next week, at the right of the matchup bar
 function lockNote(ctx) {
   const t = lockTime(ctx.start);
-  const when = `${t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  const when = `${t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtTime(t)}`;
   return `<span class="actions fx-lock"><span class="muted small" title="Starters locked ${esc(when)}, so this shows the lineups as set. Suggestions pick up again for next week.">Lineups locked</span>${weekShifts().some(s => s > ui.weekShift) ? '<button class="btn sm" data-action="week-shift" data-step="1">Plan next week →</button>' : ''}</span>`;
 }
 

@@ -39,6 +39,11 @@ const actions = {
     try { localStorage.setItem(SCORES_KEY, ui.hideScores ? '1' : '0'); } catch (e) { /* ignore */ }
     render();
   },
+  'toggle-clock'() {
+    ui.clock24 = !ui.clock24;
+    try { localStorage.setItem(CLOCK_KEY, ui.clock24 ? '24' : '12'); } catch (e) { /* ignore */ }
+    render();
+  },
   'fx-load-opp'() {
     const opp = fxOpponentFor(weekStart());
     if (!opp) return toast(`No ${sourceName()} matchup found for this week`);

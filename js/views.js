@@ -149,7 +149,7 @@ function dashGame(p, d) {
   if (!playsOn(p, d)) return '<span class="muted">No game</span>';
   const g = liveGame(p, d), s = g || (BOX.scores && BOX.scores.get(`${d} ${p.team}`));
   const vs = x => (x.home === p.team ? `vs ${x.away}` : `@${x.home}`);
-  if (g && g.state === 'pre') return `${vs(g)} ${g.start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  if (g && g.state === 'pre') return `${vs(g)} ${fmtTime(g.start)}`;
   const score = !s ? '' : ui.hideScores ? vs(s) : `${s.away} ${s.as} @ ${s.home} ${s.hs}`;
   if (g && g.state === 'in') return `${liveStatus(p, d)} · ${score}`;
   const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
@@ -376,7 +376,7 @@ function topPerformancesCard() {
   const dates = avg ? [] : range === 'year' ? P.year : range === 'week' ? P.week : [range === 'today' ? today : P.day];
   const day = dates[0];
   const updated = range === 'day' || avg ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
-    : live.at ? ` · updated ${new Date(live.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
+    : live.at ? ` · updated ${fmtTime(live.at)}` : '';
   const when = avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly ? `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
   const toggle = opts.length > 1 ? `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="perf-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>` : '';
 
@@ -497,7 +497,7 @@ function topPerformancesCard() {
   const count = `${picked.length > shown.length ? `${shown.length} of ` : ''}${picked.length} player${picked.length === 1 ? '' : 's'}`;
   // today before tip-off: when the first game starts
   const first = live.games.filter(g => g.d === day && g.state === 'pre').sort((a, b) => a.start - b.start)[0];
-  const waiting = range === 'today' && !rows.length ? `<p class="muted small" style="margin:0">${live.at || live.error ? `No games have started yet.${first ? ` First tip-off ${first.start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : ''}` : "Loading today's games…"}</p>` : '';
+  const waiting = range === 'today' && !rows.length ? `<p class="muted small" style="margin:0">${live.at || live.error ? `No games have started yet.${first ? ` First tip-off ${fmtTime(first.start)}.` : ''}` : "Loading today's games…"}</p>` : '';
   const table = !rows.length ? waiting : !shown.length ? '<p class="muted small" style="margin:0">No players match these filters.</p>' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
       <thead><tr>${th('name', 'Player', 'pf-name')}${cats.map(c => th(c.key, c.label, 'sc')).join('')}${th('v', pts ? 'FP' : 'Value', 'num pf-v')}</tr></thead>
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
@@ -562,7 +562,7 @@ function movesCard() {
   const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${esc(fxTeamName(tid))}</div>
       <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
     : '<p class="muted small" style="margin:0">No adds or drops since last week.</p>';
-  return `<div class="card">${head}${body}${at ? `<p class="muted small mv-when">Rosters as of ${new Date(at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · ↻ Reload in ⚙ for the latest</p>` : ''}</div>`;
+  return `<div class="card">${head}${body}${at ? `<p class="muted small mv-when">Rosters as of ${fmtTime(at, { weekday: 'short' })} · ↻ Reload in ⚙ for the latest</p>` : ''}</div>`;
 }
 
 function slotBadge(slot) {

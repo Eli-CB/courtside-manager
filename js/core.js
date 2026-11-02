@@ -9,6 +9,7 @@
 const STORAGE_KEY = 'courtside-manager-v1';
 const THEME_KEY = 'courtside-theme';
 const SCORES_KEY = 'courtside-hide-scores'; // this device hides game scores (no spoilers)
+const CLOCK_KEY = 'courtside-clock'; // '24' or '12': this device's choice of clock; unset = the device's own
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const SLOT_TYPES = ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'];
 const ELIG = {
@@ -74,6 +75,13 @@ const ui = { weekShift: 0, tab: 'dashboard', recapWeek: null, afterPick: null, r
   dashRange: null, dashBench: false, perfRange: null, perfQ: '', perfPos: '', perfTeam: '', perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
   perfShow: { me: true, opp: true, fa: true, other: true, active: true, bench: true } };
 ui.hideScores = (() => { try { return localStorage.getItem(SCORES_KEY) === '1'; } catch (e) { return false; } })();
+// 24-hour clock: as chosen in the settings menu, else as the device shows times
+ui.clock24 = (() => {
+  try { const c = localStorage.getItem(CLOCK_KEY); if (c) return c === '24'; } catch (e) { /* storage blocked */ }
+  try { return !/h1[12]/.test(new Intl.DateTimeFormat([], { hour: 'numeric' }).resolvedOptions().hourCycle || 'h12'); } catch (e) { return false; }
+})();
+// A time of day ("7:30 PM" or "19:30"); more = other parts to show with it (weekday)
+const fmtTime = (t, more) => new Date(t).toLocaleString([], { ...more, hour: ui.clock24 ? '2-digit' : 'numeric', minute: '2-digit', hourCycle: ui.clock24 ? 'h23' : 'h12' });
 
 function load() {
   let s = null;

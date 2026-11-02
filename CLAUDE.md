@@ -12,7 +12,8 @@ saved leagues are lost). Owner's league:
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
   scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, yahoo, render, history, views,
   matchups, recap, live, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
-  - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers, headshots (ring + background in team colors,
+  - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers (every time of day through `fmtTime`:
+    the gear menu's 24-hour toggle, `courtside-clock`, else the device's own clock), headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo)
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
     model (`scoreCats`, `catZ`, `BASE`: each stat's mean/spread from the data via `baseNow`, the league's teams × roster
