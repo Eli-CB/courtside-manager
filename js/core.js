@@ -344,7 +344,8 @@ async function loadImages() {
     // face shifted after the monthly rebuild)
     let h = 2166136261;
     for (const c of IMG.ids.join()) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
-    document.documentElement.style.setProperty('--hs-sheet', `url(data/headshots.webp?v=${h.toString(36)})`);
+    IMG.sheet = `data/headshots.webp?v=${h.toString(36)}`; // also drawn into the recap image
+    document.documentElement.style.setProperty('--hs-sheet', `url(${IMG.sheet})`);
     cropLogos(IMG.logos);
     render();
   } catch (e) { /* images are optional */ }

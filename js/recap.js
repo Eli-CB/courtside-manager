@@ -92,18 +92,18 @@ function buildRecap(L, P, period) {
 
 const scoreLine = sc => (isPoints() ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
 
-// The standouts as { emoji, label, html, text for sharing }. Names are plain links (no photo), so they sit on the
-// line with the text around them.
+// The standouts as { emoji, label, html, text for sharing }; a player's also { p, tid, stats } for the image. Names
+// are plain links (no photo), so they sit on the line with the text around them.
 function recapItems(X) {
   const team = tid => fxTeamName(tid);
   const out = [];
-  const add = (e, label, html, text) => out.push({ e, label, html, text });
+  const add = (e, label, html, text, more) => out.push({ e, label, html, text, ...more });
   const name = (p, bold) => `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${bold ? `<b>${esc(p.name)}</b>` : esc(p.name)}</button>`;
   const unit = isPoints() ? 'FP' : 'value';
   const stand = (e, label, x, perGame, cls = '') => {
     const parts = fullLine(x.line, perGame), head = perGame ? `${x.line.gp1} G, per game: ` : '';
     add(e, label, `${name(x.p, true)} <span class="muted">${esc(team(x.tid))}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
-      `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`);
+      `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}` });
   };
   if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
   if (X.game) stand('🚀', 'Game of the week', X.game, false);
@@ -172,6 +172,140 @@ function viewRecap() {
   <div class="card"><div class="card-head"><h2>Results</h2></div>
     <ul class="rc-finals">${finals}</ul>
   </div>`;
+}
+
+// ----- The recap as a picture, for the league chat -----
+// 1080 px wide, as tall as it needs: the league and week, the standouts (photos for the players), every final, the
+// site's address. Drawn on a canvas from the same recap; the headshots come from the site's own sheet.
+const RC_IMG = { w: 1080, pad: 64, bg: '#15171b', card: '#1f2228', line: '#2c3038', text: '#f3f4f6', muted: '#9aa3b2', accent: '#f07a2a' };
+const RC_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+const loadSheet = () => new Promise(res => {
+  if (!IMG || !IMG.sheet) return res(null);
+  const im = new Image();
+  im.onload = () => res(im);
+  im.onerror = () => res(null);
+  im.src = IMG.sheet;
+});
+
+// lines of text that fit the width, at the font already set, broken between words (or between stats: sep ' · ')
+function wrapText(ctx, text, max, sep = ' ') {
+  const lines = [];
+  let cur = '';
+  for (const w of String(text).split(sep)) {
+    const next = cur ? `${cur}${sep}${w}` : w;
+    if (cur && ctx.measureText(next).width > max) { lines.push(cur); cur = w; } else cur = next;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+// one line, cut with … to fit
+function fitText(ctx, text, max) {
+  if (ctx.measureText(text).width <= max) return text;
+  let t = String(text);
+  while (t.length > 1 && ctx.measureText(t + '…').width > max) t = t.slice(0, -1);
+  return t.trimEnd() + '…';
+}
+
+async function recapCanvas(L, X) {
+  const C = RC_IMG, W = C.w, inner = W - C.pad * 2, sheet = await loadSheet();
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = 5000;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, cv.height);
+  ctx.textBaseline = 'top';
+  const font = (px, weight = 400) => { ctx.font = `${weight} ${px}px ${RC_FONT}`; };
+  const text = (t, x, y, color = C.text, align = 'left') => { ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(t, x, y); };
+  const round = (x, y, w, h, r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
+  // a player's photo in a ring of his NBA team's colors (as on the site); his initials without one
+  const photo = (p, x, y, d) => {
+    const raw = nbaById.get(p.nbaId), tc = TEAM_COLORS[raw && raw.team], cx = x + d / 2, cy = y + d / 2, i = IMG_INDEX.get(p.nbaId);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = C.line; ctx.fill(); ctx.clip();
+    if (sheet && i !== undefined) ctx.drawImage(sheet, (i % IMG.cols) * IMG.size, Math.floor(i / IMG.cols) * IMG.size, IMG.size, IMG.size, x, y, d, d);
+    else { font(d * 0.36, 700); ctx.textBaseline = 'middle'; text(initials(p.name), cx, cy, C.muted, 'center'); ctx.textBaseline = 'top'; }
+    ctx.restore();
+    if (tc) {
+      ctx.lineWidth = 5;
+      const a0 = (240 - 90) * Math.PI / 180;
+      for (const [c, from, to] of [[tc[0], 0, 2 / 3], [tc[1], 2 / 3, 1]]) {
+        ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(cx, cy, d / 2 - 2.5, a0 + from * Math.PI * 2, a0 + to * Math.PI * 2); ctx.stroke();
+      }
+    }
+  };
+
+  let y = C.pad;
+  // the top: week, league, days
+  font(28, 800); text(`WEEK ${X.period.n} RECAP`, C.pad, y, C.accent); y += 44;
+  font(58, 800);
+  for (const l of wrapText(ctx, L.name, inner).slice(0, 2)) { text(l, C.pad, y); y += 70; }
+  font(30); text(`${fmtDay(X.period.start)} – ${fmtDay(matchDates(X.period.start).slice(-1)[0] || X.period.end)}`, C.pad, y, C.muted); y += 64;
+
+  // the standouts, each in a card
+  for (const it of recapItems(X)) {
+    const d = it.p ? 112 : 0, tx = C.pad + 32 + (d ? d + 28 : 0), tw = W - C.pad - 32 - tx;
+    let body;
+    if (it.p) {
+      font(40, 800); const name = fitText(ctx, it.p.name, tw);
+      font(28); const team = fitText(ctx, fxTeamName(it.tid), tw);
+      font(27); const stats = wrapText(ctx, it.stats, tw, ' · ');
+      body = { name, team, stats, h: 44 + 50 + 42 + stats.length * 38 };
+    } else {
+      font(32, 500); const lines = wrapText(ctx, it.text, tw);
+      body = { lines, h: 44 + 4 + lines.length * 44 };
+    }
+    const h = Math.max(body.h, d) + 56;
+    round(C.pad, y, inner, h, 24, C.card);
+    let ty = y + 28;
+    if (d) photo(it.p, C.pad + 32, y + (h - d) / 2, d);
+    font(26, 800); text(`${it.e}  ${it.label.toUpperCase()}`, tx, ty, C.accent); ty += 44;
+    if (it.p) {
+      font(40, 800); text(body.name, tx, ty); ty += 50;
+      font(28); text(body.team, tx, ty, C.muted); ty += 42;
+      font(27); for (const l of body.stats) { text(l, tx, ty, '#d5d9e0'); ty += 38; }
+    } else { ty += 4; font(32, 500); for (const l of body.lines) { text(l, tx, ty); ty += 44; } }
+    y += h + 20;
+  }
+
+  // every final, winner on the left in bold
+  y += 28;
+  font(28, 800); text('RESULTS', C.pad, y, C.accent); y += 52;
+  for (const g of X.games) {
+    font(34, 800); const colW = (inner - 64 - ctx.measureText(scoreLine(g.sc)).width - 48) / 2; // the names share what the score leaves
+    round(C.pad, y, inner, 76, 18, C.card);
+    font(31, g.margin ? 800 : 500); text(fitText(ctx, fxTeamName(g.a), colW), C.pad + 32, y + 21);
+    font(34, 800); text(scoreLine(g.sc), W / 2, y + 19, C.accent, 'center');
+    font(31, 500); text(fitText(ctx, fxTeamName(g.b), colW), W - C.pad - 32, y + 21, C.muted, 'right');
+    y += 88;
+  }
+
+  // the bottom: where it came from
+  y += 32;
+  ctx.fillStyle = C.line; ctx.fillRect(C.pad, y, inner, 2); y += 30;
+  font(30, 800); text('League Layer', C.pad, y, C.text);
+  font(28); text('leaguelayer.com', W - C.pad, y + 2, C.muted, 'right');
+  y += 40 + C.pad - 10;
+
+  const out = document.createElement('canvas');
+  out.width = W; out.height = Math.ceil(y);
+  out.getContext('2d').drawImage(cv, 0, 0);
+  return out;
+}
+
+const recapBlob = cv => new Promise(res => cv.toBlob(res, 'image/png'));
+const recapFileName = (L, X) => `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-week-${X.period.n}.png`;
+
+// The popup: the picture, then Share (the share sheet, with the picture, where the browser can), Copy, Save, or the
+// text and link as before
+function recapSharePopup(L, X, url) {
+  const canFiles = !!(navigator.canShare && navigator.share);
+  return `<img class="rc-img" src="${url}" alt="Week ${X.period.n} recap for ${esc(L.name)}">
+    <div class="fb-actions">
+      ${canFiles ? `<button type="button" class="btn primary" data-action="recap-img-share" data-week="${X.period.n}">Share image</button>` : ''}
+      ${window.ClipboardItem ? `<button type="button" class="btn${canFiles ? '' : ' primary'}" data-action="recap-img-copy">Copy image</button>` : ''}
+      <a class="btn" href="${url}" download="${esc(recapFileName(L, X))}">Save image</a>
+      <button type="button" class="btn" data-action="recap-text" data-week="${X.period.n}">Copy text and link</button>
+    </div>`;
 }
 
 // A week that ended in the last three days: offered on the Dashboard

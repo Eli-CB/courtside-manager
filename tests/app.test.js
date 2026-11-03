@@ -1441,6 +1441,11 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.ok(!/Biggest win|Closest/.test(text + html), 'not the biggest win or the closest');
     assert.ok(!html.includes('inl-p'), 'names without photos, in line with the text');
     assert.ok(app.recapUrl(L, 1).endsWith(`?league=${L.id}&week=1#recap`), app.recapUrl(L, 1));
+    // the image: each player standout brings its player, team and stat line (stats kept whole: ' · ' between them)
+    const items = app.recapItems(X), mvp = items.find(x => x.label === 'Player of the week');
+    assert.ok(mvp.p.nbaId === X.mvp.p.nbaId && mvp.tid === X.mvp.tid && mvp.stats.includes(' · ') && mvp.stats.startsWith(`${X.mvp.line.gp1} G, per game: `));
+    assert.ok(items.filter(x => !x.p).every(x => x.text && !x.stats), 'the others are a sentence');
+    assert.match(app.recapFileName(L, X), /^[a-z0-9-]+-week-1\.png$/);
     // the Dashboard points to it for three days
     assert.equal(app.freshRecap().n, 1);
     assert.ok(app.buildAlerts().some(a => a.action === 'go-recap'));
