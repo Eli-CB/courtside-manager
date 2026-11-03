@@ -20,6 +20,35 @@ const STATUSES = ['Healthy', 'DTD', 'Out'];
 // this deploy's version (the commit), stamped in by the publish workflow; '__BUILD__' when run locally
 const BUILD = '__BUILD__';
 
+// Errors in someone's browser go to the error log on the helper server (worker/yahoo.js: POST /errors), so a page
+// that breaks for a visitor is known without waiting for them to say so: the message, where in the code, the page,
+// the league's site and ID, this version and the browser. Only on the live site; each error once a visit, 5 at most.
+const ERROR_LOG = 'https://api.leaguelayer.com/errors';
+const errorsSent = new Set();
+function reportError(msg, at, stack) {
+  if (location.hostname !== 'leaguelayer.com' || errorsSent.size >= 5 || errorsSent.has(msg + at)) return;
+  errorsSent.add(msg + at);
+  let L = null, browse = false;
+  try { L = fxLeague(); browse = !!state.browse; } catch (e) { /* the league is what broke, or it hasn't loaded */ }
+  const body = JSON.stringify({ msg, at, stack, page: location.hash.split('/')[0] || '#', source: L ? L.source || 'fantrax' : browse ? 'browse' : '',
+    league: L ? L.id : '', build: BUILD, ua: navigator.userAgent });
+  try { fetch(ERROR_LOG, { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain' }, body }).catch(() => {}); } catch (e) { /* offline */ }
+}
+if (typeof window.addEventListener === 'function') {
+  // our own scripts' errors only: a browser extension's come as "Script error." from elsewhere
+  window.addEventListener('error', e => {
+    if (!e.filename || !e.filename.startsWith(location.origin)) return;
+    reportError(String(e.message), `${e.filename.replace(location.origin + '/', '').replace(/\?.*$/, '')}:${e.lineno}:${e.colno}`, e.error && e.error.stack);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const r = e.reason;
+    // ours, and not just a dropped connection (no bug of ours)
+    if (!(r instanceof Error) || !/\/js\/\w+\.js/.test(r.stack || '') || /Failed to fetch|Load failed|NetworkError/.test(r.message)) return;
+    const at = (r.stack.match(/js\/(\w+\.js)[^:]*:(\d+):(\d+)/) || []).slice(1).join(':');
+    reportError(`${r.name}: ${r.message}`, at, r.stack);
+  });
+}
+
 // The standard 9 categories, in the order most leagues display them (used when a league's own list is unknown).
 // Percentage categories name the makes and attempts they're built from.
 const CATS = [

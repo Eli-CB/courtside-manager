@@ -29,6 +29,27 @@ Cloudflare's plan. It stores nothing: each visitor's tokens stay in their browse
 3. **Turn it on in the site**: in `js/yahoo.js`, set `proxy: 'https://api.leaguelayer.com'` and deploy the site.
    The "Sign in with Yahoo" button appears on the league form.
 
+## Error log
+
+The same Worker keeps the site's error log: when a page breaks in someone's browser on leaguelayer.com, the site sends
+the error (message, where in the code, page, league site and ID, version, browser) to `POST /errors`, and it's kept for
+30 days in a KV namespace. One-time setup, from this folder:
+
+```
+npx wrangler kv namespace create ERRORS
+```
+
+Put the `id` it prints into the `[[kv_namespaces]]` block at the end of `wrangler.toml` and remove the `#` signs there. Then
+pick a password for the log page and deploy:
+
+```
+npx wrangler secret put ERRORS_KEY
+npx wrangler deploy
+```
+
+The log: `https://api.leaguelayer.com/errors?key=<that password>` (each error once, with how many times, when, and on
+which pages and leagues). Until this is set up the site's reports are dropped.
+
 ## Checking it
 
 `https://api.leaguelayer.com/yahoo/login?return=https://leaguelayer.com/` should open Yahoo's sign-in. After

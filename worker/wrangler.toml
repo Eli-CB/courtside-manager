@@ -11,3 +11,9 @@ routes = [{ pattern = "api.leaguelayer.com", custom_domain = true }]
 SITE_ORIGINS = "https://leaguelayer.com,http://localhost:5173"
 
 # YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET are secrets: npx wrangler secret put YAHOO_CLIENT_ID (and _SECRET)
+
+# The site's error log (see README.md): make the namespace with  npx wrangler kv namespace create ERRORS
+# put the id it prints below and remove the # signs, then  npx wrangler secret put ERRORS_KEY  (a password for the log page)
+# [[kv_namespaces]]
+# binding = "ERRORS"
+# id = "paste-the-id-here"

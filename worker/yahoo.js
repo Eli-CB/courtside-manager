@@ -7,9 +7,66 @@
 //   GET  /yahoo/api/<path>            the fantasy API itself, passed through with the visitor's token
 // Nothing is stored here: each visitor's tokens live in their own browser.
 // Settings (wrangler.toml and `wrangler secret put`): YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET, SITE_ORIGINS.
+//
+// It also keeps the site's error log (a page that crashed in someone's browser):
+//   POST /errors                      the site sends one error: message, where it came from, page, league, version, browser
+//   GET  /errors?key=<ERRORS_KEY>     the last 30 days' errors, newest first, the same ones grouped (for the owner)
+// Kept in the KV namespace bound as ERRORS for 30 days; ERRORS_KEY is a secret. Without them errors are dropped.
 
 const AUTH = 'https://api.login.yahoo.com/oauth2/';
 const API = 'https://fantasysports.yahooapis.com/fantasy/v2/';
+const ERROR_DAYS = 30;
+const ERROR_FIELDS = { msg: 300, at: 300, stack: 1500, page: 120, source: 20, league: 60, build: 20, ua: 200 };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+// One error from the site, cut to size; the newest sort first in KV's listing (keys count down)
+async function saveError(req, env, origins) {
+  if (!origins.includes(req.headers.get('Origin') || '') || !env.ERRORS) return;
+  const text = await req.text();
+  if (text.length > 4000) return;
+  let e;
+  try { e = JSON.parse(text); } catch (x) { return; }
+  if (!e || typeof e.msg !== 'string' || !e.msg) return;
+  const rec = { t: Date.now(), country: (req.cf && req.cf.country) || '' };
+  for (const [k, n] of Object.entries(ERROR_FIELDS)) rec[k] = String(e[k] == null ? '' : e[k]).slice(0, n);
+  const key = `${String(1e13 - rec.t).padStart(13, '0')}-${Math.random().toString(36).slice(2, 8)}`;
+  await env.ERRORS.put(key, JSON.stringify(rec), { expirationTtl: ERROR_DAYS * 86400 });
+}
+
+// The log as a page: each distinct error once (how many times, when last, which leagues and pages), newest first
+async function errorPage(env) {
+  const keys = [];
+  let cursor;
+  do {
+    const r = await env.ERRORS.list({ cursor, limit: 1000 });
+    keys.push(...r.keys.map(k => k.name));
+    cursor = r.list_complete ? null : r.cursor;
+  } while (cursor && keys.length < 300);
+  const recs = (await Promise.all(keys.slice(0, 300).map(k => env.ERRORS.get(k, 'json')))).filter(Boolean);
+  const groups = new Map();
+  for (const r of recs) {
+    const id = `${r.msg}|${r.at}`;
+    if (!groups.has(id)) groups.set(id, { ...r, n: 0, pages: new Set(), sources: new Set(), leagues: new Set(), first: r.t });
+    const g = groups.get(id);
+    g.n++; g.first = Math.min(g.first, r.t);
+    if (r.page) g.pages.add(r.page);
+    if (r.source) g.sources.add(r.source);
+    if (r.league) g.leagues.add(r.league);
+  }
+  const when = t => new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const list = [...groups.values()].map(g => `<li><b>${esc(g.msg)}</b> <span class="n">×${g.n}</span>
+    <div class="m">Last ${when(g.t)} ET${g.n > 1 ? `, first ${when(g.first)}` : ''} · ${esc([...g.sources].join(', ') || 'no league')} · ${esc([...g.pages].slice(0, 5).join(' '))}</div>
+    <div class="m">${esc(g.at)} · version ${esc(g.build)} · ${esc(g.country)}</div>
+    <details><summary>More</summary><div class="m">Leagues: ${esc([...g.leagues].slice(0, 10).join(', ') || 'none')}</div><div class="m">${esc(g.ua)}</div><pre>${esc(g.stack)}</pre></details></li>`).join('');
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>League Layer errors</title>
+<style>body{font:15px/1.45 system-ui,sans-serif;max-width:860px;margin:0 auto;padding:16px;color:#1f2328;background:#fff}
+@media(prefers-color-scheme:dark){body{color:#e6e6e6;background:#16181c}li{border-color:#333}}
+ol{list-style:none;padding:0}li{border-bottom:1px solid #ddd;padding:10px 0;overflow-wrap:anywhere}.n{color:#c2410c;font-weight:700}
+.m{font-size:13px;opacity:.75}pre{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}</style>
+<h1>Errors</h1><p class="m">The last ${ERROR_DAYS} days (${recs.length} reports${keys.length > 300 ? ', the newest 300' : ''}), the same error grouped, newest first.</p>
+${list ? `<ol>${list}</ol>` : '<p>No errors.</p>'}`;
+}
 
 export default {
   async fetch(req, env) {
@@ -24,6 +81,15 @@ export default {
       Vary: 'Origin',
     };
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+    if (url.pathname === '/errors' && req.method === 'POST') {
+      try { await saveError(req, env, origins); } catch (e) { /* a full day's writes, or KV down: drop it */ }
+      return new Response(null, { status: 204, headers: cors });
+    }
+    if (url.pathname === '/errors' && req.method === 'GET') {
+      if (!env.ERRORS || !env.ERRORS_KEY || url.searchParams.get('key') !== env.ERRORS_KEY) return new Response('Not found', { status: 404 });
+      return new Response(await errorPage(env), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
+    }
     const callback = `${url.origin}/yahoo/callback`;
     const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     // the page to send someone back to: only the site's own pages

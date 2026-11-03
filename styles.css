@@ -118,9 +118,12 @@ a { color: var(--accent); }
 .nav-btn { display: none; }
 
 .container {
-  max-width: 1200px; margin: 0 auto; padding-block: 20px 64px; outline: none;
+  max-width: 1200px; margin: 0 auto; padding-block: 20px 32px; outline: none;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
+/* the small print under every page: not affiliated, and what's kept and sent */
+.site-foot { max-width: 640px; margin: 0 auto; padding: 0 16px 32px; text-align: center; font-size: .75rem; line-height: 1.5; color: var(--muted); }
+.site-foot p { margin: 0 0 4px; }
 .top-right { display: flex; align-items: center; gap: 10px; flex: none; }
 .top-right .icon-btn { width: 30px; height: 30px; }
 /* settings gear */
