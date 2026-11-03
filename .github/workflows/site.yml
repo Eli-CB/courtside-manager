@@ -65,10 +65,21 @@ jobs:
             exit 1
           fi
 
+  test:
+    # a code push publishes only once the tests pass (scheduled runs change only data, which the tests don't read)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/app.test.js
+
   deploy:
-    needs: refresh
-    # publish even if the data pull failed, so the site keeps the last good data
-    if: always() && needs.refresh.result != 'cancelled'
+    needs: [refresh, test]
+    # publish even if the data pull failed, so the site keeps the last good data; never code whose tests failed
+    if: always() && needs.refresh.result != 'cancelled' && (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
     environment:
       name: github-pages

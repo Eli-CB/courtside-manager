@@ -85,7 +85,8 @@ saved leagues are lost). Owner's league:
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 - `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
   in page order with fake fetch (fixtures) and a fixed clock (2026-10-26 20:00 ET). Fixtures in
-  `tests/fixtures` (refresh: `python tests/capture_fixtures.py`). Runs on every push (`.github/workflows/tests.yml`).
+  `tests/fixtures` (refresh: `python tests/capture_fixtures.py`). Every push to main runs them in the site workflow's
+  `test` job, and the site publishes only if they pass (`site.yml`; `tests.yml` covers pull requests).
 
 ## Rules settled with the owner (keep them)
 - Everything follows each league's own settings on Fantrax or ESPN (category list or point values, slots, daily

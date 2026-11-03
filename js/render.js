@@ -160,6 +160,17 @@ function savedSize() {
   return n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`;
 }
 
+// Feedback by email (Cloudflare forwards feedback@leaguelayer.com), with what's needed to look into it already filled
+// in: the league (its site and ID), the page, this version and the browser
+const FEEDBACK_EMAIL = 'feedback@leaguelayer.com';
+function feedbackHref() {
+  const L = fxLeague();
+  const body = ['What happened, or what would you like to see?', '', '', '',
+    '--- (this helps look into it)', `League: ${L ? `${L.name} (${sourceName(L)} ${L.id})` : 'none connected'}`,
+    `Page: ${location.hash || '#dashboard'}`, `Version: ${BUILD}`, `Browser: ${navigator.userAgent}`].join('\n');
+  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('League Layer feedback')}&body=${encodeURIComponent(body)}`;
+}
+
 function gearMenu() {
   const el = $('#gearMenu');
   if (!el) return;
@@ -178,6 +189,8 @@ function gearMenu() {
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers in the Dashboard's matchup</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-clock" role="switch" aria-checked="${ui.clock24}"><span>24-hour time<span class="gear-sub">tip-offs and update times as ${fmtTime('2026-11-02T19:30:00')}</span></span><span class="gear-switch${ui.clock24 ? ' on' : ''}" aria-hidden="true"></span></button>
+      <div class="lm-sec">Help</div>
+      <a class="lm-item" href="${esc(feedbackHref())}">✉ Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></a>
     </div>
   </details>`;
 }

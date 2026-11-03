@@ -1,8 +1,7 @@
 name: Tests
 
+# pushes to main are tested by the site workflow, before it publishes (site.yml); this covers pull requests
 on:
-  push:
-    branches: [main]
   pull_request:
 
 permissions:

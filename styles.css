@@ -905,6 +905,7 @@ tr.me-row td { background: var(--accent-soft); }
 .lm-row { display: flex; align-items: center; gap: 4px; }
 .lm-item { display: block; width: 100%; text-align: left; font: inherit; font-size: .9rem; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
 .lm-item:hover, .lm-item:focus-visible { background: var(--surface-2); }
+a.lm-item { text-decoration: none; }
 .lm-item.on { font-weight: 700; color: var(--accent); }
 .lm-item.danger { color: var(--bad); }
 .lm-item.lm-sub { padding: 6px 10px 6px 26px; font-size: .86rem; }

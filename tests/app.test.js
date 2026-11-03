@@ -1914,3 +1914,12 @@ test("Fantrax's 'too many requests' in a normal answer waits as long as it says,
     assert.ok(Date.now() - t0 >= 1000, 'waited the second it asked for');
   } finally { app.fetch = realFetch; }
 });
+
+test('Send feedback: an email to feedback@leaguelayer.com with the league, page and version filled in', async () => {
+  const L = await app.useLeague(CATS9);
+  const href = app.feedbackHref();
+  assert.ok(href.startsWith('mailto:feedback@leaguelayer.com?subject=League%20Layer%20feedback&body='));
+  const body = decodeURIComponent(href.split('&body=')[1]);
+  assert.ok(body.includes(`League: ${L.name} (Fantrax ${L.id})`) && body.includes('Page: ') && body.includes('Version: '), body);
+  assert.ok(body.split('\n').length > 6, 'on separate lines');
+});
