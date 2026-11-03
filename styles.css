@@ -819,7 +819,7 @@ tr.dr-mine td { background: color-mix(in srgb, var(--accent-soft) 60%, transpare
 .dr-via { display: block; font-size: .64rem; color: var(--muted); font-style: italic; }
 
 /* ---------- Landing ---------- */
-body.landing .tabs { visibility: hidden; }
+body.landing .tabs, body.landing .nav-btn { visibility: hidden; } /* no sections before a league: phones' Menu too */
 .landing-wrap { min-height: calc(100vh - 140px); display: grid; place-items: center; padding-block: 24px; }
 .landing-card { width: min(560px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 28px; }
 .landing-card h1 { font-size: 1.7rem; letter-spacing: -.02em; text-wrap: balance; margin-bottom: 8px; }
