@@ -554,6 +554,16 @@ def fantrax(league_id, index, saved_league=None):
         msg = (info.get('error') or {}).get('message') or 'no teams returned'
         raise RuntimeError(f'Fantrax league {league_id}: {msg}')
     rosters = get_json(FX + 'getTeamRosters', {'leagueId': league_id})
+    # weekly lineups: next week's too (this week's locked when it started; next week's is the one being set)
+    next_n = (rosters.get('period') or 0) + 1
+    next_rosters = None
+    if rosters.get('period') and roster_period_days(info.get('rosterPeriods') or []) >= 2 and any(p.get('number') == next_n for p in info.get('rosterPeriods') or []):
+        try:
+            next_rosters = get_json(FX + 'getTeamRosters', {'leagueId': league_id, 'period': next_n})
+            if next_rosters.get('period') != next_n:
+                next_rosters = None
+        except Exception:
+            next_rosters = None
     try:  # Fantrax-wide average draft position, used to order keepers
         adp = {a['id']: a.get('ADP') for a in get_json(FX + 'getAdp', {'sport': 'NBA'}) if a.get('id')}
     except Exception:
@@ -631,6 +641,11 @@ def fantrax(league_id, index, saved_league=None):
                   for it in r.get('rosterItems', [])]
             for tid, r in rosters.get('rosters', {}).items()
         },
+        'nextRosters': {'period': next_n, 'rosters': {
+            tid: [{'nba': fx_to_nba.get(it['id']), 'name': fx_names.get(it['id'], ''), 'slot': it.get('position', ''), 'st': it.get('status', '')}
+                  for it in r.get('rosterItems', [])]
+            for tid, r in next_rosters.get('rosters', {}).items()
+        }} if next_rosters else None,
     }
     # Keepers: players each team rostered without drafting them, but only in leagues whose draft gives
     # each team fewer picks than roster spots (starters plus bench). Saved the first time and kept after

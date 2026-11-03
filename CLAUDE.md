@@ -96,6 +96,10 @@ saved leagues are lost). Owner's league:
 ## Rules settled with the owner (keep them)
 - Everything follows each league's own settings on Fantrax or ESPN (category list or point values, slots, daily
   vs weekly lineups, playoffs). Never hard-code the owner's league.
+- Weekly lineups lock when the week starts, so the lineup people are setting is next week's: Fantrax leagues with weekly
+  lineups also load next period's rosters (`L.nextRosters`, one more request; the daily job too), and the Matchups tab
+  shows them on next week (`withViewedTeam(viewWeek, true)`, `nextRosterPeriod()`, `fxTeamSide(tid, period)`). Every
+  other tab and the saved lineup stay on this week's.
 - Fantrax: minimize requests. League data cached on the device; manual ↻ Reload (gear menu) instead of
   loading fresh each visit. Weekly rosters fetched once per finished period. Shared player list/ADP once a day.
 - Keepers exist only if draft rounds < roster spots (starters + bench); keepers = opening-week roster minus

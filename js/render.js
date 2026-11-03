@@ -242,7 +242,7 @@ function render() {
   }
   const early = preDraft();
   if (early && ['week', 'dashboard', 'roster', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
-  const views = { week: () => withViewedTeam(viewWeek), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade, recap: viewRecap };
+  const views = { week: () => withViewedTeam(viewWeek, true), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), roster: () => withViewedTeam(viewRoster), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade, recap: viewRecap };
   // keep scroll position of inner lists (e.g. trade picker, performances) across re-renders
   const inner = '.pick-list, .perf-wrap.scroll';
   const scrolls = [...document.querySelectorAll(inner)].map(el => [el.scrollTop, el.scrollLeft]);

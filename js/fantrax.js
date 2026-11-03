@@ -241,6 +241,9 @@ async function fetchFantraxLeague(id, opts = {}) {
   const draft = draftFirst || await pause(1500).then(() => fxGet(`getDraftResults?leagueId=${q}`)).catch(() => null);
   // the opening week's rosters: past seasons use them for keepers and pickups, and so does this season once week 1 is over
   const opening = opts.opening || (rosters.period || 1) > 1 ? await fxGet(`getTeamRosters?leagueId=${q}&period=1`).catch(() => null) : null;
+  // weekly lineups: next week's too. This week's locked when it started, so the lineup people are setting is next week's
+  const nextN = rosters.period && rosterPeriodDays(info.rosterPeriods || []) >= 2 && (info.rosterPeriods || []).some(p => p.number === rosters.period + 1) ? rosters.period + 1 : null;
+  const next = nextN && !opts.opening ? await fxGet(`getTeamRosters?leagueId=${q}&period=${nextN}`).catch(() => null) : null;
 
   const names = Object.fromEntries(Object.entries(ids).map(([fid, v]) => [fid, fxName(v.name || '')]));
   const toNba = matchPlayers(ids, names);
@@ -269,6 +272,8 @@ async function fetchFantraxLeague(id, opts = {}) {
     rosterPeriods: (info.rosterPeriods || []).map(p => [p.number, String(p.startDate), String(p.endDate)]),
     rosters: Object.fromEntries(Object.entries(rosters.rosters || {}).map(([tid, r]) => [tid,
       (r.rosterItems || []).map(it => ({ fid: it.id, nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])),
+    nextRosters: next && next.period === nextN ? { period: nextN, rosters: Object.fromEntries(Object.entries(next.rosters || {}).map(([tid, r]) => [tid,
+      (r.rosterItems || []).map(it => ({ fid: it.id, nba: toNba[it.id] || null, name: names[it.id] || '', slot: it.position || '', st: it.status || '' }))])) } : null,
     openingRosters: opening ? Object.fromEntries(Object.entries(opening.rosters || {}).map(([tid, r]) => [tid,
       (r.rosterItems || []).map(it => ({ fid: it.id, nba: toNba[it.id] || null, name: names[it.id] || '', st: it.status || '' }))])) : null,
     rosterInfo: info.rosterInfo || null,
@@ -383,16 +388,17 @@ function fxOpponentFor(start, teamId = state.fxTeam) {
 }
 
 // A Fantrax roster as players, with each one's lineup slot and status
-function fxRoster(teamId) {
-  const L = fxLeague();
-  return ((L && L.rosters[teamId]) || [])
+// period: next week's lineups (L.nextRosters) when that's the week asked for; else this week's
+function fxRoster(teamId, period) {
+  const L = fxLeague(), next = L && period && L.nextRosters && L.nextRosters.period === period ? L.nextRosters.rosters : null;
+  return (((next || (L && L.rosters)) || {})[teamId] || [])
     .map(it => ({ raw: it.nba ? nbaById.get(it.nba) : null, name: it.name, slot: it.slot === 'Flx' ? 'FLX' : it.slot, st: it.st }))
     .filter(x => x.raw);
 }
 
 // A league team as players, with Fantrax starters in their own slots and IR players on IR
-function fxTeamSide(teamId) {
-  const roster = fxRoster(teamId);
+function fxTeamSide(teamId, period) {
+  const roster = fxRoster(teamId, period);
   const players = roster.map(x => playerFromRaw(x.raw));
   const lineup = Array(state.slots.length).fill(null);
   const leftover = [];
@@ -497,12 +503,26 @@ ui.viewA = null; // team whose side is on the left (null = yours)
 ui.viewB = null; // who they're compared against (null = their real opponent)
 const viewingOther = () => !!(ui.viewA && ui.viewA !== state.fxTeam && fxLeague());
 
-function withViewedTeam(fn) {
-  if (!viewingOther()) return fn();
-  const a = fxTeamSide(ui.viewA);
+// The roster period Matchups shows when it's next week's and that week's lineups are here (L.nextRosters), else null
+function nextRosterPeriod(start = weekStart()) {
+  const L = fxLeague(), N = L && L.nextRosters, rp = N && (L.rosterPeriods || []).find(r => r[0] === N.period);
+  return rp && String(rp[1]).slice(0, 10) <= start && start < String(rp[2]).slice(0, 10) ? N.period : null;
+}
+
+// week: the Matchups tab, where next week shows next week's lineups as set on the league's site
+function withViewedTeam(fn, week = false) {
+  const n = week ? nextRosterPeriod() : null;
+  if (!viewingOther()) {
+    if (!n || !state.fxTeam) return fn();
+    const me = fxTeamSide(state.fxTeam, n), o = state.opp.fxId ? fxTeamSide(state.opp.fxId, n) : null;
+    const saved = state;
+    state = { ...saved, players: me.players, lineup: me.lineup, il: me.il, opp: o ? { ...saved.opp, players: o.players, starters: o.starters } : saved.opp };
+    try { return fn(); } finally { state = saved; }
+  }
+  const a = fxTeamSide(ui.viewA, n);
   const real = fxOpponentFor(weekStart(), ui.viewA);
   const bId = ui.viewB || (real && real.id);
-  const b = bId ? fxTeamSide(bId) : null;
+  const b = bId ? fxTeamSide(bId, n) : null;
   const saved = state;
   state = {
     ...saved, teamName: a.name, players: a.players, lineup: a.lineup, il: a.il, sample: false,
@@ -519,7 +539,8 @@ function fxStrip(ctx) {
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const opp = fxOpponentFor(ctx.start, leftId); // the left team's real opponent this week
   const over = ctx.dates[ctx.dates.length - 1] < todayIso(); // a finished week: no lineup to set, its own rosters
-  const stale = !over && L.rosterPeriod && opp && opp.period !== L.rosterPeriod;
+  const shown = nextRosterPeriod(ctx.start) || L.rosterPeriod; // whose lineups these are
+  const stale = !over && L.rosterPeriod && opp && opp.period !== shown;
   const teams = fxPickable();
   const cur = state.opp.fxId;
   const hypo = cur && (!opp || cur !== opp.id);
@@ -530,7 +551,7 @@ function fxStrip(ctx) {
       <span class="muted">vs</span>
       ${stepper('fx-cycle', 'team', `<select class="ctx-team" data-change="fx-opp" aria-label="Compare against">${cur ? '' : '<option value="">Pick a team</option>'}${teams.filter(t => t.id !== leftId).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id ? ` (${['last week', 'this week', 'next week'][ui.weekShift + 1] || 'that week'})` : ''}</option>`).join('')}</select>`)}
       ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
-      ${stale ? `<span class="muted small">rosters as of week ${L.rosterPeriod}</span>` : ''}
+      ${stale ? `<span class="muted small">rosters as of week ${shown}</span>` : ''}
     </span>${ctx.locked && !over ? lockNote(ctx) : ''}</div>`;
 }
 

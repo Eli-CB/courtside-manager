@@ -1045,6 +1045,39 @@ test("Players: the Opponent filter is this matchup's opponent for every range, n
   }
 });
 
+test("Matchups: next week shows next week's lineups as set on Fantrax (this week's locked when it started)", async () => {
+  const L = await app.useLeague(CATS9);
+  assert.equal(L.rosterPeriod, 2);
+  assert.equal(L.nextRosters && L.nextRosters.period, 3, "weekly lineups: next week's asked for too");
+  const ui = app.get('ui'), st = app.get('state'), was = { team: st.fxTeam, shift: ui.weekShift, lineup: st.lineup, players: st.players, il: st.il, opp: st.opp };
+  // a team that changed its starters for next week
+  const starters = (tid, n) => app.fxTeamSide(tid, n).starters.join();
+  // a side's lineup as NBA ids (player ids are made fresh each time)
+  const nba = S => [...S.lineup].map(id => (S.players.find(p => p.id === id) || {}).nbaId);
+  const nbaOn = (S, ids) => [...ids].map(id => (S.players.find(p => p.id === id) || {}).nbaId).sort();
+  const shown = week => app.withViewedTeam(() => { const s = app.get('state'); return { lineup: nba(s), opp: nbaOn(s.opp, s.opp.starters || []) }; }, week);
+  const tid = L.teams.map(t => t.id).find(id => starters(id) !== starters(id, 3));
+  assert.ok(tid, 'someone set a different lineup');
+  try {
+    app.adoptTeam(tid);
+    ui.weekShift = 0;
+    assert.equal(app.nextRosterPeriod(), null);
+    assert.deepEqual([...shown(true).lineup], nba(app.fxTeamSide(tid)), 'this week: as locked');
+    ui.weekShift = 1;
+    assert.equal(app.nextRosterPeriod(), 3);
+    assert.notDeepEqual(nba(app.fxTeamSide(tid, 3)), nba(app.fxTeamSide(tid)));
+    assert.deepEqual([...shown(true).lineup], nba(app.fxTeamSide(tid, 3)), "next week: next week's lineup");
+    const opp = app.fxOpponentFor(app.weekStart(), tid);
+    if (opp) { app.loadFxTeam(opp.id); const O = app.fxTeamSide(opp.id, 3); assert.deepEqual([...shown(true).opp], nbaOn(O, O.starters), "and the opponent's"); }
+    assert.deepEqual([...shown(false).lineup], nba(app.fxTeamSide(tid)), 'other tabs: this week');
+    assert.deepEqual(nba(app.get('state')), nba(app.fxTeamSide(tid)), 'the saved lineup is left alone');
+    assert.ok(!app.viewWeek().includes('rosters as of week'), "next week's lineups, not an old week's");
+  } finally {
+    Object.assign(st, { fxTeam: was.team, lineup: was.lineup, players: was.players, il: was.il, opp: was.opp }); ui.weekShift = was.shift;
+    ui.tab = 'standings'; clearTimeout(app.get('live').timer); // the redraw started live scores
+  }
+});
+
 test('Players: one table; Per game ranks every NBA player, with search and position', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
