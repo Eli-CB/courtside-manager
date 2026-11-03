@@ -348,6 +348,8 @@ function setNav(open) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('nav-open')) setNav(false); });
 
 document.addEventListener('click', e => {
+  // a tap outside a popup (on its backdrop) closes it
+  if (e.target instanceof HTMLDialogElement && e.target.open) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { e.target.close(); return; } }
   if (document.body.classList.contains('nav-open') && !e.target.closest('.nav-btn') && (!e.target.closest('#tabs') || e.target.closest('#tabs a'))) setNav(false);
   const menu = $('#leagueMenu details');
   if (menu && menu.open && !e.target.closest('#leagueMenu')) menu.removeAttribute('open');

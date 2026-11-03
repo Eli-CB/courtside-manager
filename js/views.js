@@ -1105,8 +1105,6 @@ function showPlayerDetail(nbaId) {
     ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}
     <h3 class="sub" style="margin-top:16px">Games${games.length ? ` <span class="muted small">${games.length}</span>` : ''}</h3>
     ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th><th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
-  $('#detailFoot').innerHTML = `
-    <button type="button" class="btn ghost" data-action="close-detail">Close</button>`;
   const d = $('#detailDialog');
   cardOpen = nbaId;
   if (!d.open) d.showModal();
