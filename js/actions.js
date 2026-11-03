@@ -101,6 +101,17 @@ const actions = {
     el.nextElementSibling.hidden = !open;
   },
   'close-info'() { $('#infoDialog').close(); },
+  // Send feedback: Gmail, the email app, or copy it (in the popup the (i) buttons use)
+  feedback() {
+    $('#gearMenu details').removeAttribute('open');
+    $('#infoTitle').textContent = 'Send feedback';
+    $('#infoBody').innerHTML = feedbackPopup();
+    const d = $('#infoDialog');
+    if (!d.open) d.showModal();
+  },
+  async 'feedback-copy'() {
+    try { await navigator.clipboard.writeText(`To: ${FEEDBACK_EMAIL}\nSubject: ${FEEDBACK_SUBJECT}\n\n${feedbackBody()}`); toast(`Copied: paste it into an email to ${FEEDBACK_EMAIL}`); } catch (e) { toast(`Couldn't copy. The address is ${FEEDBACK_EMAIL}`); }
+  },
   'yahoo-signin'() { yahooSignIn(); },
   'yahoo-signout'() { yahooSignOut(); render(); },
   async 'yahoo-pick'(el) {

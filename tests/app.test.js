@@ -1922,4 +1922,9 @@ test('Send feedback: an email to feedback@leaguelayer.com with the league, page 
   const body = decodeURIComponent(href.split('&body=')[1]);
   assert.ok(body.includes(`League: ${L.name} (Fantrax ${L.id})`) && body.includes('Page: ') && body.includes('Version: '), body);
   assert.ok(body.split('\n').length > 6, 'on separate lines');
+  // the popup: Gmail in the browser (an email link alone does nothing without an email app), the email app, or copy
+  const pop = app.feedbackPopup();
+  assert.ok(pop.includes('https://mail.google.com/mail/?view=cm') && pop.includes('to=feedback%40leaguelayer.com'));
+  assert.ok(pop.includes('href="mailto:feedback@leaguelayer.com') && pop.includes('data-action="feedback-copy"'));
+  assert.ok(pop.includes(L.id), 'the details shown');
 });

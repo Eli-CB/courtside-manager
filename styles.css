@@ -906,6 +906,10 @@ tr.me-row td { background: var(--accent-soft); }
 .lm-item { display: block; width: 100%; text-align: left; font: inherit; font-size: .9rem; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
 .lm-item:hover, .lm-item:focus-visible { background: var(--surface-2); }
 a.lm-item { text-decoration: none; }
+/* Send feedback popup */
+.fb-details { font-size: .78rem; white-space: pre-wrap; word-break: break-word; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin: 8px 0 12px; }
+.fb-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fb-actions .btn { text-decoration: none; }
 .lm-item.on { font-weight: 700; color: var(--accent); }
 .lm-item.danger { color: var(--bad); }
 .lm-item.lm-sub { padding: 6px 10px 6px 26px; font-size: .86rem; }
