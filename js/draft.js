@@ -7,14 +7,64 @@
 // Gain = draft slot − current rank: a #40 pick playing like the #5 player is +35.
 const KEEPER_SLOTS = [5, 15];
 
+// The league's own season: its first week's first day to its last week's last game day, playoffs included
+function leagueSeason(L) {
+  const ps = L.periods || [];
+  if (!ps.length) return null;
+  const last = ps[ps.length - 1], end = String(last.endAt || last.end);
+  // a period that ends in the morning (Fantrax's, the Monday after) ends with the day before
+  return { from: ps[0].start.slice(0, 10), to: end.length <= 10 || +end.slice(11, 13) >= 21 ? end.slice(0, 10) : addDays(end.slice(0, 10), -1) };
+}
+// Each player's per-game stats from a season's games between two days, in nbaStats's shape: NBA id -> stats
+function windowStats(G, from, to) {
+  const d0 = Date.parse(G.start + 'T12:00:00'), day = iso => Math.round((Date.parse(iso + 'T12:00:00') - d0) / 864e5);
+  const a = day(from), b = day(to), out = new Map();
+  for (const [pid, rows] of G.players) {
+    const t = {};
+    let n = 0;
+    for (const r of rows) {
+      if (r[0] < a || r[0] > b) continue;
+      n++;
+      for (const [k, v] of Object.entries(gameLine(G, r))) t[k] = (t[k] || 0) + v;
+    }
+    if (!n) continue;
+    const s = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v / n]));
+    out.set(+pid, { ...s, gp: n, fgPct: t.fga ? t.fgm / t.fga : 0, ftPct: t.fta ? t.ftm / t.fta : 0 });
+  }
+  return out;
+}
+// What a draft is graded by: the games of the league's own season, not the NBA's (a league can end weeks before the
+// NBA does, or start after it). A past season's archived game log; this season's box scores once the league is over
+// or if it started late (until then, the season so far is the league's). { win, stats }, { loading }, or null for the
+// season's averages (nbaStats)
+const draftSeasons = new Map();
+function draftSeason(L, basis) {
+  const win = leagueSeason(L);
+  const season = basis === 'cur' ? 'cur' : String(basis || '').startsWith('arch:') ? basis.slice(5) : null;
+  if (!win || !season) return null;
+  if (season === 'cur' && !(todayIso() > win.to || win.from > (nbaGameDays()[0] || win.from))) return null;
+  if (!(season in gameLogs)) {
+    loadGameLog(season).then(() => { if (ui.tab === 'draft') render(); });
+    return { loading: true };
+  }
+  const G = gameLogs[season];
+  if (!G) return null;
+  const key = `${season}|${win.from}|${win.to}`;
+  if (!draftSeasons.has(key)) draftSeasons.set(key, { win, stats: windowStats(G, win.from, win.to) });
+  return draftSeasons.get(key);
+}
+
 function draftData() {
   const L = fxLeague();
   if (!L || !L.draft || !L.draft.picks.length) return null;
-  // this season so far, or the full season for a past draft (when the site has those stats)
+  // this season so far, or a past season (when the site has its stats); only games inside the league's own season
   const basis = seasonCtx ? seasonCtx.basis : 'cur';
+  const W = draftSeason(L, basis);
+  if (W && W.loading) return { loading: true };
+  const statsOf = raw => (W ? W.stats.get(raw.id) || null : nbaStats(raw, basis));
   const picks = L.draft.picks.map(([round, pick, teamId, nba, name]) => {
     const raw = nba ? nbaById.get(nba) : null;
-    const s = raw && basis ? nbaStats(raw, basis) : null;
+    const s = raw && basis ? statsOf(raw) : null;
     const gp = s ? Math.round(s.gp) : 0;
     const p = { round, pick, teamId, team: fxTeamName(teamId), raw, nbaId: nba, name: raw ? raw.name : name, gp, val: null, s };
     if (s && gp) p.val = value({ ...s, pos: raw.pos });
@@ -45,7 +95,7 @@ function draftData() {
     }
     keepers[tid] = ids.map(nba => {
       const raw = nbaById.get(nba) || { id: nba, pos: [] };
-      const s = basis ? nbaStats(raw, basis) : null;
+      const s = basis ? statsOf(raw) : null;
       const gp = s ? Math.round(s.gp) : 0;
       const val = s && gp ? value({ ...s, pos: raw.pos }) : null;
       const sc = score(val, gp);
@@ -57,7 +107,7 @@ function draftData() {
     }).sort((a, b) => a.rank - b.rank);
     keepers[tid].forEach((k, i) => { k.slot = KEEPER_SLOTS[i] || 25; k.gain = k.like == null ? null : k.slot - k.like; });
   }
-  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals };
+  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals, season: W && W.win };
 }
 
 function draftRow(p, mine) {
@@ -106,6 +156,7 @@ function draftList(title, list, mine, info) {
 
 function viewDraft() {
   const d = draftData();
+  if (d && d.loading) return `<div class="card"><div class="empty"><strong>Loading the season's games…</strong>The draft is graded by the games inside your league's season.</div></div>`;
   if (!d && fxLeague() && fxLeague().draftFailed) {
     return `<div class="card"><div class="empty"><strong>Couldn't load the draft</strong>${sourceName()} didn't answer when the league loaded.<br><br><button type="button" class="btn primary" data-action="draft-retry">Try again</button></div></div>`;
   }
@@ -170,7 +221,7 @@ function viewDraft() {
 
   const modeSeg = !d.graded ? '' : `<div class="seg seg-sm" role="group" aria-label="Rank picks by">${[['game', 'Per game'], ['total', 'Season totals']].map(([k, l]) => `<button type="button" class="${ui.draftMode === k ? 'on' : ''}" data-action="draft-mode" data-mode="${k}" aria-pressed="${ui.draftMode === k}">${l}</button>`).join('')}</div>`;
   return `
-  <div class="page-sub-row">${modeSeg}<p class="page-sub">${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? 'not graded: the site has no NBA stats for that season' : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`} ${infoBtn('draft')}</p></div>
+  <div class="page-sub-row">${modeSeg}<p class="page-sub">${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? 'not graded: the site has no NBA stats for that season' : d.season ? `graded by the games of the league's season, ${fmtDay(d.season.from)} – ${fmtDay(d.season.to)}` : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`} ${infoBtn('draft')}</p></div>
   ${!seasonCtx && d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
   ${d.graded ? `<div class="trade-grid">
     ${draftList(seasonCtx ? 'Best picks' : 'Best picks so far', best, mine, true)}

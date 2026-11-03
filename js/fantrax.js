@@ -35,12 +35,21 @@ const hasLineupHistory = L => !!L && ['fantrax', 'sleeper'].includes(L.source ||
 
 // One request to a league site. "Too many requests", server errors and dropped connections are retried
 // after a growing wait (the site's Retry-After when it sends one); anything else fails straight away.
+// Fantrax says "too many requests" in a normal answer: { error: { code: 'RATE_LIMITED', message: '... may be called at
+// most once every 5 seconds per IP address.' } } (getDraftResults: the current league and a past season loading
+// together ask twice): that waits as long as it says and asks again too.
 const pause = ms => new Promise(res => setTimeout(res, ms));
 async function getJson(url, site, init, tries = 3) {
   for (let i = 0; ; i++) {
     let r = null;
     try { r = await fetch(url, init); } catch (e) { if (i >= tries - 1) throw new Error(`couldn't reach ${site}`); }
-    if (r && r.ok) return JSON.parse(await r.text()); // Fantrax serves JSON as text/plain
+    if (r && r.ok) {
+      const j = JSON.parse(await r.text()); // Fantrax serves JSON as text/plain
+      if (!(j && j.error && j.error.code === 'RATE_LIMITED')) return j;
+      if (i >= tries - 1) throw new Error(`${site} is busy (too many requests)`);
+      await pause((+(String(j.error.message || '').match(/every (\d+) seconds?/) || [])[1] || 5) * 1000 + 250);
+      continue;
+    }
     if (r && r.status !== 429 && r.status < 500) throw new Error(`${site} answered ${r.status}`);
     if (i >= tries - 1) throw new Error(`${site} answered ${r ? r.status : 'nothing'}`);
     const after = r && r.headers && +r.headers.get('Retry-After');

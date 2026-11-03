@@ -289,8 +289,9 @@ test('a finished week projects exactly what happened', async () => {
   }
 });
 
-test('a past season is graded from its archived stats, inactive players included', async () => {
+test("a past season is graded from its games inside the league's season, inactive players included", async () => {
   const P = await app.loadSeason('czqgnyozmf2tbr93');
+  await app.loadGameLog('2025-26');
   assert.equal(P.basis, 'arch:2025-26');
   const picks = P.league.draft.picks;
   const matched = picks.filter(p => p[3]).length;
@@ -303,6 +304,12 @@ test('a past season is graded from its archived stats, inactive players included
   try {
     const d = app.draftData();
     assert.ok(d.graded);
+    // the league played Oct 21 to Mar 22 (its last week ends Monday morning); the NBA went on to Apr 12
+    assert.deepEqual({ ...d.season }, { from: '2025-10-21', to: '2026-03-22' });
+    const full = p => (app.archivedStats(p.raw, '2025-26') || {}).gp || 0;
+    assert.ok(d.picks.every(p => !p.raw || p.gp <= full(p)), 'never more games than the NBA season');
+    assert.ok(d.picks.filter(p => p.raw && p.gp < full(p) - 5).length > 20, "the games after the league's last week don't count");
+    assert.ok(d.maxGp < Math.max(...d.picks.map(full)), `at most ${d.maxGp} games in the league's 22 weeks`);
     const played = d.picks.filter(p => p.gp);
     assert.ok(played.length >= picks.length - 10, `${played.length} picks have 2025-26 stats`);
     assert.ok(played.every(p => Number.isFinite(p.val)));
@@ -1870,3 +1877,36 @@ test("a draft request that fails is tried again, and a draft that still won't co
 });
 // drop a league from the device's league cache
 function forgetLeague(id) { const all = app.readLeagueCache(); delete all[id]; app.localStorage.setItem(app.FX_CACHE_KEY, JSON.stringify(all)); }
+
+test("this season's draft: graded by the season so far, unless the league started late or is over", async () => {
+  await app.loadBoxes();
+  await app.loadGameLog('cur');
+  const F = await app.useLeague(CATS9);
+  assert.equal(app.draftSeason(F, 'cur'), null, 'the league started on opening night and is on: its season so far is the NBA\'s');
+  assert.equal(app.leagueSeason(await app.useLeague(SLEEPER)).to, '2027-04-04', "a Sleeper week ends with its Sunday's games");
+  const E = await app.useLeague(ESPN); // starts in week 3, Nov 2
+  const W = app.draftSeason(E, 'cur');
+  assert.equal(W.win.from, '2026-11-02');
+  assert.equal(W.stats.size, 0, 'none of the games so far (to Oct 26) were in its season');
+  // once a league is over, the NBA games after its last week don't count
+  const over = await onDay('2027-04-20', () => app.draftSeason(F, 'cur'));
+  assert.ok(over && over.win.to === '2027-04-11', 'its last week ends Apr 11');
+});
+
+test("Fantrax's 'too many requests' in a normal answer waits as long as it says, then asks again", async () => {
+  const realFetch = app.fetch;
+  let limited = 1, calls = 0;
+  const busy = JSON.stringify({ error: { onScreen: false, code: 'RATE_LIMITED', message: 'Too many requests - getDraftResults may be called at most once every 1 seconds per IP address.' } });
+  app.fetch = (url, init) => {
+    if (!String(url).includes('getDraftResults')) return realFetch(url, init);
+    calls++;
+    return limited-- > 0 ? Promise.resolve({ ok: true, status: 200, text: async () => busy }) : realFetch(url, init);
+  };
+  try {
+    const t0 = Date.now();
+    const { league } = await app.fetchFantraxLeague(POINTS);
+    assert.ok(league.draft && league.draft.picks.length && !league.draftFailed, 'the draft, not "no draft"');
+    assert.equal(calls, 2);
+    assert.ok(Date.now() - t0 >= 1000, 'waited the second it asked for');
+  } finally { app.fetch = realFetch; }
+});

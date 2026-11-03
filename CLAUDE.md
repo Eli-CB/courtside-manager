@@ -73,7 +73,9 @@ saved leagues are lost). Owner's league:
     it isn't set to the last game day (`ui.dashRange` / `ui.perfRange`), and games are on: scoreboard + the box score of each game in progress
     (`live.lines`: date -> NBA id -> line). ESPN players matched by `espn` id (from the daily job) else initial + last
     name + team. Yesterday and this week's earlier days missing from `data/boxscores.json` are asked for once.
-  - draft: Draft tab/board, saved leagues, landing page. Seasons: the league menu lists the current league's seasons
+  - draft: Draft tab/board, saved leagues, landing page. Drafts are graded on the games of the league's own season
+    (`leagueSeason`: first week to last, playoffs included; `draftSeason`/`windowStats` from that season's game log), not
+    the NBA's full season: past seasons always, this season once the league is over or if it started late. Seasons: the league menu lists the current league's seasons
     under it (`season-pick`/`season-add`); the bar under the tabs only picks a team. The league form (`connectLeague`)
     files an earlier season (year < `NBA.season`, or a later season of the same Fantrax `historyId` is here) under its
     league in `state.pastSeasons[historyId]`, never as a league; `foldPastSeasons` moves old duplicates there
@@ -125,6 +127,9 @@ saved leagues are lost). Owner's league:
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
 - `__BUILD__` in index.html and js/core.js is replaced with the commit hash at deploy (cache busting).
+- Fantrax rate limits answer 200 OK with `{ error: { code: 'RATE_LIMITED', message: '... at most once every 5 seconds per
+  IP address.' } }` (getDraftResults: 5 s): `getJson` waits what it says and asks again; a draft that still doesn't come
+  marks the league `draftFailed` (not kept on the device; Draft tab offers Try again), never "no draft".
 - Box score cache holds NBA.com and ESPN copies of games: always dedupe by date+teams (`loadBoxes` does).
 - Fantrax names can differ from NBA.com ("Nicolas"/"Nic"): `matchNicknames` (initial + last name + team).
 - The preview browser sometimes loses localStorage on restart (back to the landing page): reconnect the
