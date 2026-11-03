@@ -134,7 +134,9 @@ a { color: var(--accent); }
 .gear-adv > summary::-webkit-details-marker { display: none; }
 .gear-adv > summary::after { content: '▸'; font-size: .8rem; transition: transform .15s; }
 .gear-adv[open] > summary::after { transform: rotate(90deg); }
+.lm-ico { width: 17px; height: 17px; margin: 0 8px 0 0; vertical-align: -3px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .gear-sub { display: block; font-size: .76rem; color: var(--muted); font-weight: 400; margin-top: 1px; }
+.lm-ico ~ .gear-sub { padding-left: 25px; } /* under the label, not the icon */
 .gear-toggle { display: flex !important; align-items: center; justify-content: space-between; }
 .gear-switch { width: 34px; height: 20px; border-radius: 10px; background: var(--border); position: relative; flex: none; transition: background .15s; }
 .gear-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: left .15s; }

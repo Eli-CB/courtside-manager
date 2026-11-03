@@ -168,6 +168,11 @@ function savedSize() {
 // in: the league (its site and ID), the page, this version and the browser. A plain email link does nothing on a
 // computer without an email app, so the menu opens a popup: Gmail in the browser, the email app, or copy it all.
 const TIP_URL = 'https://ko-fi.com/leaguelayerdev'; // tips (also in index.html's footer)
+// The settings menu's icons, drawn as lines so they match on every device (emoji differ by phone and computer)
+const menuIcon = d => `<svg class="lm-ico" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const ICON_RELOAD = menuIcon('<path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 3.5v5h-5"/>');
+const ICON_MAIL = menuIcon('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>');
+const ICON_COFFEE = menuIcon('<path d="M4 10h12v4.5a4.5 4.5 0 0 1-4.5 4.5h-3A4.5 4.5 0 0 1 4 14.5z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c-.8 1 .8 2-.1 3M12 3.5c-.8 1 .8 2-.1 3"/>');
 const FEEDBACK_EMAIL = 'feedback@leaguelayer.com', FEEDBACK_SUBJECT = 'League Layer feedback';
 function feedbackDetails() {
   const L = fxLeague();
@@ -206,14 +211,14 @@ function gearMenu() {
     <summary class="icon-btn" aria-label="Settings" title="Settings">⚙</summary>
     <div class="gear-pop">
       ${league ? `<div class="lm-sec">League</div>
-      <button type="button" class="lm-item" data-action="league-reload">↻ Reload from ${sourceName()}<span class="gear-sub">rosters, lineups, matchups and standings</span></button>` : ''}
+      <button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">rosters, lineups, matchups and standings</span></button>` : ''}
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers in the Dashboard's matchup</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-clock" role="switch" aria-checked="${ui.clock24}"><span>24-hour time<span class="gear-sub">tip-offs and update times as ${fmtTime('2026-11-02T19:30:00')}</span></span><span class="gear-switch${ui.clock24 ? ' on' : ''}" aria-hidden="true"></span></button>
       <div class="lm-sec">Help</div>
-      <button type="button" class="lm-item" data-action="feedback">✉ Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></button>
-      <a class="lm-item" href="${TIP_URL}" target="_blank" rel="noopener">☕ Buy me a coffee<span class="gear-sub">tips keep League Layer free, on Ko-fi</span></a>
+      <button type="button" class="lm-item" data-action="feedback">${ICON_MAIL}Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></button>
+      <a class="lm-item" href="${TIP_URL}" target="_blank" rel="noopener">${ICON_COFFEE}Buy me a coffee<span class="gear-sub">tips keep League Layer free, on Ko-fi</span></a>
       <details class="gear-adv"${advOpen ? ' open' : ''}><summary class="lm-sec">Advanced</summary>
         <div class="gear-row">${NBA ? `NBA stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable'}</div>
         <div class="gear-row">Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
