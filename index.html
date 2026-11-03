@@ -91,5 +91,15 @@
   <script src="js/live.js?v=__BUILD__"></script>
   <script src="js/draft.js?v=__BUILD__"></script>
   <script src="js/actions.js?v=__BUILD__"></script>
+  <!-- Cloudflare Web Analytics: visits to the live site only (not the local preview); no cookies -->
+  <script>
+    if (location.hostname === 'leaguelayer.com') {
+      const cf = document.createElement('script');
+      cf.type = 'module';
+      cf.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+      cf.dataset.cfBeacon = '{"token": "82c915ddee8046a88df592730e70ea02"}';
+      document.body.appendChild(cf);
+    }
+  </script>
 </body>
 </html>

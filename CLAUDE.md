@@ -127,6 +127,8 @@ saved leagues are lost). Owner's league:
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
 - `__BUILD__` in index.html and js/core.js is replaced with the commit hash at deploy (cache busting).
+- Traffic: Cloudflare Web Analytics (no cookies), its beacon added at the end of index.html on leaguelayer.com only
+  (the domain is DNS-only, so Cloudflare can't inject it). Stats: dash.cloudflare.com → Web Analytics.
 - Fantrax rate limits answer 200 OK with `{ error: { code: 'RATE_LIMITED', message: '... at most once every 5 seconds per
   IP address.' } }` (getDraftResults: 5 s): `getJson` waits what it says and asks again; a draft that still doesn't come
   marks the league `draftFailed` (not kept on the device; Draft tab offers Try again), never "no draft".
