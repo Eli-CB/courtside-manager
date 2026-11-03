@@ -304,7 +304,15 @@ function dashMatchupCard() {
   if (range !== 'week') {
     const d = dates[0];
     const sits = p => !lineOn(p, d) && (p.status === 'Out' || gameFinal(p, d) || !!(liveGame(p, d) && liveGame(p, d).state === 'post'));
-    const plays = (list, out = false) => list.filter(p => p && playsOn(p, d) && sits(p) === out);
+    // within each group: games on now first, then finished ones, then the rest by tip-off (lineup order otherwise)
+    const stage = p => {
+      const g = liveGame(p, d);
+      if (g && g.state === 'in') return [0, 0];
+      if (gameFinal(p, d) || (g && g.state === 'post')) return [1, 0];
+      return [2, g && g.start ? +g.start : Infinity];
+    };
+    const byStage = list => list.map((p, i) => ({ p, i, s: stage(p) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.i - b.i).map(x => x.p);
+    const plays = (list, out = false) => byStage(list.filter(p => p && playsOn(p, d) && sits(p) === out));
     const BENCH_TAG = ' <span class="badge bench">Bench</span>';
     const column = S => {
       if (!S) return [];

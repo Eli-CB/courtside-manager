@@ -1240,6 +1240,10 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         const group = id => { const p = col(side).find(x => x.nbaId === id); return (sits(p) ? 2 : 0) + (starters(side).includes(p) ? 0 : 1); };
         assert.deepEqual([...left].sort(), col(side).map(p => p.nbaId).sort(), 'my side: everyone who plays, no gaps');
         assert.deepEqual(left.map(group), left.map(group).sort(), 'starters, bench, then out');
+        // within starters and within the bench: games on now first, then finished games, then those still to come
+        const stageOf = id => { const p = col(side).find(x => x.nbaId === id), g = app.liveGame(p, day); return g && g.state === 'in' ? 0 : app.gameFinal(p, day) || (g && g.state === 'post') ? 1 : 2; };
+        for (const grp of [0, 1]) { const st = left.filter(id => group(id) === grp).map(stageOf); assert.deepEqual(st, [...st].sort(), `group ${grp}: on now, finished, to come`); }
+        assert.ok(left.some(id => stageOf(id) === 0), 'a game on now in this matchup');
         assert.equal((m.match(/badge bench">Bench</g) || []).length, playing(benchOf(side)).length + playing(benchOf(opp)).length, 'bench players tagged');
         const shown = [...m.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(x => +x[1]);
         assert.ok(shown.length && shown.every(id => app.playsOn(app.playerFromRaw(app.nbaById.get(id)), day)), 'nobody without a game');
