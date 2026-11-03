@@ -1815,3 +1815,31 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     if (html.includes('Street Clothes')) assert.match(html, /empty start/);
   } finally { ui.tab = 'dashboard'; app.get('state').fxTeam = null; }
 }));
+
+test("the player card: how he came to his fantasy team", async () => {
+  const L = await app.useLeague(CATS9);
+  const [t1, t2] = L.teams.map(t => t.id);
+  const pick = L.draft.picks.find(p => p[2] === t1 && p[3]);
+  const keeper = (L.draft.keepers[t1] || [])[0];
+  assert.ok(pick && keeper, 'a pick and a keeper to look at');
+  const owner = entries => new Map(entries.map(([f, tid]) => [f, { tid, on: true }]));
+  const weeks = [
+    { n: 1, start: '2026-10-20T00:00:00', end: '2026-10-26T18:59:00', owner: owner([['pick', t1], ['keep', t1], ['traded', t2]]) },
+    { n: 2, start: '2026-10-26T19:00:00', end: '2026-11-02T18:59:00', owner: owner([['pick', t1], ['keep', t1], ['traded', t1], ['added', t1]]) },
+  ];
+  const loads = app.get('rosterWeeksLoad'), was = loads[L.id];
+  loads[L.id] = Object.assign(Promise.resolve(weeks), { done: weeks });
+  try {
+    const how = (nba, f) => app.cardHow(L, { id: nba }, t1, f);
+    assert.equal(how(keeper, 'keep'), 'Keeper');
+    assert.equal(how(pick[3], 'pick'), `Drafted · round ${pick[0]}, pick ${pick[1]}`);
+    assert.equal(how(1, 'added'), 'Waiver add · week 2');
+    assert.equal(how(2, 'traded'), `Traded from ${app.fxTeamName(t2)} · week 2`);
+    assert.equal(how(3, 'new'), 'Waiver add · this week', 'not on the latest weekly rosters yet');
+  } finally { if (was) loads[L.id] = was; else delete loads[L.id]; }
+  // without weekly rosters (ESPN): the draft, else added after it
+  const E = await app.useLeague(ESPN);
+  const ep = E.draft.picks.find(p => p[3]);
+  assert.equal(app.cardHow(E, { id: ep[3] }, ep[2], 'x'), `Drafted · round ${ep[0]}, pick ${ep[1]}`);
+  assert.equal(app.cardHow(E, { id: ep[3] }, E.teams.find(t => t.id !== ep[2]).id, 'x'), 'Added after the draft');
+});

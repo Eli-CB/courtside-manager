@@ -25,7 +25,10 @@ try { localStorage.removeItem('courtside-roster-history-v1'); } catch (e) { /* o
 // one load per league at a time, shared by Season totals and Awards
 const rosterWeeksLoad = {};
 function loadRosterWeeks(L) {
-  if (!rosterWeeksLoad[L.id]) rosterWeeksLoad[L.id] = fetchRosterWeeks(L).catch(e => { delete rosterWeeksLoad[L.id]; throw e; });
+  if (!rosterWeeksLoad[L.id]) {
+    const P = rosterWeeksLoad[L.id] = fetchRosterWeeks(L).catch(e => { delete rosterWeeksLoad[L.id]; throw e; });
+    P.then(w => { P.done = w; }, () => {}); // what it found, for anything that can't wait (the player card)
+  }
   return rosterWeeksLoad[L.id];
 }
 async function fetchRosterWeeks(L) {

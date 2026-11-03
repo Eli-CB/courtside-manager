@@ -988,9 +988,42 @@ function cardOwner(raw) {
   if (!L || !L.rosters) return '';
   for (const [tid, r] of Object.entries(L.rosters)) {
     const x = r.find(y => y.nba === raw.id);
-    if (x) return `<p class="pc-owner"><b>${esc(fxTeamName(tid))}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span></p>`;
+    if (!x) continue;
+    const how = cardHow(L, raw, tid, x.fid);
+    return `<p class="pc-owner"><b>${esc(fxTeamName(tid))}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span>${how ? `<span class="pc-how muted">${esc(how)}</span>` : ''}</p>`;
   }
   return raw.fx ? `<p class="pc-owner"><span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span></p>` : '';
+}
+
+// How a rostered player came to his fantasy team: kept, drafted (round and pick), a waiver add or a trade, and when.
+// Weekly rosters (Fantrax, Sleeper) follow him back to the week he joined; elsewhere the draft is all there is.
+function cardHow(L, raw, tid, fid) {
+  const d = L.draft;
+  const pick = d && d.picks.find(p => p[3] === raw.id && p[2] === tid);
+  const fromDraft = d && d.keepers && (d.keepers[tid] || []).includes(raw.id) ? 'Keeper' : pick ? `Drafted · round ${pick[0]}, pick ${pick[1]}` : null;
+  if (!hasLineupHistory(L) || fid == null) return fromDraft || (d && d.picks.length ? 'Added after the draft' : '');
+  const P = rosterWeeksLoad[L.id];
+  if (!P) loadRosterWeeks(L).catch(() => null).then(() => { if ($('#detailDialog').open && cardOpen === raw.id) showPlayerDetail(raw.id); });
+  const weeks = P && P.done;
+  if (!weeks) return fromDraft || '';
+  // a weekly lineup period's matchup week; a daily one's day
+  const when = w => {
+    const d = w.start.slice(0, 10), weekly = w.end && Date.parse(w.end.slice(0, 10)) - Date.parse(d) >= 4 * 864e5;
+    const mid = addDays(d, 3); // a Fantrax week's lineups start the evening before its first matchup day
+    const p = weekly && (L.periods || []).find(x => x.start <= mid && mid <= x.end);
+    return p ? `week ${p.n}` : fmtDay(d);
+  };
+  const on = w => (w.owner.get(fid) || {}).tid === tid;
+  const last = weeks[weeks.length - 1];
+  if (!on(last)) { // joined since the latest rosters
+    const was = last.owner.get(fid);
+    return was ? `Traded from ${fxTeamName(was.tid)} · this week` : 'Waiver add · this week';
+  }
+  let j = weeks.length - 1;
+  while (j > 0 && on(weeks[j - 1])) j--;
+  if (!j) return fromDraft || `On the team since ${when(weeks[0])}`;
+  const prev = weeks[j - 1].owner.get(fid);
+  return prev ? `Traded from ${fxTeamName(prev.tid)} · ${when(weeks[j])}` : `Waiver add · ${when(weeks[j])}`;
 }
 // Every game he's played this season, newest first: the saved box scores (and today's, as they're played), else
 // the few the daily file keeps (preseason ones too, before the season starts)

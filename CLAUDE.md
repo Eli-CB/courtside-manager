@@ -58,7 +58,7 @@ saved leagues are lost). Owner's league:
     this week's waiver moves (`periodMoves`: last period's rosters vs this one's, Fantrax only), action items and injuries), Roster,
     Standings + Season totals, Trades, Players tab (`#players`, was Free Agents): one table (`topPerformancesCard`) of every NBA stat line of
     today / last game day / this week / this season (added up), or Per game (`seasonRows`: averages from the Stats used basis); top 300 for the season ranges, 100 otherwise; search, position and NBA team (pill-style menus), Rookies / Injured toggles,
-    team / Active / Bench / Waivers filters, ranked by value; then recommended adds
+    team / Active / Bench / Waivers filters, ranked by value; then recommended adds. Player card: under his fantasy team, how he got there (`cardHow`: Keeper / Drafted round, pick / Waiver add / Traded from, with the week, from the weekly rosters; ESPN: the draft only)
   - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such

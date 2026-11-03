@@ -247,6 +247,7 @@ a { color: var(--accent); }
 .perf-when { margin: -6px 0 10px; }
 .flag { vertical-align: -2px; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
 .pc-owner { margin: 4px 0 0; font-size: .9rem; }
+.pc-how { display: block; margin-top: 2px; font-size: .85rem; } /* how he joined: drafted, kept, added, traded */
 .pc-rank { font-size: .78rem; color: var(--muted); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
 /* the season's games: five show, the rest scroll */
 .pc-games-wrap { max-height: 300px; overflow-y: auto; }
