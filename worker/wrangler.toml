@@ -12,8 +12,8 @@ SITE_ORIGINS = "https://leaguelayer.com,http://localhost:5173"
 
 # YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET are secrets: npx wrangler secret put YAHOO_CLIENT_ID (and _SECRET)
 
-# The site's error log (see README.md): make the namespace with  npx wrangler kv namespace create ERRORS
-# put the id it prints below and remove the # signs, then  npx wrangler secret put ERRORS_KEY  (a password for the log page)
-# [[kv_namespaces]]
-# binding = "ERRORS"
-# id = "paste-the-id-here"
+# The site's error log (see README.md), made with  npx wrangler kv namespace create ERRORS
+# The log page's password is a secret:  npx wrangler secret put ERRORS_KEY
+[[kv_namespaces]]
+binding = "ERRORS"
+id = "6237323107d847fa897250456b62c0df"

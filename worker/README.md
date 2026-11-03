@@ -39,7 +39,7 @@ the error (message, where in the code, page, league site and ID, version, browse
 npx wrangler kv namespace create ERRORS
 ```
 
-Put the `id` it prints into the `[[kv_namespaces]]` block at the end of `wrangler.toml` and remove the `#` signs there. Then
+Put the `id` it prints into the `[[kv_namespaces]]` block at the end of `wrangler.toml` (done: League Layer's is there). Then
 pick a password for the log page and deploy:
 
 ```
