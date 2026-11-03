@@ -485,7 +485,7 @@ test('past Rosters list only starters, with games and misses that match the awar
   }
 });
 
-test('a past season shows its keepers without grading them', async () => {
+test("a past season grades its keepers: the better one by the season before's value", async () => {
   const P = await app.loadSeason('czqgnyozmf2tbr93');
   const L = P.league;
   const team = L.teams.find(t => t.name === "Eli's SGAteam");
@@ -496,7 +496,12 @@ test('a past season shows its keepers without grading them', async () => {
   let d;
   try { app.withSeason(() => { d = app.draftData(); }); } finally { app.get('ui').season = null; }
   const ks = d.keepers[team.id];
-  assert.ok(ks.every(k => k.past && k.gain === undefined && k.slot === undefined), 'listed, not graded');
+  const by = Object.fromEntries(ks.map(k => [k.name, k]));
+  // today's ADP says nothing about a 2025 draft: 2024-25's value per game picks the better keeper
+  assert.equal(by['Shai Gilgeous-Alexander'].slot, 5, 'the 2024-25 MVP is the #5 pick');
+  assert.equal(by['Karl-Anthony Towns'].slot, 15);
+  assert.ok(ks.every(k => !k.past && Number.isFinite(k.gain) && k.like >= 1), 'graded against where each finished among the picks');
+  assert.equal(by['Shai Gilgeous-Alexander'].gain, 5 - by['Shai Gilgeous-Alexander'].like);
   assert.ok(!d.picks.some(p => names.includes(p.name)), 'keepers are not draft picks');
   // Team drafts: a team's name opens its keepers and every pick, in draft order, for that season
   let card;

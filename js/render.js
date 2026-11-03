@@ -99,8 +99,10 @@ async function loadSeason(id, fetched) {
   const A = season ? await loadArchive(season) : null;
   const findOld = A ? matchInactive(league, A) : () => null;
   league.fidNba = fid => idMap.toNba[fid] || (idMap.names[fid] ? findOld(idMap.names[fid]) : null);
-  // keepers again, now that players no longer in the NBA are matched (shown on the board, not graded)
+  // keepers again, now that players no longer in the NBA are matched; the season before's stats say which was the
+  // better keeper (graded as the #5 pick, the other as #15)
   if (league.draft) league.draft.keepers = keepersOf(league);
+  if (league.draft && league.year) { league.priorSeason = seasonOf(league.year - 1); await loadArchive(league.priorSeason); }
   league.weeks = await loadRosterWeeks(league).catch(() => null);
   league.season = season; // its game log loads when Awards opens
   const prevStart = NBA && NBA.prevSeason ? +String(NBA.prevSeason).slice(0, 4) : null;

@@ -91,7 +91,8 @@ saved leagues are lost). Owner's league:
 - Fantrax: minimize requests. League data cached on the device; manual ↻ Reload (gear menu) instead of
   loading fresh each visit. Weekly rosters fetched once per finished period. Shared player list/ADP once a day.
 - Keepers exist only if draft rounds < roster spots (starters + bench); keepers = opening-week roster minus
-  that team's picks. Past keepers are shown, never graded; never compare today's ADP to a past draft.
+  that team's picks. Keepers are graded as the #5 and #15 picks: this season the better one by ADP, a past season by
+  the season before's value per game (`L.priorSeason` archive); never compare today's ADP to a past draft.
 - Awards (current season "so far" + past seasons) all come from weekly starters (ACTIVE status) and game logs:
   Best draft (picks' games until first dropped, through trades, above replacement in cats), Best manager
   (actual wins vs all-play record), Waiver Wire Wizard (pickups' games while starting; trades excluded),

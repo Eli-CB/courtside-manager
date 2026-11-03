@@ -156,7 +156,7 @@ const INFO = {
     <p><b>Past seasons.</b> A past draft is graded the same way, but on that season's full per-game stats, so the rank is where each player finished.</p>
     <p><b>Team drafts.</b> The average +/− across all of a team's picks. Total value adds up the per-game value of every pick who has played.</p>
     <p><b>Colors.</b> Each pick and keeper is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
-    <p><b>Keepers</b> fill the top two rows. This season, the one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks. A past season's keepers are shown but not graded.</p>
+    <p><b>Keepers</b> fill the top two rows. This season, the one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks. In a past season, the better keeper is the one with more value per game the season before (today's ADP says nothing about a past draft).</p>
     <p><b>Board.</b> One row per round, one column per draft slot. Traded picks stay in their original slot, marked with the team that made the pick. "No pick" means the slot went unused.</p>`],
   board: ['Reading the draft board', `
     <p><b>Each cell</b> is one pick: the pick number, the player, and his <b>+/−</b>.</p>
@@ -165,7 +165,7 @@ const INFO = {
     <p><b>+/−</b> is the pick number minus that rank. A #40 pick playing like the #5 player is <b>+35</b>; a #3 pick playing like #50 is <b>−47</b>. "DNP" means he hasn't played.</p>
     <p><b>Colors.</b> Green is outplaying the slot, red is underplaying it, getting stronger the bigger the gap. Hover a cell for the player's rank.</p>
     <p><b>Layout.</b> One row per round, one column per draft slot. A traded pick stays in its original slot, marked "by" the team that made it. "No pick" means the slot went unused.</p>
-    <p><b>Keepers</b> fill the K rows at the top. This season, the one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick. A past season's keepers (players on a team's opening-week roster it didn't draft) are shown but not graded, and don't count toward any grade or award.</p>`],
+    <p><b>Keepers</b> fill the K rows at the top. This season, the one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick. A past season's keepers (players on a team's opening-week roster it didn't draft) are graded the same way, the better one being the one with more value per game the season before; keepers don't count toward any award.</p>`],
   data: ['Where the data comes from', `
     <ul><li><b>NBA.com:</b> active players, last season's stats and game-to-game spreads, and (when reachable) the schedule and box scores.</li>
     <li><b>ESPN:</b> the injury report, plus the schedule and box scores on the website's daily refresh, since NBA.com blocks the cloud servers that run it. Both give identical numbers.</li>

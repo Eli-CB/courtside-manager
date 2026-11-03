@@ -33,23 +33,28 @@ function draftData() {
   picks.filter(p => p.val == null).sort((a, b) => a.pick - b.pick).forEach((p, i) => { p.rank = played.length + i + 1; });
   picks.forEach(p => { p.gain = p.pick - p.rank; });
   const maxGp = Math.max(0, ...picks.map(p => p.gp));
-  // keepers: where each would slot among this year's picks, by value per game so far
+  // keepers: where each would slot among this year's picks, by value per game so far. The better keeper counts as the
+  // #5 pick, the other as #15: this season by Fantrax ADP; a past season by the season before's value per game (today's
+  // ADP says nothing about a past draft), a keeper without one (a rookie) last
+  const prior = seasonCtx && L.priorSeason && archives[L.priorSeason] ? L.priorSeason : null;
   const keepers = {};
   for (const [tid, ids] of Object.entries(L.draft.keepers || {})) {
-    if (seasonCtx) {
+    if (seasonCtx && (!basis || !prior)) { // no stats to grade by, or none to say which keeper was the better one
       keepers[tid] = ids.map(nba => ({ nbaId: nba, name: (nbaById.get(nba) || {}).name || '', past: true })).sort((a, b) => a.name.localeCompare(b.name));
       continue;
     }
     keepers[tid] = ids.map(nba => {
-      const raw = nbaById.get(nba);
-      const s = raw && basis ? nbaStats(raw, basis) : null;
+      const raw = nbaById.get(nba) || { id: nba, pos: [] };
+      const s = basis ? nbaStats(raw, basis) : null;
       const gp = s ? Math.round(s.gp) : 0;
       const val = s && gp ? value({ ...s, pos: raw.pos }) : null;
       const sc = score(val, gp);
       const like = sc == null ? null : played.filter(p => p.score > sc).length + 1;
-      return { nbaId: nba, name: raw ? raw.name : '', gp, val, like, adp: (raw && raw.fx && raw.fx.adp) || 999 };
-    }).sort((a, b) => a.adp - b.adp);
-    // the better keeper (lower ADP) counts as the #5 pick, the other as #15
+      const before = prior ? archivedStats(raw, prior) : null;
+      const rank = prior ? -(before && before.gp ? value({ ...before, pos: raw.pos }) : -1e9) : (raw.fx && raw.fx.adp) || 999;
+      const old = [basis && basis.startsWith('arch:') && basis.slice(5), prior].map(x => x && archives[x] && archives[x].players.get(nba)).find(Boolean);
+      return { nbaId: nba, name: raw.name || (old && old.n) || '', gp, val, like, rank }; // a player gone from the NBA: his archived name
+    }).sort((a, b) => a.rank - b.rank);
     keepers[tid].forEach((k, i) => { k.slot = KEEPER_SLOTS[i] || 25; k.gain = k.like == null ? null : k.slot - k.like; });
   }
   return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals };
