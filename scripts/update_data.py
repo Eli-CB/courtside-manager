@@ -273,6 +273,37 @@ def espn_rosters():
     return out
 
 
+def sleeper_ids():
+    """Sleeper's NBA players (one request a day, as Sleeper asks), keyed by normalized name: [(Sleeper id, team, active,
+    positions)]. Sleeper leagues name players only by these ids, so each player carries his ('slp'), and Sleeper's
+    position eligibility ('slpPos', which Sleeper lineups follow)."""
+    out = {}
+    for pid, v in (get_json('https://api.sleeper.app/v1/players/nba', timeout=90) or {}).items():
+        name = v.get('full_name') or f"{v.get('first_name') or ''} {v.get('last_name') or ''}".strip()
+        if name:
+            pos = [x for x in ('PG', 'SG', 'SF', 'PF', 'C') if x in (v.get('fantasy_positions') or [])]
+            out.setdefault(norm_name(name), []).append((pid, v.get('team') or '', bool(v.get('active')), pos))
+    return out
+
+
+def sleeper_id(slp, name, team):
+    """An NBA.com player's Sleeper entry (id, team, active, positions): same name (on the same team when two share it),
+    else the same initial, last name and team ("Cam"/"Cameron")."""
+    c = slp.get(norm_name(name)) or []
+    on_team = [x for x in c if x[1] == team]
+    if len(on_team) == 1 or (on_team and len(c) == len(on_team)):
+        return on_team[0]
+    active = [x for x in c if x[2]]
+    if len(c) == 1 or len(active) == 1:
+        return (active or c)[0]
+    if team:
+        key = name_key(name)
+        alt = [x for n, xs in slp.items() if n and name_key(n) == key for x in xs if x[1] == team]
+        if len(alt) == 1:
+            return alt[0]
+    return None
+
+
 def nba_games():
     """Regular-season games from the NBA data server."""
     data = get_json(CDN + 'staticData/scheduleLeagueV2.json', timeout=60)
@@ -698,6 +729,7 @@ def main():
         prev, pre_logs, prev_logs = {}, {}, {}
     inj = optional('Injury report (ESPN)', injuries, {})
     espn = optional('Birth dates and ESPN ids (ESPN rosters)', espn_rosters, {})
+    slp = optional('Sleeper player ids', sleeper_ids, {})
     fx_players, league = {}, None
     league_id, past_ids = '', []
     if os.path.exists(LEAGUE_CFG):
@@ -760,6 +792,10 @@ def main():
         if b: p['born'] = b
         eid = e.get('espn') or was.get('espn')
         if eid: p['espn'] = eid
+        s = sleeper_id(slp, name, team) if slp else None
+        sid, spos = (s[0], s[3]) if s else (was.get('slp'), was.get('slpPos'))
+        if sid: p['slp'] = sid
+        if sid and spos: p['slpPos'] = spos
         i = inj.get(norm_name(name))
         if i:
             p['inj'] = i

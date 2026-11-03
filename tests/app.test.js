@@ -1628,3 +1628,103 @@ test('times follow the 24-hour setting', () => {
     assert.match(app.fmtTime('2026-11-02T19:05:00'), /^7:05\s?p\.?m\.?$/i);
   } finally { ui.clock24 = was; }
 });
+
+// ----- Sleeper -----
+const SLEEPER = '1369432599025442816'; // a public Sleeper league (tests/capture_sleeper_fixtures.py): 12 teams, points, Lock-In
+
+test('Sleeper league IDs and addresses', () => {
+  assert.equal(app.parseLeagueId(SLEEPER), SLEEPER);
+  assert.equal(app.parseLeagueId(`https://sleeper.com/leagues/${SLEEPER}/matchup`), SLEEPER);
+  assert.equal(app.parseLeagueId(`sleeper.app/leagues/${SLEEPER}`), SLEEPER);
+  assert.equal(app.leagueSourceOf(SLEEPER), 'sleeper');
+  assert.equal(app.leagueSourceOf('794342666'), 'espn', 'short all-digit IDs stay ESPN');
+});
+
+test('reads a Sleeper league into the same shape as the others', async () => {
+  const L = await app.useLeague(SLEEPER);
+  assert.equal(L.source, 'sleeper');
+  assert.equal(app.sourceName(L), 'Sleeper');
+  assert.equal(L.name, 'Smart League');
+  assert.ok(app.isPoints() && L.oneGame && app.isOneGame());
+  assert.deepEqual({ ...L.points }, { ast: 1, blk: 2, dd: 1, pts: 0.5, reb: 1, stl: 2, td: 2, to: -1, tpm: 0.5 });
+  assert.deepEqual([...L.pointsOther], ['40+ point games', '50+ point games', 'flagrant fouls', 'technical fouls'], 'bonuses listed, not projected');
+  assert.deepEqual(JSON.parse(JSON.stringify(app.slotsFromLeague(L))), { slots: ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX', 'FLX'], bench: 5, ir: 1 });
+  assert.equal(L.teams.length, 12);
+  const all = Object.values(L.rosters).flat();
+  assert.equal(all.filter(x => x.st === 'ACTIVE').length, 12 * 9);
+  assert.ok(all.filter(x => x.nba).length >= all.length - 3, 'rostered players matched by their Sleeper ids');
+  assert.ok(all.every(x => x.name && !/^Player /.test(x.name)), 'everyone named');
+  assert.equal(L.draft.picks.length, 168);
+  assert.equal(L.draft.perRound, 12);
+  assert.deepEqual([...L.draft.picks[0].slice(0, 3)], [1, 1, '7']);
+  assert.equal(L.standings.length, 12);
+  assert.ok(L.standings.every((s, i) => !i || s.w <= L.standings[i - 1].w), 'ranked by wins');
+  assert.ok(!app.hasLineupHistory(L), 'awards and recaps stay Fantrax-only');
+  // weeks: Monday to Sunday from opening night, no All-Star exception; 3 playoff weeks for 6 teams from week 22
+  const span = n => { const p = L.periods.find(x => x.n === n); return p && `${p.start}..${p.end}`; };
+  assert.equal(span(1), '2026-10-20..2026-10-25');
+  assert.equal(span(2), '2026-10-26..2026-11-01');
+  assert.equal(span(18), '2027-02-15..2027-02-21');
+  assert.equal(span(24), '2027-03-29..2027-04-04');
+  assert.equal(L.periods.length, 24);
+  assert.equal(L.playoffPeriod, 22);
+  assert.deepEqual(Object.keys(L.matchups).map(Number), [1, 2, 3], 'the week before, this week and the next');
+  assert.ok(app.fxOpponentFor('2026-10-26', L.teams[0].id), 'an opponent this week');
+
+  // Sleeper's own positions: its lineups follow them (Luka is a PG there, a guard-forward on NBA.com)
+  const saved = app.NBA.players.map(r => [r, r.fx, r.pos]);
+  try {
+    app.applyFantraxLeague(await app.getLeague(SLEEPER, true));
+    const luka = app.NBA.players.find(r => r.name === 'Luka Dončić');
+    assert.deepEqual([...luka.pos], ['PG']);
+    assert.equal(luka.fx.id, luka.slp);
+  } finally {
+    for (const [r, fx, pos] of saved) { if (fx) r.fx = fx; else delete r.fx; r.pos = pos; }
+    app.set('nbaCache', null);
+  }
+});
+
+test('Sleeper counts one game a week for each starter', async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(SLEEPER);
+  const luka = app.NBA.players.find(r => r.name === 'Luka Dončić');
+  const p = app.playerFromRaw(luka);
+  const week1 = app.matchDates('2026-10-20');
+  const lines = week1.map(d => app.actualLine(p, d)).filter(Boolean);
+  assert.equal(lines.length, 3);
+  // Sleeper's 53 points for him in week 1 are his 52-point night (Oct 25), not his week
+  L.slpWeek = { n: 1, pts: { [luka.slp]: 53 }, at: Date.now() };
+  assert.equal(app.oneGameLine(p, lines).pts, 52);
+  // with no points from Sleeper: his latest game, as Sleeper counts one that isn't locked in
+  L.slpWeek = { n: 1, pts: {}, at: Date.now() };
+  assert.equal(app.oneGameLine(p, lines), lines[2]);
+
+  // a finished week projects to one game per starter, well under every game added up
+  const A = app.fxTeamSide(L.teams[0].id);
+  const one = app.projectSide(A.players, week1, null);
+  L.oneGame = false;
+  let every;
+  try { every = app.projectSide(A.players, week1, null); } finally { L.oneGame = true; }
+  assert.ok(one.games <= 9 && one.games > 0, `${one.games} starters' games count`);
+  assert.ok(every.games > one.games);
+  const fp = S => app.fpTotals(S).a;
+  assert.ok(fp(one) < fp(every) * 0.6, `one game each: ${fp(one)} FP, every game: ${fp(every)}`);
+});
+
+test("Sleeper on the Dashboard: this period shows the game that counts", async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(SLEEPER);
+  const tid = L.teams[0].id;
+  useTeam(tid);
+  const ui = app.get('ui'), was = ui.dashRange;
+  L.slpWeek = { n: 1, pts: {}, at: Date.now() }; // fresh: nothing asks Sleeper again
+  try {
+    ui.dashRange = 'week';
+    const m = await onDay('2026-10-25', () => app.dashMatchupCard());
+    assert.ok(m.includes(app.fxTeamName(tid)));
+    assert.ok(m.includes('this one counts'), 'a starter with more than one game shows which counts');
+    assert.ok(!m.includes('Game minutes left'), 'no minutes-left chip: games beyond the first one may not count');
+    const score = +[...m.matchAll(/class="mu-score">([^<]*)</g)][0][1];
+    assert.ok(score > 0 && score < 500, `period score ${score}`);
+  } finally { ui.dashRange = was; app.get('state').fxTeam = null; }
+});

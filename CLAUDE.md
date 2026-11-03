@@ -1,6 +1,6 @@
 # League Layer: notes for working on this repo
 
-Fantasy basketball (Fantrax, and public ESPN leagues) weekly matchup site. Static GitHub Pages site, no build step, no backend.
+Fantasy basketball (Fantrax, public ESPN leagues, Sleeper) weekly matchup site. Static GitHub Pages site, no build step, no backend.
 Live: https://leaguelayer.com (domain on Cloudflare, DNS only, set in the repo's Pages settings; the old
 eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/courtside-manager:
 the site was Courtside Manager until Oct 2026; the repo and every `courtside-*` storage key keep the old name so nobody's
@@ -10,7 +10,7 @@ saved leagues are lost). Owner's league:
 
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
-  scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, yahoo, render, history, views,
+  scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, sleeper, yahoo, render, history, views,
   matchups, recap, live, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers (every time of day through `fmtTime`:
     the gear menu's 24-hour toggle, `courtside-clock`, else the device's own clock), headshots (ring + background in team colors,
@@ -27,6 +27,15 @@ saved leagues are lost). Owner's league:
     (`matchPlayers`), which site an ID is on (`leagueSourceOf`, `parseLeagueId`, `sourceName`), `getJson` (shared retries)
   - espn: `fetchEspnLeague` turns a public ESPN league into the same league shape (`source: 'espn'`), so every
     tab works unchanged. "fx" names (`fxLeague`, `raw.fx`, `fxTeamSide`) mean "the league's site", either one.
+  - sleeper: `fetchSleeperLeague` (api.sleeper.app, CORS-open, no sign-in; IDs are 15-20 digits, `source: 'sleeper'`).
+    Sleeper basketball is points only and counts ONE game a week per lineup slot (Lock-In: the game locked in after it's
+    played, else the last of the week; Game Pick: the one picked): `L.oneGame`, `isOneGame()`. Projections (`oneGameSide`
+    in nba.js: one game per starter, the best fill the slots), `weekGames`/`weeklyPriority` (1 game at most) and the
+    Dashboard's period score (`oneGameLine`: the game nearest Sleeper's points for him this week, `L.slpWeek`, asked for
+    again every 2 min by `sleeperWeekFresh`) follow it; no Daily bench swaps card. Weeks: Monday-Sunday from opening
+    night, no All-Star exception (checked against 2025-26's weekly points); playoffs a week a round. Players are named
+    only by Sleeper ids: the daily job gives each player `slp` (+ `slpPos`, Sleeper's positions, which its lineups follow).
+    Fixtures: `tests/capture_sleeper_fixtures.py` (names anonymized). Awards/Recap/Season totals stay Fantrax-only.
   - yahoo: Yahoo leagues through a Yahoo login (OAuth): the helper server `worker/yahoo.js` (Cloudflare Worker at
     api.leaguelayer.com, setup in `worker/README.md`) runs the sign-in and passes API requests through (Yahoo's API isn't
     CORS-open); tokens stay in the browser (`courtside-yahoo`). `yahoo.proxy` empty = Yahoo hidden; while `yahoo.beta`, the sign-in shows only on a device that opened `?yahoo=1` (or is signed in). `yflat` turns Yahoo's
@@ -64,7 +73,7 @@ saved leagues are lost). Owner's league:
     league in `state.pastSeasons[historyId]`, never as a league; `foldPastSeasons` moves old duplicates there
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
-  `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
+  `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 - `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
   in page order with fake fetch (fixtures) and a fixed clock (2026-10-26 20:00 ET). Fixtures in

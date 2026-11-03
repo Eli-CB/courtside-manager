@@ -36,7 +36,8 @@ const fmtCatDelta = (c, d) => (c.pct ? (d >= 0 ? '+' : '−') + Math.abs(d).toFi
 const pctTxt = p => `${Math.round(p * 100)}%`;
 // a change in the matchup goal: categories won, or projected fantasy points
 const goalDelta = v => (isPoints() ? `${signed(v, 1)} FP` : `${signed(v, 2)} cats`);
-const weekGames = (p, dates) => (p.status === 'Out' ? 0 : gamesIn(p, dates));
+// a player's games that count this week (one at most in one-game leagues)
+const weekGames = (p, dates) => (p.status === 'Out' ? 0 : isOneGame() ? Math.min(1, gamesIn(p, dates)) : gamesIn(p, dates));
 function gamesLeftTip(p, dates) {
   const played = dates.filter(d => playsOn(p, d) && gameFinal(p, d) && actualLine(p, d)).length;
   const left = dates.filter(d => playsOn(p, d) && !gameFinal(p, d)).length;
@@ -631,9 +632,9 @@ function viewWeek() {
       ${changed && !over ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'points' : 'cats'} · ${pctTxt(oSet.win)} to win · ${asSet.games} starter games</div></div>` : ''}
     </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from ${sourceName()}</button>` : `${sourceName()} has no matchup for you this week.`}</div></div>`;
 
-  // Daily-lineup leagues keep the day-by-day swap list
+  // Daily-lineup leagues keep the day-by-day swap list (not one-game leagues: more games don't count there)
   let dailyCards = '';
-  if (!weekly) {
+  if (!weekly && !isOneGame()) {
     const swaps = dates.map((d, i) => {
       const s = asSet.days[i], b = best.days[i];
       return { d, start: [...b.active].filter(id => !s.active.has(id)).map(byId), sit: [...s.active].filter(id => !b.active.has(id)).map(byId), past: d < today };

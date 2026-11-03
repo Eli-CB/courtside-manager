@@ -335,6 +335,7 @@ function leagueError(id, e) {
   const site = SOURCE_NAME[leagueSourceOf(id)];
   if (e.message === 'yahoo sign-in') return new Error('Sign in with Yahoo to load Yahoo leagues.');
   if (e.message === 'private league') return new Error("That ESPN league is private, so ESPN won't share it. Only public ESPN leagues can be loaded; the league manager can make it viewable to the public in the league's settings.");
+  if (/not basketball/.test(e.message)) return new Error(`That league isn't basketball (${e.message.replace(/^that's /, '')}).`);
   return new Error(`${site} didn't find that league (${e.message}). Check the ID in your league's address.${site === 'ESPN' ? ' Only public ESPN leagues can be loaded.' : ''}`);
 }
 
@@ -408,10 +409,10 @@ function viewLanding() {
       <h1>${forSeason ? 'Add an earlier season' : adding ? 'Connect another league' : 'Plan your fantasy basketball week'}</h1>
       <p class="muted">${forSeason ? `Each season of <b>${esc(forSeason.name)}</b> has its own Fantrax league ID: open that season on Fantrax and copy the part of the address after <b>/league/</b>.`
         : adding ? 'Enter its league ID. Each league keeps its own team and notes, and earlier seasons go under their league in the menu at the top.'
-        : "Connect your Fantrax or ESPN league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
+        : "Connect your Fantrax, ESPN or Sleeper league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
       <form class="land-form" data-form="land-league">
         <label class="field" for="landLeague">${forSeason ? "That season's league ID or address" : 'League ID or address'}
-          <input id="landLeague" name="leagueId" placeholder="${forSeason ? 'Fantrax league ID' : 'Fantrax or ESPN league ID'}" autocomplete="off" spellcheck="false" autofocus>
+          <input id="landLeague" name="leagueId" placeholder="${forSeason ? 'Fantrax league ID' : 'Fantrax, ESPN or Sleeper league ID'}" autocomplete="off" spellcheck="false" autofocus>
         </label>
         <button class="btn primary" type="submit">${forSeason ? 'Add season' : 'Connect league'}</button>
       </form>
@@ -424,8 +425,10 @@ function viewLanding() {
         <p><b>ESPN:</b> open your league on espn.com. The ID is the number after <b>leagueId=</b>:<br>
         <span class="land-url">fantasy.espn.com/basketball/league?leagueId=<b>12345678</b></span><br>
         Only public ESPN leagues can be loaded.</p>
+        <p><b>Sleeper:</b> open your league at sleeper.com. The ID is the long number after <b>/leagues/</b>:<br>
+        <span class="land-url">sleeper.com/leagues/<b>1234567890123456789</b>/matchup</span></p>
         <p>Pasting the whole address works too.</p>
       </details>
-      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax and ESPN. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
+      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax, ESPN and Sleeper. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
 }

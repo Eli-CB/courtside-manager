@@ -194,6 +194,8 @@ function dashMatchupCard() {
   if (!L) return '';
   if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');
   if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
+  sleeperWeekFresh(L);
+  const one = isOneGame(); // Sleeper: one game a week counts for each starter
   const D = dashDays();
   // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Until one is picked: today once its games have started,
   // else the last game day
@@ -206,9 +208,17 @@ function dashMatchupCard() {
   const side = tid => {
     const S = fxTeamSide(tid), byId = new Map(S.players.map(p => [p.id, p])), on = new Set(S.lineup), il = new Set(S.il);
     const starters = S.lineup.map(id => byId.get(id) || null);
-    const total = ds => { const t = {}; for (const p of starters) if (p) for (const d of ds) { const l = lineOn(p, d); if (l) addLine(t, l); } return t; };
+    const total = (ds, week) => {
+      const t = {};
+      for (const p of starters) {
+        if (!p) continue;
+        const lines = ds.map(d => lineOn(p, d)).filter(Boolean);
+        if (one && week) { const c = oneGameLine(p, lines); if (c) addLine(t, c); } else lines.forEach(l => addLine(t, l));
+      }
+      return t;
+    };
     return {
-      tid, name: S.name, starters, tot: total(dates), week: total(D.week),
+      tid, name: S.name, starters, tot: total(dates, range === 'week'), week: total(D.week, true),
       bench: S.players.filter(p => !on.has(p.id) && !il.has(p.id)).sort((a, b) => value(b) - value(a)),
       ir: S.players.filter(p => il.has(p.id)),
     };
@@ -223,6 +233,16 @@ function dashMatchupCard() {
   // (48 a game to come, what's left of each game on now)
   const pace = S => {
     const n = { played: 0, now: 0, left: 0, min: 0 };
+    // one-game leagues: starters, not games: with a game in, on now, still to play their first
+    if (one) {
+      for (const p of S.starters) {
+        if (!p) continue;
+        if (D.all.some(d => d <= today && lineOn(p, d) && !(d === today && liveOn(p, d)))) n.played++;
+        else if (liveOn(p, today) && lineOn(p, today)) n.now++;
+        else if (p.status !== 'Out' && D.all.some(d => d >= today && playsOn(p, d) && !gameFinal(p, d))) n.left++;
+      }
+      return n;
+    }
     for (const p of S.starters) if (p) for (const d of D.all) {
       if (!playsOn(p, d)) continue;
       const g = d === today ? liveGame(p, d) : null, line = lineOn(p, d);
@@ -238,8 +258,8 @@ function dashMatchupCard() {
   const paceChips = S => {
     const n = pace(S);
     return `<div class="mu-pace">
-      <span class="mu-pc" title="Starter games this period: ${n.played} played, ${n.now} on now, ${n.left} to come">${ICON_GAMES}<b>${n.played}</b><span class="${n.now ? 'pos-good' : ''}">${n.now}</span><span class="muted">${n.left}</span></span>
-      <span class="mu-pc" title="Game minutes left for your starters this period: 48 a game to come, less what's been played of games on now">${ICON_CLOCK}<b>${n.min}</b></span>
+      <span class="mu-pc" title="${one ? `Starters with a game in: ${n.played}, playing their first now: ${n.now}, yet to play: ${n.left}` : `Starter games this period: ${n.played} played, ${n.now} on now, ${n.left} to come`}">${ICON_GAMES}<b>${n.played}</b><span class="${n.now ? 'pos-good' : ''}">${n.now}</span><span class="muted">${n.left}</span></span>
+      ${one ? '' : `<span class="mu-pc" title="Game minutes left for your starters this period: 48 a game to come, less what's been played of games on now">${ICON_CLOCK}<b>${n.min}</b></span>`}
     </div>`;
   };
   const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div>${paceChips(S)}</div></div>`;
@@ -264,11 +284,13 @@ function dashMatchupCard() {
   const cell = (p, right, counts, tag = '', cls = '') => {
     if (!p) return `<div class="mu-p${right ? ' right' : ''}"><span class="muted small">${B || !right ? 'Empty' : ''}</span></div>`;
     const lines = dates.map(d => lineOn(p, d)).filter(Boolean);
-    const tot = lines.reduce(addLine, {});
+    // a one-game league's period shows the game that counts (for a starter; the bench's latest)
+    const counted = one && range === 'week' ? oneGameLine(p, lines) : null;
+    const tot = counted ? { ...counted } : lines.reduce(addLine, {});
     let game;
     if (range === 'week') {
       const left = D.all.filter(d => playsOn(p, d) && !lineOn(p, d) && (d > today || (d === today && !gameFinal(p, d) && !(liveGame(p, d) && liveGame(p, d).state === 'post')))).length;
-      game = `${lines.length} G${left && p.status !== 'Out' ? ` · ${left} left` : ''}${liveOn(p, today) && lineOn(p, today) ? ` · ${liveStatus(p, today)}` : ''}`;
+      game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${left} left` : ''}${liveOn(p, today) && lineOn(p, today) ? ` · ${liveStatus(p, today)}` : ''}`;
     } else game = dashGame(p, dates[0]);
     const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
     return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">

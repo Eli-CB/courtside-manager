@@ -399,7 +399,35 @@ function projectSide(players, dates, fixedIds) {
     games += active.length;
     days.push({ date: d, active: new Set(active.map(p => p.id)), avail: new Set(avail.map(p => p.id)) });
   }
+  if (isOneGame()) return { ...oneGameSide(ranked, days), days };
   return { tot, vr, left, games, days };
+}
+
+// One-game leagues (Sleeper): each lineup slot counts one game of the week, not all of them. A player's game already
+// played counts if it's at least his average or he has no game left to lock in instead; otherwise one game still to
+// come, projected. The best of those fill the slots, one player each.
+function oneGameSide(players, days) {
+  const tot = Object.fromEntries(COUNT_KEYS.map(k => [k, 0])), vr = { ...tot }, left = { ...tot };
+  const cands = [];
+  for (const p of players) {
+    const on = days.filter(x => x.active.has(p.id));
+    if (!on.length) continue;
+    const played = on.map(x => (gameFinal(p, x.date) ? actualLine(p, x.date) : null)).filter(Boolean);
+    const toCome = on.some(x => !gameFinal(p, x.date));
+    const g = perGame(p), c = oneGameLine(p, played);
+    if (c && (!toCome || lineFp(c) >= lineFp(g.m))) cands.push({ p, line: c, fp: lineFp(c) });
+    else if (toCome) cands.push({ p, g, fp: lineFp(g.m) });
+  }
+  cands.sort((a, b) => b.fp - a.fp);
+  const seated = new Set(fillSlots(cands.map(x => x.p), state.slots).filter(Boolean));
+  let games = 0;
+  for (const x of cands) {
+    if (!seated.has(x.p.id)) continue;
+    games++;
+    if (x.line) for (const k of COUNT_KEYS) tot[k] += x.line[k] || 0;
+    else for (const k of COUNT_KEYS) { tot[k] += x.g.m[k]; vr[k] += x.g.sd[k] ** 2; left[k] += x.g.m[k]; }
+  }
+  return { tot, vr, left, games };
 }
 
 function phi(x) { // standard normal CDF
@@ -485,9 +513,9 @@ function playerFromRaw(raw, extra = {}) {
 }
 
 // ----- Locked weekly lineups -----
-// Rough worth of starting a player for the week: games × value (against not playing)
+// Rough worth of starting a player for the week: games × value (against not playing); one game in one-game leagues
 function weeklyPriority(p, dates) {
-  return p.status === 'Out' ? -1 : gamesIn(p, dates) * Math.max(value(p), 0.01);
+  return p.status === 'Out' ? -1 : (isOneGame() ? Math.min(1, gamesIn(p, dates)) : gamesIn(p, dates)) * Math.max(value(p), 0.01);
 }
 
 function fitsSlots(ids, players) {

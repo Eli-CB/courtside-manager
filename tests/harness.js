@@ -44,6 +44,9 @@ function fakeFetch(url) {
     // the Yahoo helper: /yahoo/api/<path> answers from tests/fixtures/yahoo/<path with ; = , / as _>.json
     const p = u.pathname.replace(/^\/yahoo\/api\//, '').replace(/[;=,\/]/g, '_');
     body = u.pathname.startsWith('/yahoo/api/') ? readFixture(`yahoo/${p}.json`) : u.pathname === '/yahoo/refresh' ? JSON.stringify({ access: 'new', refresh: 'r', until: NOW + 36e5 }) : null;
+  } else if (u.hostname === 'api.sleeper.app') {
+    // Sleeper: /v1/<path> answers from tests/fixtures/sleeper/<path with / as _>.json
+    body = readFixture(`sleeper/${u.pathname.replace(/^\/v1\//, '').replace(/\//g, '_')}.json`);
   } else if (u.hostname === 'lm-api-reads.fantasy.espn.com') {
     const league = u.pathname.match(/\/leagues\/(\d+)$/);
     body = league ? readFixture(`espn/${league[1]}/league.json`) : u.pathname.endsWith('/players') ? readFixture('espn/players.json') : null;
@@ -98,10 +101,10 @@ function loadApp() {
   app.get = expr => ctx.__get(expr);
   app.set = (name, value) => { ctx.__value = value; ctx.__get(`${name} = globalThis.__value`); };
   app.ready = () => ctx.__get('nbaLoading');
-  // load a Fantrax or ESPN league from the fixtures and make it the current one
+  // load a Fantrax, ESPN, Sleeper or Yahoo league from the fixtures and make it the current one
   app.useLeague = async id => {
     const src = ctx.__get('leagueSourceOf')(id);
-    const res = await (src === 'espn' ? ctx.fetchEspnLeague(id) : src === 'yahoo' ? ctx.fetchYahooLeague(id) : ctx.fetchFantraxLeague(id));
+    const res = await (src === 'espn' ? ctx.fetchEspnLeague(id) : src === 'sleeper' ? ctx.fetchSleeperLeague(id) : src === 'yahoo' ? ctx.fetchYahooLeague(id) : ctx.fetchFantraxLeague(id));
     const L = res.league;
     ctx.__get('NBA').league = L;
     ctx.applyLeagueRules(L);
