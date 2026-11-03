@@ -417,7 +417,8 @@ function topPerformancesCard() {
   const L = fxLeague();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) { owner.set(x.nba, tid); spot.set(x.nba, x); }
   const mine = ui.viewing ? ui.viewA : state.fxTeam;
-  const opp = owner.size && mine ? fxOpponentFor(dates[0] || today, mine) : null; // this matchup's opponent
+  // this matchup's opponent (the Dashboard's), whatever days are shown: the rosters are today's
+  const opp = owner.size && mine ? fxOpponentFor(weekStartAt(0), mine) : null;
   // where a player is: in a team's starting lineup (active), on its bench (IR included), or on no roster (waivers)
   const statusOf = id => (!spot.has(id) ? 'fa' : spot.get(id).st === 'ACTIVE' ? 'active' : 'bench');
   const lineupBadge = id => {

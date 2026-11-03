@@ -1020,6 +1020,31 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
   }
 });
 
+test("Players: the Opponent filter is this matchup's opponent for every range, not the first day shown's", async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(CATS9);
+  const ui = app.get('ui'), was = app.state.fxTeam;
+  try {
+    await onDay('2026-11-03', () => {
+      // a team whose opponent now isn't its opening week's
+      const me = L.teams.map(t => t.id).find(id => {
+        const a = app.fxOpponentFor(app.perfDays().year[0], id), b = app.fxOpponentFor(app.weekStartAt(0), id);
+        return a && b && a.id !== b.id;
+      });
+      assert.ok(me, 'a team with a different opponent than in week 1');
+      app.state.fxTeam = me;
+      const now = app.fxOpponentFor(app.weekStartAt(0), me);
+      for (const r of ['year', 'avg', 'day']) {
+        ui.perfRange = r;
+        const html = app.topPerformancesCard();
+        assert.ok(html.includes(`data-group="opp" aria-pressed="true" title="${now.name.replace(/'/g, '&#39;')}"`), `${r}: ${now.name}`);
+      }
+    });
+  } finally {
+    app.state.fxTeam = was; ui.perfRange = null; ui.tab = 'standings'; clearTimeout(app.get('live').timer);
+  }
+});
+
 test('Players: one table; Per game ranks every NBA player, with search and position', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
