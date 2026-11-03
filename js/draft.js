@@ -106,6 +106,9 @@ function draftList(title, list, mine, info) {
 
 function viewDraft() {
   const d = draftData();
+  if (!d && fxLeague() && fxLeague().draftFailed) {
+    return `<div class="card"><div class="empty"><strong>Couldn't load the draft</strong>${sourceName()} didn't answer when the league loaded.<br><br><button type="button" class="btn primary" data-action="draft-retry">Try again</button></div></div>`;
+  }
   if (!d) {
     return `<div class="card"><div class="empty"><strong>No draft results</strong>${sourceName()} didn't return draft picks for this league. Leagues that skipped the draft or started from imported rosters won't have any.</div></div>`;
   }

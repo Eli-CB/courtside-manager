@@ -116,6 +116,14 @@ const actions = {
     const d = $('#infoDialog');
     if (!d.open) d.showModal();
   },
+  // the draft didn't load with the league: load the league (or the past season) again
+  async 'draft-retry'(el) {
+    el.disabled = true;
+    try {
+      if (ui.season) { delete pastCache[ui.season]; await loadSeason(ui.season); } else await refreshLeague(true);
+    } catch (e) { toast(`Couldn't reach ${sourceName()} (${e.message})`); }
+    render();
+  },
   // one team's keepers and picks from the Draft tab's Team drafts
   'draft-team'(el) {
     const D = draftTeamCards.get(el.dataset.team);

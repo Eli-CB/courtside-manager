@@ -1848,3 +1848,25 @@ test("the player card: how he came to his fantasy team", async () => {
   assert.equal(app.cardHow(E, { id: ep[3] }, ep[2], 'x'), `Drafted · round ${ep[0]}, pick ${ep[1]}`);
   assert.equal(app.cardHow(E, { id: ep[3] }, E.teams.find(t => t.id !== ep[2]).id, 'x'), 'Added after the draft');
 });
+
+test("a draft request that fails is tried again, and a draft that still won't come isn't kept as 'no draft'", async () => {
+  const realFetch = app.fetch;
+  let fails = 0;
+  app.fetch = (url, init) => (String(url).includes('getDraftResults') && fails-- > 0
+    ? Promise.resolve({ ok: false, status: 403, text: async () => '' }) : realFetch(url, init));
+  try {
+    fails = 1; // once: the second try brings it
+    const once = await app.fetchFantraxLeague(POINTS);
+    assert.ok(once.league.draft && once.league.draft.picks.length && !once.league.draftFailed);
+    fails = 2; // twice: a failure, not a league without a draft
+    forgetLeague(POINTS);
+    const res = await app.getLeague(POINTS, true);
+    assert.ok(res.league.draftFailed && !res.league.draft);
+    assert.ok(!app.readLeagueCache()[POINTS], "not kept on the device, so it's asked for again");
+    const was = app.NBA.league;
+    app.NBA.league = res.league;
+    try { assert.match(app.viewDraft(), /Couldn't load the draft[\s\S]*data-action="draft-retry"/); } finally { app.NBA.league = was; }
+  } finally { app.fetch = realFetch; }
+});
+// drop a league from the device's league cache
+function forgetLeague(id) { const all = app.readLeagueCache(); delete all[id]; app.localStorage.setItem(app.FX_CACHE_KEY, JSON.stringify(all)); }

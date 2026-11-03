@@ -222,11 +222,14 @@ async function fxPlayerLists() {
 
 async function fetchFantraxLeague(id, opts = {}) {
   const q = encodeURIComponent(id);
-  const [{ ids, adp: adpList }, info, rosters, draft, standings] = await Promise.all([
+  const [{ ids, adp: adpList }, info, rosters, draftFirst, standings] = await Promise.all([
     fxPlayerLists(), fxGet(`getLeagueInfo?leagueId=${q}`), fxGet(`getTeamRosters?leagueId=${q}`),
-    fxGet(`getDraftResults?leagueId=${q}`).catch(() => ({})), fxGet(`getStandings?leagueId=${q}`).catch(() => []),
+    fxGet(`getDraftResults?leagueId=${q}`).catch(() => null), fxGet(`getStandings?leagueId=${q}`).catch(() => []),
   ]);
   if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
+  // the draft can fail with everything else asking at once: once more on its own, a moment later. Still nothing is
+  // a failure (draftFailed), not a league without a draft
+  const draft = draftFirst || await pause(1500).then(() => fxGet(`getDraftResults?leagueId=${q}`)).catch(() => null);
   // the opening week's rosters: past seasons use them for keepers and pickups, and so does this season once week 1 is over
   const opening = opts.opening || (rosters.period || 1) > 1 ? await fxGet(`getTeamRosters?leagueId=${q}&period=1`).catch(() => null) : null;
 
@@ -261,10 +264,11 @@ async function fetchFantraxLeague(id, opts = {}) {
       (r.rosterItems || []).map(it => ({ fid: it.id, nba: toNba[it.id] || null, name: names[it.id] || '', st: it.status || '' }))])) : null,
     rosterInfo: info.rosterInfo || null,
     draft: null,
-    draftAt: draft.draftDate || null,
+    draftAt: (draft && draft.draftDate) || null,
     standings: parseStandings(standings),
+    ...(draft ? {} : { draftFailed: true }),
   };
-  const picks = (draft.draftPicks || []).filter(d => d.playerId);
+  const picks = ((draft && draft.draftPicks) || []).filter(d => d.playerId);
   if (picks.length) {
     league.draft = {
       date: String(draft.draftDate || '').slice(0, 10), type: draft.draftType || '', state: draft.draftState || '',
@@ -439,7 +443,7 @@ async function getLeague(id, force) {
   if (kept) return kept;
   const src = leagueSourceOf(id);
   const res = await (src === 'espn' ? fetchEspnLeague(id) : src === 'sleeper' ? fetchSleeperLeague(id) : src === 'yahoo' ? fetchYahooLeague(id) : fetchFantraxLeague(id));
-  saveLeague(id, res);
+  if (!res.league.draftFailed) saveLeague(id, res); // a league missing its draft is asked for again next time
   delete rosterWeeksLoad[id]; // the current period's lineups may have changed
   return res;
 }

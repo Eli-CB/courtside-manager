@@ -85,7 +85,7 @@ async function fetchSleeperLeague(id) {
   const weeksWanted = [cur - 1, cur, cur + 1].filter(n => periods.some(p => p.n === n));
   const [rostersRaw, users, draftPicks, draft, ...weeks] = await Promise.all([
     slpGet(`league/${id}/rosters`), slpGet(`league/${id}/users`),
-    lg.draft_id ? slpGet(`draft/${lg.draft_id}/picks`).catch(() => []) : [],
+    lg.draft_id ? slpGet(`draft/${lg.draft_id}/picks`).catch(() => null) : [],
     lg.draft_id ? slpGet(`draft/${lg.draft_id}`).catch(() => null) : null,
     ...weeksWanted.map(n => slpGet(`league/${id}/matchups/${n}`).catch(() => [])),
   ]);
@@ -162,6 +162,7 @@ async function fetchSleeperLeague(id) {
     rosters: leagueRosters, openingRosters: null, rosterInfo,
     draft: null, draftAt, standings,
     slpWeek: { n: cur, pts: weekPts, at: Date.now() },
+    ...(draftPicks ? {} : { draftFailed: true }), // the picks didn't come: asked for again next time
   };
   const picks = (draftPicks || []).filter(p => p.player_id);
   if (picks.length) {
