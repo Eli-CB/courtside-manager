@@ -198,8 +198,8 @@ function dashMatchupCard() {
   const one = isOneGame(); // Sleeper: one game a week counts for each starter
   const D = dashDays();
   // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Until one is picked: today once its games have started,
-  // else the last game day
-  const opts = [D.today && ['today', 'Today'], D.day && ['day', D.day === yesterday ? 'Yesterday' : fmtDay(D.day)], ['week', 'This period', `${fmtDay(D.all[0])} – ${fmtDay(D.all[D.all.length - 1])}`]].filter(Boolean);
+  // else the last game day. Today stays on the toggle on a day without NBA games (Election Day), to say so.
+  const opts = [D.all.includes(today) && ['today', 'Today'], D.day && ['day', D.day === yesterday ? 'Yesterday' : fmtDay(D.day)], ['week', 'This period', `${fmtDay(D.all[0])} – ${fmtDay(D.all[D.all.length - 1])}`]].filter(Boolean);
   const range = opts.some(([k]) => k === ui.dashRange) ? ui.dashRange : D.today && (D.started || !D.day) ? 'today' : D.day ? 'day' : 'week';
   const dates = range === 'week' ? D.week : [range === 'today' ? today : D.day];
   const toggle = `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l, tip]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="dash-range" data-range="${k}" aria-pressed="${k === range}"${tip ? ` title="${tip}"` : ''}>${l}</button>`).join('')}</div>`;
@@ -323,7 +323,8 @@ function dashMatchupCard() {
     const a = column(A), b = column(B);
     const one = (x, right) => (x ? cell(x[0], right, x[1] === 'start', x[1].endsWith('bench') ? BENCH_TAG : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
     const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${one(a[i], false)}${one(b[i], true)}</div>`).join('');
-    const none = !rows ? `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>` : '';
+    const none = rows ? '' : d === today && !D.today ? '<p class="muted small mu-none">No NBA games today.</p>'
+      : `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>`;
     chipWas = isToday ? chipNext : new Map();
     return card(toggle, `${head}${catTable}<div class="mu-rows">${rows}</div>${none}`);
   }

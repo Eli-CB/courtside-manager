@@ -753,6 +753,16 @@ test("the Dashboard's matchup: this matchup's days only", async () => {
   });
   // Wednesday: yesterday is Tuesday
   assert.equal((await days('2026-10-28')).day, '2026-10-27');
+  // a day without NBA games (Election Day): it opens on yesterday, and Today is still there to say so
+  const ui = app.get('ui');
+  try {
+    await onDay('2026-11-03', () => {
+      const m = app.dashMatchupCard();
+      assert.ok(m.includes('class="on" data-action="dash-range" data-range="day"') && m.includes('data-range="today"'));
+      ui.dashRange = 'today';
+      assert.match(app.dashMatchupCard(), /No NBA games today\./);
+    });
+  } finally { ui.dashRange = null; }
   // the tab's new name
   assert.ok(app.tabList().some(([k, l]) => k === 'players' && l === 'Players'));
 });
