@@ -199,16 +199,14 @@ function gearMenu() {
   const el = $('#gearMenu');
   if (!el) return;
   const wasOpen = el.querySelector('details') && el.querySelector('details').open;
+  const advOpen = !!(el.querySelector('.gear-adv') && el.querySelector('.gear-adv').open);
   const dark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
   const league = fxLeague() && !needsLanding() && !state.demo;
   el.innerHTML = `<details class="gear"${wasOpen ? ' open' : ''}>
     <summary class="icon-btn" aria-label="Settings" title="Settings">⚙</summary>
     <div class="gear-pop">
-      <div class="lm-sec">Data</div>
-      <div class="gear-row">${NBA ? `NBA stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable'}</div>
-      ${league ? `<button type="button" class="lm-item" data-action="league-reload">↻ Reload from ${sourceName()}<span class="gear-sub">rosters, lineups, matchups and standings</span></button>` : ''}
-      <div class="gear-row">Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
-      <button type="button" class="lm-item" data-action="clear-saved">Clear saved league data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
+      ${league ? `<div class="lm-sec">League</div>
+      <button type="button" class="lm-item" data-action="league-reload">↻ Reload from ${sourceName()}<span class="gear-sub">rosters, lineups, matchups and standings</span></button>` : ''}
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers in the Dashboard's matchup</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
@@ -216,6 +214,11 @@ function gearMenu() {
       <div class="lm-sec">Help</div>
       <button type="button" class="lm-item" data-action="feedback">✉ Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></button>
       <a class="lm-item" href="${TIP_URL}" target="_blank" rel="noopener">☕ Buy me a coffee<span class="gear-sub">tips keep League Layer free, on Ko-fi</span></a>
+      <details class="gear-adv"${advOpen ? ' open' : ''}><summary class="lm-sec">Advanced</summary>
+        <div class="gear-row">${NBA ? `NBA stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable'}</div>
+        <div class="gear-row">Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
+        <button type="button" class="lm-item" data-action="clear-saved">Clear saved league data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
+      </details>
     </div>
   </details>`;
 }
