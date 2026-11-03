@@ -39,12 +39,12 @@ const INFO = {
     <p>A finished week's standouts across the league, counted from that week's real lineups and the NBA box scores (as How week N ended counts one matchup), then every matchup's result. Only starters count. Stat lines show your league's categories.</p>
     <ul><li><b>Player of the week:</b> the most value from a starter's games that week (categories won, or fantasy points in points leagues), with his per-game line.</li>
     <li><b>Game of the week:</b> the best single game by a starter.</li>
-    <li><b>Brick of the week:</b> the starter who did the least a game over the week (2 or more games), with his per-game line.</li>
-    <li><b>Dud of the week:</b> the worst single game by a starter.</li>
+    <li><b>Worst week:</b> the starter who did the least a game over the week (2 or more games), with his per-game line.</li>
+    <li><b>Worst game:</b> the worst single game by a starter.</li>
     <li><b>Street clothes:</b> the starter who missed the most of his NBA team's games while in a starting lineup that week (injury, rest or coach's decision; the box scores can't tell which).</li>
     <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Matchups).</li>
     <li><b>Best week:</b> the team whose week would have beaten the most others.</li></ul>
-    <p><b>Sleeper leagues</b> count one game a week for each starter, so a starter's week is the game that counted (the one whose fantasy points match Sleeper's for him that week, bonuses included). Player of the week is the best of those games and Dud of the week the worst; there's no separate Game or Brick of the week. Street clothes is a starter who didn't play a game all week while his NBA team did, and a bench regret puts in the bench player's best game.</p>
+    <p><b>Sleeper leagues</b> count one game a week for each starter, so a starter's week is the game that counted (the one whose fantasy points match Sleeper's for him that week, bonuses included). Player of the week is the best of those games and Worst game the worst; there's no separate Game of the week or Worst week. Street clothes is a starter who didn't play a game all week while his NBA team did, and a bench regret puts in the bench player's best game.</p>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
   moves: ['Waiver wire', `
     <p>Who each team added and dropped since last week's rosters: this week's moves so far, including the ones made before its first game. A player on no roster last week is an add (+), one on no roster now a drop (−), one who was on another team a trade (⇄).</p>

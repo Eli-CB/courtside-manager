@@ -1372,7 +1372,7 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     // the brick did the least over the week, the dud had the worst single game
     assert.ok(X.brick && X.dud);
     assert.ok(X.brick.line.gp1 >= 2 && X.brick.v / X.brick.line.gp1 <= X.mvp.v / X.mvp.line.gp1 && X.dud.v <= X.game.v && X.dud.line.gp1 === 1);
-    assert.ok(html.includes('Brick of the week') && html.includes('Dud of the week'));
+    assert.ok(html.includes('Worst week') && html.includes('Worst game'));
     // Street clothes: games missed while starting, never more than his team played
     assert.ok(X.missed.every(x => x.games > 0 && x.games <= x.sched));
     if (X.missed.length) assert.ok(html.includes('Street clothes') && html.includes('while starting'));
@@ -1798,7 +1798,7 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     assert.equal(X.games.length, 6);
     assert.ok(X.mvp && X.mvp.line.gp1 === 1, 'Player of the week: his counted game');
     assert.equal(X.game, null, 'no separate Game of the week');
-    assert.equal(X.brick, null, 'no Brick: a week is one game');
+    assert.equal(X.brick, null, 'no Worst week: a week is one game');
     assert.ok(X.dud && X.dud.line.gp1 === 1);
     assert.ok(!html.includes('Game of the week') && html.includes('Player of the week'));
     assert.ok(X.missed.every(x => x.games === 1 && x.sched === 1), 'Street clothes: a start without any game');

@@ -39,7 +39,7 @@ saved leagues are lost). Owner's league:
     on Sleeper's weekly matchups (`hasLineupHistory`; `loadRosterWeeks` keeps [id, starting, points] per player and the
     week's pairings under '#m', which fill `L.matchups`): `countedRows` keeps a starter's one counted game (nearest
     Sleeper's points, `countedIndex`; none when Sleeper says 0), a bench swap puts in the bench player's best game, Street
-    Clothes counts empty starts, and the Recap has no Game/Brick of the week. A game's Sleeper bonuses (40-point games...)
+    Clothes counts empty starts, and the Recap has no Game of the week / Worst week. A game's Sleeper bonuses (40-point games...)
     ride along as `bonus` on game lines (`withBonus`, added by `lineFp`), so weekly scores match Sleeper's within techs and
     stat corrections. Past seasons stay Fantrax-only.
   - yahoo: Yahoo leagues through a Yahoo login (OAuth): the helper server `worker/yahoo.js` (Cloudflare Worker at
@@ -64,7 +64,7 @@ saved leagues are lost). Owner's league:
     leagues without weekly lineups (ESPN) show today's lineups labelled as such
   - A week is over (`periodOver`) at its end or once its last game day's box scores are all in: Fantrax ends a weekly
     period Monday evening when the next locks, a day after its last games. Recap, awards, past-week cards use it.
-  - recap: Recap tab: a finished week across the league (Player/Game of the week, Brick (worst per game, 2+ G), Dud (worst game), Street clothes (most games missed while starting), with full lines in the league's cats,
+  - recap: Recap tab: a finished week across the league (Player/Game of the week, Worst week (worst per game, 2+ G), Worst game, Street clothes (most games missed while starting), with full lines in the league's cats,
     bench regret, best all-play week, then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends the standouts +
     a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
     Fantrax and Sleeper. The Dashboard offers it for 3 days after a week ends (`freshRecap`)

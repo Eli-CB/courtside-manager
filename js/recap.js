@@ -107,8 +107,8 @@ function recapItems(X) {
   };
   if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
   if (X.game) stand('🚀', 'Game of the week', X.game, false);
-  if (X.brick) stand('🧱', 'Brick of the week', X.brick, true, X.brick.v < 0 ? 'pos-bad' : '');
-  if (X.dud) stand('🗑️', 'Dud of the week', X.dud, false, X.dud.v < 0 ? 'pos-bad' : '');
+  if (X.brick) stand('🧱', 'Worst week', X.brick, true, X.brick.v < 0 ? 'pos-bad' : '');
+  if (X.dud) stand('🗑️', 'Worst game', X.dud, false, X.dud.v < 0 ? 'pos-bad' : '');
   if (X.missed && X.missed.length) {
     // nobody's photo: names in line with the text, as the others
     const who = (x, html) => (html ? `${name({ nbaId: x.nba, name: x.name }, true)} <span class="muted">${esc(team(x.tid))}</span>` : `${x.name} (${team(x.tid)})`);
