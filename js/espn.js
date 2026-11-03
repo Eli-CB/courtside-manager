@@ -112,6 +112,15 @@ function espnPeriods(j, dayOne) {
   });
 }
 
+// The waiver order: each team's rank (1 = first claim), with its budget left when the league bids for players
+function espnWaivers(j) {
+  const acq = (j.settings && j.settings.acquisitionSettings) || {};
+  const ranked = j.teams.filter(t => t.waiverRank > 0);
+  if (!ranked.length) return null;
+  const budget = acq.isUsingAcquisitionBudget ? +acq.acquisitionBudget || 0 : null;
+  return ranked.map(t => ({ id: String(t.id), rank: t.waiverRank, left: budget == null ? null : budget - (+((t.transactionCounter || {}).acquisitionBudgetSpent) || 0) }))
+    .sort((a, b) => a.rank - b.rank);
+}
 const espnTeamName = t => String(t.name || [t.location, t.nickname].filter(Boolean).join(' ') || `Team ${t.id}`).trim();
 const espnPositions = slots => POSITIONS.filter(x => slots.some(n => ESPN_SLOTS[n] === x));
 
@@ -197,6 +206,7 @@ async function fetchEspnLeague(id) {
     draft: null,
     draftAt,
     standings,
+    waivers: espnWaivers(j),
   };
   // ESPN marks keepers among the picks; here, like Fantrax, they're listed apart from the players drafted
   const picks = ((j.draftDetail || {}).picks || []).filter(p => p.playerId > 0);

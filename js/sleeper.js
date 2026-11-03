@@ -162,6 +162,10 @@ async function fetchSleeperLeague(id) {
     rosters: leagueRosters, openingRosters: null, rosterInfo,
     draft: null, draftAt, standings,
     slpWeek: { n: cur, pts: weekPts, at: Date.now() },
+    // the waiver order (1 = first claim); a budget league (waiver_type 2, FAAB) also has each team's budget left
+    waivers: rosters.some(r => +r.settings.waiver_position > 0) ? rosters.filter(r => +r.settings.waiver_position > 0)
+      .map(r => ({ id: String(r.roster_id), rank: +r.settings.waiver_position, left: +s.waiver_type === 2 ? (+s.waiver_budget || 0) - (+r.settings.waiver_budget_used || 0) : null }))
+      .sort((a, b) => a.rank - b.rank) : null,
     ...(draftPicks ? {} : { draftFailed: true }), // the picks didn't come: asked for again next time
   };
   const picks = (draftPicks || []).filter(p => p.player_id);

@@ -1915,6 +1915,32 @@ test("Fantrax's 'too many requests' in a normal answer waits as long as it says,
   } finally { app.fetch = realFetch; }
 });
 
+test('the waiver order: from ESPN and Sleeper, in the action items and a popup; Fantrax shares none', async () => {
+  const E = await app.useLeague(ESPN);
+  assert.deepEqual(E.waivers.map(w => w.rank), E.waivers.map((w, i) => i + 1), 'first claim first');
+  assert.ok(E.waivers.every(w => w.left === null), 'no budget in this league');
+  const S = await app.useLeague(SLEEPER);
+  assert.equal(S.waivers.length, 12);
+  assert.equal(S.waivers[0].rank, 1);
+  const st = app.get('state'), was = st.fxTeam;
+  try {
+    useTeam(S.waivers[2].id);
+    const item = app.buildAlerts().find(a => a.action === 'waiver-order');
+    assert.ok(item && item.msg.includes('<b>#3</b> of 12'), item && item.msg);
+    const pop = app.waiverPopup();
+    assert.equal((pop.match(/<li/g) || []).length, 12);
+    assert.ok(pop.includes('class="me"') && pop.includes(app.fxTeamName(S.waivers[2].id)));
+    const ui = app.get('ui');
+    ui.season = 'past';
+    try { assert.ok(!app.buildAlerts().some(a => a.action === 'waiver-order'), 'not while a past season is on screen'); } finally { ui.season = null; }
+    // Fantrax doesn't share it: no item
+    const F = await app.useLeague(CATS9);
+    assert.equal(F.waivers, undefined);
+    useTeam(F.teams[0].id);
+    assert.ok(!app.buildAlerts().some(a => a.action === 'waiver-order'));
+  } finally { st.fxTeam = was; }
+});
+
 test('Send feedback: an email to feedback@leaguelayer.com with the league, page and version filled in', async () => {
   const L = await app.useLeague(CATS9);
   const href = app.feedbackHref();

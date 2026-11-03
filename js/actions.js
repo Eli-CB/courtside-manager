@@ -101,6 +101,12 @@ const actions = {
     el.nextElementSibling.hidden = !open;
   },
   'close-info'() { $('#infoDialog').close(); },
+  'waiver-order'() {
+    $('#infoTitle').textContent = 'Waiver order';
+    $('#infoBody').innerHTML = waiverPopup();
+    const d = $('#infoDialog');
+    if (!d.open) d.showModal();
+  },
   // Send feedback: Gmail, the email app, or copy it (in the popup the (i) buttons use)
   feedback() {
     $('#gearMenu details').removeAttribute('open');

@@ -26,6 +26,9 @@ function buildAlerts() {
     if (better) a.push({ lvl: 'warn', msg: `A better lineup for this week takes you from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> to win.`, action: 'go-week', label: 'See it' });
   }
   if (!a.length) a.push({ lvl: 'good', msg: 'Lineup is set and everyone starting is healthy.' });
+  // the waiver order, where the league's site shares it (ESPN, Sleeper; Fantrax doesn't): this season only
+  const W = !ui.season && !seasonCtx && fxLeague() && fxLeague().waivers, mine = W && W.find(w => w.id === state.fxTeam);
+  if (mine) a.push({ lvl: '', msg: `You're <b>#${mine.rank}</b> of ${W.length} on waivers${mine.left != null ? `, with $${mine.left} of budget left` : ''}.`, action: 'waiver-order', label: 'See waiver order' });
   const fresh = freshRecap();
   if (fresh) a.push({ lvl: 'good', msg: `The <b>week ${fresh.n} recap</b> is in: every result and the week's standouts, ready to share.`, action: 'go-recap', label: 'See it' });
   return a;
@@ -180,6 +183,14 @@ function feedbackPopup() {
       <a class="btn" href="${esc(feedbackHref())}">Your email app</a>
       <button type="button" class="btn" data-action="feedback-copy">Copy address and details</button>
     </div>`;
+}
+
+// The league's waiver order, in the popup the (i) buttons use
+function waiverPopup() {
+  const L = fxLeague(), W = (L && L.waivers) || [], budget = W.some(w => w.left != null);
+  const rows = W.map(w => `<li class="${w.id === state.fxTeam ? 'me' : ''}"><span class="wo-rank">${w.rank}</span><span class="wo-team">${esc(fxTeamName(w.id))}${w.id === state.fxTeam ? ' <span class="badge accent">you</span>' : ''}</span>${budget ? `<span class="wo-left">$${w.left}</span>` : ''}</li>`).join('');
+  return `<ol class="wo-list">${rows}</ol>
+    <p class="muted small">${budget ? 'Budget left for bids beside each team. ' : ''}From ${sourceName(L)}, as of when the league loaded: ↻ Reload in the settings menu for the latest, after claims go through.</p>`;
 }
 
 function gearMenu() {

@@ -906,6 +906,13 @@ tr.me-row td { background: var(--accent-soft); }
 .lm-item { display: block; width: 100%; text-align: left; font: inherit; font-size: .9rem; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
 .lm-item:hover, .lm-item:focus-visible { background: var(--surface-2); }
 a.lm-item { text-decoration: none; }
+/* Waiver order popup */
+.prose .wo-list, .wo-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.wo-list li { display: flex; align-items: center; gap: 10px; padding: 7px 4px; margin: 0; border-bottom: 1px solid var(--border); }
+.wo-list li.me { font-weight: 700; color: var(--accent); }
+.wo-rank { width: 22px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.wo-team { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wo-left { font-variant-numeric: tabular-nums; }
 /* Send feedback popup */
 .fb-details { font-size: .78rem; white-space: pre-wrap; word-break: break-word; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin: 8px 0 12px; }
 .fb-actions { display: flex; flex-wrap: wrap; gap: 8px; }
