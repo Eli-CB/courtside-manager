@@ -167,6 +167,7 @@ function savedSize() {
 // Feedback by email (Cloudflare forwards feedback@leaguelayer.com), with what's needed to look into it already filled
 // in: the league (its site and ID), the page, this version and the browser. A plain email link does nothing on a
 // computer without an email app, so the menu opens a popup: Gmail in the browser, the email app, or copy it all.
+const TIP_URL = 'https://ko-fi.com/leaguelayerdev'; // tips (also in index.html's footer)
 const FEEDBACK_EMAIL = 'feedback@leaguelayer.com', FEEDBACK_SUBJECT = 'League Layer feedback';
 function feedbackDetails() {
   const L = fxLeague();
@@ -214,6 +215,7 @@ function gearMenu() {
       <button type="button" class="lm-item gear-toggle" data-action="toggle-clock" role="switch" aria-checked="${ui.clock24}"><span>24-hour time<span class="gear-sub">tip-offs and update times as ${fmtTime('2026-11-02T19:30:00')}</span></span><span class="gear-switch${ui.clock24 ? ' on' : ''}" aria-hidden="true"></span></button>
       <div class="lm-sec">Help</div>
       <button type="button" class="lm-item" data-action="feedback">✉ Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></button>
+      <a class="lm-item" href="${TIP_URL}" target="_blank" rel="noopener">☕ Buy me a coffee<span class="gear-sub">tips keep League Layer free, on Ko-fi</span></a>
     </div>
   </details>`;
 }
