@@ -46,7 +46,7 @@ function leagueMenu() {
   const P = pastSeason();
   // the current league's seasons, under it (Fantrax leagues: the others don't share past seasons)
   let seasons = '';
-  if (!state.demo && hasLineupHistory(L)) {
+  if (!state.demo && (L.source || 'fantrax') === 'fantrax') {
     const past = seasonsFor(L);
     const rows = past.length ? [{ id: '', year: L.year }, ...past] : [];
     seasons = rows.map(x => {

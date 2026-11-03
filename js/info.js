@@ -44,6 +44,7 @@ const INFO = {
     <li><b>Street clothes:</b> the starter who missed the most of his NBA team's games while in a starting lineup that week (injury, rest or coach's decision; the box scores can't tell which).</li>
     <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Matchups).</li>
     <li><b>Best week:</b> the team whose week would have beaten the most others.</li></ul>
+    <p><b>Sleeper leagues</b> count one game a week for each starter, so a starter's week is the game that counted (the one whose fantasy points match Sleeper's for him that week, bonuses included). Player of the week is the best of those games and Dud of the week the worst; there's no separate Game or Brick of the week. Street clothes is a starter who didn't play a game all week while his NBA team did, and a bench regret puts in the bench player's best game.</p>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
   moves: ['Waiver wire', `
     <p>Who each team added and dropped since last week's rosters: this week's moves so far, including the ones made before its first game. A player on no roster last week is an add (+), one on no roster now a drop (−), one who was on another team a trade (⇄).</p>
@@ -114,6 +115,7 @@ const INFO = {
     <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Dashboard (fantasy points in points leagues), added up.</p>
     <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. Only games that hurt the team (below 0: very poor shooting and turnovers with little else) lower the total.</p>
     <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>
+    <p>Sleeper leagues count one game a week for each starter, so a pickup's week is the game that counted.</p>
     <p>Tap a team's name to see which pickups helped and hurt.</p>`],
   awSteal: ['Steal of the Draft', `
     <p>The single pick that beat its draft slot by the most: where he was taken against where he ranks among all the draft's players over the season, as the Draft tab's Season totals ranks them (value above a replacement-level starter times games played; fantasy points in points leagues). Pick 98 ranking 10th is +88. Keepers aren't picks, so they don't count.</p>
@@ -137,6 +139,7 @@ const INFO = {
     <p>Games a team lost to players sitting while they were in its <b>starting lineup</b>. For each week, Fantrax's rosters say who started; for each starter, every game his NBA team played that week without him counts one.</p>
     <p>Bench and IR players don't count, and neither do games before a player joined the team or after he left it, so a player traded or dropped mid-season counts only for the weeks a team started him. Injuries, rest and coach's decisions all count the same: the game logs can't tell them apart.</p>
     <p>A team's schedule comes from that season's NBA game logs (every day any of its players played). A player who didn't play at all that season is placed on his current team.</p>
+    <p><b>Sleeper leagues</b> count one game a week for each starter, so a missed game costs nothing while another one counts. There, each start counts one when the starter played no game at all that week while his NBA team did: an empty start.</p>
     <p>Tap a team's name to see which starters missed the most.</p>`],
   awPunt: ['Biggest punt', `
     <p>Each team's season totals (every game its starters played, week by week, the same numbers as the Standings tab's Season totals), compared with the league's other teams category by category, in team-to-team spreads. The award goes to the single category furthest below the league average.</p>`],

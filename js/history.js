@@ -3,7 +3,8 @@
 'use strict';
 
 // ----- A past season week by week: who each team had, who started, and how they got them -----
-// Fantrax shares every lineup period's rosters but no transaction log. A player's stint on a team,
+// Fantrax shares every lineup period's rosters but no transaction log; Sleeper each week's matchups, with every
+// player's points (sleeperWeekRosters). A player's stint on a team,
 // walked back to its first week: there from week 1 = drafted or kept; the week before on another
 // team's roster = a trade; on nobody's roster = a free-agent or waiver pickup. Finished seasons never
 // change, so the weekly rosters are fetched once and kept on this device.
@@ -28,7 +29,7 @@ function loadRosterWeeks(L) {
   return rosterWeeksLoad[L.id];
 }
 async function fetchRosterWeeks(L) {
-  if (!hasLineupHistory(L)) return null; // only Fantrax shares each period's rosters, so far
+  if (!hasLineupHistory(L)) return null; // only Fantrax and Sleeper share each period's rosters, so far
   const all = readRosterWeeks();
   const have = { ...((all[L.id] || {}).p || {}) };
   const today = todayIso();
@@ -43,11 +44,15 @@ async function fetchRosterWeeks(L) {
   if (!have[1] && open && open.length && open.every(x => x.fid && x.st)) {
     have[1] = Object.fromEntries(Object.entries(L.openingRosters).map(([tid, items]) => [tid, items.map(x => [x.fid, x.st === 'ACTIVE' ? 1 : 0])]));
   }
-  const want = periods.map(p => p.n).filter(n => !have[n]);
+  // (a Sleeper week saved before its pairings were kept is asked for again)
+  const want = periods.map(p => p.n).filter(n => !have[n] || (L.source === 'sleeper' && !have[n]['#m']));
   // [Fantrax id, 1 if in the starting lineup]
   const parse = d => Object.fromEntries(Object.entries(d.rosters || {}).map(([tid, r]) => [tid, (r.rosterItems || []).map(it => [it.id, it.status === 'ACTIVE' ? 1 : 0])]));
   const q = encodeURIComponent(L.id);
-  try { await fxGetAll(want.map(n => `getTeamRosters?leagueId=${q}&period=${n}`), (path, d) => { have[+path.split('period=')[1]] = parse(d); }); } finally {
+  const fetching = L.source === 'sleeper'
+    ? fxGetAll(want.map(n => `league/${q}/matchups/${n}`), (path, d) => { have[+path.split('/').pop()] = sleeperWeekRosters(d); }, 4, slpGet)
+    : fxGetAll(want.map(n => `getTeamRosters?leagueId=${q}&period=${n}`), (path, d) => { have[+path.split('period=')[1]] = parse(d); });
+  try { await fetching; } finally {
     // a period still underway can change, so only finished ones are kept
     const now = Date.now();
     all[L.id] = { at: now, p: Object.fromEntries(Object.entries(have).filter(([n]) => { const p = periods.find(x => String(x.n) === n); return p && fxTime(p.end) < now; })) };
@@ -56,7 +61,11 @@ async function fetchRosterWeeks(L) {
   }
   const weeks = periods.filter(p => have[p.n]).map(p => {
     const owner = new Map();
-    for (const [tid, items] of Object.entries(have[p.n])) for (const [f, on] of items) owner.set(f, { tid, on: !!on });
+    // pts: Sleeper's points for him that week (one-game leagues: what tells which game counted)
+    for (const [tid, items] of Object.entries(have[p.n])) {
+      if (tid === '#m') { if (items.length && !(L.matchups || {})[p.n]) (L.matchups = L.matchups || {})[p.n] = items; continue; } // Sleeper's pairings
+      for (const [f, on, pts] of items) owner.set(f, { tid, on: !!on, pts: pts == null ? null : pts });
+    }
     return { ...p, owner };
   });
   return weeks.length ? weeks : null;
@@ -69,6 +78,16 @@ function arrivalAt(weeks, k, f) {
   while (j > 0 && (weeks[j - 1].owner.get(f) || {}).tid === tid) j--;
   return j === 0 ? 'start' : weeks[j - 1].owner.has(f) ? 'trade' : 'pickup';
 }
+
+// One-game leagues (Sleeper): of a starter's games in a week (oldest first), the one that counted, as Sleeper's points
+// for him that week tell (countedIndex). Other leagues: all of them.
+function countedRows(L, G, w, f, rows) {
+  if (!L.oneGame || !rows.length) return rows;
+  const o = w.owner.get(f), i = countedIndex(rows.map(r => gameLine(G, r)), o ? o.pts : null);
+  return i < 0 ? [] : [rows[i]];
+}
+// and his best game, for a bench player swapped in (he'd have locked in his best)
+const bestRow = (G, rows) => (rows.length ? [rows.reduce((b, r) => (lineFp(gameLine(G, r)) > lineFp(gameLine(G, b)) ? r : b))] : []);
 
 // This season's box scores in the same shape as a past season's game log, so the awards run on either
 const BOX_KEYS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'];
@@ -117,7 +136,7 @@ async function loadGameLog(season) {
 function gameLine(G, row) {
   const line = Object.fromEntries(G.keys.map((k, i) => [k, row[i + 2]]));
   const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => line[k] >= 10).length;
-  return { ...line, dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 };
+  return withBonus({ ...line, dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 }); // Sleeper's one-game bonuses, if any
 }
 // the season's day numbers a lineup period covers
 function periodDays(G, w) {
@@ -147,7 +166,7 @@ function pickupImpact(L, G) {
       if (!o.on || arrivalAt(L.weeks, k, f) !== 'pickup') continue;
       const nba = L.fidNba(f);
       if (!nba) continue;
-      const games = (G.players.get(nba) || []).filter(r => wd.has(r[0]));
+      const games = countedRows(L, G, w, f, (G.players.get(nba) || []).filter(r => wd.has(r[0])));
       const team = out[o.tid] = out[o.tid] || new Map();
       const P = team.get(f) || { nba, name: (nbaById.get(nba) || {}).name || '', v: 0, weeks: 0, games: 0 };
       P.v += sum(games.map(r => lineValue(gameLine(G, r))));
@@ -370,6 +389,8 @@ function startersMissed(L, G) {
         if (!played.has(day)) n++;
       }
       if (!sched) continue;
+      // one-game leagues: a missed game costs nothing while another counts, so a start is lost only with no game at all
+      if (L.oneGame) { n = n === sched ? 1 : 0; sched = 1; }
       const team = out[o.tid] = out[o.tid] || new Map();
       // games: missed while starting; sched: his team's games while he started; weeks: weeks he missed any
       const P = team.get(nba) || { nba, name: (nbaById.get(nba) || {}).name || '', games: 0, sched: 0, weeks: 0 };
@@ -397,13 +418,15 @@ function benchSwaps(L, G, weeks, period, tids) {
     if (!known.has(f)) { const nba = L.fidNba(f), raw = nba && nbaById.get(nba); known.set(f, raw ? playerFromRaw(raw, { fid: f }) : null); }
     return known.get(f);
   };
-  // a player's games in one lineup period, added up
+  // a player's games in one lineup period, added up (one-game leagues: a starter's that counted, a bench player's best)
   const lineMemo = new Map();
-  const linesIn = (f, rp) => {
-    const k = `${f}|${rp.n}`;
+  const linesIn = (f, rp, on) => {
+    const k = `${f}|${rp.n}|${L.oneGame && on ? 1 : 0}`;
     if (!lineMemo.has(k)) {
       const days = periodDays(G, rp), nba = L.fidNba(f), out = {};
-      for (const r of (nba && G.players.get(nba)) || []) if (days.has(r[0])) for (const [s, v] of Object.entries(gameLine(G, r))) out[s] = (out[s] || 0) + v;
+      let rows = ((nba && G.players.get(nba)) || []).filter(r => days.has(r[0]));
+      if (L.oneGame) rows = on ? countedRows(L, G, rp, f, rows) : bestRow(G, rows);
+      for (const r of rows) for (const [s, v] of Object.entries(gameLine(G, r))) out[s] = (out[s] || 0) + v;
       lineMemo.set(k, out);
     }
     return lineMemo.get(k);
@@ -415,8 +438,8 @@ function benchSwaps(L, G, weeks, period, tids) {
     const per = rps.map(rp => {
       const on = [], off = [];
       for (const [f, o] of rp.owner) if (o.tid === tid) (o.on ? on : off).push(f);
-      for (const f of on) { add(tot, linesIn(f, rp), 1); if (!started.has(f)) started.set(f, {}); add(started.get(f), linesIn(f, rp), 1); }
-      for (const f of off) { if (!sat.has(f)) sat.set(f, {}); add(sat.get(f), linesIn(f, rp), 1); }
+      for (const f of on) { add(tot, linesIn(f, rp, true), 1); if (!started.has(f)) started.set(f, {}); add(started.get(f), linesIn(f, rp, true), 1); }
+      for (const f of off) { if (!sat.has(f)) sat.set(f, {}); add(sat.get(f), linesIn(f, rp, false), 1); }
       const starters = on.map(playerOf).filter(Boolean);
       return { rp, on, off, starters, n: filled(starters) };
     });
@@ -431,8 +454,8 @@ function benchSwaps(L, G, weeks, period, tids) {
           if (!outP || filled([...P.starters.filter(p => p !== outP), inP]) < P.n) continue;
           const k = `${fin}|${fout}`;
           if (!swaps.has(k)) swaps.set(k, { inP, outP, tot: { ...tot } });
-          add(swaps.get(k).tot, linesIn(fout, P.rp), -1);
-          add(swaps.get(k).tot, linesIn(fin, P.rp), 1);
+          add(swaps.get(k).tot, linesIn(fout, P.rp, true), -1);
+          add(swaps.get(k).tot, linesIn(fin, P.rp, false), 1);
         }
       }
     }
@@ -723,6 +746,11 @@ function draftDetail(T, txt) {
 function streetDetail(T, txt) {
   const ps = [...(T.missedList || [])].sort((a, b) => b.games - a.games || a.sched - b.sched).slice(0, 10);
   if (!ps.length) return '<p class="muted">No starter has missed a game yet.</p>';
+  if (isOneGame()) {
+    return `<p class="aw-break-total"><b>${esc(txt)}</b> by ${T.missedN} starter${T.missedN === 1 ? '' : 's'}. ${T.missedN > 10 ? 'The 10 with the most:' : ''}</p>
+    ${awardRows(ps, p => `${p.games} wk${p.games === 1 ? '' : 's'}`, p => `started ${p.sched} wk${p.sched === 1 ? '' : 's'}`)}
+    <p class="muted small">Weeks he was in the starting lineup without playing a game while his NBA team did (out of his weeks starting).</p>`;
+  }
   return `<p class="aw-break-total"><b>${esc(txt)}</b> missed by ${T.missedN} starter${T.missedN === 1 ? '' : 's'}. ${T.missedN > 10 ? 'The 10 who missed most:' : ''}</p>
     ${awardRows(ps, p => `${p.games} G`, p => `out ${p.games} of ${p.sched} · ${p.weeks} wk${p.weeks === 1 ? '' : 's'}`)}
     <p class="muted small">Games his NBA team played without him in weeks he was in the starting lineup (out of his team's games those weeks · weeks he missed any).</p>`;
@@ -740,7 +768,7 @@ function seasonAwards() {
   const G = L.season ? gameLogs[L.season] : null;
   if (!L.weeks || !G) return null;
   const teams = fxPickable().map(t => ({ id: t.id, name: t.name }));
-  const each = matchupScoring() === 'each' || !mostCatsWins(L.scoring);
+  const each = !isPoints() && (matchupScoring() === 'each' || !mostCatsWins(L.scoring));
 
   // Best manager: actual wins against an all-play record
   const allPlay = allPlayRecords(L, G, each);
@@ -835,7 +863,7 @@ function seasonAwards() {
     { title: 'Heartbreak Hotel', info: 'awHeart', detail: heartDetail, list: ranked('heartN', 1, T => `${T.heartN} close loss${T.heartN === 1 ? '' : 'es'}`, T => (T.heartN ? `weeks ${T.heart.map(x => x.n).join(', ')}` : '')) },
     { title: 'Waiver Wire Wizard', info: 'awWaiver', detail: waiverDetail, list: ranked('waiver', 1, T => (isPoints() ? `${fmt(T.waiver, 0)} FP` : `${signed(T.waiver, 1)} value`), pickupNote) },
     { title: 'Benchwarmer Blues', info: 'awBench', detail: benchDetail, list: ranked('bench', 1, T => total(T.bench), T => (T.benchTop ? `most: ${T.benchTop.name} (${total(T.benchTop.v)} in ${T.benchTop.games} games)` : '')) },
-    { title: 'Street Clothes', info: 'awStreet', detail: streetDetail, list: ranked('missed', 1, T => `${T.missed} game${T.missed === 1 ? '' : 's'}`, T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },
+    { title: 'Street Clothes', info: 'awStreet', detail: streetDetail, list: ranked('missed', 1, T => (isOneGame() ? `${T.missed} empty start${T.missed === 1 ? '' : 's'}` : `${T.missed} game${T.missed === 1 ? '' : 's'}`), T => (T.missedTop ? `most: ${T.missedTop.name} (${T.missedTop.games})` : '')) },
     ...(cats.length ? [{ title: 'Biggest punt', info: 'awPunt', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
       { title: 'Even Steven', info: 'awSteven', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`, T => { const order = [...cats].sort((a, b) => T.z[b.key] - T.z[a.key]); return `best: ${order[0].label} · worst: ${order[order.length - 1].label}`; }) }] : []),
     { title: 'Fan Boy', info: 'awFan', detail: fanDetail, list: ranked('fanShare', 1, T => `${Math.round(T.fanShare * 100)}% ${T.fan.teams[0].team}`, T => `${T.fan.teams[0].n} of ${T.fan.n} starts`) },
@@ -848,7 +876,7 @@ const curAwards = {}; // league id -> { weeks, fidNba } once loaded
 function viewAwardsSoFar() {
   const L = fxLeague();
   if (!L || !NBA) return '';
-  if (!hasLineupHistory(L)) return `<div class="card"><div class="empty"><strong>No awards for ${esc(sourceName(L))} leagues yet</strong>Awards come from every day's lineups, which the site reads from Fantrax only for now.</div></div>`;
+  if (!hasLineupHistory(L)) return `<div class="card"><div class="empty"><strong>No awards for ${esc(sourceName(L))} leagues yet</strong>Awards come from every day's lineups, which the site reads from Fantrax and Sleeper only for now.</div></div>`;
   const C = curAwards[L.id];
   if (!C) {
     curAwards[L.id] = { loading: true };

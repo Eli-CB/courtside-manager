@@ -30,8 +30,8 @@ function parseLeagueId(text) {
   return /^\d{3,12}$/.test(id) || /^[A-Za-z0-9]{6,32}$/.test(id) ? id : null;
 }
 const BAD_LEAGUE_ID = "That doesn't look like a league ID. Paste your league's address from Fantrax, ESPN or Sleeper, or just its ID.";
-// Weekly lineup history (Season totals, Awards, past seasons) is read from Fantrax only, so far
-const hasLineupHistory = L => !!L && (L.source || 'fantrax') === 'fantrax';
+// Weekly lineup history (Season totals, Awards, Recap) is read from Fantrax and Sleeper (past seasons: Fantrax only)
+const hasLineupHistory = L => !!L && ['fantrax', 'sleeper'].includes(L.source || 'fantrax');
 
 // One request to a league site. "Too many requests", server errors and dropped connections are retried
 // after a growing wait (the site's Retry-After when it sends one); anything else fails straight away.
@@ -48,13 +48,14 @@ async function getJson(url, site, init, tries = 3) {
   }
 }
 const fxGet = (path, tries) => getJson(FX_API + path, 'Fantrax', undefined, tries);
-// Many requests at once (weekly rosters): a few at a time, and stop as soon as one fails for good
-async function fxGetAll(paths, each, width = 4) {
+// Many requests at once (weekly rosters): a few at a time, and stop as soon as one fails for good. get: the site's
+// request (Fantrax's unless given)
+async function fxGetAll(paths, each, width = 4, get = fxGet) {
   let next = 0, failed = null;
   const worker = async () => {
     while (next < paths.length && !failed) {
       const path = paths[next++];
-      try { each(path, await fxGet(path)); } catch (e) { failed = failed || e; }
+      try { each(path, await get(path)); } catch (e) { failed = failed || e; }
     }
   };
   await Promise.all(Array.from({ length: Math.min(width, paths.length) }, worker));

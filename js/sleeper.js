@@ -18,14 +18,36 @@ const SLEEPER_STATS = { pts: 'pts', reb: 'reb', oreb: 'oreb', dreb: 'dreb', ast:
 const SLEEPER_OTHER = { bonus_pt_40p: '40+ point games', bonus_pt_50p: '50+ point games', bonus_reb_20p: '20+ rebound games',
   bonus_ast_15p: '15+ assist games', ff: 'flagrant fouls', tf: 'technical fouls', plus_minus: 'plus/minus' };
 
+// One-game bonuses: [Sleeper's key, our stat, at least]. A game's are in its fantasy points (gameBonus), not projected.
+const SLEEPER_BONUS = [['bonus_pt_40p', 'pts', 40], ['bonus_pt_50p', 'pts', 50], ['bonus_reb_20p', 'reb', 20], ['bonus_ast_15p', 'ast', 15]];
 function sleeperScoring(ss) {
-  const points = {}, other = [];
+  const points = {}, other = [], bonus = [];
   for (const [k, v] of Object.entries(ss || {})) {
     if (!+v) continue;
+    const b = SLEEPER_BONUS.find(x => x[0] === k);
+    if (b) bonus.push([b[1], b[2], +v]);
     if (SLEEPER_STATS[k]) points[SLEEPER_STATS[k]] = (points[SLEEPER_STATS[k]] || 0) + +v;
     else other.push(SLEEPER_OTHER[k] || k);
   }
-  return Object.keys(points).length ? { points, pointsOther: other } : {};
+  return Object.keys(points).length ? { points, pointsOther: other, bonus } : {};
+}
+// A single game's bonus points (40-point games and the like; Sleeper adds each one it reaches)
+function gameBonus(line) {
+  const L = fxLeague();
+  return L && L.bonus ? sum(L.bonus.map(([k, at, v]) => ((line[k] || 0) >= at ? v : 0))) : 0;
+}
+// A single game with its bonus points carried along (as 'bonus', which lineFp adds), so totals of games keep them
+const withBonus = line => { const b = gameBonus(line); return b ? { ...line, bonus: b } : line; };
+
+// Which of a starter's games (lines, oldest first) Sleeper counted, from its points for him that week: the nearest
+// (technicals and flagrant fouls aren't in our points). None when Sleeper has 0 and no game comes close: he went
+// into the lineup after his games. Without Sleeper's points, his last game (what Sleeper counts unless one's locked).
+function countedIndex(lines, pts) {
+  if (!lines.length) return -1;
+  if (pts == null) return lines.length - 1;
+  let at = 0;
+  lines.forEach((l, i) => { if (Math.abs(lineFp(withBonus(l)) - pts) < Math.abs(lineFp(withBonus(lines[at])) - pts)) at = i; });
+  return pts === 0 && Math.abs(lineFp(withBonus(lines[at]))) > 3 ? -1 : at;
 }
 
 // The league's weeks with their dates: Sleeper's week n is the n-th Monday-to-Sunday week from opening night. A league
@@ -157,6 +179,21 @@ async function fetchSleeperLeague(id) {
   return { league, fxPlayers, idMap: { toNba, names } };
 }
 
+// ----- Weekly lineups (Awards, Recap, Season totals) -----
+// Each week's matchups carry every team's players, its starters and each player's points that week (for a starter,
+// the game that counted). As loadRosterWeeks keeps them: team id -> [[Sleeper id, 1 if starting, points]], and under
+// '#m' the week's pairings (the league itself only brings this week's and its neighbors')
+function sleeperWeekRosters(ms) {
+  const list = Array.isArray(ms) ? ms : [], by = {};
+  for (const m of list) if (m.matchup_id != null) (by[m.matchup_id] = by[m.matchup_id] || []).push(String(m.roster_id));
+  const out = Object.fromEntries(list.map(m => {
+    const on = new Set(m.starters || []), pts = m.players_points || {};
+    return [String(m.roster_id), (m.players || []).map(f => [f, on.has(f) ? 1 : 0, pts[f] != null ? +pts[f] : null])];
+  }));
+  out['#m'] = Object.values(by).filter(x => x.length === 2);
+  return out;
+}
+
 // ----- This week's counted games, kept current while the Dashboard is open -----
 // Sleeper's points for each player this week are the game that counts for him so far; asked for again at most every
 // 2 minutes (it's one small request), so a game locked in shows up without a full reload.
@@ -172,14 +209,12 @@ function sleeperWeekFresh(L) {
   }).catch(() => { L.slpWeek = { ...(L.slpWeek || { n, pts: {} }), at: Date.now() }; }).finally(() => { slpWeekLoad = null; });
 }
 
-// One-game leagues: the one game of a player's that counts among his lines this period (oldest first). Sleeper's
-// points for him this week say which: the game nearest them (bonuses and technicals aren't in our fantasy points).
-// Without them, his latest game, as Sleeper counts an unlocked one.
+// One-game leagues: the one game of a player's that counts among his lines this period (oldest first), with its
+// bonus points: Sleeper's points for him this week say which (countedIndex)
 function oneGameLine(p, lines) {
-  if (!lines.length) return null;
   const L = fxLeague(), raw = nbaById.get(p.nbaId);
-  const pts = L && L.slpWeek && raw && raw.slp ? L.slpWeek.pts[raw.slp] : null;
-  if (!pts) return lines[lines.length - 1];
-  return lines.reduce((best, l) => (Math.abs(lineFp(l) - pts) < Math.abs(lineFp(best) - pts) ? l : best));
+  const pts = L && L.slpWeek && raw && raw.slp && L.slpWeek.pts[raw.slp] != null ? +L.slpWeek.pts[raw.slp] : null;
+  const i = countedIndex(lines, pts);
+  return i < 0 ? null : withBonus(lines[i]);
 }
 const isOneGame = () => !!(fxLeague() && fxLeague().oneGame);

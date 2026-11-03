@@ -4,7 +4,8 @@
 
 // ----- Weekly recap -----
 // A finished week across the whole league, counted from the week's real lineups and box scores as How week N ended
-// counts one matchup: every final, then the standouts. Fantrax leagues only (the others don't share past lineups).
+// counts one matchup: every final, then the standouts. Fantrax and Sleeper leagues (the others don't share past lineups);
+// in Sleeper's one-game weeks a starter's week is the game that counted, so Player of the week is the best such game.
 const recaps = new Map(); // "league|period" -> recap, or null when the week's lineups aren't there
 
 // weeks whose games are all played (a Fantrax week ends officially when the next locks, a day after its last games)
@@ -47,8 +48,7 @@ function buildRecap(L, P, period) {
     for (const [f, o] of rp.owner) {
       if (!o.on || !by.has(o.tid)) continue;
       const nba = currentFidNba()(f), raw = nba && nbaById.get(nba);
-      for (const r of (raw && P.G.players.get(nba)) || []) {
-        if (!days.has(r[0])) continue;
+      for (const r of countedRows(L, P.G, rp, f, ((raw && P.G.players.get(nba)) || []).filter(r => days.has(r[0])))) {
         const line = gameLine(P.G, r);
         single.push({ p: playerFromRaw(raw), tid: o.tid, line, v: lineValue(line) });
       }
@@ -78,9 +78,9 @@ function buildRecap(L, P, period) {
   return {
     period, games: order,
     mvp: best(weeks, x => x.v),
-    game: best(single, x => x.v),
+    game: L.oneGame ? null : best(single, x => x.v), // one-game weeks: the player of the week's game
     // the least a starter did a game over the week, among those with 2 or more games (one short night isn't a week)
-    brick: best(weeks.filter(x => x.line.gp1 >= 2), x => -x.v / x.line.gp1),
+    brick: L.oneGame ? null : best(weeks.filter(x => x.line.gp1 >= 2), x => -x.v / x.line.gp1),
     dud: best(single, x => -x.v), // the single worst game
     // the most games missed; a tie lists up to three (the ones whose team played least first) and counts the rest
     missed: most ? missedBy.filter(x => x.games === most).sort((a, b) => a.sched - b.sched) : [],
@@ -105,7 +105,7 @@ function recapItems(X) {
     add(e, label, `${name(x.p, true)} <span class="muted">${esc(team(x.tid))}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
       `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`);
   };
-  if (X.mvp) stand('🏆', 'Player of the week', X.mvp, true);
+  if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
   if (X.game) stand('🚀', 'Game of the week', X.game, false);
   if (X.brick) stand('🧱', 'Brick of the week', X.brick, true, X.brick.v < 0 ? 'pos-bad' : '');
   if (X.dud) stand('🗑️', 'Dud of the week', X.dud, false, X.dud.v < 0 ? 'pos-bad' : '');
@@ -114,7 +114,8 @@ function recapItems(X) {
     const who = (x, html) => (html ? `${name({ nbaId: x.nba, name: x.name }, true)} <span class="muted">${esc(team(x.tid))}</span>` : `${x.name} (${team(x.tid)})`);
     const g = X.missed[0].games, shown = X.missed.slice(0, 3), more = X.missed.length - shown.length;
     const list = html => shown.map(x => who(x, html)).join(', ') + (more ? ` and ${more} other${more === 1 ? '' : 's'}` : '');
-    const tail = X.missed.length > 1 ? `each missed ${g} game${g === 1 ? '' : 's'} while starting` : `missed ${g} of ${X.missed[0].sched} games while starting`;
+    const tail = isOneGame() ? (X.missed.length > 1 ? 'each started without playing a game' : 'started without playing a game')
+      : X.missed.length > 1 ? `each missed ${g} game${g === 1 ? '' : 's'} while starting` : `missed ${g} of ${X.missed[0].sched} games while starting`;
     add('🤕', 'Street clothes', `${list(true)} ${tail}`, `${list(false)} ${tail}`);
   }
   if (X.regret) {
@@ -143,7 +144,7 @@ function viewRecap() {
   const L = fxLeague();
   if (!L || !NBA) return '';
   const empty = (t, m) => `<div class="card"><div class="empty"><strong>${t}</strong>${m}</div></div>`;
-  if (!hasLineupHistory(L)) return empty(`No recaps for ${esc(sourceName(L))} leagues yet`, "Recaps come from each week's real lineups, which the site reads from Fantrax only for now.");
+  if (!hasLineupHistory(L)) return empty(`No recaps for ${esc(sourceName(L))} leagues yet`, "Recaps come from each week's real lineups, which the site reads from Fantrax and Sleeper only for now.");
   // the last game day's box scores tell whether a week is over before Fantrax says so
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'recap') render(); }).catch(() => {});
   const done = finishedPeriods(L);

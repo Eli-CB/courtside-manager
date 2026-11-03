@@ -35,7 +35,13 @@ saved leagues are lost). Owner's league:
     again every 2 min by `sleeperWeekFresh`) follow it; no Daily bench swaps card. Weeks: Monday-Sunday from opening
     night, no All-Star exception (checked against 2025-26's weekly points); playoffs a week a round. Players are named
     only by Sleeper ids: the daily job gives each player `slp` (+ `slpPos`, Sleeper's positions, which its lineups follow).
-    Fixtures: `tests/capture_sleeper_fixtures.py` (names anonymized). Awards/Recap/Season totals stay Fantrax-only.
+    Fixtures: `tests/capture_sleeper_fixtures.py` (names anonymized). Awards, Recap, Season totals and past-week cards run
+    on Sleeper's weekly matchups (`hasLineupHistory`; `loadRosterWeeks` keeps [id, starting, points] per player and the
+    week's pairings under '#m', which fill `L.matchups`): `countedRows` keeps a starter's one counted game (nearest
+    Sleeper's points, `countedIndex`; none when Sleeper says 0), a bench swap puts in the bench player's best game, Street
+    Clothes counts empty starts, and the Recap has no Game/Brick of the week. A game's Sleeper bonuses (40-point games...)
+    ride along as `bonus` on game lines (`withBonus`, added by `lineFp`), so weekly scores match Sleeper's within techs and
+    stat corrections. Past seasons stay Fantrax-only.
   - yahoo: Yahoo leagues through a Yahoo login (OAuth): the helper server `worker/yahoo.js` (Cloudflare Worker at
     api.leaguelayer.com, setup in `worker/README.md`) runs the sign-in and passes API requests through (Yahoo's API isn't
     CORS-open); tokens stay in the browser (`courtside-yahoo`). `yahoo.proxy` empty = Yahoo hidden; while `yahoo.beta`, the sign-in shows only on a device that opened `?yahoo=1` (or is signed in). `yflat` turns Yahoo's
@@ -61,7 +67,7 @@ saved leagues are lost). Owner's league:
   - recap: Recap tab: a finished week across the league (Player/Game of the week, Brick (worst per game, 2+ G), Dud (worst game), Street clothes (most games missed while starting), with full lines in the league's cats,
     bench regret, best all-play week, then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share sends the standouts +
     a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
-    Fantrax only. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
+    Fantrax and Sleeper. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
   - live: live box scores for the Dashboard matchup's and Performances' Today (and This week). The browser polls ESPN's site API
     (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) every 30 s (60 s with Save-Data) while the Dashboard or Players tab is visible,
     it isn't set to the last game day (`ui.dashRange` / `ui.perfRange`), and games are on: scoreboard + the box score of each game in progress
@@ -103,7 +109,7 @@ saved leagues are lost). Owner's league:
   player list (daily, needs the `X-Fantasy-Filter` header). ESPN sends no dates: day 1 = NBA opening night; weeks
   Monday-Sunday with the All-Star week joined to the next (verified on ESPN's schedule page: 2027 Matchup 18 =
   Feb 15-28), checked against `status.finalScoringPeriod`. Matchup numbers are ESPN's week numbers; weeks before
-  `status.firstScoringPeriod` aren't the league's. Season totals, Awards and past seasons are Fantrax-only
+  `status.firstScoringPeriod` aren't the league's. Season totals, Awards and past seasons are Fantrax/Sleeper-only
   (`hasLineupHistory`); doing ESPN means one roster request per day (`mRoster&scoringPeriodId=N`) or its
   transactions (`mTransactions2`). ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
 - `python serve.py` (preview config "site", port 5173) refreshes `data/` locally: never commit

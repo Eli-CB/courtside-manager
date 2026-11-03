@@ -213,7 +213,7 @@ function dashMatchupCard() {
       for (const p of starters) {
         if (!p) continue;
         const lines = ds.map(d => lineOn(p, d)).filter(Boolean);
-        if (one && week) { const c = oneGameLine(p, lines); if (c) addLine(t, c); } else lines.forEach(l => addLine(t, l));
+        if (one && week) { const c = oneGameLine(p, lines); if (c) addLine(t, c); } else lines.forEach(l => addLine(t, withBonus(l)));
       }
       return t;
     };
@@ -286,7 +286,7 @@ function dashMatchupCard() {
     const lines = dates.map(d => lineOn(p, d)).filter(Boolean);
     // a one-game league's period shows the game that counts (for a starter; the bench's latest)
     const counted = one && range === 'week' ? oneGameLine(p, lines) : null;
-    const tot = counted ? { ...counted } : lines.reduce(addLine, {});
+    const tot = counted ? { ...counted } : lines.map(withBonus).reduce(addLine, {});
     let game;
     if (range === 'week') {
       const left = D.all.filter(d => playsOn(p, d) && !lineOn(p, d) && (d > today || (d === today && !gameFinal(p, d) && !(liveGame(p, d) && liveGame(p, d).state === 'post')))).length;
@@ -333,7 +333,8 @@ function dashMatchupCard() {
 // Today's games come from ESPN as they're played (live.js). Category leagues rank what the games added to winning a
 // week's categories against not playing (catWins), so a week adds them up; points leagues use fantasy points.
 const lineStat = (line, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (line[b] || 0) * c)) : line[k] || 0);
-const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v));
+// (with any one-game bonuses its games carry: Sleeper's 40-point games and the like, gameBonus)
+const lineFp = line => sum(Object.entries(leaguePoints() || {}).map(([k, v]) => lineStat(line, k) * v)) + (line.bonus || 0);
 // a game's value: fantasy points, or categories won against not playing (catWins), as player value counts an average game
 const lineValue = line => (isPoints() ? lineFp(line) : sum(Object.values(catWins(line))));
 
@@ -752,8 +753,8 @@ function pastSeasonTotals(L, G) {
       if (!o.on) continue;
       const T = teams[o.tid] = teams[o.tid] || { gp: 0, s: {} };
       const nba = L.fidNba(f);
-      for (const r of (nba && G.players.get(nba)) || []) {
-        if (!wd.has(r[0])) continue;
+      // one-game leagues: only the game that counted
+      for (const r of countedRows(L, G, w, f, ((nba && G.players.get(nba)) || []).filter(r => wd.has(r[0])))) {
         T.gp++;
         for (const [k, v] of Object.entries(gameLine(G, r))) T.s[k] = (T.s[k] || 0) + v;
       }
@@ -776,7 +777,7 @@ function seasonTotalsCard(L, standings) {
     if (!gameLogs[L.season]) return note('No NBA game logs are saved for this season (the site has 2016-17 on).');
     teams = pastSeasonTotals(L, gameLogs[L.season]);
   } else if (!hasLineupHistory(L)) {
-    return note(`Season totals need every day's lineups, which the site reads from Fantrax only for now, not ${sourceName(L)}.`);
+    return note(`Season totals need every day's lineups, which the site reads from Fantrax and Sleeper only for now, not ${sourceName(L)}.`);
   } else {
     const id = L.id;
     const S = seasonTot[id];

@@ -1659,7 +1659,7 @@ test('reads a Sleeper league into the same shape as the others', async () => {
   assert.deepEqual([...L.draft.picks[0].slice(0, 3)], [1, 1, '7']);
   assert.equal(L.standings.length, 12);
   assert.ok(L.standings.every((s, i) => !i || s.w <= L.standings[i - 1].w), 'ranked by wins');
-  assert.ok(!app.hasLineupHistory(L), 'awards and recaps stay Fantrax-only');
+  assert.ok(app.hasLineupHistory(L), 'weekly lineups for awards and recaps');
   // weeks: Monday to Sunday from opening night, no All-Star exception; 3 playoff weeks for 6 teams from week 22
   const span = n => { const p = L.periods.find(x => x.n === n); return p && `${p.start}..${p.end}`; };
   assert.equal(span(1), '2026-10-20..2026-10-25');
@@ -1697,7 +1697,11 @@ test('Sleeper counts one game a week for each starter', async () => {
   assert.equal(app.oneGameLine(p, lines).pts, 52);
   // with no points from Sleeper: his latest game, as Sleeper counts one that isn't locked in
   L.slpWeek = { n: 1, pts: {}, at: Date.now() };
-  assert.equal(app.oneGameLine(p, lines), lines[2]);
+  assert.equal(app.oneGameLine(p, lines).min, lines[2].min);
+  assert.equal(app.oneGameLine(p, lines).bonus, 4, 'with its bonus points');
+  // Sleeper's 0 for a player with games: he went into the lineup after them, so none counts
+  L.slpWeek = { n: 1, pts: { [luka.slp]: 0 }, at: Date.now() };
+  assert.equal(app.oneGameLine(p, lines), null);
 
   // a finished week projects to one game per starter, well under every game added up
   const A = app.fxTeamSide(L.teams[0].id);
@@ -1728,3 +1732,86 @@ test("Sleeper on the Dashboard: this period shows the game that counts", async (
     assert.ok(score > 0 && score < 500, `period score ${score}`);
   } finally { ui.dashRange = was; app.get('state').fxTeam = null; }
 });
+
+// The Sleeper league as the site has it once connected: its players matched by their Sleeper ids (raw.fx)
+async function asSleeper(fn) {
+  const saved = app.NBA.players.map(r => [r, r.fx, r.pos]);
+  try {
+    await app.useLeague(SLEEPER);
+    app.applyFantraxLeague(await app.getLeague(SLEEPER, true));
+    return await fn(app.fxLeague());
+  } finally {
+    for (const [r, fx, pos] of saved) { if (fx) r.fx = fx; else delete r.fx; r.pos = pos; }
+    app.set('nbaCache', null);
+  }
+}
+
+test("Sleeper's weekly lineups: each week's starters, and the one game of each that counted", () => asSleeper(async L => {
+  await app.loadBoxes();
+  const weeks = await app.fetchRosterWeeks(L);
+  assert.deepEqual([...weeks.map(w => w.n)], [1, 2], 'every week started (the fixtures are in week 2)');
+  const w1 = weeks[0];
+  const byTeam = {};
+  for (const [, o] of w1.owner) if (o.on) byTeam[o.tid] = (byTeam[o.tid] || 0) + 1;
+  assert.ok(Object.values(byTeam).every(n => n <= 9) && Object.keys(byTeam).length === 12, 'up to 9 starters a team');
+  assert.ok([...w1.owner.values()].every(o => o.pts != null), "everyone's points that week");
+  // the pairings of every week come with its lineups (the league brings only this week's and its neighbors')
+  const pairs = JSON.stringify(L.matchups[1]);
+  delete L.matchups[1];
+  await app.fetchRosterWeeks(L);
+  assert.equal(JSON.stringify(L.matchups[1]), pairs);
+  assert.ok(![...w1.owner.values()].some(o => o.tid === '#m'));
+  const G = await app.loadGameLog('cur');
+  const fidNba = app.currentFidNba();
+  const L2 = { ...L, weeks: [w1], fidNba };
+  // Luka's counted game in week 1: his 52-point night, not his first or every game
+  const luka = app.NBA.players.find(r => r.name === 'Luka Dončić');
+  const rows = (G.players.get(luka.id) || []).filter(r => app.periodDays(G, w1).has(r[0]));
+  assert.equal(rows.length, 3);
+  const c = app.countedRows(L2, G, w1, luka.slp, rows);
+  assert.equal(c.length, 1);
+  assert.equal(app.gameLine(G, c[0]).pts, 52);
+  assert.equal(app.lineFp(app.gameLine(G, c[0])), 53, 'with its 40- and 50-point bonuses');
+  assert.equal(app.countedRows({ ...L2, oneGame: false }, G, w1, luka.slp, rows).length, 3, 'other leagues count every game');
+  // each team's week, one counted game per starter, comes to Sleeper's own score less the bonuses we don't count
+  const tot = app.pastSeasonTotals(L2, G);
+  const ms = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'fixtures/sleeper/league_1369432599025442816_matchups_1.json'), 'utf8'));
+  for (const m of ms) {
+    const T = tot[String(m.roster_id)];
+    const fp = T ? app.lineFp(T.s) : 0;
+    // within a technical foul or a stat correction (bonuses included: Luka's 52-point night is worth 53 there)
+    assert.ok(Math.abs(fp - m.points) <= 3, `team ${m.roster_id}: ${fp} against Sleeper's ${m.points}`);
+    assert.ok(!T || T.gp <= 9, 'one game a starter');
+  }
+}));
+
+test('Sleeper recap and awards: one counted game per starter', () => asSleeper(async L => {
+  const ui = app.get('ui');
+  useTeam(L.teams[0].id);
+  ui.tab = 'recap';
+  try {
+    app.viewRecap();
+    await new Promise(r => setTimeout(r, 30));
+    const html = app.viewRecap();
+    assert.match(html, /Week 1 standouts/);
+    const X = app.get('recaps').get(`${L.id}|1`);
+    assert.equal(X.games.length, 6);
+    assert.ok(X.mvp && X.mvp.line.gp1 === 1, 'Player of the week: his counted game');
+    assert.equal(X.game, null, 'no separate Game of the week');
+    assert.equal(X.brick, null, 'no Brick: a week is one game');
+    assert.ok(X.dud && X.dud.line.gp1 === 1);
+    assert.ok(!html.includes('Game of the week') && html.includes('Player of the week'));
+    assert.ok(X.missed.every(x => x.games === 1 && x.sched === 1), 'Street clothes: a start without any game');
+    if (X.missed.length) assert.ok(html.includes('started without playing a game'));
+  } finally { ui.tab = 'dashboard'; }
+  // Awards so far run on the same weeks
+  ui.tab = 'awards';
+  try {
+    app.viewAwardsSoFar();
+    await new Promise(r => setTimeout(r, 30));
+    const html = app.viewAwardsSoFar();
+    assert.ok(!/No awards for Sleeper/.test(html), 'awards for Sleeper leagues');
+    assert.match(html, /Best manager|Waiver Wire Wizard|Unc Status/);
+    if (html.includes('Street Clothes')) assert.match(html, /empty start/);
+  } finally { ui.tab = 'dashboard'; app.get('state').fxTeam = null; }
+}));
