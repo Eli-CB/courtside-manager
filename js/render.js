@@ -81,7 +81,8 @@ function leagueMenu() {
 // Fantrax leagues only, so far.
 const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
-const tabList = () => (ui.season ? TABS_PAST : TABS_NOW);
+const TABS_BROWSE = [['players', 'Players']]; // browsing without a league
+const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
 let seasonCtx = null; // set while a past season renders: { basis, label }
@@ -226,7 +227,7 @@ function render() {
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   if (ui.pendingSeason) { $('#view').innerHTML = '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>'; return; }
   const nav = $('#tabs');
-  const mode = ui.season ? 'past:' + ui.season : 'now';
+  const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : 'now';
   if (nav.dataset.mode !== mode) {
     nav.innerHTML = tabList().map(([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${l}</a>`).join('');
     nav.dataset.mode = mode;

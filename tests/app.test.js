@@ -1941,6 +1941,39 @@ test('the waiver order: from ESPN and Sleeper, in the action items and a popup; 
   } finally { st.fxTeam = was; }
 });
 
+test('browsing without a league: just the Players tab, no league anywhere', async () => {
+  await app.loadBoxes();
+  const st = app.get('state'), ui = app.get('ui');
+  const saved = app.NBA.players.map(r => [r, r.fx, r.pos]);
+  const was = { browse: st.browse, fxTeam: st.fxTeam, demo: st.demo, leagueChosen: st.leagueChosen };
+  await app.useLeague(CATS9); // the daily file's own league stays loaded underneath
+  try {
+    st.fxTeam = undefined; st.demo = false; st.leagueChosen = false; // as on a first visit
+    assert.ok(app.needsLanding(), 'no team: the landing page');
+    assert.match(app.viewLanding(), /data-action="land-browse"/);
+    app.actions['land-browse']();
+    assert.ok(st.browse && !app.needsLanding());
+    assert.equal(app.fxLeague(), null, "the site's league isn't this visitor's");
+    assert.deepEqual([...app.tabList().map(t => t[0])], ['players']);
+    assert.ok(app.NBA.players.every(r => !r.fx), "nobody shows as free in someone else's league");
+    const html = app.viewPlayers();
+    assert.match(html, /No league connected[\s\S]*data-action="browse-exit"/);
+    assert.ok(!html.includes('perf-owner') && !html.includes('badge good'), 'no fantasy teams or free-agent badges');
+    assert.ok(/data-nba="\d+"/.test(html), 'players listed');
+    assert.equal(app.scoreCats().length, 9, 'a standard 9-category league');
+    // back out: the landing page again
+    app.actions['browse-exit']();
+    assert.ok(!st.browse && app.needsLanding());
+  } finally {
+    Object.assign(st, was);
+    for (const [r, fx, pos] of saved) { if (fx) r.fx = fx; else delete r.fx; r.pos = pos; }
+    app.set('nbaCache', null);
+    ui.tab = 'standings'; // no live box scores in the background
+    const live = app.get('live');
+    clearTimeout(live.timer); live.timer = null;
+  }
+});
+
 test('Send feedback: an email to feedback@leaguelayer.com with the league, page and version filled in', async () => {
   const L = await app.useLeague(CATS9);
   const href = app.feedbackHref();

@@ -428,7 +428,7 @@ function topPerformancesCard() {
   // except on IR (out of the lineup, so whose he is helps)
   const who = id => {
     const tid = owner.get(id);
-    if ((tid === mine || (opp && tid === opp.id)) && spot.get(id).st !== 'INJURED_RESERVE') return lineupBadge(id);
+    if (tid && (tid === mine || (opp && tid === opp.id)) && spot.get(id).st !== 'INJURED_RESERVE') return lineupBadge(id);
     if (tid) return `<span class="perf-owner">${esc(fxTeamName(tid))}</span> ${lineupBadge(id)}`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
@@ -899,6 +899,10 @@ function viewPlayers() {
   // the latest games come from the box scores, loaded on first need; today's as they're played
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'players') render(); }).catch(() => {});
   startLive();
+  if (!fxLeague()) { // browsing without a league
+    return `<div class="sample-banner browse-note"><span>No league connected: values are for a standard 9-category league.</span><button type="button" class="btn sm" data-action="browse-exit">Connect a league</button></div>
+  ${topPerformancesCard()}`;
+  }
   return `
   ${topPerformancesCard()}
   ${ui.viewing ? '' : recommendedCard()}`;

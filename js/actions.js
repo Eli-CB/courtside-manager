@@ -189,6 +189,14 @@ const actions = {
     if (!state.fxTeam && back) await actions['league-switch']({ dataset: { id: back.id } });
     else commit();
   },
+  // no league: just the Players tab, valued for a standard 9-category league
+  'land-browse'() {
+    state.browse = true; state.demo = false; ui.addingLeague = false;
+    clearLeaguePlayers();
+    commit();
+    location.hash = '#players';
+  },
+  'browse-exit'() { state.browse = false; state.leagueChosen = false; commit(); },
   async 'land-demo'() {
     const site = NBA && NBA.siteLeague;
     if (!site) return;
@@ -488,7 +496,7 @@ function route() {
   if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
   if (tab === 'live') tab = 'dashboard'; // and the old Live tab on Performances (Today)
   if (tab === 'rosters' && !ui.season) tab = 'roster';
-  ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : 'dashboard';
+  ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : state.browse ? 'players' : 'dashboard';
   if (!VIEW_TABS.includes(ui.tab)) { ui.viewA = null; ui.viewB = null; }
   render();
   window.scrollTo(0, 0);

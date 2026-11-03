@@ -414,6 +414,7 @@ async function switchLeague(input) {
   applyFantraxLeague(withSiteExtras(res));
   state.fxLeagueId = NBA.siteLeague && NBA.siteLeague.id === id ? null : id;
   state.demo = false;
+  state.browse = false; // a league again, after browsing without one
   state.leagueChosen = true;
   ui.viewA = null; ui.viewB = null;
   if (!wasCurrent) {
@@ -450,7 +451,7 @@ function adoptTeam(teamId) {
 }
 
 /* ---------- Landing page: connect a league, then pick your team ---------- */
-const needsLanding = () => ui.addingLeague || (!state.fxTeam && !state.demo);
+const needsLanding = () => ui.addingLeague || (!state.fxTeam && !state.demo && !state.browse);
 
 function viewLanding() {
   const chosen = !ui.addingLeague && state.leagueChosen && fxLeague() && !state.fxTeam;
@@ -488,6 +489,7 @@ function viewLanding() {
         <span class="land-url">sleeper.com/leagues/<b>1234567890123456789</b>/matchup</span></p>
         <p>Pasting the whole address works too.</p>
       </details>
-      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax, ESPN and Sleeper. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>`;
+      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax, ESPN and Sleeper. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>
+      ${adding ? '' : '<p class="small muted land-browse">No league to connect? <button class="link-btn" data-action="land-browse">Just browse players</button></p>'}`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
 }

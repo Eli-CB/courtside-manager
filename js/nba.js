@@ -90,7 +90,7 @@ async function loadNba(fresh = false) {
     BASE = baseNow();
     NBA.siteLeague = NBA.league;
     // a reload from Fantrax since this morning's file beats the file (the site's own league is on Fantrax)
-    const fresher = NBA.league && !state.fxLeagueId ? cachedLeague(NBA.league.id) : null;
+    const fresher = NBA.league && !state.fxLeagueId && !state.browse ? cachedLeague(NBA.league.id) : null;
     if (fresher) applyFantraxLeague(withSiteExtras(fresher));
     const other = state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId);
     if (other) {
@@ -106,6 +106,7 @@ async function loadNba(fresh = false) {
     const migrate = state.fxTeam && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
     if (migrate) rememberLeague(NBA.league.id, NBA.league);
     const folded = foldPastSeasons();
+    if (state.browse) clearLeaguePlayers(); // browsing without a league: none of the site league's on the players
     if (syncLinked() || migrate || folded) commit(); else render();
     if (ui.pendingSeason) route(); // a refresh on a past season waited for this data
     return true;

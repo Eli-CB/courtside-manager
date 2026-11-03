@@ -339,7 +339,14 @@ function slotsFromLeague(league) {
 // The league on screen: a past season (or this season's awards) can be viewed without touching the
 // loaded league or your saved team, which stay as they are underneath.
 let viewLeague = null, viewTeam = null;
-const fxLeague = () => viewLeague || (NBA && NBA.league) || null;
+// Browsing without a league (state.browse): none, though the daily file still carries the site's own (the demo)
+const fxLeague = () => viewLeague || (!state.browse && NBA && NBA.league) || null;
+// No league's rosters or positions on the players: nobody "free" in a league you're not in
+function clearLeaguePlayers() {
+  if (!NBA) return;
+  for (const raw of NBA.players) { delete raw.fx; raw.pos = raw.basePos; }
+  nbaCache = null;
+}
 const myTeamId = () => (viewLeague ? viewTeam : state.fxTeam);
 function viewingLeague(L, me, fn) {
   const was = [viewLeague, viewTeam];

@@ -80,6 +80,10 @@ saved leagues are lost). Owner's league:
     files an earlier season (year < `NBA.season`, or a later season of the same Fantrax `historyId` is here) under its
     league in `state.pastSeasons[historyId]`, never as a league; `foldPastSeasons` moves old duplicates there
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
+  - No league (`state.browse`, the landing page's "Just browse players"): `fxLeague()` is null (the daily file's site
+    league stays loaded for the demo), `clearLeaguePlayers()` drops its rosters/positions from the players, the tabs are
+    just Players (`TABS_BROWSE`), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
+    any league ends it. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
