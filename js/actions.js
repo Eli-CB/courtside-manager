@@ -71,7 +71,8 @@ const actions = {
     const item = INFO[el.dataset.key];
     if (!item) return;
     $('#infoTitle').textContent = item[0];
-    $('#infoBody').innerHTML = typeof item[1] === 'function' ? item[1]() : item[1]; // some are written from live numbers
+    // some are written from live numbers; they're worded for basketball, the league's sport named here
+    $('#infoBody').innerHTML = (typeof item[1] === 'function' ? item[1]() : item[1]).replace(/\bNBA\b/g, SPORT.name);
     const d = $('#infoDialog');
     if (!d.open) d.showModal();
   },
@@ -220,10 +221,13 @@ const actions = {
   },
   // no league: just the Players tab, valued for a standard 9-category league
   'land-browse'() {
-    state.browse = true; state.demo = false; ui.addingLeague = false;
-    clearLeaguePlayers();
-    commit();
-    location.hash = '#players';
+    const go = () => {
+      state.browse = true; state.demo = false; ui.addingLeague = false;
+      clearLeaguePlayers();
+      commit();
+      location.hash = '#players';
+    };
+    if (SPORT.key === 'nba') go(); else useSport('nba').then(go);
   },
   'browse-exit'() { state.browse = false; state.leagueChosen = false; commit(); },
   async 'land-demo'() {
@@ -309,7 +313,7 @@ const actions = {
     const ok = await loadNba(true);
     el.disabled = false;
     el.textContent = 'Refresh stats';
-    toast(!ok ? "Couldn't load NBA data" : live ? 'Pulled the latest NBA stats' : "Couldn't reach the local data server");
+    toast(!ok ? `Couldn't load ${SPORT.name} data` : live ? `Pulled the latest ${SPORT.name} stats` : "Couldn't reach the local data server");
   },
   'dash-range'(el) {
     ui.dashRange = el.dataset.range;
@@ -368,6 +372,7 @@ const actions = {
   async 'start-fresh'() {
     $('#leagueMenu details')?.removeAttribute('open');
     if (!(await askConfirm('Reset and start over?', 'Removes your leagues, teams and matchup logs from this device. Copy a backup first if you want to keep anything.', 'Reset'))) return;
+    await useSport('nba');
     state = emptyState();
     ui.tradeGive.clear(); ui.tradeGet.clear();
     ui.addingLeague = false; ui.viewA = null; ui.viewB = null;

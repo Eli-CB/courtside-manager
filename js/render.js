@@ -48,7 +48,7 @@ function leagueMenu() {
   const P = pastSeason();
   // the current league's seasons, under it (Fantrax leagues: the others don't share past seasons)
   let seasons = '';
-  if (!state.demo && (L.source || 'fantrax') === 'fantrax') {
+  if (!state.demo && (L.source || 'fantrax') === 'fantrax' && L.sport !== 'nhl') {
     const past = seasonsFor(L);
     const rows = past.length ? [{ id: '', year: L.year }, ...past] : [];
     seasons = rows.map(x => {
@@ -81,7 +81,7 @@ function leagueMenu() {
 const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const TABS_BROWSE = [['players', 'Players']]; // browsing without a league
-const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW);
+const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
 let seasonCtx = null; // set while a past season renders: { basis, label }
@@ -228,6 +228,7 @@ function gearMenu() {
 }
 
 function render() {
+  if (ui.hold) return; // changing sports: the league isn't in place yet
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
   leagueMenu();
@@ -236,7 +237,7 @@ function render() {
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   if (ui.pendingSeason) { $('#view').innerHTML = '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>'; return; }
   const nav = $('#tabs');
-  const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : 'now';
+  const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : `now:${SPORT.key}`;
   if (nav.dataset.mode !== mode) {
     nav.innerHTML = tabList().map(([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${l}</a>`).join('');
     nav.dataset.mode = mode;
@@ -300,7 +301,7 @@ function viewPreDraft(L) {
   const past = draftTime(L) && draftTime(L) < new Date();
   return `<div class="card"><div class="empty"><strong>${past ? 'Waiting on the draft' : "This league hasn't drafted yet"}</strong>
       ${when ? `${past ? 'The draft was set for' : 'The draft is set for'} <b>${esc(when)}</b>. ` : ''}Rosters, matchups and the draft board fill in here once teams have players.
-      In the meantime, the <a href="#players">Players</a> tab ranks every NBA player (Per game).</div></div>`;
+      In the meantime, the <a href="#players">Players</a> tab ranks every ${SPORT.name} player (Per game).</div></div>`;
 }
 
 function standingOf(teamId) {

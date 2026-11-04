@@ -13,7 +13,7 @@ const INFO = {
     <p><b>Sleeper leagues</b> count one game a week in each lineup slot, so each starter projects to one game: a game he's already played if it's at least his average or he has none left (the one Sleeper is counting), else his average game. Sleeper's bonuses (40-point games and the like) aren't projected.</p>
     <p><b>Winning the week.</b> Categories are treated as independent, and we add up the chances of every way to take more than half of them. The projected category score is the sum of the category win chances.</p>`],
   suggest: ['How lineup suggestions work', `
-    <p><b>Starting point.</b> Starters are ranked by games this week × (player value + 4), then fitted into your slots (PG, SG, G, SF, PF, F, C, Flx) so every slot gets an eligible player.</p>
+    <p><b>Starting point.</b> Starters are ranked by games this week × (player value + 4), then fitted into your slots so every slot gets an eligible player.</p>
     <p><b>Search.</b> We try every single swap of a starter for a bench player that still fits the slots and keep the one that improves the goal most, repeating up to 6 times until nothing helps.</p>
     <p><b>The goal.</b> Your league gives one win to whoever takes more categories, so the goal is your chance of winning the week. Total categories won only breaks ties.</p>
     <p><b>Punting.</b> A category's win chance follows a bell curve, so adding stats to one you're far behind in (or far ahead in) barely moves it. Those categories effectively get ignored, and players are used where the matchup is close.</p>

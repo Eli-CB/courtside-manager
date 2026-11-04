@@ -319,6 +319,7 @@ async function connectLeague(input) {
       // one fetch serves either way: as the league, or as the season
       fetched = await fetchFantraxLeague(id, { opening: true }).catch(e => { throw leagueError(id, e); });
       f = { hid: fetched.league.historyId || null, year: fetched.league.year || null };
+      if (fetched.league.sport === 'nhl' && isPastSeason(f)) throw new Error("Past hockey seasons aren't here yet. Connect this season's league.");
     }
     if (isPastSeason(f)) {
       const P = await loadSeason(id, fetched).catch(e => { throw leagueError(id, e); });
@@ -340,8 +341,7 @@ async function connectLeague(input) {
   return null;
 }
 
-function stashLeague() {
-  const id = currentLeagueId();
+function stashLeague(id = currentLeagueId()) {
   if (!id || !state.fxTeam) return;
   state.leagueStates = state.leagueStates || {};
   state.leagueStates[id] = JSON.parse(JSON.stringify(Object.fromEntries(LEAGUE_FIELDS.map(k => [k, state[k]]))));
@@ -387,7 +387,7 @@ function yahooLanding() {
 // Switch the whole app to a Fantrax or ESPN league by ID (or the league's address). Throws a readable message.
 async function needNba() {
   if (!NBA) await nbaLoading;
-  if (!NBA) throw new Error("Couldn't load NBA data. Check your connection and try again.");
+  if (!NBA) throw new Error(`Couldn't load ${SPORT.name} data. Check your connection and try again.`);
 }
 // A league that didn't load, as a readable message
 function leagueError(id, e) {
@@ -402,15 +402,24 @@ async function switchLeague(input) {
   const id = parseLeagueId(input);
   if (!id) throw new Error(BAD_LEAGUE_ID);
   await needNba();
+  // the league's sport has to be on screen before the league can be: nothing's drawn until both are (ui.hold), and
+  // a league that doesn't load leaves the sport as it was. Only Fantrax has hockey; the other sites read basketball's tables.
+  const cur = currentLeagueId(), was = SPORT.key;
   let res;
+  ui.hold = true;
   try {
+    if (leagueSourceOf(id) !== 'fantrax') await useSport('nba');
     res = await getLeague(id);
+    await useSport(res.league.sport || 'nba');
   } catch (e) {
+    await useSport(was).catch(() => {});
     throw leagueError(id, e);
+  } finally {
+    ui.hold = false;
   }
-  const wasCurrent = currentLeagueId() === id;
+  const wasCurrent = cur === id;
   ui.season = null; ui.pastTeam = null;
-  if (!wasCurrent) stashLeague();
+  if (!wasCurrent) stashLeague(cur);
   applyFantraxLeague(withSiteExtras(res));
   state.fxLeagueId = NBA.siteLeague && NBA.siteLeague.id === id ? null : id;
   state.demo = false;

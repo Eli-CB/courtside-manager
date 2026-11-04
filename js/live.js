@@ -8,7 +8,6 @@
 // box score of each game in progress whose score has changed, or that hasn't been read for a minute (once more when
 // it ends). Earlier days come from the saved box scores; days the daily data job hasn't saved yet (it runs at
 // 4 a.m. ET) are asked for once.
-const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/';
 const LIVE_EVERY = 30e3;
 const LIVE_STALE = 60e3; // a game's box score is read again after this even if its score hasn't moved
 const LIVE_IDLE = 30 * 60e3; // nothing on: look again in half an hour (or at the next tip-off)
@@ -20,10 +19,13 @@ const live = { day: null, games: [], lines: new Map(), done: new Set(), read: ne
 // ESPN lists tip-offs in UTC; 5 hours back always lands on the US game date (as the daily data job does)
 const usDay = t => new Date(t - 5 * 36e5).toISOString().slice(0, 10);
 
+// ESPN's team as the data's: basketball by its id, hockey by its code
+const espnTri = t => (isHockey() ? SPORT.espnTeams[t.abbreviation] || t.abbreviation : ESPN_TEAMS[t.id] || t.abbreviation);
+
 function espnGames(sb) {
   return (sb.events || []).map(e => {
     const side = Object.fromEntries(e.competitions[0].competitors.map(t => [t.homeAway, t]));
-    const tri = t => ESPN_TEAMS[t.team.id] || t.team.abbreviation;
+    const tri = t => espnTri(t.team);
     const start = new Date(e.date);
     return { id: e.id, d: usDay(start), start, home: tri(side.home), away: tri(side.away), hs: +side.home.score || 0, as: +side.away.score || 0, state: e.status.type.state, detail: e.status.type.shortDetail, period: +e.status.period || 0, clock: +e.status.clock || 0 };
   });
@@ -31,24 +33,52 @@ function espnGames(sb) {
 
 // ESPN's players as NBA.com's: by ESPN id (the daily data file has them), else first initial, last name and team
 let espnIndex = null;
-function espnPlayer(a, team) {
+function espnPlayer(a, team, role = '') {
   if (!espnIndex || espnIndex.nba !== NBA) {
     espnIndex = { nba: NBA, ids: new Map(), names: new Map() };
     for (const r of NBA.players) {
       if (r.espn) espnIndex.ids.set(String(r.espn), r);
-      const k = `${nameKey(r.name)}|${r.team}`;
+      const k = `${nameKey(r.name)}|${r.team}|${isHockey() ? hockeyRole(r.pos[0]) : ''}`;
       espnIndex.names.set(k, espnIndex.names.has(k) ? null : r);
     }
   }
-  return espnIndex.ids.get(String(a.id)) || espnIndex.names.get(`${nameKey(a.displayName)}|${team}`) || null;
+  return espnIndex.ids.get(String(a.id)) || espnIndex.names.get(`${nameKey(a.displayName)}|${team}|${role}`) || null;
 }
 
 const madeAtt = v => String(v || '0-0').split('-').map(x => +x || 0);
-// One ESPN box score as the lines the saved box scores give: NBA id -> stats (players who've been on the floor)
-function espnLines(sm) {
+const clockMin = v => { const [m, s] = String(v || '0:00').split(':'); return (+m || 0) + (+s || 0) / 60; };
+
+// ESPN's hockey box score: forwards and defensemen on one list of keys, goalies on another. It has no power-play
+// points or decisions: those, and the wins, come with the next morning's box scores.
+function espnHockeyLines(sm) {
   const out = new Map();
   for (const team of (sm.boxscore && sm.boxscore.players) || []) {
-    const tri = ESPN_TEAMS[team.team.id] || team.team.abbreviation;
+    const tri = espnTri(team.team);
+    for (const st of team.statistics || []) {
+      const i = Object.fromEntries((st.keys || []).map((k, n) => [k, n])), goalies = st.name === 'goalies';
+      for (const a of st.athletes || []) {
+        const v = a.stats || [];
+        const num = k => (k in i ? +v[i[k]] || 0 : 0);
+        const min = clockMin(v[i.timeOnIce]);
+        const raw = !a.didNotPlay && min > 0 ? espnPlayer(a.athlete, tri, goalies ? 'G' : st.name === 'defenses' ? 'D' : 'F') : null;
+        if (!raw) continue;
+        const fow = num('faceoffsWon'), fol = num('faceoffsLost');
+        out.set(raw.id, boxCounts(goalies ? { min, gt: min / 60, ga: num('goalsAgainst'), sa: num('shotsAgainst'), sv: num('saves'), gpim: num('penaltyMinutes') } : {
+          min, g: num('goals'), a: num('assists'), pts: num('goals') + num('assists'), pm: num('plusMinus'), pim: num('penaltyMinutes'),
+          sog: num('shotsTotal'), hit: num('hits'), blk: num('blockedShots'), fow, fol, fot: fow + fol,
+        }));
+      }
+    }
+  }
+  return out;
+}
+
+// One ESPN box score as the lines the saved box scores give: NBA id -> stats (players who've been on the floor)
+function espnLines(sm) {
+  if (isHockey()) return espnHockeyLines(sm);
+  const out = new Map();
+  for (const team of (sm.boxscore && sm.boxscore.players) || []) {
+    const tri = espnTri(team.team);
     const st = (team.statistics || [])[0];
     if (!st) continue;
     const i = Object.fromEntries(st.keys.map((k, n) => [k, n]));
@@ -81,7 +111,7 @@ const liveWanted = () => !document.hidden && (ui.tab === 'dashboard' ? ui.dashRa
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {
   const res = await Promise.allSettled(games.map(async g => {
-    const lines = espnLines(await getJson(`${ESPN_SITE}summary?event=${g.id}`, 'ESPN'));
+    const lines = espnLines(await getJson(`${SPORT.espn}summary?event=${g.id}`, 'ESPN'));
     if (!live.lines.has(g.d)) live.lines.set(g.d, new Map());
     for (const [id, line] of lines) live.lines.get(g.d).set(id, line);
     live.read.set(g.id, { sc: liveScore(g), at: Date.now() });
@@ -99,7 +129,7 @@ async function pollLive() {
   live.busy = true;
   try {
     await loadBoxes().catch(() => null); // to know which finished games are saved already
-    const sb = await getJson(ESPN_SITE + 'scoreboard', 'ESPN');
+    const sb = await getJson(SPORT.espn + 'scoreboard', 'ESPN');
     live.games = espnGames(sb);
     live.day = (sb.day && sb.day.date) || (live.games[0] && live.games[0].d) || live.day;
     await readBoxes(live.games.filter(g => g.state !== 'pre' && !live.done.has(g.id) && !savedFinal(g) && boxDue(g)));
@@ -110,7 +140,7 @@ async function pollLive() {
     for (const d of [...days].filter(d => d !== live.day && !live.done.has(d))) {
       if (![...teamDates].some(([t, ds]) => ds.has(d) && !(BOX && BOX.finals.has(`${d} ${t}`)))) { live.done.add(d); continue; }
       try {
-        const past = espnGames(await getJson(`${ESPN_SITE}scoreboard?dates=${espnDate(d)}`, 'ESPN', undefined, 1));
+        const past = espnGames(await getJson(`${SPORT.espn}scoreboard?dates=${espnDate(d)}`, 'ESPN', undefined, 1));
         if (!(await readBoxes(past.filter(g => g.state === 'post' && !live.done.has(g.id) && !savedFinal(g))))) live.done.add(d);
       } catch (e) { /* try again on the next update */ }
     }
@@ -153,15 +183,18 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { clearTimeout(live.timer); live.timer = null; } else startLive();
 });
 
-// minutes of a game still to be played: 48 before tip-off, less the game clock's progress (none left in overtime)
-const gameMinLeft = g => (!g || g.state === 'pre' ? 48 : g.state === 'post' || g.period > 4 ? 0 : Math.max(0, 48 - (g.period - 1) * 12 - (12 - g.clock / 60)));
+// minutes of a game still to be played: all of them before the start, less the game clock's progress (none left in overtime)
+function gameMinLeft(g) {
+  const { minutes: all, periods: n } = SPORT.game, one = all / n;
+  return !g || g.state === 'pre' ? all : g.state === 'post' || g.period > n ? 0 : Math.max(0, all - (g.period - 1) * one - (one - g.clock / 60));
+}
 const liveGame = (p, d) => live.games.find(g => g.d === d && (g.home === p.team || g.away === p.team)) || null;
 const liveOn = (p, d) => { const g = liveGame(p, d); return !!g && g.state === 'in'; };
 // a game's state for its row: the clock while it's on, Final once it's over
 function liveStatus(p, d) {
   const g = liveGame(p, d);
   if (!g || g.state === 'pre') return '';
-  // ESPN's "4:12 - 3rd" as "Q3 4:12" ("2:00 - OT" as "OT 2:00"); Halftime, End of 3rd and the like as they are
-  const clock = String(g.detail || '').replace(/^([\d:.]+) - (?:(\d)(?:st|nd|rd|th)|(\d*OT))$/, (m, t, q, ot) => `${q ? `Q${q}` : ot} ${t}`);
+  // ESPN's "4:12 - 3rd" as "Q3 4:12" (hockey: "P3 4:12", "2:00 - OT" as "OT 2:00"); Halftime, End of 3rd and the like as they are
+  const clock = String(g.detail || '').replace(/^([\d:.]+) - (?:(\d)(?:st|nd|rd|th)|(\d*OT))$/, (m, t, q, ot) => `${q ? `${SPORT.game.tag}${q}` : ot} ${t}`);
   return g.state === 'in' ? `<span class="lv-dot" aria-hidden="true"></span>${esc(clock)}` : 'Final';
 }

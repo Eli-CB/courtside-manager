@@ -49,7 +49,7 @@ function applyNba(p, raw) {
   p.team = raw.team;
   if (raw.fx && raw.pos && raw.pos.length) p.pos = [...raw.pos]; // your league's eligibility
   const s = nbaStats(raw);
-  for (const k of ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fga', 'fta', 'fgPct', 'ftPct', ...EXTRA_KEYS]) p[k] = s && s[k] != null ? +(+s[k]).toFixed(3) : 0;
+  for (const k of SPORT.playerKeys) p[k] = s && s[k] != null ? +(+s[k]).toFixed(3) : 0;
   p.gp = s ? Math.round(s.gp) : 0;
   p.status = raw.inj ? raw.inj.status : 'Healthy';
   p.inj = raw.inj || null;
@@ -73,22 +73,52 @@ function syncLinked() {
   return before !== JSON.stringify([state.players, state.opp.players]);
 }
 
+// A sport's data file, once a visit (fresh: asked for again). Loading one doesn't put it on screen: a league can be
+// read and matched to its players first (fetchFantraxLeague), and a bad league ID leaves everything as it was.
+const sportFiles = {};
+async function fetchSport(key, fresh = false) {
+  if (!fresh && sportFiles[key]) return sportFiles[key];
+  const r = await fetch(`${SPORTS[key].data}players.json` + (fresh ? '?t=' + Date.now() : ''), { cache: 'no-cache' });
+  if (!r.ok) throw new Error(r.status);
+  const data = await r.json();
+  if (!data || !Array.isArray(data.players)) throw new Error('bad data');
+  for (const raw of data.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
+  if (data.league && data.league.scoringSystem) Object.assign(data.league, fxScoring(data.league.scoringSystem));
+  data.siteLeague = data.league;
+  return (sportFiles[key] = data);
+}
+
+// A data file onto the page: every table the site reads from it
+function useData(data) {
+  NBA = data;
+  nbaById.clear(); nbaByName.clear();
+  for (const raw of NBA.players) { nbaById.set(raw.id, raw); nbaByName.set(normName(raw.name), raw.id); }
+  teamDates = new Map(Object.entries(NBA.teams || {}).map(([t, v]) => [t, new Set(v.dates || [])]));
+  countNames();
+  baseMemo.clear(); // new stats, new baselines
+  BASE = baseNow();
+}
+
+// Change sports: the other sport's data, photos and box scores, and nothing of this one's left in any memo. The
+// page mustn't draw until the league is in place too (ui.hold, switchLeague).
+async function useSport(key) {
+  if (SPORT.key === key && NBA) return;
+  const data = await fetchSport(key); // first: if it can't load, nothing has changed
+  setSport(key);
+  state.sport = key;
+  BOX = null; boxLoad = null; espnIndex = null; nbaCache = null; winsMemo = null; fpBaseCache = null; rankMemo = { key: null };
+  catsMemo = { L: undefined, cats: CATS };
+  clearTimeout(live.timer);
+  Object.assign(live, { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, error: '', timer: null });
+  document.documentElement.style.removeProperty('--hs-sheet');
+  IMG = null; IMG_INDEX.clear();
+  useData(data);
+  loadImages();
+}
+
 async function loadNba(fresh = false) {
   try {
-    const r = await fetch('data/players.json' + (fresh ? '?t=' + Date.now() : ''), { cache: 'no-cache' });
-    if (!r.ok) throw new Error(r.status);
-    const data = await r.json();
-    if (!data || !Array.isArray(data.players)) throw new Error('bad data');
-    NBA = data;
-    nbaById.clear(); nbaByName.clear();
-    for (const raw of NBA.players) { nbaById.set(raw.id, raw); nbaByName.set(normName(raw.name), raw.id); }
-    teamDates = new Map(Object.entries(NBA.teams || {}).map(([t, v]) => [t, new Set(v.dates || [])]));
-    for (const raw of NBA.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
-    countNames();
-    if (NBA.league && NBA.league.scoringSystem) Object.assign(NBA.league, fxScoring(NBA.league.scoringSystem));
-    baseMemo.clear(); // new stats, new baselines
-    BASE = baseNow();
-    NBA.siteLeague = NBA.league;
+    useData(await fetchSport(SPORT.key, fresh));
     // a reload from Fantrax since this morning's file beats the file (the site's own league is on Fantrax)
     const fresher = NBA.league && !state.fxLeagueId && !state.browse ? cachedLeague(NBA.league.id) : null;
     if (fresher) applyFantraxLeague(withSiteExtras(fresher));
@@ -125,9 +155,8 @@ function nbaPlayers() {
     const p = {
       id: 'nba' + raw.id, nbaId: raw.id, name: raw.name, team: raw.team, pos: raw.pos,
       status: raw.inj ? raw.inj.status : 'Healthy', inj: raw.inj || null, next: t ? t.next : null, games: t ? t.left : 0,
-      gp: Math.round(s.gp || 0), min: s.min || 0, pts: s.pts || 0, reb: s.reb || 0, ast: s.ast || 0, stl: s.stl || 0,
-      blk: s.blk || 0, tpm: s.tpm || 0, to: s.to || 0, fga: s.fga || 0, fta: s.fta || 0, fgPct: s.fgPct || 0, ftPct: s.ftPct || 0,
-      ...Object.fromEntries(EXTRA_KEYS.map(k => [k, s[k] || 0])),
+      gp: Math.round(s.gp || 0),
+      ...Object.fromEntries(SPORT.playerKeys.map(k => [k, s[k] || 0])),
     };
     p.val = p.gp ? value(p) : -99;
     return p;
@@ -209,10 +238,6 @@ function fillSlots(cands, slots) {
 /* =========================================================
    Weekly matchup engine
    ========================================================= */
-// Per-game stats we project. The first 11 have spreads from game logs (raw.sd, same order); the rest are
-// for points leagues that score them (dd/td are per-game rates; gp1 is one per game played).
-const COUNT_KEYS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm', 'dd', 'td', 'min', 'gp1'];
-const EXTRA_KEYS = ['oreb', 'dreb', 'tpa', 'pf', 'pm', 'dd', 'td'];
 let teamDates = new Map();
 
 const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -326,7 +351,7 @@ function winWeights() {
     if (c.pct) {
       // a week's % moves by (makes − average % × attempts) ÷ the team's attempts; shot-making noise as in compareCats
       const p = BASE[c.key][0], A = G * ((BASE[c.att] || [0])[0] || 1);
-      w[c.key] = { p, A, sd: Math.sqrt(2 * (1.3 * p * (1 - p) / A + G * G / S * b * b / (A * A))) };
+      w[c.key] = { p, A, sd: Math.sqrt(2 * (pctNoise(c, p) / A + G * G / S * b * b / (A * A))) };
     } else {
       const m = BASE[c.key][0];
       w[c.key] = { sd: Math.sqrt(2 * (G * gameSd(c.key, m) ** 2 + G * G / S * b * b)) };
@@ -342,7 +367,7 @@ function catWins(s) {
   for (const c of scoreCats()) {
     const w = W[c.key];
     if (!w) continue;
-    const d = c.pct ? (get(c.made) - w.p * get(c.att)) / w.A : (c.neg ? -1 : 1) * get(c.key);
+    const d = (c.neg ? -1 : 1) * (c.pct ? (get(c.made) - w.p * get(c.att)) / w.A : get(c.key));
     z[c.key] = 0.4 * d / w.sd;
   }
   return z;
@@ -355,7 +380,8 @@ function waiverValue() {
   return vals.length > n ? vals[n] : 0;
 }
 // How much a stat swings from game to game for a player who averages m
-const gameSd = (k, m) => (k === 'pts' ? 0.3 * m + 2.5
+const gameSd = (k, m) => (isHockey() ? (k === 'pm' ? 1.3 : k === 'min' ? 3 : k === 'gp1' ? 0 : 1.1 * Math.sqrt(Math.max(m, 0.1)))
+  : k === 'pts' ? 0.3 * m + 2.5
   : k === 'dd' || k === 'td' ? Math.sqrt(m * (1 - m)) // happens or not, game to game
   : k === 'pm' ? 9 : k === 'min' ? 4 : k === 'gp1' ? 0
   : 1.1 * Math.sqrt(Math.max(m, 0.1)));
@@ -365,7 +391,7 @@ function perGame(p) {
   const m = Object.fromEntries(COUNT_KEYS.map(k => [k, statVal(p, k)]));
   const raw = p.nbaId ? nbaById.get(p.nbaId) : null;
   const sd = {};
-  COUNT_KEYS.forEach((k, i) => { sd[k] = raw && raw.sd && raw.sd[i] != null ? raw.sd[i] : gameSd(k, m[k]); });
+  COUNT_KEYS.forEach((k, i) => { sd[k] = raw && raw.sd && raw.sd[i] != null ? raw.sd[i] : gameSd(k, m[k]); }); // (raw.sd: COUNT_KEYS' order)
   return { m, sd };
 }
 
@@ -438,6 +464,9 @@ function phi(x) { // standard normal CDF
   return x > 0 ? 1 - p : p;
 }
 
+// How much a percentage swings per attempt, a bit wider than pure chance; a rate (goals against average) like a count
+const pctNoise = (c, x) => (c.rate ? x : 1.3 * x * (1 - x));
+
 // A side's projected fantasy points, and their spread. Stats in one game move together (a big
 // scoring night brings rebounds and assists too), so spreads are combined with a 0.35 correlation.
 const FP_RHO = 0.35;
@@ -460,7 +489,7 @@ function compareCats(A, B) {
       a = A.tot[at] ? A.tot[mk] / A.tot[at] : 0;
       b = B.tot[at] ? B.tot[mk] / B.tot[at] : 0;
       // shot-making noise on the attempts still to come, a bit wider than pure binomial
-      const noise = (S, x) => (S.tot[at] ? 1.3 * x * (1 - x) * (S.left ? S.left[at] : S.tot[at]) / S.tot[at] ** 2 : 0);
+      const noise = (S, x) => (S.tot[at] ? pctNoise(c, x) * (S.left ? S.left[at] : S.tot[at]) / S.tot[at] ** 2 : 0);
       const va = noise(A, a), vb = noise(B, b);
       sd = Math.sqrt(va + vb);
     } else {

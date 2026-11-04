@@ -27,16 +27,17 @@ class Lines(unittest.TestCase):
     def test_skater_line_takes_all_four_reports(self):
         r = self.skater
         self.assertEqual([r[0], r[1]], [10, 'VAN'])
-        self.assertEqual({k: stat(r, k) for k in ('min', 'g', 'a', 'pts', 'pm', 'pim', 'sog', 'hit', 'blk', 'ppg', 'ppa', 'shg', 'sha', 'gwg', 'fow', 'fol')},
-                         {'min': 20.0, 'g': 1, 'a': 2, 'pts': 3, 'pm': -1, 'pim': 2, 'sog': 4, 'hit': 3, 'blk': 1, 'ppg': 1, 'ppa': 1, 'shg': 0, 'sha': 1, 'gwg': 1, 'fow': 9, 'fol': 7})
+        self.assertEqual({k: stat(r, k) for k in ('min', 'g', 'a', 'pts', 'pm', 'pim', 'sog', 'hit', 'blk', 'ppg', 'ppa', 'shg', 'sha', 'gwg', 'fow', 'fol', 'fot')},
+                         {'min': 20.0, 'g': 1, 'a': 2, 'pts': 3, 'pm': -1, 'pim': 2, 'sog': 4, 'hit': 3, 'blk': 1, 'ppg': 1, 'ppa': 1, 'shg': 0, 'sha': 1, 'gwg': 1, 'fow': 9, 'fol': 7, 'fot': 16})
 
     def test_trailing_zeros_are_trimmed_and_come_back(self):
-        self.assertEqual(len(self.skater), 2 + N.LINE_KEYS.index('fol') + 1, 'no goalie columns on a skater')
+        self.assertEqual(len(self.skater), 2 + N.LINE_KEYS.index('fot') + 1, 'no goalie columns on a skater')
         self.assertEqual(len(N.full(self.skater)), len(N.LINE_KEYS))
         self.assertEqual(stat(self.skater, 'sa'), 0)
 
     def test_goalie_line_and_who(self):
-        self.assertEqual({k: stat(self.goalie, k) for k in ('min', 'a', 'gs', 'otl', 'ga', 'sv', 'sa')}, {'min': 65.0, 'a': 1, 'gs': 1, 'otl': 1, 'ga': 3, 'sv': 27, 'sa': 30})
+        self.assertEqual({k: stat(self.goalie, k) for k in ('min', 'gs', 'otl', 'ga', 'sv', 'sa', 'gt', 'ag')}, {'min': 65.0, 'gs': 1, 'otl': 1, 'ga': 3, 'sv': 27, 'sa': 30, 'gt': 1.083, 'ag': 1})
+        self.assertEqual((stat(self.goalie, 'a'), stat(self.goalie, 'pts')), (0, 0), "a goalie's assist isn't a skater's")
         self.assertEqual((self.who[20]['name'], self.who[20]['pos'], self.who[10]['pos']), ('Thatcher Demko', 'G', 'C'))
 
     def test_a_shootout_loss_is_kept_apart_from_an_overtime_loss(self):

@@ -10,12 +10,6 @@ const STORAGE_KEY = 'courtside-manager-v1';
 const THEME_KEY = 'courtside-theme';
 const SCORES_KEY = 'courtside-hide-scores'; // this device hides game scores (no spoilers)
 const CLOCK_KEY = 'courtside-clock'; // '24' or '12': this device's choice of clock; unset = the device's own
-const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
-const SLOT_TYPES = ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'];
-const ELIG = {
-  PG: ['PG'], SG: ['SG'], SF: ['SF'], PF: ['PF'], C: ['C'],
-  G: ['PG', 'SG'], F: ['SF', 'PF'], FLX: POSITIONS,
-};
 const STATUSES = ['Healthy', 'DTD', 'Out'];
 // this deploy's version (the commit), stamped in by the publish workflow; '__BUILD__' when run locally
 const BUILD = '__BUILD__';
@@ -49,39 +43,9 @@ if (typeof window.addEventListener === 'function') {
   });
 }
 
-// The standard 9 categories, in the order most leagues display them (used when a league's own list is unknown).
-// Percentage categories name the makes and attempts they're built from.
-const CATS = [
-  { key: 'fgPct', label: 'FG%', pct: true, made: 'fgm', att: 'fga' },
-  { key: 'ftPct', label: 'FT%', pct: true, made: 'ftm', att: 'fta' },
-  { key: 'tpm', label: '3PM' },
-  { key: 'pts', label: 'PTS' },
-  { key: 'reb', label: 'REB' },
-  { key: 'ast', label: 'AST' },
-  { key: 'stl', label: 'STL' },
-  { key: 'blk', label: 'BLK' },
-  { key: 'to', label: 'TO', neg: true },
-];
-
-// Mean / spread of each stat for an average rostered player, for turning stats into "value" (a z-score sum).
-// BASE comes from the data (baseNow: the league's rostered-player pool, that season's stats); these rough
-// numbers for a standard 12-team league stand in until the NBA data has loaded.
-const BASE_DEFAULT = {
-  pts: [15, 6], reb: [6, 3], ast: [3.8, 2.3], stl: [1.0, 0.4], blk: [0.6, 0.5],
-  tpm: [1.7, 1.0], to: [1.9, 0.9],
-  fgPct: [0.47, 0.9], // impact = (FG% - mean) * FGA
-  ftPct: [0.78, 0.7], // impact = (FT% - mean) * FTA
-};
 let BASE = { ...BASE_DEFAULT };
 
 
-const STAT_FIELDS = [
-  ['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'],
-  ['tpm', '3PM'], ['to', 'TO'], ['fgPct', 'FG%'], ['fga', 'FGA'], ['ftPct', 'FT%'], ['fta', 'FTA'],
-  ['games', 'Games / wk'],
-];
-
-const DEFAULT_SLOTS = ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'];
 // the local app (python serve.py) can re-pull NBA data on demand; the website updates daily on its own
 const LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
@@ -89,7 +53,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 function emptyState() {
   return {
-    version: 2, teamName: 'My Team', basis: 'blend',
+    version: 2, sport: 'nba', teamName: 'My Team', basis: 'blend',
     matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] }, savedLeagues: [], leagueStates: {}, pastSeasons: {},
     slots: [...DEFAULT_SLOTS], benchSize: 5, ilSize: 1, slotsSet: true, lineupMode: 'weekly',
     players: [], lineup: [], il: [],
@@ -118,6 +82,7 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) s = JSON.parse(raw);
   } catch (e) { /* storage unavailable or corrupt */ }
+  setSport(s && s.sport); // the saved league's sport: its positions and slots, and which data set loads
   return normalize(s && Array.isArray(s.players) ? s : emptyState());
 }
 
@@ -147,8 +112,8 @@ function normalize(s) {
 
 function normalizePlayer(p) {
   const out = { id: p.id || uid(), name: String(p.name || 'Unnamed'), team: String(p.team || '').toUpperCase(), pos: Array.isArray(p.pos) ? p.pos.filter(x => POSITIONS.includes(x)) : [], status: STATUSES.includes(p.status) ? p.status : 'Healthy', tag: p.tag || '' };
-  if (!out.pos.length) out.pos = ['SF'];
-  for (const [k] of STAT_FIELDS) out[k] = Number.isFinite(+p[k]) ? +p[k] : 0;
+  if (!out.pos.length) out.pos = [POSITIONS[0]];
+  for (const k of STAT_FIELDS) out[k] = Number.isFinite(+p[k]) ? +p[k] : 0;
   if (!p.games && p.games !== 0) out.games = 3;
   if (p.nbaId) out.nbaId = p.nbaId;
   out.gp = +p.gp || 0;
@@ -163,6 +128,12 @@ function save() {
 
 function restoreFrom(data) {
   if (!data || !Array.isArray(data.players)) throw new Error('bad backup');
+  if ((data.sport || 'nba') !== SPORT.key) { // the other sport's data set: start over from the restored copy
+    state = data;
+    save();
+    location.reload();
+    return;
+  }
   state = normalize(data);
   ui.tradeGive.clear(); ui.tradeGet.clear();
   commit(`Restored ${state.players.length} players`);
@@ -220,7 +191,7 @@ function catZ(p) {
   for (const c of scoreCats()) {
     if (c.fp || !BASE[c.key]) continue;
     const [m, sd] = BASE[c.key];
-    if (c.pct) { const att = statVal(p, c.att); z[c.key] = att ? (pctOf(p, c) - m) * att / sd : 0; } else z[c.key] = (c.neg ? -1 : 1) * (statVal(p, c.key) - m) / sd;
+    if (c.pct) { const att = statVal(p, c.att); z[c.key] = att ? (c.neg ? -1 : 1) * (pctOf(p, c) - m) * att / sd : 0; } else z[c.key] = (c.neg ? -1 : 1) * (statVal(p, c.key) - m) / sd;
   }
   return z;
 }
@@ -230,11 +201,6 @@ const pctOf = (p, c) => { const att = statVal(p, c.att); return att ? statVal(p,
 // Points leagues score fantasy points from the league's own values; category leagues their own categories
 const leaguePoints = () => { const L = fxLeague(); return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
 const isPoints = () => !!leaguePoints();
-const STAT_LABEL = { pts: 'PTS', reb: 'REB', oreb: 'OREB', dreb: 'DREB', ast: 'AST', stl: 'STL', blk: 'BLK', tpm: '3PM', tpa: '3PA', tpmi: '3P miss',
-  fg2m: '2PM', fg2a: '2PA', to: 'TO', fgm: 'FGM', fga: 'FGA', fgmi: 'FG miss', ftm: 'FTM', fta: 'FTA', ftmi: 'FT miss', dd: 'DD', td: 'TD',
-  pf: 'PF', pm: '+/−', min: 'MIN', gp1: 'GP' };
-// stats a league can score that are combinations of ones we project
-const DERIVED = { fgmi: { fga: 1, fgm: -1 }, ftmi: { fta: 1, ftm: -1 }, tpmi: { tpa: 1, tpm: -1 }, fg2m: { fgm: 1, tpm: -1 }, fg2a: { fga: 1, tpa: -1 } };
 function statVal(p, k) {
   if (k === 'fgm') return p.fgPct * p.fga;
   if (k === 'ftm') return p.ftPct * p.fta;
@@ -260,11 +226,8 @@ function fantasyPoints(p, sc = leaguePoints()) {
 }
 
 // The columns a matchup is decided on: the league's categories, or each scored stat plus total fantasy points
-const PCT_CATS = { fgPct: ['FG%', 'fgm', 'fga'], ftPct: ['FT%', 'ftm', 'fta'], tpPct: ['3P%', 'tpm', 'tpa'] };
-const NEG_CATS = new Set(['to', 'pf', 'fgmi', 'ftmi', 'tpmi']); // fewer is better
-const CAT_ORDER = ['fgPct', 'ftPct', 'tpPct', 'tpm', 'tpa', 'pts', 'reb', 'oreb', 'dreb', 'ast', 'stl', 'blk', 'to', 'dd', 'td'];
 function catDef(key) {
-  if (PCT_CATS[key]) { const [label, made, att] = PCT_CATS[key]; return { key, label, pct: true, made, att }; }
+  if (PCT_CATS[key]) { const [label, made, att, more] = PCT_CATS[key]; return { key, label, pct: true, made, att, ...more }; }
   return { key, label: STAT_LABEL[key] || key.toUpperCase(), neg: NEG_CATS.has(key), dec: key === 'dd' || key === 'td' ? 2 : null };
 }
 let catsMemo = { L: undefined, cats: CATS };
@@ -303,13 +266,11 @@ function fpBase() {
 
 // Aggregate per-game totals for a group of players (counting stats summed, % weighted by attempts)
 function totals(list, mult = () => 1) {
-  const t = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tpm: 0, to: 0, fgm: 0, fga: 0, ftm: 0, fta: 0 };
+  const t = Object.fromEntries(COUNT_KEYS.map(k => [k, 0]));
   for (const p of list) {
     const m = mult(p);
-    for (const k of ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fga', 'fta', 'min', ...EXTRA_KEYS]) t[k] = (t[k] || 0) + (p[k] || 0) * m;
-    t.gp1 = (t.gp1 || 0) + m;
-    t.fgm += p.fgPct * p.fga * m;
-    t.ftm += p.ftPct * p.fta * m;
+    for (const k of COUNT_KEYS) t[k] += statVal(p, k) * m;
+    t.gp1 += m - statVal(p, 'gp1') * m;
   }
   for (const k of Object.keys(DERIVED)) t[k] = sum(Object.entries(DERIVED[k]).map(([b, c]) => (t[b] || 0) * c));
   for (const [k, [, made, att]] of Object.entries(PCT_CATS)) t[k] = t[att] ? t[made] / t[att] : 0;
@@ -330,21 +291,25 @@ function stepper(action, what, select, ends = {}) {
   return `<span class="stepper">${btn(-1)}${select}${btn(1)}</span>`;
 }
 
-// ----- Headshots and team logos (data/headshots.webp + data/images.json, built by scripts/build_images.py) -----
+// ----- Headshots and team logos (headshots.webp + images.json in the sport's data folder, built by scripts/build_images.py) -----
 let IMG = null;
 const IMG_INDEX = new Map();
 
 async function loadImages() {
+  const sport = SPORT;
   try {
-    const r = await fetch('data/images.json', { cache: 'no-cache' });
+    const r = await fetch(`${sport.data}images.json`, { cache: 'no-cache' });
     if (!r.ok) return;
-    IMG = await r.json();
+    const got = await r.json();
+    if (sport !== SPORT) return; // the sport changed while this came
+    IMG = got;
+    IMG_INDEX.clear();
     IMG.ids.forEach((id, i) => IMG_INDEX.set(id, i));
     // the sheet's address carries its layout, so a browser never pairs a cached old sheet with a new index (every
     // face shifted after the monthly rebuild)
     let h = 2166136261;
     for (const c of IMG.ids.join()) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
-    IMG.sheet = `data/headshots.webp?v=${h.toString(36)}`; // also drawn into the recap image
+    IMG.sheet = `${sport.data}headshots.webp?v=${h.toString(36)}`; // also drawn into the recap image
     document.documentElement.style.setProperty('--hs-sheet', `url(${IMG.sheet})`);
     cropLogos(IMG.logos);
     render();
@@ -373,18 +338,6 @@ function cropLogos(logos) {
 }
 
 const initials = name => String(name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-
-// Each team's primary and secondary colors, for the ring and background of a player's photo
-const TEAM_COLORS = {
-  ATL: ['#E03A3E', '#C1D32F'], BOS: ['#007A33', '#BA9653'], BKN: ['#000000', '#FFFFFF'], CHA: ['#1D1160', '#00788C'],
-  CHI: ['#CE1141', '#000000'], CLE: ['#860038', '#FDBB30'], DAL: ['#00538C', '#B8C4CA'], DEN: ['#0E2240', '#FEC524'],
-  DET: ['#C8102E', '#1D42BA'], GSW: ['#1D428A', '#FFC72C'], HOU: ['#CE1141', '#000000'], IND: ['#002D62', '#FDBB30'],
-  LAC: ['#12173F', '#C8102E'], LAL: ['#552583', '#FDB927'], MEM: ['#5D76A9', '#12173F'], MIA: ['#98002E', '#F9A01B'],
-  MIL: ['#00471B', '#EEE1C6'], MIN: ['#0C2340', '#78BE20'], NOP: ['#0C2340', '#B4975A'], NYK: ['#006BB6', '#F58426'],
-  OKC: ['#007AC1', '#EF3B24'], ORL: ['#0077C0', '#C4CED4'], PHI: ['#006BB6', '#ED174C'], PHX: ['#1D1160', '#E56020'],
-  POR: ['#E03A3E', '#000000'], SAC: ['#5A2D81', '#63727A'], SAS: ['#000000', '#C4CED4'], TOR: ['#CE1141', '#000000'],
-  UTA: ['#4E008E', '#000000'], WAS: ['#002B5C', '#E31837'],
-};
 
 function headshot(p, px = 28) {
   const i = IMG && p && p.nbaId != null ? IMG_INDEX.get(p.nbaId) : undefined;

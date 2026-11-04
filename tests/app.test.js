@@ -2061,3 +2061,183 @@ test('Send feedback: an email to feedback@leaguelayer.com with the league, page 
   assert.ok(pop.includes('href="mailto:feedback@leaguelayer.com') && pop.includes('data-action="feedback-copy"'));
   assert.ok(pop.includes(L.id), 'the details shown');
 });
+
+// ----- Hockey: a Fantrax league's sport decides what the whole site reads -----
+const HOCKEY = 'hockeyfixture01'; // a real league, cut down, its team names replaced (tests/capture_nhl_fixtures.py): H2H points, weekly lineups
+const quiet = a => { clearTimeout(a.get('live').timer); };
+async function hockeyApp() {
+  const a = loadApp();
+  await a.ready();
+  await a.connectLeague(HOCKEY);
+  a.adoptTeam(a.fxLeague().teams[0].id);
+  a.get('ui').tab = 'standings';
+  quiet(a);
+  return a;
+}
+
+test('a Fantrax league says its sport: reading one changes nothing until it is opened', async () => {
+  const a = loadApp();
+  await a.ready();
+  const { league, idMap } = await a.fetchFantraxLeague(HOCKEY);
+  assert.equal(league.sport, 'nhl');
+  assert.equal(a.get('SPORT').key, 'nba', 'still basketball');
+  assert.equal(a.get('POSITIONS')[0], 'PG');
+  // all rostered players matched, the two Elias Petterssons (a center and a defenseman, one team) to the right one
+  const rostered = Object.values(league.rosters).flat();
+  const missing = rostered.filter(x => !x.nba).map(x => x.name);
+  assert.ok(missing.length <= 1 && missing.every(n => n === 'Caleb Malhotra'), `all but a prospect with no NHL games: ${missing}`); // (he's in no NHL data)
+  const ids = JSON.parse(readFixture('fantrax/nhl/getPlayerIds.json'));
+  const data = JSON.parse(readFixture('nhl/players.json'));
+  const eps = Object.entries(ids).filter(([, v]) => v.name === 'Pettersson, Elias');
+  assert.equal(eps.length, 2);
+  for (const [fid, v] of eps) {
+    const raw = data.players.find(p => p.id === idMap.toNba[fid]);
+    assert.equal(raw.pos[0] === 'D', v.position === 'D', `${v.position} goes to ${raw.pos}`);
+  }
+  assert.equal((await a.fetchFantraxLeague(POINTS)).league.sport, 'nba');
+});
+
+test('hockey scoring: goals and assists count apart for skaters and goalies, and every rule comes from the league', async () => {
+  const a = await hockeyApp();
+  const L = a.fxLeague(), state = a.get('state');
+  assert.equal(a.get('SPORT').key, 'nhl');
+  assert.equal(state.sport, 'nhl');
+  assert.deepEqual({ ...L.points }, { a: 1, ag: 1, blk: 0.1, g: 2, gg: 2, otl: 1, pm: 0.5, so: 3, sog: 0.1, sol: 1, w: 2 });
+  assert.deepEqual([...L.pointsOther], []);
+  assert.equal(+a.lineFp({ g: 1, a: 1, pm: 1, sog: 2, blk: 1 }).toFixed(2), 3.8);
+  assert.equal(a.lineFp({ w: 1, so: 1, ag: 1 }), 6);
+  assert.equal(a.lineFp({ sol: 1 }), 1, 'a shootout loss once: Fantrax scores it apart from an overtime loss');
+  assert.equal(state.slots.join(), 'C,C,C,W,W,W,W,W,W,D,D,D,D,G,G');
+  assert.equal(state.benchSize, 6);
+  assert.equal(state.lineupMode, 'weekly');
+  // "W" on Fantrax plays either wing
+  const w = state.players.find(p => state.lineup.includes(p.id) && a.slotOf(p) === 'W');
+  assert.ok(a.canPlay(w, 'W') && !a.canPlay(w, 'D'));
+  assert.equal(state.lineup.filter(Boolean).length, 15);
+  assert.ok(state.players.every(p => p.pos.every(x => a.get('POSITIONS').includes(x))));
+  // goalies' stats never land in a skater's column
+  const box = JSON.parse(readFixture('nhl/boxscores.json')), keys = box.keys;
+  const row = Object.values(box.games).flatMap(g => g.rows).find(r => r.length > 2 + keys.indexOf('sa'));
+  const line = Object.fromEntries(keys.map((k, i) => [k, row[i + 2] || 0]));
+  assert.ok(line.sa > 0 && !line.g && !line.a && !line.pts);
+});
+
+test('hockey: the tabs it has show real numbers, the ones it does not are gone', async () => {
+  const a = await hockeyApp();
+  await a.loadBoxes();
+  const ui = a.get('ui'), L = a.fxLeague();
+  assert.equal(a.tabList().map(t => t[0]).join(), 'dashboard,week,roster,players,standings');
+  assert.equal(a.hasLineupHistory(L), false);
+  assert.equal(a.freshRecap(), null);
+  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), roster: () => a.viewRoster(), players: () => a.viewPlayers(), standings: () => a.viewStandings() })) {
+    ui.tab = tab;
+    const html = make();
+    quiet(a);
+    assert.ok(html.length > 500, `${tab} draws`);
+    assert.ok(!/undefined|NaN|\[object/.test(html.replace(/<[^>]*>/g, ' ')), `${tab} has only real numbers`);
+  }
+  ui.tab = 'standings';
+  // a week's projection and a win chance from real rosters
+  const ctx = a.weekContext();
+  assert.ok(ctx.oSet.expected > 20 && ctx.oSet.win > 0 && ctx.oSet.win < 1, JSON.stringify(ctx.oSet));
+  // the player card speaks hockey, a goalie his own language
+  const raw = a.get('NBA').players;
+  const goalie = raw.find(p => p.pos.includes('G') && p.cur), skater = raw.find(p => p.pos.includes('C') && p.cur);
+  assert.equal(a.cardStats(goalie).map(c => c[0]).join(), 'GS,MIN,W,L,OTL,SO,GA,SV%,GAA');
+  assert.equal(a.cardStats(skater).map(c => c[0]).slice(0, 4).join(), 'MIN,G,A,PTS');
+  assert.match(a.gameStats(goalie, { sv: 30, sa: 32, ga: 2, w: 1 })[0][0], /30 saves on 32/);
+  assert.equal(a.gameStats(goalie, { sv: 30, sa: 32, ga: 2, w: 1 })[1][0], 'Win');
+  assert.equal(a.gameStats(skater, { g: 1, a: 2, sog: 4, hit: 1, blk: 0, pm: 2, pim: 0 })[1][0], '+2');
+});
+
+test('hockey category leagues: lower is better for goals against, and a rate is not a percentage', async () => {
+  const a = await hockeyApp();
+  const cfg = (code, shortName) => ({ position: { code: 'DEFAULT' }, scoringCategory: { code, shortName }, points: 0 });
+  const ss = { type: 'HEAD_TO_HEAD', scoringCategorySettings: [
+    { group: { code: 'HOCKEY_SKATING' }, configs: [cfg('INDIVIDUAL_ASSISTS', 'A'), cfg('INDIVIDUAL_GOALS', 'G'), cfg('POWER_PLAY_POINTS', 'PPP'), cfg('INDIVIDUAL_SHOTS_ON_GOAL', 'SOG'), cfg('FACEOFF_WIN_PERCENT', 'FO%'), cfg('MADE_UP', 'XYZ')] },
+    { group: { code: 'HOCKEY_GOALIE' }, configs: [cfg('INDIVIDUAL_GOALIE_WINS', 'W'), cfg('GOALS_AGAINST_AVERAGE', 'GAA'), cfg('SAVE_PERCENTAGE', 'SV%')] },
+  ] };
+  const { cats, catsOther } = a.fxCategories(ss, 'nhl');
+  assert.deepEqual([...cats], ['g', 'a', 'sog', 'ppp', 'foPct', 'w', 'gaa', 'svPct'].sort((x, y) => a.get('CAT_ORDER').indexOf(x) - a.get('CAT_ORDER').indexOf(y)));
+  assert.deepEqual([...catsOther], ['XYZ']);
+  const L = a.fxLeague();
+  L.scoring = 'HEAD_TO_HEAD'; L.points = undefined; L.cats = cats;
+  a.set('catsMemo', { L: undefined, cats: [] });
+  const list = a.scoreCats(), gaa = list.find(c => c.key === 'gaa');
+  assert.ok(gaa.pct && gaa.neg && gaa.rate);
+  const side = (ga, gt) => ({ tot: { ga, gt, sv: 300, sa: 300 + ga, ppg: 3, ppa: 4, fow: 10, fot: 20 }, vr: { ga: 3 }, left: { gt: gt / 2, sa: 100 } });
+  const c = a.compareCats(side(10, 5), side(20, 5)).find(x => x.key === 'gaa');
+  assert.equal(c.a, 2);
+  assert.ok(c.p > 0.5, `fewer goals against wins it (${c.p})`);
+  assert.ok(Number.isFinite(c.p));
+  const players = a.get('NBA').players, goalie = players.find(p => p.pos.includes('G') && p.cur);
+  const w = a.catWins({ ...a.nbaStats(goalie) });
+  assert.ok(Object.values(w).every(Number.isFinite), JSON.stringify(w));
+  assert.equal(a.get('PCT_CATS').gaa[3].rate, true);
+  assert.equal(a.pctWords(gaa, 2.5), '2.50');
+});
+
+test('hockey live scores: forwards, defensemen and goalies from ESPN, Vancouver\'s Petterssons kept apart', async () => {
+  const a = await hockeyApp();
+  const D = a.get('NBA').players.find(p => p.name === 'Elias Pettersson' && p.pos.includes('D'));
+  const C = a.get('NBA').players.find(p => p.name === 'Elias Pettersson' && !p.pos.includes('D'));
+  const G = a.get('NBA').players.find(p => p.pos.includes('G') && p.team);
+  const skKeys = ['blockedShots', 'hits', 'plusMinus', 'timeOnIce', 'goals', 'assists', 'shotsTotal', 'faceoffsWon', 'faceoffsLost', 'penaltyMinutes'];
+  const noId = (r, name) => ({ athlete: { id: '1', displayName: name }, stats: r });
+  const sm = { boxscore: { players: [
+    { team: { abbreviation: 'VAN' }, statistics: [
+      { name: 'forwards', keys: skKeys, athletes: [noId(['1', '2', '-1', '18:30', '1', '1', '3', '7', '5', '2'], 'Elias Pettersson')] },
+      { name: 'defenses', keys: skKeys, athletes: [noId(['3', '1', '2', '21:00', '0', '1', '1', '0', '0', '0'], 'Elias Pettersson')] },
+    ] },
+    { team: { abbreviation: G.team }, statistics: [{ name: 'goalies', keys: ['goalsAgainst', 'shotsAgainst', 'saves', 'timeOnIce', 'penaltyMinutes'], athletes: [{ athlete: { id: String(G.espn || 1), displayName: G.name }, stats: ['2', '30', '28', '60:00', '0'] }] }] },
+  ] } };
+  if (C.espn) delete C.espn;
+  if (D.espn) delete D.espn;
+  const lines = a.espnLines(sm);
+  assert.equal(lines.get(C.id).fow, 7);
+  assert.equal(lines.get(C.id).min, 18.5);
+  assert.equal(lines.get(D.id).blk, 3);
+  assert.equal(lines.get(G.id).sv, 28);
+  assert.equal(lines.get(G.id).gt, 1);
+  assert.equal(a.espnTri({ abbreviation: 'TB' }), 'TBL');
+  // a hockey clock: three periods of twenty minutes
+  assert.equal(a.gameMinLeft({ state: 'pre' }), 60);
+  assert.equal(a.gameMinLeft({ state: 'in', period: 2, clock: 600 }), 30);
+  assert.equal(a.gameMinLeft({ state: 'in', period: 4, clock: 100 }), 0);
+});
+
+test('changing sports: each league comes back as it was, and one that does not load changes nothing', async () => {
+  const a = await hockeyApp();
+  const hockeyTeam = a.get('state').fxTeam;
+  await a.switchLeague(CATS9);
+  a.adoptTeam(a.fxLeague().teams[0].id);
+  quiet(a);
+  assert.equal(a.get('SPORT').key, 'nba');
+  assert.equal(a.get('POSITIONS')[0], 'PG');
+  assert.equal(a.get('state').sport, 'nba');
+  assert.equal(a.fxLeague().id, CATS9);
+  assert.equal(a.get('state').slots.length, 8);
+  assert.equal(a.tabList().length, 9);
+  const nbaTeam = a.get('state').fxTeam;
+  await a.switchLeague(HOCKEY);
+  quiet(a);
+  assert.equal(a.get('SPORT').key, 'nhl');
+  assert.equal(a.get('state').fxTeam, hockeyTeam);
+  assert.equal(a.get('state').slots.length, 15);
+  assert.equal(a.get('BOX'), null, "no box scores of the other sport's");
+  await assert.rejects(a.connectLeague('nosuchleague01'), /didn't find that league/);
+  assert.equal(a.get('SPORT').key, 'nhl');
+  assert.equal(a.fxLeague().id, HOCKEY);
+  assert.equal(a.get('ui').hold, false);
+  await a.switchLeague(CATS9);
+  quiet(a);
+  assert.equal(a.get('state').fxTeam, nbaTeam);
+  // a saved hockey league opens as hockey after a refresh
+  const saved = a.get('state');
+  saved.sport = 'nhl';
+  a.localStorage.setItem('courtside-manager-v1', JSON.stringify({ ...saved, slots: ['C', 'W', 'D', 'G'], players: [{ name: 'A Goalie', pos: ['G'] }] }));
+  const s = a.load();
+  assert.equal(a.get('SPORT').key, 'nhl');
+  assert.equal(s.slots.join(), 'C,W,D,G');
+  assert.equal(s.players[0].pos[0], 'G');
+});

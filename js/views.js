@@ -64,7 +64,7 @@ function strengthsCard() {
     // For FG%/FT% that's makes above or below average at the player's volume.
     const ref = league ? mean : (BASE[c.key] || [0])[0];
     const att = c.att;
-    const impact = p => (c.pct ? (pctOf(p, c) - ref) * statVal(p, att) : (c.neg ? -1 : 1) * (statOf(p, c) - ref));
+    const impact = p => (c.neg ? -1 : 1) * (c.pct ? (pctOf(p, c) - ref) * statVal(p, att) : statOf(p, c) - ref);
     const byImpact = mine.map(p => ({ p, d: impact(p) })).sort((a, b) => b.d - a.d);
     const big = c.pct ? 0.1 : Math.max(0.1, ref * 0.1);
     const drivers = byImpact.filter(x => x.d > big).slice(0, 2);
@@ -335,7 +335,7 @@ function dashMatchupCard() {
     const a = column(A), b = column(B);
     const one = (x, right) => (x ? cell(x[0], right, x[1] === 'start', x[1].endsWith('bench') ? BENCH_TAG : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
     const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${one(a[i], false)}${one(b[i], true)}</div>`).join('');
-    const none = rows ? '' : d === today && !D.today ? '<p class="muted small mu-none">No NBA games today.</p>'
+    const none = rows ? '' : d === today && !D.today ? `<p class="muted small mu-none">No ${SPORT.name} games today.</p>`
       : `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>`;
     chipWas = isToday ? chipNext : new Map();
     return card(toggle, `${head}${catTable}<div class="mu-rows">${rows}</div>${none}`);
@@ -517,7 +517,7 @@ function topPerformancesCard() {
   const menu = (action, label, val, opts) => `<select class="pill pill-menu${val ? ' on' : ''}" data-change="${action}" aria-label="${label}"><option value="">${label === 'Position' ? 'All positions' : 'All teams'}</option>${opts.map(x => `<option ${val === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
   const only = (k, l, title) => `<button type="button" class="pill${ui.perfOnly[k] ? ' on' : ''}" data-action="perf-only" data-key="${k}" aria-pressed="${!!ui.perfOnly[k]}" title="${title}">${l}</button>`;
   const find = `<input id="perfQ" class="perf-q" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(ui.perfQ)}" data-input="perf-q" autocomplete="off">
-    <div class="perf-filters" role="group" aria-label="Narrow the list">${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', 'NBA team', ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}</div>`;
+    <div class="perf-filters" role="group" aria-label="Narrow the list">${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', `${SPORT.name} team`, ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}</div>`;
   const filters = find + (!owner.size || !rows.length ? '' : `<div class="perf-filters" role="group" aria-label="Show players">${teams.map(pill).join('')}<span class="pf-sep" aria-hidden="true"></span>${where.map(pill).join('')}</div>`);
   const q = normName(ui.perfQ);
   const picked = rows.filter(r => {
@@ -715,7 +715,6 @@ function viewStandings() {
 // ----- Season totals: what each team's starters actually produced -----
 // Fantrax returns every lineup period's rosters. A player's games count for a team only in periods he
 // was ACTIVE there, using this season's box scores (data/boxscores.json, loaded when Standings opens).
-const BOX_COLS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'];
 let boxLoad = null;
 let BOX = null; // { byPlayer, finals } once data/boxscores.json has loaded
 const seasonTot = {}; // league id -> { state: 'loading' | 'ready' | 'error', teams, msg }
@@ -734,11 +733,11 @@ function boxCounts(st) {
 }
 
 function loadBoxes() {
-  boxLoad = boxLoad || fetch(`data/boxscores.json?v=${encodeURIComponent(NBA.updated || '')}`).then(r => {
+  boxLoad = boxLoad || fetch(`${SPORT.data}boxscores.json?v=${encodeURIComponent(NBA.updated || '')}`).then(r => {
     if (!r.ok) throw new Error(`box scores ${r.status}`);
     return r.json();
   }).then(data => {
-    const unique = new Map();
+    const unique = new Map(), cols = data.keys || SPORT.boxCols;
     for (const [gid, g] of Object.entries(data.games || {})) {
       const key = `${g.d} ${g.home} ${g.away}`;
       if (!unique.has(key) || !gid.startsWith('espn:')) unique.set(key, g);
@@ -751,7 +750,7 @@ function loadBoxes() {
       const s = { home: g.home, away: g.away, hs: g.hs, as: g.as };
       scores.set(`${g.d} ${g.home}`, s).set(`${g.d} ${g.away}`, s);
       for (const row of g.rows) {
-        const st = boxCounts(Object.fromEntries(BOX_COLS.map((k, i) => [k, +row[i + 2] || 0])));
+        const st = boxCounts(Object.fromEntries(cols.map((k, i) => [k, +row[i + 2] || 0])));
         const margin = row[1] === g.home ? g.hs - g.as : g.as - g.hs;
         if (!byPlayer.has(row[0])) byPlayer.set(row[0], []);
         byPlayer.get(row[0]).push([g.d, st, margin, row[1]]);
@@ -1087,6 +1086,28 @@ function valueRanks() {
   return rankMemo;
 }
 
+// The player card's columns: [label, a season's per-game average, a game's number, the games table's label if it's another]
+function cardStats(raw) {
+  const n = k => [k.toUpperCase(), s => fmt(s[k]), o => o[k]];
+  const two = (label, k) => [label, s => fmt(s[k], 2), o => o[k]];
+  if (isGoalie(raw)) {
+    return [['GS', s => fmt(s.gs, 2), o => o.gs], ['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], two('W', 'w'), two('L', 'l'), two('OTL', 'otl'), two('SO', 'so'), ['GA', s => fmt(s.ga, 2), o => o.ga],
+      ['SV%', s => fmtPct(s.sa ? s.sv / s.sa : 0), o => `${o.sv}-${o.sa}`, 'SV'], ['GAA', s => fmt(s.gt ? s.ga / s.gt : 0, 2), o => fmt(o.gt ? o.ga / o.gt : 0, 2)]];
+  }
+  if (isHockey()) {
+    return [['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], two('G', 'g'), two('A', 'a'), two('PTS', 'pts'), ['+/−', s => fmt(s.pm, 2), o => o.pm], two('SOG', 'sog'), two('HIT', 'hit'), two('BLK', 'blk'),
+      two('PIM', 'pim'), ['PPP', s => fmt(s.ppg + s.ppa, 2), o => (o.ppg || 0) + (o.ppa || 0)]];
+  }
+  return [['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], n('pts'), n('reb'), n('ast'), n('stl'), n('blk'), ['3PM', s => fmt(s.tpm), o => o.tpm], n('to'),
+    ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0), o => `${o.fgm}-${o.fga}`, 'FG'], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0), o => `${o.ftm}-${o.fta}`, 'FT']];
+}
+// A game's numbers as words: [the main ones, the ones in gray]
+function gameStats(raw, o) {
+  if (isGoalie(raw)) return [[`${o.sv || 0} saves on ${o.sa || 0}`, `${o.ga || 0} GA`], [o.w ? 'Win' : o.l ? 'Loss' : o.otl ? 'OT loss' : o.sol ? 'Shootout loss' : o.so ? 'Shutout' : ''].filter(Boolean)];
+  if (isHockey()) return [[`${o.g || 0} G`, `${o.a || 0} A`, `${o.sog || 0} SOG`, `${o.hit || 0} HIT`, `${o.blk || 0} BLK`], [`${(o.pm > 0 ? '+' : '') + (o.pm || 0)}`, `${o.pim || 0} PIM`]];
+  return [[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`], [`${o.fgm}-${o.fga} FG`, `${o.ftm}-${o.fta} FT`]];
+}
+
 let cardOpen = null; // the player whose card is showing
 function showPlayerDetail(nbaId) {
   // the season's box scores, the first time a card needs them
@@ -1104,19 +1125,19 @@ function showPlayerDetail(nbaId) {
   const cur = statObj(raw.cur);
   const season = cur && cur.gp ? { per: perGameVal(cur), gp: Math.round(cur.gp) } : null;
   // phones: stats down the side, seasons across
-  const AVG = [['GP', s => Math.round(s.gp)], ['MIN', s => fmt(s.min, 1)], ['PTS', s => fmt(s.pts)], ['REB', s => fmt(s.reb)], ['AST', s => fmt(s.ast)], ['STL', s => fmt(s.stl)], ['BLK', s => fmt(s.blk)], ['3PM', s => fmt(s.tpm)], ['TO', s => fmt(s.to)], ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0)], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0)]];
+  const CS = cardStats(raw), AVG = [['GP', s => Math.round(s.gp)], ...CS];
   const avgNarrow = lines.length ? `<table class="pc-avg show-sm"><thead><tr><th></th>${lines.map(([, short]) => `<th class="num">${esc(short)}</th>`).join('')}</tr></thead>
     <tbody>${AVG.map(([label, f]) => `<tr><td><b>${label}</b></td>${lines.map(([, , st]) => `<td class="num">${f(st)}</td>`).join('')}</tr>`).join('')}
     <tr><td><b>${VAL}</b></td>${lines.map(([, , st]) => valCell(perGameVal(st))).join('')}</tr></tbody></table>` : '';
   const rows = lines.map(([l, , s]) => [l, s])
-    .map(([l, s]) => `<tr><td><b>${l}</b></td><td class="num">${Math.round(s.gp)}</td><td class="num">${fmt(s.min, 1)}</td><td class="num">${fmt(s.pts)}</td><td class="num">${fmt(s.reb)}</td><td class="num">${fmt(s.ast)}</td><td class="num">${fmt(s.stl)}</td><td class="num">${fmt(s.blk)}</td><td class="num">${fmt(s.tpm)}</td><td class="num">${fmt(s.to)}</td><td class="num">${fmtPct(s.fga ? s.fgm / s.fga : 0)}</td><td class="num">${fmtPct(s.fta ? s.ftm / s.fta : 0)}</td>${valCell(perGameVal(s))}</tr>`).join('');
+    .map(([l, s]) => `<tr><td><b>${l}</b></td>${AVG.map(([, f]) => `<td class="num">${f(s)}</td>`).join('')}${valCell(perGameVal(s))}</tr>`).join('');
   const games = cardGames(raw);
   // phones: each game as a short block
   const gamesNarrow = games.length ? `<ul class="pc-games show-sm pc-games-wrap">${games.map(o => { const v = lineValue(o); return `<li>
       <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min · <span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtValue(v)} ${isPoints() ? 'FP' : 'value'}</span></span></div>
-      <div>${[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`].map(x => `<span>${x}</span>`).join(' · ')}</div>
-      <div class="muted">${o.fgm}-${o.fga} FG · ${o.ftm}-${o.fta} FT</div></li>`; }).join('')}</ul>` : '';
-  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td><td class="num">${Math.round(o.min)}</td><td class="num">${o.pts}</td><td class="num">${o.reb}</td><td class="num">${o.ast}</td><td class="num">${o.stl}</td><td class="num">${o.blk}</td><td class="num">${o.tpm}</td><td class="num">${o.to}</td><td class="num">${o.fgm}-${o.fga}</td><td class="num">${o.ftm}-${o.fta}</td>${valCell(lineValue(o))}</tr>`).join('');
+      <div>${gameStats(raw, o)[0].map(x => `<span>${x}</span>`).join(' · ')}</div>
+      <div class="muted">${gameStats(raw, o)[1].join(' · ')}</div></li>`; }).join('')}</ul>` : '';
+  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td>${CS.map(([, , g]) => `<td class="num">${g(o)}</td>`).join('')}${valCell(lineValue(o))}</tr>`).join('');
   $('#detailBody').innerHTML = `
     <div class="detail-head">
       <div class="detail-id">${headshot({ nbaId: raw.id, name: raw.name }, 64)}<div><h2>${esc(raw.name)}</h2><p class="muted" style="margin:2px 0 0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)} · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}</p>${cardOwner(raw)}</div></div>
@@ -1130,14 +1151,14 @@ function showPlayerDetail(nbaId) {
         // his value, and under it his rank among every NBA player this season (per game: regulars only)
         const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
         const rank = (n, of, tip) => `<div class="pc-rank" data-tip="${esc(tip)}">${n ? `#${n} of ${of}` : season ? `ranked with ${R.minGp}+ G` : ''}</div>`;
-        return `<div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div>${rank(per, R.perN, `Among the ${R.perN} NBA players with ${R.minGp}+ games this season, keepers and free agents included (the Draft tab ranks only the league's draft picks)`)}</div>
-      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div>${tot ? rank(tot, R.totN, `Among the ${R.totN} NBA players who've played this season, by ${VAL.toLowerCase()} added up`) : ''}</div>`;
+        return `<div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div>${rank(per, R.perN, `Among the ${R.perN} ${SPORT.name} players with ${R.minGp}+ games this season, keepers and free agents included (the Draft tab ranks only the league's draft picks)`)}</div>
+      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div>${tot ? rank(tot, R.totN, `Among the ${R.totN} ${SPORT.name} players who've played this season, by ${VAL.toLowerCase()} added up`) : ''}</div>`;
       })()}
     </div>
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
-    ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted small">No NBA regular-season stats yet.</p>'}
+    ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th>${AVG.map(([h]) => `<th class="num">${h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted small">No ${SPORT.name} regular-season stats yet.</p>`}
     <h3 class="sub" style="margin-top:16px">Games${games.length ? ` <span class="muted small">${games.length}</span>` : ''}</h3>
-    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG</th><th class="num">FT</th><th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
+    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th>${CS.map(([h, , , gh]) => `<th class="num">${gh || h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   const d = $('#detailDialog');
   cardOpen = nbaId;
   if (!d.open) d.showModal();

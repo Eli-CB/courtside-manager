@@ -31,7 +31,7 @@ function parseLeagueId(text) {
 }
 const BAD_LEAGUE_ID = "That doesn't look like a league ID. Paste your league's address from Fantrax, ESPN or Sleeper, or just its ID.";
 // Weekly lineup history (Season totals, Awards, Recap) is read from Fantrax and Sleeper (past seasons: Fantrax only)
-const hasLineupHistory = L => !!L && ['fantrax', 'sleeper'].includes(L.source || 'fantrax');
+const hasLineupHistory = L => !!L && L.sport !== 'nhl' && ['fantrax', 'sleeper'].includes(L.source || 'fantrax');
 
 // One request to a league site. "Too many requests", server errors and dropped connections are retried
 // after a growing wait (the site's Retry-After when it sends one); anything else fails straight away.
@@ -94,20 +94,22 @@ function keepersOf(league) {
 // same last name, first initial and team. How Fantrax abbreviates teams (GS for GSW, say) is learned
 // from the players that matched exactly. A player two Fantrax entries point to is left unmatched.
 const nameKey = n => { const w = normName(n).split(' '); return w.length > 1 ? `${w[0][0]} ${w.slice(1).join(' ')}` : w[0]; };
-function matchNicknames(ids, names, toNba) {
+// role: what else tells two players apart (hockey: the Elias Petterssons, a center and a defenseman on one team)
+function matchNicknames(ids, names, toNba, D = NBA, role = () => '') {
+  const byId = new Map(D.players.map(r => [r.id, r]));
   const votes = {};
   for (const [fid, id] of Object.entries(toNba)) {
-    const t = ids[fid].team, nt = (nbaById.get(id) || {}).team;
+    const t = ids[fid].team, nt = (byId.get(id) || {}).team;
     if (t && nt) (votes[t] = votes[t] || {})[nt] = (votes[t][nt] || 0) + 1;
   }
   const team = Object.fromEntries(Object.entries(votes).map(([t, v]) => [t, Object.entries(v).sort((a, b) => b[1] - a[1])[0][0]]));
   const taken = new Set(Object.values(toNba));
   const open = new Map();
-  for (const raw of NBA.players) if (!taken.has(raw.id)) { const k = `${nameKey(raw.name)}|${raw.team}`; open.set(k, open.has(k) ? null : raw.id); }
+  for (const raw of D.players) if (!taken.has(raw.id)) { const k = `${nameKey(raw.name)}|${raw.team}|${role(raw.pos[0])}`; open.set(k, open.has(k) ? null : raw.id); }
   const found = {}, claims = {};
   for (const [fid, v] of Object.entries(ids)) {
     if (toNba[fid] || !team[v.team]) continue;
-    const id = open.get(`${nameKey(names[fid])}|${team[v.team]}`);
+    const id = open.get(`${nameKey(names[fid])}|${team[v.team]}|${role(v.position)}`);
     if (id) { found[fid] = id; claims[id] = (claims[id] || 0) + 1; }
   }
   for (const [fid, id] of Object.entries(found)) if (claims[id] === 1) toNba[fid] = id;
@@ -115,9 +117,9 @@ function matchNicknames(ids, names, toNba) {
 
 // A league site's players matched to NBA.com players by name (team breaks ties), then by nickname.
 // ids: { site id: { team } }, names: { site id: "First Last" } -> { site id: NBA id }
-function matchPlayers(ids, names) {
+function matchPlayers(ids, names, D = NBA, role = () => '') {
   const byName = new Map();
-  for (const raw of NBA.players) {
+  for (const raw of D.players) {
     const n = normName(raw.name);
     if (!byName.has(n)) byName.set(n, []);
     byName.get(n).push(raw);
@@ -125,12 +127,23 @@ function matchPlayers(ids, names) {
   const toNba = {};
   for (const [fid, v] of Object.entries(ids)) {
     const hits = byName.get(normName(names[fid])) || [];
-    const hit = hits.length > 1 ? (hits.find(h => h.team === v.team) || hits[0]) : hits[0];
+    const hit = hits.length > 1 ? (hits.find(h => h.team === v.team && role(h.pos[0]) === role(v.position)) || hits.find(h => h.team === v.team) || hits[0]) : hits[0];
     if (hit) toNba[fid] = hit.id;
   }
-  matchNicknames(ids, names, toNba);
+  matchNicknames(ids, names, toNba, D, role);
   return toNba;
 }
+
+// Hockey's last pass, for a first name that shares nothing with the other's ("Benoit-Olivier" and "Bo" Groulx): the
+// only unmatched player of his last name, team and role, on both sides
+function matchLastNames(ids, names, toNba, D, role) {
+  const taken = new Set(Object.values(toNba)), last = n => normName(n).split(' ').pop();
+  const open = new Map(), want = new Map();
+  for (const raw of D.players) if (!taken.has(raw.id)) { const k = `${last(raw.name)}|${raw.team}|${role(raw.pos[0])}`; open.set(k, open.has(k) ? null : raw.id); }
+  for (const [fid, v] of Object.entries(ids)) if (!toNba[fid]) { const k = `${last(names[fid])}|${v.team}|${role(v.position)}`; want.set(k, want.has(k) ? null : fid); }
+  for (const [k, fid] of want) if (fid && open.get(k)) toNba[fid] = open.get(k);
+}
+const hockeyRole = pos => (pos === 'G' || pos === 'D' ? pos : 'F');
 
 // "Last, First" -> "First Last"
 const fxName = n => { const [last, first] = String(n).split(', '); return first ? `${first} ${last}` : String(n); };
@@ -159,13 +172,18 @@ const FX_PTS_CODES = [
   [/TECHNICAL|FLAGRANT|EJECT/, null], [/FOUL/, 'pf'], [/PLUS_MINUS/, 'pm'], [/MINUTE/, 'min'],
   [/GAMES?_PLAYED/, 'gp1'], [/POINTS$/, 'pts'],
 ];
-function fxStatKey(cat) {
+// group: Fantrax's scoring group, which hockey needs (G is a goal for a skater and for a goalie); else one list
+function fxStatKey(cat, group) {
   const short = String(cat.shortName || '').toUpperCase();
-  if (FX_PTS_SHORT[short]) return FX_PTS_SHORT[short];
+  const T = SPORTS.nhl.fxStats[group] || { short: FX_PTS_SHORT, codes: FX_PTS_CODES };
+  if (T.short[short]) return T.short[short];
   const code = String(cat.code || '').toUpperCase();
-  for (const [re, key] of FX_PTS_CODES) if (re.test(code)) return key;
+  for (const [re, key] of T.codes) if (re.test(code)) return key;
   return null;
 }
+const fxGroup = cat => (cat.group && cat.group.code) || '';
+// A league's sport, from its scoring groups (Fantrax doesn't name it)
+const fxSport = info => (((info.scoringSystem || {}).scoringCategorySettings || []).some(c => /^HOCKEY/.test(fxGroup(c))) ? 'nhl' : 'nba');
 
 function fxPointsScoring(ss) {
   if (!ss || !/POINTS/.test(ss.type || '')) return {};
@@ -176,7 +194,7 @@ function fxPointsScoring(ss) {
       const sc = cfg.scoringCategory || {};
       if (cfg.position && cfg.position.code !== 'DEFAULT') { byPosition = true; continue; }
       if (!+cfg.points) continue;
-      const key = fxStatKey(sc);
+      const key = fxStatKey(sc, fxGroup(cat));
       if (key) points[key] = (points[key] || 0) + +cfg.points;
       else other.push(sc.shortName || sc.name || sc.code);
     }
@@ -186,9 +204,9 @@ function fxPointsScoring(ss) {
 }
 
 // Category leagues: which categories count, in display order, plus any the site can't project (like A/TO)
-function fxCategories(ss) {
+function fxCategories(ss, sport = 'nba') {
   if (!ss || /POINTS/.test(ss.type || '')) return {};
-  const keys = new Set(), other = [];
+  const T = SPORTS[sport], keys = new Set(), other = [];
   for (const cat of ss.scoringCategorySettings || []) {
     for (const cfg of cat.configs || []) {
       if (cfg.position && cfg.position.code !== 'DEFAULT') continue;
@@ -196,19 +214,21 @@ function fxCategories(ss) {
       const short = String(sc.shortName || '').toUpperCase(), code = String(sc.code || '').toUpperCase();
       const is = (shorts, re) => shorts.includes(short) || re.test(code);
       // three-point first: its code also says FIELD_GOAL
-      const key = is(['3PT%', '3P%', '3PM%'], /THREE.*(PERCENT|PCT)/) ? 'tpPct'
+      const key = sport === 'nhl' ? (is(['GAA'], /GOALS_AGAINST_AVERAGE/) ? 'gaa' : is(['SV%'], /SAVE.*(PERCENT|PCT)/) ? 'svPct' : is(['FO%'], /FACEOFF.*(PERCENT|PCT)/) ? 'foPct'
+        : /%|\//.test(short) ? null : fxStatKey(sc, fxGroup(cat)))
+        : is(['3PT%', '3P%', '3PM%'], /THREE.*(PERCENT|PCT)/) ? 'tpPct'
         : is(['FG%'], /FIELD_GOAL.*(PERCENT|PCT)/) ? 'fgPct'
         : is(['FT%'], /FREE_THROW.*(PERCENT|PCT)/) ? 'ftPct'
         : /PERCENT|PCT|%|RATIO|\//.test(`${short} ${code}`) ? null : fxStatKey(sc);
-      if (key && (PCT_CATS[key] || STAT_LABEL[key])) keys.add(key);
+      if (key && (T.pctCats[key] || T.statLabel[key])) keys.add(key);
       else other.push(sc.shortName || sc.name || sc.code);
     }
   }
-  return keys.size ? { cats: inCatOrder(keys), catsOther: other } : {};
+  return keys.size ? { cats: inCatOrder(keys, T.catOrder), catsOther: other } : {};
 }
 // Categories in the usual display order (FG%, FT%, 3PM, PTS...), any others after
-const inCatOrder = keys => [...keys].sort((a, b) => (CAT_ORDER.indexOf(a) + 1 || 99) - (CAT_ORDER.indexOf(b) + 1 || 99));
-const fxScoring = ss => ({ ...fxPointsScoring(ss), ...fxCategories(ss) });
+const inCatOrder = (keys, order = CAT_ORDER) => [...keys].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+const fxScoring = (ss, sport = 'nba') => ({ ...fxPointsScoring(ss), ...fxCategories(ss, sport) });
 
 // Typical length in days of a league's lineup lock periods: about 1 for daily lineups, 7 for weekly
 function rosterPeriodDays(periods) {
@@ -217,25 +237,35 @@ function rosterPeriodDays(periods) {
 }
 
 // Fantrax's player list (about 200 KB) and ADP are the same for every league and barely change:
-// fetched at most once a day and kept on this device
+// fetched at most once a day and kept on this device, a list for each sport. The NHL's holds everyone it has ever
+// listed (over 1 MB): only those on a team, with what matching reads, are kept.
 const FX_SHARED_KEY = 'courtside-fantrax-shared-v1';
-let fxShared = null;
-async function fxPlayerLists() {
-  if (!fxShared) { try { fxShared = JSON.parse(localStorage.getItem(FX_SHARED_KEY)); } catch (e) { fxShared = null; } }
-  if (fxShared && Date.now() - fxShared.at < 864e5 && fxShared.ids) return fxShared;
-  const [ids, adp] = await Promise.all([fxGet('getPlayerIds?sport=NBA'), fxGet('getAdp?sport=NBA').catch(() => [])]);
-  fxShared = { at: Date.now(), ids, adp };
-  try { localStorage.setItem(FX_SHARED_KEY, JSON.stringify(fxShared)); } catch (e) { /* storage full or blocked */ }
-  return fxShared;
+const fxSharedKey = sport => (sport === 'nba' ? FX_SHARED_KEY : `${FX_SHARED_KEY}-${sport}`);
+let fxShared = null, fxSharedOther = {};
+async function fxPlayerLists(sport = 'nba') {
+  let kept = sport === 'nba' ? fxShared : fxSharedOther[sport];
+  if (!kept) { try { kept = JSON.parse(localStorage.getItem(fxSharedKey(sport))); } catch (e) { kept = null; } }
+  if (!(kept && Date.now() - kept.at < 864e5 && kept.ids)) {
+    const [all, adp] = await Promise.all([fxGet(`getPlayerIds?sport=${SPORTS[sport].fantrax}`), fxGet(`getAdp?sport=${SPORTS[sport].fantrax}`).catch(() => [])]);
+    const ids = sport === 'nba' ? all : Object.fromEntries(Object.entries(all).filter(([, v]) => v.team && v.team !== '(N/A)')
+      .map(([k, v]) => [k, { name: v.name, team: v.team, position: v.position }]));
+    kept = { at: Date.now(), ids, adp };
+    try { localStorage.setItem(fxSharedKey(sport), JSON.stringify(kept)); } catch (e) { /* storage full or blocked */ }
+  }
+  if (sport === 'nba') fxShared = kept; else fxSharedOther[sport] = kept;
+  return kept;
 }
 
 async function fetchFantraxLeague(id, opts = {}) {
   const q = encodeURIComponent(id);
-  const [{ ids, adp: adpList }, info, rosters, draftFirst, standings] = await Promise.all([
-    fxPlayerLists(), fxGet(`getLeagueInfo?leagueId=${q}`), fxGet(`getTeamRosters?leagueId=${q}`),
+  // the league says its sport, which says whose players to match it to (nothing changes on the page until it's opened)
+  const info = await fxGet(`getLeagueInfo?leagueId=${q}`);
+  if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
+  const sport = fxSport(info), T = SPORTS[sport];
+  const [D, { ids, adp: adpList }, rosters, draftFirst, standings] = await Promise.all([
+    SPORT.key === sport && NBA ? NBA : fetchSport(sport), fxPlayerLists(sport), fxGet(`getTeamRosters?leagueId=${q}`),
     fxGet(`getDraftResults?leagueId=${q}`).catch(() => null), fxGet(`getStandings?leagueId=${q}`).catch(() => []),
   ]);
-  if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
   // the draft can fail with everything else asking at once: once more on its own, a moment later. Still nothing is
   // a failure (draftFailed), not a league without a draft
   const draft = draftFirst || await pause(1500).then(() => fxGet(`getDraftResults?leagueId=${q}`)).catch(() => null);
@@ -246,22 +276,21 @@ async function fetchFantraxLeague(id, opts = {}) {
   const next = nextN && !opts.opening ? await fxGet(`getTeamRosters?leagueId=${q}&period=${nextN}`).catch(() => null) : null;
 
   const names = Object.fromEntries(Object.entries(ids).map(([fid, v]) => [fid, fxName(v.name || '')]));
-  const toNba = matchPlayers(ids, names);
+  const hockey = sport === 'nhl', toNba = matchPlayers(ids, names, D, hockey ? hockeyRole : undefined);
+  if (hockey) matchLastNames(ids, names, toNba, D, hockeyRole);
   const adp = Object.fromEntries((Array.isArray(adpList) ? adpList : []).filter(a => a.id).map(a => [a.id, a.ADP]));
   const fxPlayers = {};
   for (const [fid, pi] of Object.entries(info.playerInfo || {})) {
     const nba = toNba[fid];
     if (!nba) continue;
     const elig = new Set((pi.eligiblePos || '').split(','));
-    // leagues with broad positions list G / F instead of PG,SG / SF,PF
-    if (elig.has('G') && !elig.has('PG') && !elig.has('SG')) { elig.add('PG'); elig.add('SG'); }
-    if (elig.has('F') && !elig.has('SF') && !elig.has('PF')) { elig.add('SF'); elig.add('PF'); }
-    fxPlayers[nba] = { id: fid, st: pi.status || '', pos: POSITIONS.filter(x => elig.has(x)), adp: adp[fid] };
+    for (const [broad, list] of Object.entries(T.broadPos)) if (elig.has(broad) && !list.some(x => elig.has(x))) for (const x of list) elig.add(x);
+    fxPlayers[nba] = { id: fid, st: pi.status || '', pos: T.positions.filter(x => elig.has(x)), adp: adp[fid] };
   }
   const league = {
-    id, source: 'fantrax', name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
+    id, source: 'fantrax', sport, name: info.leagueName || '', scoring: (info.scoringSystem || {}).type || '',
     historyId: info.leagueHistoryId || null, year: info.seasonYear || null,
-    ...fxScoring(info.scoringSystem),
+    ...fxScoring(info.scoringSystem, sport),
     teams: Object.entries(info.teamInfo).map(([k, v]) => ({ id: k, name: v.name || '' })),
     periods: (info.scoringPeriods || []).map(p => ({ n: p.number, start: String(p.startDate).slice(0, 10), end: String(p.endDate).slice(0, 10), lock: String(p.startDate), endAt: String(p.endDate) })),
     lockDays: rosterPeriodDays(info.rosterPeriods || []),
@@ -332,6 +361,8 @@ function slotsFromLeague(league) {
   if (!slots.length || (ri.maxTotalActivePlayers && slots.length !== ri.maxTotalActivePlayers)) return null;
   let bench = ri.maxTotalReservePlayers ?? null;
   let ir = ri.maxTotalPlayers && bench != null ? Math.max(0, ri.maxTotalPlayers - slots.length - bench) : null;
+  // (IR spots can sit outside the limit)
+  if (ir != null) ir = Math.max(ir, ...Object.values(league.rosters || {}).map(r => r.filter(it => it.st === 'INJURED_RESERVE').length));
   if (bench == null && ri.maxTotalPlayers) {
     // no reserve count: the rest of the roster is bench, and IR spots sit outside the limit
     bench = Math.max(0, ri.maxTotalPlayers - slots.length);

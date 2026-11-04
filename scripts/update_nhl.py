@@ -43,15 +43,16 @@ COUNTRY_ISO = {
 }
 POS = {'C': ['C'], 'L': ['LW'], 'R': ['RW'], 'D': ['D'], 'G': ['G']}
 
-# a game's line: min, then what skaters do, then what only goalies do
-LINE_KEYS = ['min', 'g', 'a', 'pts', 'pm', 'pim', 'sog', 'hit', 'blk', 'ppg', 'ppa', 'shg', 'sha', 'gwg', 'fow', 'fol',
-             'gs', 'w', 'l', 'otl', 'sol', 'so', 'ga', 'sv', 'sa']
+# a game's line: min, then what skaters do, then what goalies do: his own goals, assists and penalty minutes have their
+# own columns (leagues score them apart from a skater's), and gt is his hours played, for goals against average
+LINE_KEYS = ['min', 'g', 'a', 'pts', 'pm', 'pim', 'sog', 'hit', 'blk', 'ppg', 'ppa', 'shg', 'sha', 'gwg', 'fow', 'fol', 'fot',
+             'gs', 'w', 'l', 'otl', 'sol', 'so', 'ga', 'sv', 'sa', 'gt', 'gg', 'ag', 'gpim']
 STAT_KEYS = ['gp'] + LINE_KEYS
 LOG_KEYS = ['date', 'matchup', 'wl'] + LINE_KEYS + ['type']
 # per-game standard deviations, for weekly win odds
 SD_KEYS = [k for k in LINE_KEYS if k not in ('min', 'gs')]
 SD_MIN = 10  # a game counts for the spreads from this many minutes (a goalie's mop-up relief can stay out)
-BOX_VERSION = 1
+BOX_VERSION = 2  # goalies' own columns
 
 
 def get_json(url, params=None, tries=3, timeout=40):
@@ -86,15 +87,14 @@ def merge_lines(summary, realtime, faceoffs, goalies):
         line = [round((r.get('timeOnIcePerGame') or 0) / 60, 1), goals, assists, goals + assists, r.get('plusMinus') or 0, r.get('penaltyMinutes') or 0,
                 r.get('shots') or 0, x.get('hits') or 0, x.get('blockedShots') or 0, r.get('ppGoals') or 0, (r.get('ppPoints') or 0) - (r.get('ppGoals') or 0),
                 r.get('shGoals') or 0, (r.get('shPoints') or 0) - (r.get('shGoals') or 0), r.get('gameWinningGoals') or 0,
-                f.get('totalFaceoffWins') or 0, f.get('totalFaceoffLosses') or 0]
+                f.get('totalFaceoffWins') or 0, f.get('totalFaceoffLosses') or 0, (f.get('totalFaceoffWins') or 0) + (f.get('totalFaceoffLosses') or 0)]
         games.setdefault(r['gameId'], []).append([r['playerId'], r['teamAbbrev'], *line])
         who[r['playerId']] = {'name': r.get('skaterFullName') or '', 'pos': r.get('positionCode') or '', 'team': r['teamAbbrev'], 'd': r['gameDate']}
     for r in goalies:
-        goals, assists = r.get('goals') or 0, r.get('assists') or 0
-        line = [round((r.get('timeOnIce') or 0) / 60, 1), goals, assists, goals + assists, 0, r.get('penaltyMinutes') or 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                r.get('gamesStarted') or 0, r.get('wins') or 0, r.get('losses') or 0, r.get('otLosses') or 0, 0, r.get('shutouts') or 0,
-                r.get('goalsAgainst') or 0, r.get('saves') or 0, r.get('shotsAgainst') or 0]
+        line = [round((r.get('timeOnIce') or 0) / 60, 1)] + [0] * 16 + [
+            r.get('gamesStarted') or 0, r.get('wins') or 0, r.get('losses') or 0, r.get('otLosses') or 0, 0, r.get('shutouts') or 0,
+            r.get('goalsAgainst') or 0, r.get('saves') or 0, r.get('shotsAgainst') or 0, round((r.get('timeOnIce') or 0) / 3600, 3),
+            r.get('goals') or 0, r.get('assists') or 0, r.get('penaltyMinutes') or 0]
         games.setdefault(r['gameId'], []).append([r['playerId'], r['teamAbbrev'], *line])
         who[r['playerId']] = {'name': r.get('goalieFullName') or '', 'pos': 'G', 'team': r['teamAbbrev'], 'd': r['gameDate']}
     for rows in games.values():
@@ -249,7 +249,9 @@ def archive(season, season_id):
     path = os.path.join(SEASONS, f'{season}.json')
     if os.path.exists(path):
         with open(path, encoding='utf-8') as f:
-            return json.load(f)['players']
+            saved = json.load(f)
+        if saved.get('statKeys') == STAT_KEYS:
+            return saved['players']
     log(f'- {season}: saving the season')
     games, _ = club_schedules(season_id, teams_list())
     rows, who = season_lines(games[0]['gameDate'], games[-1]['gameDate'])

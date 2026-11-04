@@ -11,7 +11,7 @@ const NOW = Date.parse('2026-10-26T20:00:00-04:00'); // a Monday evening, week 2
 // An element that accepts anything the app does to it
 class El {
   constructor() {
-    this.dataset = {}; this.style = {}; this.hidden = false; this.innerHTML = ''; this.textContent = ''; this.value = ''; this.open = false;
+    this.dataset = {}; this.style = { setProperty() {}, removeProperty() {} }; this.hidden = false; this.innerHTML = ''; this.textContent = ''; this.value = ''; this.open = false;
     this.classList = { add() {}, remove() {}, toggle() {}, contains: () => false };
   }
   addEventListener() {} removeEventListener() {} setAttribute() {} removeAttribute() {} scrollIntoView() {}
@@ -27,14 +27,16 @@ function readFixture(rel) {
 function fakeFetch(url) {
   const u = new URL(String(url), 'http://localhost/');
   let body = null;
-  if (u.pathname.endsWith('/data/players.json')) body = readFixture('players.json');
+  if (u.pathname.includes('/data/nhl/')) body = readFixture('nhl/' + u.pathname.split('/').pop());
+  else if (u.pathname.endsWith('/data/players.json')) body = readFixture('players.json');
   else if (u.pathname.endsWith('/data/boxscores.json')) body = readFixture('boxscores.json');
   else if (u.pathname.includes('/data/seasons/')) body = readFixture('seasons/' + u.pathname.split('/').pop());
   else if (u.hostname === 'www.fantrax.com') {
     const ep = u.pathname.split('/').pop();
     const id = u.searchParams.get('leagueId');
     const period = u.searchParams.get('period');
-    body = id ? readFixture(`fantrax/${id}/${ep}${period ? '-' + period : ''}.json`) : readFixture(`fantrax/${ep}.json`);
+    const sport = u.searchParams.get('sport');
+    body = id ? readFixture(`fantrax/${id}/${ep}${period ? '-' + period : ''}.json`) : readFixture(`fantrax/${sport === 'NHL' ? 'nhl/' : ''}${ep}.json`);
   } else if (u.hostname === 'site.api.espn.com') {
     // live box scores: one saved evening (Oct 28); other days' scoreboards aren't saved, so they answer 404
     const ep = u.pathname.split('/').pop();

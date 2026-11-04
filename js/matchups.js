@@ -151,6 +151,7 @@ const isB2B = (p, d) => playsOn(p, d) && (playsOn(p, addDays(d, -1)) || playsOn(
 // A played game well under his usual minutes, and the likely reason: an injury (he's been on the injury
 // report since that game), a blowout, foul trouble, or unknown. Null for a normal game.
 function shortMinutes(p, line, d) {
+  if (isHockey()) return null; // ice time doesn't swing with blowouts and fouls (or a goalie's by much)
   const usual = p.min || 0;
   if (usual < 20 || line.min > usual * 0.7 || usual - line.min < 8) return null;
   const why = [];
@@ -167,9 +168,8 @@ function shortMinutes(p, line, d) {
 function gameTip(p, line, d, bench) {
   const short = shortMinutes(p, line, d);
   return `<div class="tip-head">${Math.round(line.min)} min${bench ? ' <span class="tip-tag">bench, didn\'t count</span>' : ''}</div>
-    <div>${line.pts} PTS · ${line.reb} REB · ${line.ast} AST</div>
-    <div>${line.stl} STL · ${line.blk} BLK · ${line.tpm} 3PM · ${line.to} TO</div>
-    <div class="tip-dim">${line.fgm}-${line.fga} FG · ${line.ftm}-${line.fta} FT</div>
+    <div>${gameStats(p, line)[0].join(' · ')}</div>
+    <div class="tip-dim">${gameStats(p, line)[1].join(' · ')}</div>
     ${isPoints() ? `<div class="tip-head">${fmt(lineFp(line), 1)} FP</div>` : ''}
     ${short ? `<div class="tip-warn">Usually ${Math.round(p.min)} min: ${esc(short)}</div>` : ''}`;
 }
@@ -232,7 +232,7 @@ function contribZ(p, key, g, week) {
   if (!BASE[key]) return 0;
   if (!week) return catZ(p)[key] || 0;
   const c = scoreCats().find(x => x.key === key) || catDef(key);
-  if (c.pct) { const att = statVal(p, c.att); return att ? (pctOf(p, c) - BASE[key][0]) * att * g / (BASE[key][1] * WEEK_GAMES) : 0; }
+  if (c.pct) { const att = statVal(p, c.att); return att ? (c.neg ? -1 : 1) * (pctOf(p, c) - BASE[key][0]) * att * g / (BASE[key][1] * WEEK_GAMES) : 0; }
   const z = (statVal(p, key) * g - BASE[key][0] * WEEK_GAMES) / (BASE[key][1] * WEEK_GAMES);
   return c.neg ? -z : z;
 }
@@ -312,13 +312,16 @@ function sortStatRows(list, ctx) {
   });
 }
 
+// a percentage in words; a rate (goals against average) as it is
+const pctWords = (c, v) => (c.rate ? v.toFixed(2) : `${(v * 100).toFixed(1)}%`);
+
 // Hover text with the unrounded numbers behind a stat cell
 function statTip(p, c, g, week) {
   const games = `${g} game${g === 1 ? '' : 's'}`;
   if (c.pct) {
     const [m, a] = [statVal(p, c.made), statVal(p, c.att)];
     const k = week ? g : 1;
-    return `${c.label}: ${(pctOf(p, c) * 100).toFixed(1)}% · ${(m * k).toFixed(1)}/${(a * k).toFixed(1)} ${week ? `over ${games}` : 'per game'}`;
+    return `${c.label}: ${pctWords(c, pctOf(p, c))} · ${(m * k).toFixed(1)}/${(a * k).toFixed(1)} ${week ? `over ${games}` : 'per game'}`;
   }
   const v = statOf(p, c);
   return week ? `${c.label}: ${(v * g).toFixed(1)} (${v.toFixed(2)} × ${games})` : `${c.label}: ${v.toFixed(2)} per game`;
@@ -326,7 +329,7 @@ function statTip(p, c, g, week) {
 
 // Projected-week totals, unrounded, with the matching win chance
 function totalTip(c, v, p, who) {
-  const amount = c.pct ? `${(v * 100).toFixed(1)}%` : v.toFixed(1);
+  const amount = c.pct ? pctWords(c, v) : v.toFixed(1);
   return `${c.label}: ${amount} · ${pctTxt(p)} ${who}`;
 }
 
@@ -606,7 +609,7 @@ function weekPicker() {
 
 function viewWeek() {
   if (!NBA) {
-    return `<div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the NBA data file.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the ${SPORT.name} data file.</div></div>`;
   }
   // once the week has started, finished games count their real box scores (loaded on first need)
   if (!BOX && matchDates()[0] <= todayIso()) loadBoxes().then(() => { if (ui.tab === 'week') render(); }).catch(() => {});

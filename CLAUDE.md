@@ -1,6 +1,6 @@
 # League Layer: notes for working on this repo
 
-Fantasy basketball (Fantrax, public ESPN leagues, Sleeper) weekly matchup site. Static GitHub Pages site, no build step, no backend.
+Fantasy basketball (Fantrax, public ESPN leagues, Sleeper) and hockey (Fantrax) weekly matchup site. Static GitHub Pages site, no build step, no backend.
 Live: https://leaguelayer.com (domain on Cloudflare, DNS only, set in the repo's Pages settings; the old
 eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/courtside-manager:
 the site was Courtside Manager until Oct 2026; the repo and every `courtside-*` storage key keep the old name so nobody's
@@ -10,8 +10,11 @@ saved leagues are lost). Owner's league:
 
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
-  scope; they must load in the order index.html lists: core, nba, info, fantrax, espn, sleeper, yahoo, render, history, views,
+  scope; they must load in the order index.html lists: sports, core, nba, info, fantrax, espn, sleeper, yahoo, render, history, views,
   matchups, recap, live, draft, actions. Top-level code may only use things defined in earlier files (no hoisting across files).
+  - sports: `SPORTS` (each sport's positions, slots, stats, categories, team colors, data folder, ESPN feed) and `setSport`, which
+    points the plain names the site reads (`POSITIONS`, `ELIG`, `STAT_LABEL`, `COUNT_KEYS`, `TEAM_COLORS`...) at a sport's tables.
+    "NBA", `nbaId`, `nbaPlayers` and the like mean "the sport's data" (as "fx" names mean "the league's site")
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers (every time of day through `fmtTime`:
     the gear menu's 24-hour toggle, `courtside-clock`, else the device's own clock), headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo)
@@ -89,14 +92,23 @@ saved leagues are lost). Owner's league:
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
-- NHL support, in stages (data so far; the site doesn't read it yet): `scripts/update_nhl.py` (same daily job, its own step,
-  a failure there doesn't stop the NBA data) builds `data/nhl/` laid out like `data/`: `players.json` (+ `sport: 'nhl'`),
-  `boxscores.json` (+ `keys`, `who`, each game's `last`: REG/OT/SO), `headshots.webp` + `images.json`
-  (`build_images.py nhl`), `seasons/<last season>.json` (made once, by the job). From NHL.com's stats API by date range,
+- NHL (Fantrax leagues only; stages 1-2 of 4 done: data, then Dashboard, Matchups, Roster, Players, Standings. Stage 3, goalies:
+  projections count every team game for both goalies, so they run high. Stage 4: Recap, Awards, Draft, Trades (`soonTabs`) and
+  past seasons, `hasLineupHistory` false until then). A Fantrax league's sport comes from its scoring groups (`fxSport`:
+  `HOCKEY_SKATING`, Fantrax doesn't name it). `fetchFantraxLeague` reads a league against that sport's data file
+  (`fetchSport`) without changing the page; `switchLeague` then swaps sports (`useSport`, with `ui.hold` stopping `render` until the
+  league is in place; a league that fails puts the sport back). `state.sport` picks the tables before a saved state is read.
+  `scripts/update_nhl.py` (same daily job, its own step, a failure there doesn't stop the NBA data) builds `data/nhl/` laid out
+  like `data/`: `players.json` (+ `sport: 'nhl'`), `boxscores.json` (+ `keys`, `who`, each game's `last`: REG/OT/SO), `headshots.webp` +
+  `images.json` (`build_images.py nhl`), `seasons/<last season>.json` (made once, by the job). From NHL.com's stats API by date range,
   not box scores, which lack faceoffs, power-play assists and game-winning goals. One stat row fits skaters and goalies
-  (`LINE_KEYS`); box rows drop trailing zeros. Weeks: Monday-Sunday from opening night. Regular season only. Names need
-  team and role: two Sebastian Ahos, and two Elias Petterssons on Vancouver (ESPN's "Elias N."; Fantrax's C vs D). Long-term
-  injured aren't on NHL rosters: ESPN's rosters and injury report put them on a team. Python tests: `tests/test_update_nhl.py`.
+  (`LINE_KEYS`; box rows drop trailing zeros); a goalie's goals, assists and PIM are `gg`, `ag`, `gpim`, as leagues score them
+  apart, and `gt` is his hours played (GAA is a `pct` category with `rate` and `neg`). Shootout losses (`sol`) are apart from
+  overtime losses (`otl`), as on Fantrax. Checked: every team's fantasy points through week 6 of a real league matched Fantrax's
+  `totalPointsFor` within 0.1 (that total includes the week in progress). Weeks: Monday-Sunday from opening night. Regular
+  season only. Names need team and role: two Sebastian Ahos, and two Elias Petterssons on Vancouver (ESPN's "Elias N."; Fantrax's
+  C vs D; `hockeyRole`). Long-term injured aren't on NHL rosters: ESPN's rosters and injury report put them on a team. Tests:
+  `tests/test_update_nhl.py` (Python), the last tests in `app.test.js`; fixtures from `tests/capture_nhl_fixtures.py` (team names replaced).
 - `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
   in page order with fake fetch (fixtures) and a fixed clock (2026-10-26 20:00 ET). Fixtures in
   `tests/fixtures` (refresh: `python tests/capture_fixtures.py`). Every push to main runs them in the site workflow's
