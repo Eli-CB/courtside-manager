@@ -175,9 +175,24 @@ a { color: var(--accent); }
 /* Dashboard: the matchup at full width, then things to act on (side by side when there's room) */
 .dash-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); max-width: 920px; margin: 0 auto; } /* two lineups read best close together */
 .dash-grid > .card + .card { margin-top: 0; }
-.dash-side { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-.dash-side > .card + .card { margin-top: 0; }
-@media (max-width: 900px) { .dash-side { grid-template-columns: minmax(0, 1fr); } }
+/* under the matchup: the recap, waiver wire and injury news, one line each until tapped */
+.dash-folds { display: grid; gap: 8px; }
+.dash-folds:empty { display: none; }
+.dash-folds > .card + .card { margin-top: 0; }
+.dash-folds > .dash-fold { padding: 0; }
+.dash-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 12px 16px; min-height: 48px; border-radius: var(--radius); }
+.dash-fold > summary::-webkit-details-marker { display: none; }
+.dash-fold > summary::after { content: '▸'; margin-left: auto; padding-left: 4px; color: var(--muted); font-size: .85rem; transition: transform .15s; }
+.dash-fold[open] > summary::after { transform: rotate(90deg); }
+.dash-fold > summary:hover { background: var(--surface-2); }
+.dash-fold[open] > summary:hover { border-radius: var(--radius) var(--radius) 0 0; }
+.df-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.df-dot.bad { background: var(--bad); } .df-dot.warn { background: var(--warn); } .df-dot.good { background: var(--good); }
+.df-title { font-weight: 700; white-space: nowrap; }
+.df-sub { color: var(--muted); font-size: .85rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-body { padding: 0 16px 16px; }
+.df-body > p:first-child { margin-top: 0; }
+.df-src { margin: 10px 0 0; }
 /* the Dashboard's matchup: a scoreboard, who leads each category, then both lineups slot by slot (you on the left) */
 .mu-board { margin-bottom: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 10px; }
 .mu-team { min-width: 0; }

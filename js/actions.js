@@ -423,6 +423,14 @@ document.addEventListener('click', e => {
   actions[el.dataset.action](el, e);
 });
 
+// the Dashboard's folds remember which are open, so a redraw (live updates every 30 s) doesn't shut them
+document.addEventListener('toggle', e => {
+  const k = e.target.dataset && e.target.dataset.fold;
+  if (!k) return;
+  ui.dashFolds = ui.dashFolds || new Set();
+  ui.dashFolds[e.target.open ? 'add' : 'delete'](k);
+}, true);
+
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.change === 'fx-view') {

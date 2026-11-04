@@ -29,8 +29,7 @@ function buildAlerts() {
   // the waiver order, where the league's site shares it (ESPN, Sleeper; Fantrax doesn't): this season only
   const W = !ui.season && !seasonCtx && fxLeague() && fxLeague().waivers, mine = W && W.find(w => w.id === state.fxTeam);
   if (mine) a.push({ lvl: '', msg: `You're <b>#${mine.rank}</b> of ${W.length} on waivers${mine.left != null ? `, with $${mine.left} of budget left` : ''}.`, action: 'waiver-order', label: 'See waiver order' });
-  const fresh = freshRecap();
-  if (fresh) a.push({ lvl: 'good', msg: `The <b>week ${fresh.n} recap</b> is in: every result and the week's standouts, ready to share.`, action: 'go-recap', label: 'See it' });
+  // a fresh recap has its own line under the matchup (recapFold)
   return a;
 }
 

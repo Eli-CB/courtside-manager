@@ -1481,7 +1481,8 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.match(app.recapFileName(L, X), /^[a-z0-9-]+-week-1\.png$/);
     // the Dashboard points to it for three days
     assert.equal(app.freshRecap().n, 1);
-    assert.ok(app.buildAlerts().some(a => a.action === 'go-recap'));
+    assert.ok(app.recapFold().includes('data-action="go-recap"') && app.recapFold().includes('Week 1 recap'), 'a line under the matchup');
+    assert.ok(!app.buildAlerts().some(a => a.action === 'go-recap'), 'not also an action item');
   } finally { ui.tab = 'dashboard'; }
   // leagues that don't share past lineups say so
   await app.useLeague(ESPN);

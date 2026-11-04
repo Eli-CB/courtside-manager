@@ -116,17 +116,29 @@ function viewDashboard() {
   return `
   <div class="dash-grid">
     ${NBA ? dashMatchupCard() : ''}
-    ${NBA ? movesCard() : ''}
-    <div class="dash-side">
-      <div class="card">
-        <div class="card-head"><h2>Action items</h2></div>
-        <ul class="alerts">
-          ${buildAlerts().map(x => `<li class="alert ${x.lvl}"><span class="dot"></span><span class="grow">${x.msg}</span>${x.action ? `<button class="btn sm" data-action="${x.action}">${x.label}</button>` : ''}</li>`).join('')}
-        </ul>
-      </div>
-      ${newsCard()}
+    <div class="dash-folds">${recapFold()}${NBA ? movesCard() : ''}${newsCard()}</div>
+    <div class="card">
+      <div class="card-head"><h2>Action items</h2></div>
+      <ul class="alerts">
+        ${buildAlerts().map(x => `<li class="alert ${x.lvl}"><span class="dot"></span><span class="grow">${x.msg}</span>${x.action ? `<button class="btn sm" data-action="${x.action}">${x.label}</button>` : ''}</li>`).join('')}
+      </ul>
     </div>
   </div>`;
+}
+
+// Under the matchup, one line each (the recap, the waiver wire, injury news): the line says what's inside, a tap opens
+// the rest. Open ones stay open when the page is drawn again (live updates) and on coming back to the tab, this visit.
+// dot: 'bad' / 'warn' / 'good' for a colored dot before the title
+function dashFold(key, title, sub, body, dot = '') {
+  const open = ui.dashFolds && ui.dashFolds.has(key);
+  return `<details class="card dash-fold" data-fold="${key}"${open ? ' open' : ''}><summary>${dot ? `<span class="df-dot ${dot}" aria-hidden="true"></span>` : ''}<span class="df-title">${title}</span><span class="df-sub">${sub}</span></summary><div class="df-body">${body}</div></details>`;
+}
+
+// A week that just ended: its recap, for three days
+function recapFold() {
+  const fresh = freshRecap();
+  return fresh ? dashFold('recap', `Week ${fresh.n} recap`, 'is in, ready to share',
+    `<p class="muted small">Player and game of the week, bench regret, the best all-play week and every final, ready to share with the league.</p><button type="button" class="btn sm primary" data-action="go-recap">See the recap</button>`, 'good') : '';
 }
 
 // ----- The Dashboard's matchup: both lineups slot by slot, for today, the last game day or the week so far -----
@@ -547,9 +559,11 @@ function topPerformancesCard() {
 function newsCard() {
   const mine = state.players.filter(p => p.inj);
   mine.sort((a, b) => (b.inj.date || '').localeCompare(a.inj.date || ''));
+  const out = mine.filter(p => p.inj.status === 'Out').length;
   const body = mine.length ? `<ul class="alerts">${mine.slice(0, 6).map(p => `<li class="alert ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${headshot(p, 32)}<span class="grow"><b>${esc(p.name)}</b> <span class="badge ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(p.inj.label)}</span><br><span class="small">${esc(p.inj.note)}</span> <span class="muted small">${p.inj.date ? fmtDay(p.inj.date) : ''}</span></span></li>`).join('')}</ul>`
     : `<p class="muted small" style="margin:0">${NBA ? 'None of your players are on the injury report.' : 'Injury news appears here when live NBA data is available.'}</p>`;
-  return `<div class="card"><div class="card-head"><h2>Injury news</h2><span class="muted small">your players · ESPN</span></div>${body}</div>`;
+  const sub = !NBA ? 'when NBA data is available' : !mine.length ? 'none of your players' : `${mine.length} of your players${out ? ` · ${out} out` : ''}`;
+  return dashFold('news', 'Injury news', sub, `${body}<p class="muted small df-src">Your players · from ESPN</p>`, mine.length ? (out ? 'bad' : 'warn') : '');
 }
 
 // ----- This week's waiver moves: who joined and left each team since last week's rosters -----
@@ -583,8 +597,8 @@ function movesCard() {
     loadRosterWeeks(L).then(w => movesLoad.set(L, w || [])).catch(() => movesLoad.set(L, [])).finally(() => { if (ui.tab === 'dashboard') render(); });
   }
   const weeks = movesLoad.get(L);
-  const head = `<div class="card-head"><h2>Waiver wire · week ${L.rosterPeriod} ${infoBtn('moves')}</h2></div>`;
-  if (!weeks) return `<div class="card">${head}<p class="muted small" style="margin:0">Loading last week's rosters…</p></div>`;
+  const title = `Waiver wire ${infoBtn('moves')}`;
+  if (!weeks) return dashFold('moves', title, 'loading…', `<p class="muted small" style="margin:0">Loading last week's rosters…</p>`);
   const moves = periodMoves(L, weeks);
   if (!moves) return '';
   const me = ui.viewing ? ui.viewA : state.fxTeam;
@@ -595,7 +609,12 @@ function movesCard() {
   const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${esc(fxTeamName(tid))}</div>
       <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
     : '<p class="muted small" style="margin:0">No adds or drops since last week.</p>';
-  return `<div class="card">${head}${body}${at ? `<p class="muted small mv-when">Rosters as of ${fmtTime(at, { weekday: 'short' })} · ↻ Reload in ⚙ for the latest</p>` : ''}</div>`;
+  // the line: how many adds and drops (a trade counts once), and yours
+  const all = Object.values(moves).flat().filter(m => m.kind !== 'away'), n = all.length;
+  const mineM = !ui.viewing && moves[me] ? moves[me] : [], cnt = k => mineM.filter(m => m.kind === k).length;
+  const yours = [cnt('add') && `+${cnt('add')}`, cnt('trade') && `⇄${cnt('trade')}`, cnt('drop') && `−${cnt('drop')}`].filter(Boolean).join(' ');
+  const sub = !n ? 'no adds or drops this week' : `${yours ? `you ${yours} · ` : ''}${n} move${n === 1 ? '' : 's'} this week`;
+  return dashFold('moves', title, sub, `${body}${at ? `<p class="muted small mv-when">Week ${L.rosterPeriod} · rosters as of ${fmtTime(at, { weekday: 'short' })} · ↻ Reload in ⚙ for the latest</p>` : ''}`);
 }
 
 function slotBadge(slot) {
