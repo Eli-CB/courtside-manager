@@ -48,6 +48,23 @@ jobs:
             echo "Skipping images today"
           fi
 
+      # hockey runs apart: if it fails, the basketball data still goes out
+      - name: Pull NHL and ESPN data
+        continue-on-error: true
+        run: python scripts/update_nhl.py
+
+      - name: Rebuild NHL headshots and logos (1st of the month, new players, or when asked)
+        continue-on-error: true
+        run: |
+          missing=$(python -c "import json, os; p={x['id'] for x in json.load(open('data/nhl/players.json', encoding='utf-8'))['players']}; f='data/nhl/images.json'; i=set(json.load(open(f, encoding='utf-8'))['ids']) if os.path.exists(f) else set(); print(len(p - i))")
+          echo "NHL players without a headshot: $missing"
+          if [ "${{ inputs.images }}" = "true" ] || [ "$(date -u +%d)" = "01" ] || [ "$missing" -gt 5 ]; then
+            python -m pip install --quiet pillow
+            python scripts/build_images.py nhl
+          else
+            echo "Skipping NHL images today"
+          fi
+
       - name: Commit updated data
         run: |
           git config user.name "github-actions[bot]"
@@ -56,7 +73,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Data unchanged"
           else
-            git commit -m "Refresh NBA and league data"
+            git commit -m "Refresh NBA, NHL and league data"
             # a code push can land while this job runs: replay the data on top of it and retry
             for i in 1 2 3; do
               git push && exit 0
@@ -75,6 +92,7 @@ jobs:
         with:
           node-version: 22
       - run: node --test tests/app.test.js
+      - run: python3 -m unittest discover -s tests -p "test_*.py"
 
   deploy:
     needs: [refresh, test]

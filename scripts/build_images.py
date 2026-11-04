@@ -7,6 +7,8 @@ sprite instead of hundreds of separate images:
 
 Run after scripts/update_data.py (it reads data/players.json):
   python scripts/build_images.py
+Or for the NHL, after scripts/update_nhl.py (the same files in data/nhl):
+  python scripts/build_images.py nhl
 Needs Pillow (python -m pip install pillow).
 """
 import base64
@@ -21,7 +23,8 @@ import urllib.request
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, 'data')
+NHL = sys.argv[1:] == ['nhl']
+DATA = os.path.join(ROOT, 'data', 'nhl') if NHL else os.path.join(ROOT, 'data')
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
     'Referer': 'https://www.nba.com/',
@@ -39,7 +42,7 @@ def fetch(url):
 
 
 def headshot(pid):
-    raw = fetch(f'https://cdn.nba.com/headshots/nba/latest/260x190/{pid}.png')
+    raw = fetch(f'https://assets.nhle.com/mugs/nhl/latest/{pid}.png' if NHL else f'https://cdn.nba.com/headshots/nba/latest/260x190/{pid}.png')
     if not raw:
         return None
     try:
@@ -74,7 +77,7 @@ def main():
             teams[p['team']] = p['tid']
     logos = {}
     for tri, tid in sorted(teams.items()):
-        svg = fetch(f'https://cdn.nba.com/logos/nba/{tid}/primary/L/logo.svg')
+        svg = fetch(f'https://assets.nhle.com/logos/nhl/svg/{tri}_light.svg' if NHL else f'https://cdn.nba.com/logos/nba/{tid}/primary/L/logo.svg')
         if svg and b'<svg' in svg[:2000]:
             logos[tri] = 'data:image/svg+xml;base64,' + base64.b64encode(svg).decode()
     print(f'logos: {len(logos)}/{len(teams)}')

@@ -16,3 +16,4 @@ jobs:
         with:
           node-version: 22
       - run: node --test tests/app.test.js
+      - run: python3 -m unittest discover -s tests -p "test_*.py"

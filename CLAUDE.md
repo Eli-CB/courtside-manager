@@ -89,6 +89,14 @@ saved leagues are lost). Owner's league:
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
+- NHL support, in stages (data so far; the site doesn't read it yet): `scripts/update_nhl.py` (same daily job, its own step,
+  a failure there doesn't stop the NBA data) builds `data/nhl/` laid out like `data/`: `players.json` (+ `sport: 'nhl'`),
+  `boxscores.json` (+ `keys`, `who`, each game's `last`: REG/OT/SO), `headshots.webp` + `images.json`
+  (`build_images.py nhl`), `seasons/<last season>.json` (made once, by the job). From NHL.com's stats API by date range,
+  not box scores, which lack faceoffs, power-play assists and game-winning goals. One stat row fits skaters and goalies
+  (`LINE_KEYS`); box rows drop trailing zeros. Weeks: Monday-Sunday from opening night. Regular season only. Names need
+  team and role: two Sebastian Ahos, and two Elias Petterssons on Vancouver (ESPN's "Elias N."; Fantrax's C vs D). Long-term
+  injured aren't on NHL rosters: ESPN's rosters and injury report put them on a team. Python tests: `tests/test_update_nhl.py`.
 - `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
   in page order with fake fetch (fixtures) and a fixed clock (2026-10-26 20:00 ET). Fixtures in
   `tests/fixtures` (refresh: `python tests/capture_fixtures.py`). Every push to main runs them in the site workflow's
