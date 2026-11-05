@@ -106,10 +106,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          # the history (no file contents) says when the code last changed
+          fetch-depth: 0
+          filter: blob:none
 
+      # the last commit that changed the code, not the latest: the daily data commits mustn't make every visitor download it again
       - name: Stamp this version on the page's files, so a refresh fetches the new ones
         run: |
-          v="$(git rev-parse --short HEAD)"
+          v="$(git log -1 --format=%h -- index.html styles.css js)"
           sed -i "s/__BUILD__/$v/g" index.html js/*.js
           grep -o "core.js?v=[a-z0-9]*" index.html
 

@@ -165,7 +165,7 @@ saved leagues are lost). Owner's league:
 - Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data.
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
-- `__BUILD__` in index.html and js/core.js is replaced with the commit hash at deploy (cache busting).
+- `__BUILD__` in index.html and js/core.js is replaced at deploy with the hash of the last commit that changed `index.html`, `styles.css` or `js/` (cache busting; not the latest commit: the daily data commits mustn't make visitors download the code again).
 - Errors: on leaguelayer.com, `reportError` (core.js, from window `error` / `unhandledrejection` in our own js files,
   each once a visit, 5 at most) posts to the Worker's `/errors` (KV `ERRORS`, 30 days); the owner reads
   `api.leaguelayer.com/errors?key=<ERRORS_KEY>` (setup in `worker/README.md`). The footer says so, with the not-affiliated line.
