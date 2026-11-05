@@ -7,11 +7,12 @@ Sources (all public, no API key):
     faceoff wins, power-play assists or game-winning goals, which fantasy hockey counts.
   - ESPN: injury report, birth dates and ESPN's player ids (the site matches ESPN's live box scores by them)
 
-Writes data/nhl/players.json and data/nhl/boxscores.json, laid out like the NBA's files, and data/nhl/seasons/<season>.json,
-once, for last season. One stat row fits both kinds of player: a skater's goalie columns are 0 (and goalies score and
-assist too). Regular season only: fantasy hockey seasons end before the NHL's playoffs.
+Writes data/nhl/players.json and data/nhl/boxscores.json, laid out like the NBA's files, and last season's archive,
+data/nhl/seasons/<season>.json and <season>-games.json, once. One stat row fits both kinds of player: a skater's goalie
+columns are 0. Regular season only: fantasy hockey seasons end before the NHL's playoffs.
 
 Run:  python scripts/update_nhl.py
+      python scripts/update_nhl.py --archive 2016-17 2024-25    # save a range of past seasons (once: they don't change)
 """
 import datetime as dt
 import json
@@ -190,6 +191,7 @@ def shootout_losses(rows, last):
         otl, sol = LINE_KEYS.index('otl') + 2, LINE_KEYS.index('sol') + 2
         for r in rows:
             if len(r) > otl and r[otl]:
+                r.extend([0] * (sol + 1 - len(r)))  # (a row can end there: its zeros are trimmed)
                 r[otl], r[sol] = 0, r[otl]
     return rows
 
@@ -248,30 +250,60 @@ def spreads(lines, mom=None):
     return out
 
 
-def archive(season, season_id):
-    """Last season's per-game stats and spreads, saved once: past seasons don't change."""
-    path = os.path.join(SEASONS, f'{season}.json')
-    if os.path.exists(path):
+def season_games(start_year):
+    """A past season's regular-season games, a week of the schedule at a time (some seasons ran off the usual calendar,
+    and some teams of then are gone)."""
+    games, d = {}, f'{start_year}-09-15'
+    while d and d <= f'{start_year + 1}-07-31':
+        data = get_json(WEB + f'schedule/{d}')
+        for day in data.get('gameWeek', []):
+            for g in day.get('games', []):
+                if g.get('gameType') == 2 and g.get('gameState') in ('OFF', 'FINAL'):
+                    games[g['id']] = {**g, 'gameDate': day['date']}
+        d = data.get('nextStartDate')
+    return sorted(games.values(), key=lambda g: (g['gameDate'], g['id']))
+
+
+def archive(season):
+    """A finished season, saved once: data/nhl/seasons/<season>.json (per-game stats and spreads; the daily job reads
+    last season's) and <season>-games.json (every game line, for Awards, Draft and Rosters), as the NBA's archives."""
+    path, games_path = os.path.join(SEASONS, f'{season}.json'), os.path.join(SEASONS, f'{season}-games.json')
+    if os.path.exists(path) and os.path.exists(games_path):
         with open(path, encoding='utf-8') as f:
             saved = json.load(f)
         if saved.get('statKeys') == STAT_KEYS:
             return saved['players']
     log(f'- {season}: saving the season')
-    games, _ = club_schedules(season_id, teams_list())
+    games = season_games(int(season[:4]))
     rows, who = season_lines(games[0]['gameDate'], games[-1]['gameDate'])
     by_game = {g['id']: g for g in games}
-    lines = {}
-    for gid, rs in rows.items():
+    start = dt.date.fromisoformat(games[0]['gameDate'])
+    teams = sorted({r[1] for rs in rows.values() for r in rs})
+    team_ix = {t: i for i, t in enumerate(teams)}
+    lines, game_rows = {}, {}
+    for gid in sorted(rows, key=lambda g: by_game[g]['gameDate'] if g in by_game else ''):
         g = by_game.get(gid)
-        last = ((g or {}).get('gameOutcome') or {}).get('lastPeriodType') or 'REG'
-        for r in shootout_losses(rs, last):
+        if not g:  # not on the schedule as a finished regular-season game
+            continue
+        day = (dt.date.fromisoformat(g['gameDate']) - start).days
+        for r in shootout_losses(rows[gid], (g.get('gameOutcome') or {}).get('lastPeriodType') or 'REG'):
             lines.setdefault(r[0], []).append(full(r))
+            game_rows.setdefault(str(r[0]), []).append([day, team_ix[r[1]], *r[2:]])
     players = {str(pid): {'n': who[pid]['name'], 't': who[pid]['team'], 'p': who[pid]['pos'], 's': average(x), 'g': moments(x)} for pid, x in lines.items()}
     os.makedirs(SEASONS, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump({'season': season, 'statKeys': STAT_KEYS, 'sdKeys': SD_KEYS, 'players': players}, f, separators=(',', ':'), ensure_ascii=False)
-    log(f'  {len(players)} players, {os.path.getsize(path) // 1024} KB')
+    with open(games_path, 'w', encoding='utf-8') as f:
+        json.dump({'season': season, 'v': BOX_VERSION, 'start': games[0]['gameDate'], 'teams': teams, 'keys': LINE_KEYS, 'players': game_rows}, f, separators=(',', ':'))
+    write_index()
+    log(f'  {len(players)} players, {os.path.getsize(path) // 1024} + {os.path.getsize(games_path) // 1024} KB')
     return players
+
+
+def write_index():
+    seasons = sorted(f[:-5] for f in os.listdir(SEASONS) if f.endswith('.json') and f != 'index.json' and not f.endswith('-games.json'))
+    with open(os.path.join(SEASONS, 'index.json'), 'w', encoding='utf-8') as f:
+        json.dump(seasons, f)
 
 
 def role(pos):
@@ -416,7 +448,7 @@ def main():
     cache = box_scores(season, games)
     boxes = cache['games']
     cur, l10, logs, lines = season_from_boxes(boxes)
-    prev = archive(prev_season, f'{start_year - 1}{start_year}')
+    prev = archive(prev_season)
     bio = optional('Player bios (NHL.com)', lambda: bios(season_id), {})
     inj = optional('Injury report (ESPN)', injuries, None)
     espn = optional('Birth dates and ESPN ids (ESPN rosters)', espn_rosters, {})
@@ -494,7 +526,12 @@ if __name__ == '__main__':
     except Exception:
         pass
     try:
-        main()
+        if sys.argv[1:2] == ['--archive']:
+            first, last = int(sys.argv[2][:4]), int(sys.argv[-1][:4])
+            for y in range(first, last + 1):
+                archive(season_str(y))
+        else:
+            main()
     except Exception as e:
         log(f'Update failed: {e}')
         sys.exit(1)

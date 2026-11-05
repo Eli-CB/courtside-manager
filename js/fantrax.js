@@ -31,7 +31,7 @@ function parseLeagueId(text) {
 }
 const BAD_LEAGUE_ID = "That doesn't look like a league ID. Paste your league's address from Fantrax, ESPN or Sleeper, or just its ID.";
 // Weekly lineup history (Season totals, Awards, Recap) is read from Fantrax and Sleeper (past seasons: Fantrax only)
-const hasLineupHistory = L => !!L && L.sport !== 'nhl' && ['fantrax', 'sleeper'].includes(L.source || 'fantrax');
+const hasLineupHistory = L => !!L && ['fantrax', 'sleeper'].includes(L.source || 'fantrax');
 
 // One request to a league site. "Too many requests", server errors and dropped connections are retried
 // after a growing wait (the site's Retry-After when it sends one); anything else fails straight away.
@@ -94,6 +94,8 @@ function keepersOf(league) {
 // same last name, first initial and team. How Fantrax abbreviates teams (GS for GSW, say) is learned
 // from the players that matched exactly. A player two Fantrax entries point to is left unmatched.
 const nameKey = n => { const w = normName(n).split(' '); return w.length > 1 ? `${w[0][0]} ${w.slice(1).join(' ')}` : w[0]; };
+// a player's position from the NHL or NBA, not what a league has made of it
+const homePos = r => (r.basePos || r.pos)[0];
 // role: what else tells two players apart (hockey: the Elias Petterssons, a center and a defenseman on one team)
 function matchNicknames(ids, names, toNba, D = NBA, role = () => '') {
   const byId = new Map(D.players.map(r => [r.id, r]));
@@ -105,7 +107,7 @@ function matchNicknames(ids, names, toNba, D = NBA, role = () => '') {
   const team = Object.fromEntries(Object.entries(votes).map(([t, v]) => [t, Object.entries(v).sort((a, b) => b[1] - a[1])[0][0]]));
   const taken = new Set(Object.values(toNba));
   const open = new Map();
-  for (const raw of D.players) if (!taken.has(raw.id)) { const k = `${nameKey(raw.name)}|${raw.team}|${role(raw.pos[0])}`; open.set(k, open.has(k) ? null : raw.id); }
+  for (const raw of D.players) if (!taken.has(raw.id)) { const k = `${nameKey(raw.name)}|${raw.team}|${role(homePos(raw))}`; open.set(k, open.has(k) ? null : raw.id); }
   const found = {}, claims = {};
   for (const [fid, v] of Object.entries(ids)) {
     if (toNba[fid] || !team[v.team]) continue;
@@ -127,8 +129,18 @@ function matchPlayers(ids, names, D = NBA, role = () => '') {
   const toNba = {};
   for (const [fid, v] of Object.entries(ids)) {
     const hits = byName.get(normName(names[fid])) || [];
-    const hit = hits.length > 1 ? (hits.find(h => h.team === v.team && role(h.pos[0]) === role(v.position)) || hits.find(h => h.team === v.team) || hits[0]) : hits[0];
+    // the same name twice: by team and role, then either (one listed on another team mustn't take the other's id: the Sebastian Ahos)
+    const same = h => role(homePos(h)) === role(v.position);
+    const hit = hits.length > 1 ? (hits.find(h => h.team === v.team && same(h)) || hits.find(h => h.team === v.team) || hits.find(same) || hits[0]) : hits[0];
     if (hit) toNba[fid] = hit.id;
+  }
+  // two entries on one player, the other a namesake with no data here (or the league's site lists him twice): the one on
+  // his team, in his role, keeps him, or the namesake takes his id and position
+  const claims = new Map(), byId = new Map(D.players.map(r => [r.id, r]));
+  for (const [fid, id] of Object.entries(toNba)) claims.set(id, [...(claims.get(id) || []), fid]);
+  for (const [id, fids] of claims) {
+    const raw = byId.get(id), own = fids.filter(f => ids[f].team === raw.team && role(ids[f].position) === role(homePos(raw)));
+    if (fids.length > 1 && own.length === 1) for (const f of fids) if (f !== own[0]) delete toNba[f];
   }
   matchNicknames(ids, names, toNba, D, role);
   return toNba;
@@ -139,7 +151,7 @@ function matchPlayers(ids, names, D = NBA, role = () => '') {
 function matchLastNames(ids, names, toNba, D, role) {
   const taken = new Set(Object.values(toNba)), last = n => normName(n).split(' ').pop();
   const open = new Map(), want = new Map();
-  for (const raw of D.players) if (!taken.has(raw.id)) { const k = `${last(raw.name)}|${raw.team}|${role(raw.pos[0])}`; open.set(k, open.has(k) ? null : raw.id); }
+  for (const raw of D.players) if (!taken.has(raw.id)) { const k = `${last(raw.name)}|${raw.team}|${role(homePos(raw))}`; open.set(k, open.has(k) ? null : raw.id); }
   for (const [fid, v] of Object.entries(ids)) if (!toNba[fid]) { const k = `${last(names[fid])}|${v.team}|${role(v.position)}`; want.set(k, want.has(k) ? null : fid); }
   for (const [k, fid] of want) if (fid && open.get(k)) toNba[fid] = open.get(k);
 }

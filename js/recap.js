@@ -16,9 +16,11 @@ const finishedPeriods = L => (L.periods || []).filter(p => periodOver(p) && ((L.
 function fullLine(s, perGame) {
   const g = perGame ? s.gp1 || 1 : 1, v = (k, d) => fmt(lineStat(s, k) / g, perGame ? 1 : d);
   const parts = [`${v('min', 0)} MIN`];
+  const goalie = isHockey() && !!(s.sa || s.gs); // hockey: a skater's line or a goalie's, not both
   for (const c of scoreCats()) {
-    if (c.fp) continue;
-    if (c.pct) {
+    if (c.fp || (isHockey() && SPORT.goalieCats.includes(c.key) !== goalie)) continue;
+    if (c.rate) parts.push(`${fmt(s[c.att] ? (s[c.made] || 0) / s[c.att] : 0, 2)} ${c.label}`);
+    else if (c.pct) {
       const m = s[c.made] || 0, a = s[c.att] || 0;
       parts.push(`${fmt(m / g, perGame ? 1 : 0)}-${fmt(a / g, perGame ? 1 : 0)} ${c.label.replace('%', '')}${perGame && a ? ` (${fmtPct(m / a)})` : ''}`);
     } else parts.push(`${v(c.key, c.dec || 0)} ${c.label}`);

@@ -51,7 +51,9 @@ const SPORTS = {
     boxCols: ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'],
     espn: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/',
     game: { minutes: 48, periods: 4, tag: 'Q' }, // a game's length and what its periods are called on a live clock
-    soonTabs: [], // tabs this sport doesn't have yet
+    // the stat columns of a table of per-game or season stats (past rosters), then its percentages: [key, label, makes, attempts]
+    tableStats: [['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO']],
+    tablePct: [['fgPct', 'FG%', 'fgm', 'fga'], ['ftPct', 'FT%', 'ftm', 'fta']],
     teamColors: {
       ATL: ['#E03A3E', '#C1D32F'], BOS: ['#007A33', '#BA9653'], BKN: ['#000000', '#FFFFFF'], CHA: ['#1D1160', '#00788C'],
       CHI: ['#CE1141', '#000000'], CLE: ['#860038', '#FDBB30'], DAL: ['#00538C', '#B8C4CA'], DEN: ['#0E2240', '#FEC524'],
@@ -99,11 +101,16 @@ const SPORTS = {
     espn: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/',
     espnTeams: { LA: 'LAK', NJ: 'NJD', SJ: 'SJS', TB: 'TBL' }, // ESPN's codes that aren't the NHL's
     game: { minutes: 60, periods: 3, tag: 'P' },
-    soonTabs: ['recap', 'draft', 'awards', 'trade'],
+    tableStats: [['min', 'MIN'], ['g', 'G'], ['a', 'A'], ['sog', 'SOG'], ['hit', 'HIT'], ['blk', 'BLK'], ['w', 'W'], ['so', 'SO']],
+    tablePct: [['svPct', 'SV%', 'sv', 'sa']],
+    goalieCats: ['gs', 'w', 'l', 'otl', 'sol', 'so', 'ga', 'gaa', 'sv', 'sa', 'svPct'],
     // added to an (i) popup
     infoMore: {
       win: `<p><b>Goalies.</b> A goalie counts by his chance of starting each game: his share of his team's recent starts, much lower the night after he plays (a team's goalie started both games of a back-to-back 7% of the time in 2025-26), lower after any start. Once ESPN names the starter, that's who counts. This week's starts usually come within about one of the guess.</p>`,
       dots: `<p>A goalie's games show his team's schedule: hover a game for his chance of starting it. The number on the right is the starts he's expected to play.</p>`,
+      recap: `<p>Street clothes counts skaters: a healthy backup goalie sits most games, so goalies aren't in it.</p>`,
+      awStreet: `<p>Goalies aren't counted: a healthy backup sits most games.</p>`,
+      pastRoster: `<p>Missed counts skaters: a healthy backup goalie sits most games.</p>`,
     },
     // Fantrax's stats by scoring group (goals and assists are in both): short names first, then its category codes
     fxStats: {

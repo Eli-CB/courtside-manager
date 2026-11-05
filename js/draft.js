@@ -319,7 +319,8 @@ async function connectLeague(input) {
       // one fetch serves either way: as the league, or as the season
       fetched = await fetchFantraxLeague(id, { opening: true }).catch(e => { throw leagueError(id, e); });
       f = { hid: fetched.league.historyId || null, year: fetched.league.year || null };
-      if (fetched.league.sport === 'nhl' && isPastSeason(f)) throw new Error("Past hockey seasons aren't here yet. Connect this season's league.");
+      // a past season opens under its league, on that sport's data
+      if ((fetched.league.sport || 'nba') !== SPORT.key && isPastSeason(f)) throw new Error(`That's a past season of a ${SPORTS[fetched.league.sport || 'nba'].name} league. Connect this season's league first, then add it from the league menu.`);
     }
     if (isPastSeason(f)) {
       const P = await loadSeason(id, fetched).catch(e => { throw leagueError(id, e); });

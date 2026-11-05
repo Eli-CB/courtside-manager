@@ -93,7 +93,6 @@ function countedRows(L, G, w, f, rows) {
 const bestRow = (G, rows) => (rows.length ? [rows.reduce((b, r) => (lineFp(gameLine(G, r)) > lineFp(gameLine(G, b)) ? r : b))] : []);
 
 // This season's box scores in the same shape as a past season's game log, so the awards run on either
-const BOX_KEYS = ['min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'to', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'tpa', 'pf', 'pm'];
 function boxGameLog(B) {
   const dates = [...B.finals].map(x => x.slice(0, 10)).sort();
   const start = dates[0] || todayIso();
@@ -105,9 +104,9 @@ function boxGameLog(B) {
   for (const x of B.finals) days.get(x.slice(11)).add(dayOf(x.slice(0, 10)));
   const players = new Map();
   for (const [pid, games] of B.byPlayer) {
-    players.set(pid, games.filter(g => ix.has(g[3])).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, st, , team]) => [dayOf(d), ix.get(team), ...BOX_KEYS.map(k => st[k] || 0)]));
+    players.set(pid, games.filter(g => ix.has(g[3])).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, st, , team]) => [dayOf(d), ix.get(team), ...B.cols.map(k => st[k] || 0)]));
   }
-  return { start, teams, keys: BOX_KEYS, players, days };
+  return { start, teams, keys: B.cols, players, days };
 }
 
 // A past season's game lines (data/seasons/<season>-games.json), kept as the plain number arrays they
@@ -120,7 +119,7 @@ async function loadGameLog(season) {
     return gameLogs.cur;
   }
   try {
-    const r = await fetch(`data/seasons/${season}-games.json`);
+    const r = await fetch(`${SPORT.data}seasons/${season}-games.json`);
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     const players = new Map(Object.entries(d.players).map(([pid, rows]) => [+pid, rows]));
@@ -137,7 +136,7 @@ async function loadGameLog(season) {
 }
 // one game row as a stat line (for valuing it)
 function gameLine(G, row) {
-  const line = Object.fromEntries(G.keys.map((k, i) => [k, row[i + 2]]));
+  const line = Object.fromEntries(G.keys.map((k, i) => [k, row[i + 2] || 0]));
   const tens = ['pts', 'reb', 'ast', 'stl', 'blk'].filter(k => line[k] >= 10).length;
   return withBonus({ ...line, dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 }); // Sleeper's one-game bonuses, if any
 }
@@ -382,6 +381,7 @@ function startersMissed(L, G) {
       const nba = L.fidNba(f);
       if (!nba) continue;
       const rows = G.players.get(nba) || [];
+      if (isGoalie(nbaById.get(nba))) continue; // a healthy backup sits most games: that's not missing one
       const played = new Set(rows.map(r => r[0]));
       const now = (nbaById.get(nba) || {}).team;
       let n = 0, sched = 0;
@@ -481,13 +481,13 @@ function weekScore(a, b) {
   return { me: lead.filter(x => x > 0).length, opp: lead.filter(x => x < 0).length, ties: lead.filter(x => !x).length, lead };
 }
 
-// ----- Archived seasons: data/seasons/<season>.json, saved once by scripts/archive_season.py -----
+// ----- Archived seasons: seasons/<season>.json in the sport's data folder, saved once (scripts/archive_season.py; update_nhl.py) -----
 const archives = {}; // season -> { keys, players: Map(id -> { n, s }) }, or null when not saved
 const seasonOf = year => `${year}-${String(year + 1).slice(2)}`;
 async function loadArchive(season) {
   if (season in archives) return archives[season];
   try {
-    const r = await fetch(`data/seasons/${season}.json`);
+    const r = await fetch(`${SPORT.data}seasons/${season}.json`);
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     archives[season] = { keys: d.statKeys, players: new Map(Object.entries(d.players).map(([pid, p]) => [+pid, p])) };
@@ -512,7 +512,9 @@ function matchInactive(league, A) {
   }
   const find = name => {
     const pid = byName.get(normName(name)) || byKey.get(nameKey(name));
-    if (pid && !nbaById.has(pid)) nbaById.set(pid, { id: pid, name: A.players.get(pid).n, team: '', pos: [...POSITIONS], inactive: true });
+    // (hockey's archive has his position: a skater mustn't pass for a goalie)
+    const was = isHockey() && A.players.get(pid);
+    if (pid && !nbaById.has(pid)) nbaById.set(pid, { id: pid, name: A.players.get(pid).n, team: '', pos: was ? ({ L: ['LW'], R: ['RW'] }[was.p] || [was.p]) : [...POSITIONS], inactive: true });
     return pid || null;
   };
   for (const pick of (league.draft && league.draft.picks) || []) if (!pick[3] && pick[4]) pick[3] = find(pick[4]);
@@ -578,7 +580,7 @@ function activeStints(L, G, tid) {
         for (const [key, val] of Object.entries(line)) P.s[key] = (P.s[key] || 0) + val;
       }
       const now = (nbaById.get(nba) || {}).team;
-      for (const day of wd) {
+      if (!isGoalie(nbaById.get(nba))) for (const day of wd) {
         const team = teamOn(G, rows, day) || now;
         if (!played.has(day) && team && G.days.has(team) && G.days.get(team).has(day)) P.missed++;
       }
@@ -615,15 +617,15 @@ function viewPastRosters() {
   <p class="page-sub">${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''}${graded ? ` · ${seasonCtx.label} per-game stats ${infoBtn('value')}` : ''}</p>
   <div class="card">
     ${rows.length ? `<div class="table-wrap"><table>
-      <thead><tr><th>Player</th><th>Slot</th>${graded ? '<th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">3PM</th><th class="num">TO</th><th class="num">FG%</th><th class="num">FT%</th><th class="num">Value</th>' : ''}</tr></thead>
+      <thead><tr><th>Player</th><th>Slot</th>${graded ? `<th class="num">GP</th>${[...SPORT.tableStats, ...SPORT.tablePct].map(x => `<th class="num">${x[1]}</th>`).join('')}<th class="num">Value</th>` : ''}</tr></thead>
       <tbody>${rows.map(x => `<tr>
         <td class="player"><div class="bplayer">${headshot({ nbaId: x.raw ? x.raw.id : null, name: x.name }, 28)}<div class="bmain"><div class="bname">${x.raw ? `<button class="link-btn pname" data-action="player-detail" data-nba="${x.raw.id}">${esc(x.name)}</button>` : esc(x.name)}</div></div></div></td>
         <td>${slotBadge(slotOfItem(x.it))}</td>
-        ${graded ? `<td class="num">${x.gp || '—'}</td>${x.s ? statCells(x.s) : '<td class="num muted" colspan="11">No NBA stats that season</td>'}` : ''}
+        ${graded ? `<td class="num">${x.gp || '—'}</td>${x.s ? statCells(x.s) : `<td class="num muted" colspan="${SPORT.tableStats.length + SPORT.tablePct.length + 1}">No ${SPORT.name} stats that season</td>`}` : ''}
       </tr>`).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No roster</strong>Fantrax didn't return a roster for this team.</div>`}
   </div>
-  ${graded ? '' : `<p class="small muted">No NBA stats are saved for this season (the site has 2016-17 on), so players show without stats.</p>`}`;
+  ${graded ? '' : `<p class="small muted">No ${SPORT.name} stats are saved for this season (the site has 2016-17 on), so players show without stats.</p>`}`;
 }
 
 function pastStarters(L, G, tid, r, teams) {
@@ -632,9 +634,10 @@ function pastStarters(L, G, tid, r, teams) {
   const per = (P, k) => (total ? P.s[k] || 0 : P.gp ? (P.s[k] || 0) / P.gp : 0);
   // any column sorts, following the Totals / Per game choice
   const so = ui.pastRosterSort;
+  const PCTS = SPORT.tablePct;
   const sortVal = P => (so.key === 'name' ? P.name.toLowerCase() : so.key === 'how' ? ['keeper', 'start', 'pickup', 'trade'].indexOf(P.how)
     : so.key === 'weeks' || so.key === 'gp' || so.key === 'missed' ? P[so.key]
-    : so.key === 'fgPct' ? (P.s.fga ? P.s.fgm / P.s.fga : -1) : so.key === 'ftPct' ? (P.s.fta ? P.s.ftm / P.s.fta : -1)
+    : PCTS.some(x => x[0] === so.key) ? (([, , m, a]) => (P.s[a] ? P.s[m] / P.s[a] : -1))(PCTS.find(x => x[0] === so.key))
     : so.key === 'value' ? (total ? P.v : P.gp ? P.v / P.gp : -1e9) : per(P, so.key));
   const list = [...activeStints(L, G, tid).values()].sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? 1 : x > y ? -1 : 0) * so.dir; });
   const th = (key, label, cls = 'num', tip = '') => sortTh('past-roster-sort', key, label, so, { cls, tip, down: so.dir > 0 });
@@ -642,12 +645,12 @@ function pastStarters(L, G, tid, r, teams) {
   const pct = (P, m, a) => (P.s[a] ? fmtPct(P.s[m] / P.s[a]) : '—');
   const val = P => (!P.gp ? '—' : isPoints() ? fmt(total ? P.v : P.v / P.gp, total ? 0 : 1) : signed(total ? P.v : P.v / P.gp, total ? 1 : 2));
   const seg = `<div class="seg seg-sm" role="group" aria-label="Show stats as">${[['total', 'Totals'], ['game', 'Per game']].map(([k, l]) => `<button type="button" class="${ui.pastRosterMode === k ? 'on' : ''}" data-action="past-roster-mode" data-mode="${k}" aria-pressed="${ui.pastRosterMode === k}">${l}</button>`).join('')}</div>`;
-  const STATS = [['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO']];
+  const STATS = SPORT.tableStats;
   return `
   <div class="page-sub-row">${seg}<p class="page-sub">${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''} · everyone who started, and what he did while starting ${infoBtn('pastRoster')}</p></div>
   <div class="card">
     ${list.length ? `<div class="table-wrap"><table>
-      <thead><tr>${th('name', 'Player', '')}${th('how', 'How', '')}${th('weeks', 'Wks', 'num', 'Weeks in the starting lineup')}${th('gp', 'GP', 'num', 'Games played while starting')}${th('missed', 'Missed', 'num', 'Games his NBA team played without him while he was starting')}${STATS.map(([k, l]) => th(k, l)).join('')}${th('fgPct', 'FG%')}${th('ftPct', 'FT%')}${th('value', isPoints() ? (total ? 'FP' : 'FP/G') : 'Value')}</tr></thead>
+      <thead><tr>${th('name', 'Player', '')}${th('how', 'How', '')}${th('weeks', 'Wks', 'num', 'Weeks in the starting lineup')}${th('gp', 'GP', 'num', 'Games played while starting')}${th('missed', 'Missed', 'num', `Games his ${SPORT.name} team played without him while he was starting`)}${STATS.map(([k, l]) => th(k, l)).join('')}${PCTS.map(([k, l]) => th(k, l)).join('')}${th('value', isPoints() ? (total ? 'FP' : 'FP/G') : 'Value')}</tr></thead>
       <tbody>${list.map(P => {
         const raw = nbaById.get(P.nba);
         const [label, cls] = how[P.how];
@@ -656,7 +659,7 @@ function pastStarters(L, G, tid, r, teams) {
         <td><span class="badge ${cls}">${label}</span></td>
         <td class="num">${P.weeks}</td><td class="num"><b>${P.gp}</b></td><td class="num ${P.missed ? 'pos-bad' : 'muted'}">${P.missed}</td>
         ${STATS.map(([k]) => `<td class="num">${num(P, k)}</td>`).join('')}
-        <td class="num">${pct(P, 'fgm', 'fga')}</td><td class="num">${pct(P, 'ftm', 'fta')}</td><td class="num"><b>${val(P)}</b></td>
+        ${PCTS.map(([, , m, a]) => `<td class="num">${pct(P, m, a)}</td>`).join('')}<td class="num"><b>${val(P)}</b></td>
       </tr>`;
       }).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No starters</strong>Fantrax's weekly rosters show nobody starting for this team.</div>`}
@@ -711,7 +714,7 @@ function fanDetail(T) {
   const top = F.teams[0];
   return `<p class="aw-break-total"><b>${Math.round(top.share * 100)}%</b> of ${F.n} starts were ${esc(top.team)} players</p>
     <ul class="aw-break">${F.teams.slice(0, 5).map(x => `<li><div class="bplayer">${teamLogo(x.team, 24)}<div class="bmain"><b>${esc(x.team)}</b><div class="muted small">${x.players.slice(0, 3).map(p => esc(p.name)).join(', ')}${x.players.length > 3 ? ` +${x.players.length - 3}` : ''}</div></div></div><b class="aw-break-v">${Math.round(x.share * 100)}%</b></li>`).join('')}</ul>
-    <p class="muted small">A start is a player in the starting lineup for a week, counted for the NBA team he played for that week.</p>`;
+    <p class="muted small">A start is a player in the starting lineup for a week, counted for the ${SPORT.name} team he played for that week.</p>`;
 }
 const pickRows = list => awardRows(list, p => signed(p.gain, 0), p => `Rd ${p.round}, pick ${p.pick} · ranked ${ordinal(p.rank)}`);
 function stealDetail(T) {
@@ -752,11 +755,11 @@ function streetDetail(T, txt) {
   if (isOneGame()) {
     return `<p class="aw-break-total"><b>${esc(txt)}</b> by ${T.missedN} starter${T.missedN === 1 ? '' : 's'}. ${T.missedN > 10 ? 'The 10 with the most:' : ''}</p>
     ${awardRows(ps, p => `${p.games} wk${p.games === 1 ? '' : 's'}`, p => `started ${p.sched} wk${p.sched === 1 ? '' : 's'}`)}
-    <p class="muted small">Weeks he was in the starting lineup without playing a game while his NBA team did (out of his weeks starting).</p>`;
+    <p class="muted small">Weeks he was in the starting lineup without playing a game while his ${SPORT.name} team did (out of his weeks starting).</p>`;
   }
   return `<p class="aw-break-total"><b>${esc(txt)}</b> missed by ${T.missedN} starter${T.missedN === 1 ? '' : 's'}. ${T.missedN > 10 ? 'The 10 who missed most:' : ''}</p>
     ${awardRows(ps, p => `${p.games} G`, p => `out ${p.games} of ${p.sched} · ${p.weeks} wk${p.weeks === 1 ? '' : 's'}`)}
-    <p class="muted small">Games his NBA team played without him in weeks he was in the starting lineup (out of his team's games those weeks · weeks he missed any).</p>`;
+    <p class="muted small">Games his ${SPORT.name} team played without him in weeks he was in the starting lineup (out of his team's games those weeks · weeks he missed any).</p>`;
 }
 function uncDetail(T, txt) {
   const ps = [...(T.ageList || [])].sort((a, b) => b.moved - a.moved).slice(0, 10);
@@ -899,7 +902,7 @@ function viewAwardsSoFar() {
 
 function viewAwards() {
   if (seasonCtx && !seasonCtx.basis) {
-    return `<div class="card"><div class="empty"><strong>No awards for this season</strong>No NBA stats are saved for this season (the site has 2016-17 on), and every award needs that season's numbers.</div></div>`;
+    return `<div class="card"><div class="empty"><strong>No awards for this season</strong>No ${SPORT.name} stats are saved for this season (the site has 2016-17 on), and every award needs that season's numbers.</div></div>`;
   }
   // the season's game log (about 350 KB) loads the first time Awards opens
   const L = fxLeague();
@@ -910,7 +913,7 @@ function viewAwards() {
   const me = myTeamId();
   const awards = seasonAwards();
   awardDetails.clear();
-  if (!awards) return `<div class="card"><div class="empty"><strong>No awards for this season</strong>Awards need Fantrax's weekly lineups and that season's NBA game logs (the site has 2016-17 on).</div></div>`;
+  if (!awards) return `<div class="card"><div class="empty"><strong>No awards for this season</strong>Awards need Fantrax's weekly lineups and that season's ${SPORT.name} game logs (the site has 2016-17 on).</div></div>`;
   // awards with a breakdown: each team's name opens what made its number (written now, in this season's context)
   const name = (a, x, place) => {
     if (!a.detail) return esc(x.T.name);

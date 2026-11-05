@@ -653,9 +653,8 @@ function headerRow(cols, sortState, scope) {
 }
 
 function statCells(p) {
-  return `<td class="num">${fmt(p.min, 0)}</td><td class="num">${fmt(p.pts)}</td><td class="num">${fmt(p.reb)}</td><td class="num">${fmt(p.ast)}</td>
-    <td class="num">${fmt(p.stl)}</td><td class="num">${fmt(p.blk)}</td><td class="num">${fmt(p.tpm)}</td><td class="num">${fmt(p.to)}</td>
-    <td class="num">${fmtPct(p.fgPct)}</td><td class="num">${fmtPct(p.ftPct)}</td><td class="num"><b>${fmtValue(value(p))}</b></td>`;
+  return `${SPORT.tableStats.map(([k], i) => `<td class="num">${fmt(p[k] || 0, i ? 1 : 0)}</td>`).join('')}
+    ${SPORT.tablePct.map(([, , m, a]) => `<td class="num">${fmtPct(p[a] ? statVal(p, m) / p[a] : 0)}</td>`).join('')}<td class="num"><b>${fmtValue(value(p))}</b></td>`;
 }
 
 // The roster as a team profile: minutes, then whatever the league scores, each cell shaded by how
@@ -740,7 +739,7 @@ function loadBoxes() {
     if (!r.ok) throw new Error(`box scores ${r.status}`);
     return r.json();
   }).then(data => {
-    const unique = new Map(), cols = data.keys || SPORT.boxCols;
+    const unique = new Map(), cols = data.keys || SPORT.boxCols; // (a box row's columns, as boxGameLog reads them too)
     for (const [gid, g] of Object.entries(data.games || {})) {
       const key = `${g.d} ${g.home} ${g.away}`;
       if (!unique.has(key) || !gid.startsWith('espn:')) unique.set(key, g);
@@ -759,7 +758,7 @@ function loadBoxes() {
         byPlayer.get(row[0]).push([g.d, st, margin, row[1]]);
       }
     }
-    BOX = { byPlayer, finals, scores, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };
+    BOX = { cols, byPlayer, finals, scores, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };
     return BOX;
   }).catch(e => { boxLoad = null; throw e; });
   return boxLoad;
@@ -803,9 +802,9 @@ function seasonTotalsCard(L, standings) {
     if (!L.weeks) return note("Fantrax didn't return this season's weekly rosters.");
     if (!L.season || !(L.season in gameLogs)) {
       if (L.season) loadGameLog(L.season).then(() => { if (ui.tab === 'standings' && ui.season) render(); });
-      return L.season ? note('Loading the season’s games…') : note('No NBA game logs are saved for this season.');
+      return L.season ? note('Loading the season’s games…') : note(`No ${SPORT.name} game logs are saved for this season.`);
     }
-    if (!gameLogs[L.season]) return note('No NBA game logs are saved for this season (the site has 2016-17 on).');
+    if (!gameLogs[L.season]) return note(`No ${SPORT.name} game logs are saved for this season (the site has 2016-17 on).`);
     teams = pastSeasonTotals(L, gameLogs[L.season]);
   } else if (!hasLineupHistory(L)) {
     return note(`Season totals need every day's lineups, which the site reads from Fantrax and Sleeper only for now, not ${sourceName(L)}.`);
@@ -883,7 +882,7 @@ function viewTrade() {
     const before = totals(active);
     const after = totals([...active.filter(p => !ui.tradeGive.has(p.id)), ...get]);
     // over a waiver player: each player in a deal takes a roster spot someone off waivers could fill
-    const wv = waiverValue(), over = p => value(p) - wv;
+    const wv = waiverValue(), over = p => gameWorth(p) - wv; // (a goalie for his share of his team's games, as the waiver player's)
     const vGive = sum(give.map(over)), vGet = sum(get.map(over));
     const diff = vGet - vGive;
     const tradeCats = scoreCats();

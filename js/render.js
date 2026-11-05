@@ -48,7 +48,7 @@ function leagueMenu() {
   const P = pastSeason();
   // the current league's seasons, under it (Fantrax leagues: the others don't share past seasons)
   let seasons = '';
-  if (!state.demo && (L.source || 'fantrax') === 'fantrax' && L.sport !== 'nhl') {
+  if (!state.demo && (L.source || 'fantrax') === 'fantrax') {
     const past = seasonsFor(L);
     const rows = past.length ? [{ id: '', year: L.year }, ...past] : [];
     seasons = rows.map(x => {
@@ -81,7 +81,7 @@ function leagueMenu() {
 const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const TABS_BROWSE = [['players', 'Players']]; // browsing without a league
-const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
+const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW);
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
 let seasonCtx = null; // set while a past season renders: { basis, label }

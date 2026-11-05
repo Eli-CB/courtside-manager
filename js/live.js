@@ -41,7 +41,7 @@ function espnPlayer(a, team, role = '') {
     espnIndex = { nba: NBA, ids: new Map(), names: new Map() };
     for (const r of NBA.players) {
       if (r.espn) espnIndex.ids.set(String(r.espn), r);
-      const k = `${nameKey(r.name)}|${r.team}|${isHockey() ? hockeyRole(r.pos[0]) : ''}`;
+      const k = `${nameKey(r.name)}|${r.team}|${isHockey() ? hockeyRole(homePos(r)) : ''}`;
       espnIndex.names.set(k, espnIndex.names.has(k) ? null : r);
     }
   }

@@ -2095,6 +2095,16 @@ test('a Fantrax league says its sport: reading one changes nothing until it is o
     assert.equal(raw.pos[0] === 'D', v.position === 'D', `${v.position} goes to ${raw.pos}`);
   }
   assert.equal((await a.fetchFantraxLeague(POINTS)).league.sport, 'nba');
+  // the same name twice, one listed on another team than the NHL's: each still goes to the player of his role
+  const D = { players: [{ id: 1, name: 'Sebastian Aho', team: 'CAR', pos: ['C'] }, { id: 2, name: 'Sebastian Aho', team: 'PIT', pos: ['D'] }] };
+  const m = a.matchPlayers({ c: { team: 'CAR', position: 'C' }, d: { team: 'NYI', position: 'D' } }, { c: 'Sebastian Aho', d: 'Sebastian Aho' }, D, a.hockeyRole);
+  assert.equal(m.c, 1);
+  assert.equal(m.d, 2);
+  // a namesake with no NHL data of his own leaves the player he shares a name with alone
+  const one = { players: [D.players[0]] };
+  const n = a.matchPlayers({ d: { team: 'PIT', position: 'D' }, c: { team: 'CAR', position: 'C' } }, { c: 'Sebastian Aho', d: 'Sebastian Aho' }, one, a.hockeyRole);
+  assert.equal(n.c, 1);
+  assert.equal(n.d, undefined);
 });
 
 test('hockey scoring: goals and assists count apart for skaters and goalies, and every rule comes from the league', async () => {
@@ -2122,13 +2132,12 @@ test('hockey scoring: goals and assists count apart for skaters and goalies, and
   assert.ok(line.sa > 0 && !line.g && !line.a && !line.pts);
 });
 
-test('hockey: the tabs it has show real numbers, the ones it does not are gone', async () => {
+test('hockey: every tab shows real numbers, the player card speaks hockey', async () => {
   const a = await hockeyApp();
   await a.loadBoxes();
   const ui = a.get('ui'), L = a.fxLeague();
-  assert.equal(a.tabList().map(t => t[0]).join(), 'dashboard,week,roster,players,standings');
-  assert.equal(a.hasLineupHistory(L), false);
-  assert.equal(a.freshRecap(), null);
+  assert.equal(a.tabList().length, 9);
+  assert.equal(a.hasLineupHistory(L), true);
   for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), roster: () => a.viewRoster(), players: () => a.viewPlayers(), standings: () => a.viewStandings() })) {
     ui.tab = tab;
     const html = make();
@@ -2310,4 +2319,71 @@ test('goalies project by their starts: a team of two does not count two goalies 
   // a league's value baselines hold a league's goalies, not every goalie who's played
   const base = a.computeBase(a.get('NBA').players.map(r => { const s = a.nbaStats(r, 'blend'); return s && { ...s, sample: s.gp }; }), 252);
   assert.ok(base.w[0] > 0 && base.w[0] < 0.2, `wins per pool player: ${base.w[0]}`);
+});
+
+test('hockey history: weeks, recaps and awards run on its box scores, and a healthy backup never missed a game', async () => {
+  const a = await hockeyApp();
+  const L = a.fxLeague(), ui = a.get('ui');
+  const [weeks, G] = await Promise.all([a.loadRosterWeeks(L), a.loadGameLog('cur')]);
+  quiet(a);
+  assert.ok(weeks.length >= 4, `${weeks.length} weeks`);
+  assert.ok(G.keys.includes('sv') && G.keys.includes('gg'), "the game log has hockey's columns");
+  const line = a.gameLine(G, [...G.players.values()][0][0]);
+  assert.ok(line.gp1 === 1 && Object.values(line).every(Number.isFinite), 'a trimmed row reads as zeros');
+  // week by week the two teams add up from their starters
+  const LL = { ...L, weeks, fidNba: a.currentFidNba() };
+  const period = L.periods.find(p => p.n === 3), pair = L.matchups['3'][0];
+  const R = a.benchSwaps(LL, G, weeks, period, pair);
+  assert.equal(R.length, 2);
+  assert.ok(a.lineFp(R[0].tot) > 10 && a.lineFp(R[1].tot) > 10);
+  // Street Clothes: skaters who sat, no goalies
+  const missed = Object.values(a.startersMissed(LL, G)).flat();
+  assert.ok(missed.length > 0, 'skaters miss games');
+  assert.ok(!missed.some(x => a.isGoalie(a.nbaById.get(x.nba))), 'no goalie is in it');
+  // a recap line is a skater's or a goalie's, not both
+  assert.ok(!/ W|SOG/.test(a.fullLine({ min: 60, sa: 30, sv: 28, ga: 2, gs: 1, w: 1 }).join(' ').replace(/ W\b/, '')), 'a goalie has no shots');
+  assert.match(a.fullLine({ min: 60, sa: 30, sv: 28, ga: 2, gs: 1, w: 1 }).join(' '), /1 W/);
+  assert.ok(!a.fullLine({ min: 20, g: 1, a: 1, sog: 3 }).join(' ').includes(' W'), 'a skater has no wins');
+  // the tabs that were basketball's
+  await a.loadBoxes();
+  for (const [tab, make] of Object.entries({ recap: () => a.viewRecap(), awards: () => a.viewAwards(), draft: () => a.viewDraft(), trade: () => a.viewTrade() })) {
+    ui.tab = tab;
+    const html = make();
+    await new Promise(r => setTimeout(r, 30));
+    const again = make();
+    quiet(a);
+    assert.ok(!/undefined|NaN|\[object/.test(again.replace(/<[^>]*>/g, ' ')), `${tab} has only real numbers`);
+    assert.ok(html.length && again.length > 100, tab);
+  }
+  ui.tab = 'standings';
+});
+
+test('hockey trades and waivers weigh a goalie by the games he plays; past seasons stay with their sport', async () => {
+  const a = await hockeyApp();
+  const players = a.get('NBA').players, backup = players.find(p => p.pos.includes('G') && p.st > 0 && p.st < 0.5 && p.cur);
+  const P = a.playerFromRaw(backup);
+  assert.ok(a.gameWorth(P) < a.value(P));
+  assert.equal(a.gameWorth(P).toFixed(4), (a.value(P) * backup.st).toFixed(4));
+  const skater = a.playerFromRaw(players.find(p => p.pos.includes('C') && p.cur));
+  assert.equal(a.gameWorth(skater), a.value(skater));
+  // a retired player from a past season's archive plays his own position, not every one
+  const A = { players: new Map([[99, { n: 'Old Goalie', p: 'G' }], [98, { n: 'Old Winger', p: 'L' }]]) };
+  const find = a.matchInactive({ rosters: {} }, A);
+  assert.equal(a.nbaById.get(find('Old Goalie')).pos[0], 'G');
+  assert.equal(a.nbaById.get(find('Old Winger')).pos[0], 'LW');
+  assert.equal(a.isGoalie(a.nbaById.get(find('Old Winger'))), false);
+  // table columns follow the sport
+  assert.equal(a.get('SPORT').tableStats.map(x => x[1]).slice(1, 3).join(), 'G,A');
+  assert.ok(a.statCells({ min: 20, g: 0.5, a: 0.5, sog: 3, hit: 1, blk: 1, sv: 0, sa: 0 }).includes('0.5'));
+});
+
+test("a season's memos don't cross sports", async () => {
+  const a = await hockeyApp();
+  a.get('gameLogs')['2025-26'] = { made: 'up' };
+  a.get('archives')['2025-26'] = { made: 'up' };
+  await a.switchLeague(CATS9);
+  quiet(a);
+  assert.equal(a.get('gameLogs')['2025-26'], undefined);
+  assert.equal(a.get('archives')['2025-26'], undefined);
+  assert.equal(a.get('SPORT').tableStats.map(x => x[1]).slice(1, 3).join(), 'PTS,REB');
 });

@@ -38,6 +38,7 @@ def main(lid):
     now = get(f'getTeamRosters?leagueId={lid}&period={PERIOD}')
     nxt = get(f'getTeamRosters?leagueId={lid}&period={PERIOD + 1}')
     opening = get(f'getTeamRosters?leagueId={lid}&period=1')
+    weeks = {n: get(f'getTeamRosters?leagueId={lid}&period={n}') for n in range(2, PERIOD)}
     standings = get(f'getStandings?leagueId={lid}')
     draft = get(f'getDraftResults?leagueId={lid}')
     ids = get('getPlayerIds?sport=NHL')
@@ -55,11 +56,11 @@ def main(lid):
     info['leagueName'] = 'Hockey Fixture League'
     for r in standings:
         r['teamName'] = teams[r['teamId']]
-    for R in (now, nxt, opening):
+    for R in (now, nxt, opening, *weeks.values()):
         for tid, r in R['rosters'].items():
             r['teamName'] = teams[tid]
 
-    keep = {it['id'] for R in (now, nxt, opening) for r in R['rosters'].values() for it in r['rosterItems']}
+    keep = {it['id'] for R in (now, nxt, opening, *weeks.values()) for r in R['rosters'].values() for it in r['rosterItems']}
     keep |= {k for k in ids if 'Pettersson' in ids[k]['name'] and ids[k].get('team') == 'VAN'}
     # a few free agents, for the Players tab
     keep |= set([a['id'] for a in adp if a.get('id') in info['playerInfo'] and info['playerInfo'][a['id']].get('status') != 'T'][:25])
@@ -68,6 +69,8 @@ def main(lid):
     put(OUT, 'getTeamRosters.json', now)
     put(OUT, f'getTeamRosters-{PERIOD + 1}.json', nxt)
     put(OUT, 'getTeamRosters-1.json', opening)
+    for n, R in weeks.items():
+        put(OUT, f'getTeamRosters-{n}.json', R)
     put(OUT, 'getStandings.json', standings)
     put(OUT, 'getDraftResults.json', draft)
     put(os.path.join(FIX, 'fantrax', 'nhl'), 'getPlayerIds.json', {k: {x: v[x] for x in ('name', 'team', 'position', 'fantraxId') if x in v} for k, v in ids.items() if k in keep})

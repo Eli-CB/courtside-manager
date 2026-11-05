@@ -107,6 +107,7 @@ async function useSport(key) {
   setSport(key);
   state.sport = key;
   BOX = null; boxLoad = null; espnIndex = null; nbaCache = null; winsMemo = null; fpBaseCache = null; rankMemo = { key: null };
+  for (const memo of [archives, gameLogs]) for (const k of Object.keys(memo)) delete memo[k]; // (the same season names)
   catsMemo = { L: undefined, cats: CATS };
   clearTimeout(live.timer);
   Object.assign(live, { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, error: '', timer: null });
@@ -209,7 +210,7 @@ function autoLineupIds(s = state) {
     const ilSet = new Set(s.il);
     const cand = s.players
       .filter(p => !ilSet.has(p.id) && p.status !== 'Out')
-      .map(p => ({ p, v: value(p) * (p.status === 'DTD' ? 0.85 : 1) * (isGoalie(p) ? (nbaById.get(p.nbaId) || { st: 1 }).st || 0 : 1) }))
+      .map(p => ({ p, v: gameWorth(p) * (p.status === 'DTD' ? 0.85 : 1) }))
       .sort((a, b) => b.v - a.v)
       .map(x => x.p);
     return fillSlots(cand, slots);
@@ -350,6 +351,8 @@ function startChance(p, d) {
   const m = startChain(p.team).get(d);
   return (m && m.get(p.nbaId != null ? p.nbaId : p.id)) || 0;
 }
+// What a player is worth over his team's games, not his own: a goalie's value counts for his share of the starts
+const gameWorth = p => value(p) * (isGoalie(p) ? (nbaById.get(p.nbaId) || { st: 1 }).st || 0 : 1);
 // His games in these days, a goalie's as he's expected to play them: those he played, then his chances
 const expectedGames = (p, dates) => (isGoalie(p) ? sum(dates.filter(d => playsOn(p, d)).map(d => (gameFinal(p, d) ? (actualLine(p, d) ? 1 : 0) : startChance(p, d)))) : gamesIn(p, dates));
 const startWords = (p, d) => { const c = startChance(p, d); return c >= 0.97 ? 'starting' : c <= 0.03 ? 'not starting' : `${Math.round(c * 100)}% to start`; };
@@ -440,7 +443,7 @@ function catWins(s) {
 
 // The per-game value of the best player a league leaves on waivers (the first past its teams × roster spots)
 function waiverValue() {
-  const vals = nbaPlayers().filter(p => p.gp).map(p => p.val).sort((a, b) => b - a);
+  const vals = nbaPlayers().filter(p => p.gp).map(p => (isGoalie(p) ? gameWorth(p) : p.val)).sort((a, b) => b - a);
   const n = (fxPickable().length || 12) * (state.slots.length + (state.benchSize ?? 5));
   return vals.length > n ? vals[n] : 0;
 }
