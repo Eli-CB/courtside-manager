@@ -92,9 +92,15 @@ saved leagues are lost). Owner's league:
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
-- NHL (Fantrax leagues only; stages 1-2 of 4 done: data, then Dashboard, Matchups, Roster, Players, Standings. Stage 3, goalies:
-  projections count every team game for both goalies, so they run high. Stage 4: Recap, Awards, Draft, Trades (`soonTabs`) and
-  past seasons, `hasLineupHistory` false until then). A Fantrax league's sport comes from its scoring groups (`fxSport`:
+- NHL (Fantrax leagues only; stages 1-3 of 4 done: data; Dashboard, Matchups, Roster, Players, Standings; goalies. Stage 4: Recap,
+  Awards, Draft, Trades (`soonTabs`) and past seasons, `hasLineupHistory` false until then). Goalies: a team's game isn't each
+  goalie's. `startChance(p, d)` (nba.js) is 1 for skaters; a goalie's comes from `startChain(team)`, game by game from the team's last
+  (`teams[t].lg`): his share of recent starts (`raw.st`, `goalie_shares` in the job; roster goalies only, anyone Out shares nothing), cut
+  for whoever started the game before (×0.1 on a back-to-back: the same goalie started the second night 7% of the time in 2025-26;
+  ×0.8 otherwise), and ESPN's named starter (`g.goalies` from the scoreboard's `probables`: Confirmed is certain, Expected counts
+  75%). `projectSide`, `weeklyPriority`, `weekGames` (to a tenth) and the Dashboard's pace use it; value stays per game played. Checked on 48
+  real team-weeks: goalies scored 4.7 a week, every-game projected 8.1, this 5.2 (average miss 3.8 to 2.0). Category leagues were
+  only tested on a made-up scoring setup: no real hockey category league yet. A Fantrax league's sport comes from its scoring groups (`fxSport`:
   `HOCKEY_SKATING`, Fantrax doesn't name it). `fetchFantraxLeague` reads a league against that sport's data file
   (`fetchSport`) without changing the page; `switchLeague` then swaps sports (`useSport`, with `ui.hold` stopping `render` until the
   league is in place; a league that fails puts the sport back). `state.sport` picks the tables before a saved state is read.

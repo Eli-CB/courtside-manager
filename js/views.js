@@ -161,13 +161,14 @@ function dashGame(p, d) {
   if (!playsOn(p, d)) return '<span class="muted">No game</span>';
   const g = liveGame(p, d), s = g || (BOX.scores && BOX.scores.get(`${d} ${p.team}`));
   const vs = x => (x.home === p.team ? `vs ${x.away}` : `@${x.home}`);
-  if (g && g.state === 'pre') return `${vs(g)} ${fmtTime(g.start)}`;
+  const inGoal = isGoalie(p) && !lineOn(p, d) ? ` · ${startWords(p, d)}` : '';
+  if (g && g.state === 'pre') return `${vs(g)} ${fmtTime(g.start)}${inGoal}`;
   const score = !s ? '' : ui.hideScores ? vs(s) : `${s.away} ${s.as} @ ${s.home} ${s.hs}`;
   if (g && g.state === 'in') return `${liveStatus(p, d)} · ${score}`;
   const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
   if (s) return `${score}${ui.hideScores ? ' · Final' : ' F'}${dnp}`;
   const nx = NBA.teams && NBA.teams[p.team] && NBA.teams[p.team].next;
-  return nx && nx.date === d ? (nx.home ? `vs ${nx.opp}` : `@${nx.opp}`) : `Final${dnp}`;
+  return nx && nx.date === d ? `${nx.home ? `vs ${nx.opp}` : `@${nx.opp}`}${inGoal}` : `Final${dnp}`;
 }
 
 // A line in the league's own categories: makes-attempts for the percentages, fantasy points first in points leagues;
@@ -258,11 +259,12 @@ function dashMatchupCard() {
     for (const p of S.starters) if (p) for (const d of D.all) {
       if (!playsOn(p, d)) continue;
       const g = d === today ? liveGame(p, d) : null, line = lineOn(p, d);
-      if (g && g.state === 'in') { if (line || p.status !== 'Out') { n.now++; n.min += gameMinLeft(g); } continue; }
+      if (g && g.state === 'in') { if (line || (p.status !== 'Out' && startChance(p, d))) { n.now++; n.min += gameMinLeft(g); } continue; }
       if (d < today || gameFinal(p, d) || (g && g.state === 'post')) { if (line) n.played++; continue; }
-      if (p.status !== 'Out') { n.left++; n.min += 48; }
+      if (p.status !== 'Out') { const c = startChance(p, d); n.left += c; n.min += c * SPORT.game.minutes; } // (a goalie by his chance of starting)
     }
     n.min = Math.round(n.min);
+    n.left = Math.round(n.left);
     return n;
   };
   const ICON_GAMES = '<svg viewBox="0 0 20 16" width="15" height="12" aria-hidden="true"><circle cx="7" cy="4.5" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M1.5 15c0-3.2 2.5-5.3 5.5-5.3s5.5 2.1 5.5 5.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M13 1.8a3 3 0 0 1 0 5.6M15.5 10.2c1.8.7 3 2.4 3 4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
@@ -271,7 +273,7 @@ function dashMatchupCard() {
     const n = pace(S);
     return `<div class="mu-pace">
       <span class="mu-pc" title="${one ? `Starters with a game in: ${n.played}, playing their first now: ${n.now}, yet to play: ${n.left}` : `Starter games this period: ${n.played} played, ${n.now} on now, ${n.left} to come`}">${ICON_GAMES}<b>${n.played}</b><span class="${n.now ? 'pos-good' : ''}">${n.now}</span><span class="muted">${n.left}</span></span>
-      ${one ? '' : `<span class="mu-pc" title="Game minutes left for your starters this period: 48 a game to come, less what's been played of games on now">${ICON_CLOCK}<b>${n.min}</b></span>`}
+      ${one ? '' : `<span class="mu-pc" title="Game minutes left for your starters this period: ${SPORT.game.minutes} a game to come, less what's been played of games on now">${ICON_CLOCK}<b>${n.min}</b></span>`}
     </div>`;
   };
   const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div>${paceChips(S)}</div></div>`;
@@ -302,7 +304,8 @@ function dashMatchupCard() {
     let game;
     if (range === 'week') {
       const left = D.all.filter(d => playsOn(p, d) && !lineOn(p, d) && (d > today || (d === today && !gameFinal(p, d) && !(liveGame(p, d) && liveGame(p, d).state === 'post')))).length;
-      game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${left} left` : ''}${liveOn(p, today) && lineOn(p, today) ? ` · ${liveStatus(p, today)}` : ''}`;
+      const toCome = isGoalie(p) ? `about ${fmt(expectedGames(p, D.all.filter(d => d >= today && !gameFinal(p, d))), 1)}` : left;
+      game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${toCome} left` : ''}${liveOn(p, today) && lineOn(p, today) ? ` · ${liveStatus(p, today)}` : ''}`;
     } else game = dashGame(p, dates[0]);
     const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
     return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
@@ -315,7 +318,7 @@ function dashMatchupCard() {
   // games didn't count, tagged), then anyone Out or who sat out a finished game
   if (range !== 'week') {
     const d = dates[0];
-    const sits = p => !lineOn(p, d) && (p.status === 'Out' || gameFinal(p, d) || !!(liveGame(p, d) && liveGame(p, d).state === 'post'));
+    const sits = p => !lineOn(p, d) && (p.status === 'Out' || gameFinal(p, d) || !!(liveGame(p, d) && liveGame(p, d).state === 'post') || startWords(p, d) === 'not starting');
     // within each group: games on now first, then finished ones, then the rest by tip-off (lineup order otherwise)
     const stage = p => {
       const g = liveGame(p, d);
@@ -1145,8 +1148,9 @@ function showPlayerDetail(nbaId) {
     </div>
     ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small">${esc(raw.inj.note)} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
     <div class="proj-grid" style="margin-top:12px">
-      <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div></div>
-      <div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>
+      <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
+      ${isGoalie(raw) ? `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? `about ${fmt(raw.inj && raw.inj.status === 'Out' ? 0 : expectedGames({ ...raw, nbaId: raw.id }, matchDates(weekStartAt(0)).filter(d => d >= todayIso() && !gameFinal(raw, d))), 1)}` : '—'}</div><div class="pc-rank">${t ? `of ${t.left} games` : ''}</div></div>`
+    : `<div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>`}
       ${(() => {
         // his value, and under it his rank among every NBA player this season (per game: regulars only)
         const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);

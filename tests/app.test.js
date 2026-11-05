@@ -2241,3 +2241,73 @@ test('changing sports: each league comes back as it was, and one that does not l
   assert.equal(s.slots.join(), 'C,W,D,G');
   assert.equal(s.players[0].pos[0], 'G');
 });
+
+test('who starts in goal: shares from recent starts, the night after, and ESPN naming the starter', async () => {
+  const a = await hockeyApp();
+  const NBA = a.get('NBA');
+  // a team of two, made up: the first has started most, and the last game
+  const [one, two] = NBA.players.filter(p => p.pos.includes('G')).slice(0, 2);
+  Object.assign(one, { team: 'XXX', st: 0.7, inj: null });
+  Object.assign(two, { team: 'XXX', st: 0.3, inj: null });
+  NBA.teams.XXX = { lg: [one.id, '2026-10-26'], dates: [], left: 2 };
+  a.get('teamDates').set('XXX', new Set(['2026-10-27', '2026-10-29', '2026-10-31']));
+  a.set('startMemo', { key: null, teams: new Map() });
+  const P = { pos: ['G'], team: 'XXX', nbaId: one.id }, Q = { pos: ['G'], team: 'XXX', nbaId: two.id };
+  const on = (x, d) => +a.startChance(x, d).toFixed(3);
+  // the night after his start he rarely goes again: 0.7 × 0.1 against 0.3
+  assert.equal(on(P, '2026-10-27'), +(0.07 / 0.37).toFixed(3));
+  assert.equal(+(on(P, '2026-10-27') + on(Q, '2026-10-27')).toFixed(2), 1, "the team's chances add up");
+  assert.ok(on(P, '2026-10-29') > 0.6, 'with a day off he is the likely starter again');
+  assert.equal(a.startChance({ pos: ['G'], team: 'XXX', nbaId: 1 }, '2026-10-27'), 0, 'a goalie with no share');
+  assert.equal(a.startChance({ pos: ['C'], team: 'XXX' }, '2026-10-27'), 1, 'skaters play their games');
+  // his week: three team games, under three starts
+  const dates = ['2026-10-27', '2026-10-29', '2026-10-31'];
+  const week = a.expectedGames(P, dates) + a.expectedGames(Q, dates);
+  assert.equal(+week.toFixed(2), 3);
+  assert.ok(a.weekGames(P, dates) < 2.5 && a.weekGames(P, dates) > 1, String(a.weekGames(P, dates)));
+  assert.equal(a.weeklyPriority({ ...P, status: 'Healthy' }, dates) < a.gamesIn(P, dates) * Math.max(a.value(P), 0.01), true);
+  // ruled Out: all to the other
+  one.inj = { status: 'Out', label: 'Out', note: '' };
+  a.set('startMemo', { key: null, teams: new Map() });
+  assert.equal(on(Q, '2026-10-27'), 1);
+  one.inj = null;
+  // ESPN names him: Expected counts for most of it, Confirmed for all, and the page says so
+  const live = a.get('live');
+  live.at = 123;
+  live.games = [{ d: '2026-10-27', home: 'XXX', away: 'YYY', state: 'pre', goalies: { XXX: { a: { id: 'none', displayName: two.name }, sure: false } } }];
+  two.espn = 777; live.games[0].goalies.XXX.a.id = '777';
+  a.set('espnIndex', null);
+  assert.ok(on(Q, '2026-10-27') >= 0.75 && on(Q, '2026-10-27') < 1);
+  live.games[0].goalies.XXX.sure = true;
+  live.at = 124;
+  assert.equal(on(Q, '2026-10-27'), 1);
+  assert.equal(on(P, '2026-10-27'), 0);
+  assert.equal(a.startWords(Q, '2026-10-27'), 'starting');
+  assert.equal(a.startWords(P, '2026-10-27'), 'not starting');
+  live.games = [];
+  live.at = 125;
+  assert.match(a.startWords(P, '2026-10-29'), /^\d+% to start$/);
+});
+
+test('goalies project by their starts: a team of two does not count two goalies a game', async () => {
+  const a = await hockeyApp();
+  await a.loadBoxes();
+  const state = a.get('state'), dates = a.matchDates(a.weekStartAt(0));
+  const goalies = state.players.filter(p => p.pos.includes('G'));
+  assert.ok(goalies.length, 'the team has goalies');
+  const g = goalies[0], ids = new Set([g.id]);
+  const full = a.get('NBA').players.find(p => p.id === g.nbaId);
+  // from the projection: his wins are his per-game rate × his expected starts, not × his team's games
+  const games = dates.filter(d => a.playsOn(g, d) && !a.gameFinal(g, d)), S = a.projectSide([g], games, ids);
+  const pg = a.perGame(g).m.w;
+  assert.ok(Math.abs(S.tot.w - pg * a.expectedGames(g, games)) < 1e-9);
+  assert.ok(a.expectedGames(g, games) < games.length, `${a.expectedGames(g, games)} of ${games.length}`);
+  assert.ok(full.st > 0 && full.st <= 1);
+  // the projection's spread is wider for not knowing whether he plays
+  const sd = a.perGame(g).sd.w, c = a.startChance(g, games[0]);
+  const one = a.projectSide([g], [games[0]], ids);
+  assert.ok(Math.abs(one.vr.w - (c * (sd ** 2 + pg ** 2) - (c * pg) ** 2)) < 1e-9);
+  // a league's value baselines hold a league's goalies, not every goalie who's played
+  const base = a.computeBase(a.get('NBA').players.map(r => { const s = a.nbaStats(r, 'blend'); return s && { ...s, sample: s.gp }; }), 252);
+  assert.ok(base.w[0] > 0 && base.w[0] < 0.2, `wins per pool player: ${base.w[0]}`);
+});

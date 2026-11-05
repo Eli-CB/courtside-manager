@@ -37,10 +37,12 @@ const pctTxt = p => `${Math.round(p * 100)}%`;
 // a change in the matchup goal: categories won, or projected fantasy points
 const goalDelta = v => (isPoints() ? `${signed(v, 1)} FP` : `${signed(v, 2)} cats`);
 // a player's games that count this week (one at most in one-game leagues)
-const weekGames = (p, dates) => (p.status === 'Out' ? 0 : isOneGame() ? Math.min(1, gamesIn(p, dates)) : gamesIn(p, dates));
+// (a goalie: the starts he's expected to play, to a tenth)
+const weekGames = (p, dates) => (p.status === 'Out' ? 0 : isOneGame() ? Math.min(1, gamesIn(p, dates)) : isGoalie(p) ? Math.round(expectedGames(p, dates) * 10) / 10 : gamesIn(p, dates));
 function gamesLeftTip(p, dates) {
   const played = dates.filter(d => playsOn(p, d) && gameFinal(p, d) && actualLine(p, d)).length;
   const left = dates.filter(d => playsOn(p, d) && !gameFinal(p, d)).length;
+  if (isGoalie(p)) return `${played} played, about ${fmt(p.status === 'Out' ? 0 : expectedGames(p, dates.filter(d => !gameFinal(p, d))), 1)} more starts in his team's ${left} games left`;
   return `${played} played, ${p.status === 'Out' ? 0 : left} left this week`;
 }
 
@@ -185,8 +187,8 @@ function dayDots(p, ctx, counts) {
       return dot(`done${bench}${shortMinutes(p, line, d) ? ' short' : ''}`, gameTip(p, line, d, bench));
     }
     if (p.status === 'Out') return dot('out', `Upcoming, but he's listed Out${p.inj && p.inj.note ? `<div class="tip-dim">${esc(p.inj.note)}</div>` : ''}`);
-    const b2b = isB2B(p, d);
-    return dot(`up${bench}${b2b ? ' b2b' : ''}`, `Upcoming game${b2b ? ', on a back-to-back' : ''}${bench ? '<div class="tip-dim">On the bench, so it won\'t count</div>' : ''}`);
+    const b2b = isB2B(p, d), goalie = isGoalie(p) ? ` (${startWords(p, d)})` : '';
+    return dot(`up${bench}${b2b ? ' b2b' : ''}`, `Upcoming game${b2b ? ', on a back-to-back' : ''}${goalie}${bench ? '<div class="tip-dim">On the bench, so it won\'t count</div>' : ''}`);
   }).join('')}</span>`;
 }
 
@@ -481,7 +483,7 @@ function pickupIdeas(ctx) {
     const proj = projectSide(team, dates, weekly ? bestWeeklyIds(team, dates, null) : null);
     const cats = compareCats(proj, them);
     const odds = matchOdds(cats);
-    out.push({ p, drop, gain: odds.expected - baseOdds.expected, score: objective(odds) - objective(baseOdds), win: odds.win, games: gamesIn(p, dates), cats });
+    out.push({ p, drop, gain: odds.expected - baseOdds.expected, score: objective(odds) - objective(baseOdds), win: odds.win, games: weekGames(p, dates), cats });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, 5);
 }

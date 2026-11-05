@@ -209,7 +209,7 @@ function autoLineupIds(s = state) {
     const ilSet = new Set(s.il);
     const cand = s.players
       .filter(p => !ilSet.has(p.id) && p.status !== 'Out')
-      .map(p => ({ p, v: value(p) * (p.status === 'DTD' ? 0.85 : 1) }))
+      .map(p => ({ p, v: value(p) * (p.status === 'DTD' ? 0.85 : 1) * (isGoalie(p) ? (nbaById.get(p.nbaId) || { st: 1 }).st || 0 : 1) }))
       .sort((a, b) => b.v - a.v)
       .map(x => x.p);
     return fillSlots(cand, slots);
@@ -292,6 +292,68 @@ function periodOver(p) {
 const playsOn = (p, d) => !!(teamDates.get(p.team) && teamDates.get(p.team).has(d));
 const gamesIn = (p, dates) => dates.filter(d => playsOn(p, d)).length;
 
+// ----- Who starts in goal -----
+// A team's game isn't each of its goalies' game. From the team's last game on, each game of its schedule passes on who
+// probably started the one before: his share of recent starts (the daily job's raw.st; anyone ruled Out shares nothing),
+// cut for whoever started the game before, heavily on a back-to-back: the same goalie started the second night 7% of the
+// time in 2025-26. Backtested on that season from each Monday, a goalie's starts in a week come out within about 0.7.
+// Once ESPN names the starter (Confirmed, a few hours before; Expected counts for most of it), or he's in today's box, that's who.
+const GOALIE_B2B = 0.1, GOALIE_NEXT = 0.8, GOALIE_EXPECTED = 0.75;
+function nextStarter(q, s, k) {
+  const out = new Map();
+  for (const [j, qj] of q) {
+    const t = sum([...s].map(([i, v]) => v * (i === j ? k : 1)));
+    for (const [i, v] of s) out.set(i, (out.get(i) || 0) + qj * v * (i === j ? k : 1) / t);
+  }
+  return out;
+}
+// Who's known for that game: { id, sure }
+function namedGoalie(team, d, list) {
+  const lines = liveLines(d), inBox = list.find(r => lines.has(r.id));
+  if (inBox) return { id: inBox.id, sure: true };
+  const g = live.games.find(x => x.d === d && (x.home === team || x.away === team)), n = g && g.goalies && g.goalies[team];
+  const raw = n && espnPlayer(n.a, team, 'G');
+  return raw ? { id: raw.id, sure: n.sure } : null;
+}
+let startMemo = { key: null, teams: new Map() };
+// date -> goalie's id -> his chance of starting
+function startChain(team) {
+  const key = `${NBA.updated}|${live.at}`;
+  if (startMemo.key !== key) startMemo = { key, teams: new Map() };
+  if (startMemo.teams.has(team)) return startMemo.teams.get(team);
+  const list = NBA.players.filter(r => r.team === team && r.st != null && r.pos.includes('G'));
+  const fit = list.filter(r => !(r.inj && r.inj.status === 'Out'));
+  const all = sum(fit.map(r => r.st)) || 1;
+  const s = new Map(fit.map(r => [r.id, r.st ? r.st / all : 0]));
+  if (!sum([...s.values()])) for (const k of s.keys()) s.set(k, 1 / s.size); // no one has started: an even guess
+  const T = teamInfo(team) || {}, last = T.lg || [];
+  let q = last[0] ? new Map([[last[0], 1]]) : new Map(s), prev = last[1] || null;
+  const out = new Map();
+  for (const d of [...(teamDates.get(team) || [])].sort()) {
+    if (prev && d <= prev) continue;
+    q = nextStarter(q, s, prev && addDays(prev, 1) === d ? GOALIE_B2B : GOALIE_NEXT);
+    const named = namedGoalie(team, d, list);
+    if (named) {
+      const w = named.sure ? 1 : GOALIE_EXPECTED;
+      q = new Map([...q].map(([i, v]) => [i, v * (1 - w)]));
+      q.set(named.id, (q.get(named.id) || 0) + w);
+    }
+    out.set(d, q);
+    prev = d;
+  }
+  startMemo.teams.set(team, out);
+  return out;
+}
+// A player's chance of playing a game his team has: always 1, but for a goalie his chance of starting it
+function startChance(p, d) {
+  if (!isGoalie(p)) return 1;
+  const m = startChain(p.team).get(d);
+  return (m && m.get(p.nbaId != null ? p.nbaId : p.id)) || 0;
+}
+// His games in these days, a goalie's as he's expected to play them: those he played, then his chances
+const expectedGames = (p, dates) => (isGoalie(p) ? sum(dates.filter(d => playsOn(p, d)).map(d => (gameFinal(p, d) ? (actualLine(p, d) ? 1 : 0) : startChance(p, d)))) : gamesIn(p, dates));
+const startWords = (p, d) => { const c = startChance(p, d); return c >= 0.97 ? 'starting' : c <= 0.03 ? 'not starting' : `${Math.round(c * 100)}% to start`; };
+
 // Baselines for "value": each category's mean and spread among the players a league rosters (its teams × roster
 // spots, the ones with the most minutes), from that season's per-game stats: this season's smart blend, or a past
 // season's archive while one shows, so seasons never mix. Percentages measure (% − average) × attempts.
@@ -316,7 +378,10 @@ function baseNow() {
 }
 
 function computeBase(stats, n) {
-  const pool = stats.filter(x => x && x.sample >= 3).sort((a, b) => b.min - a.min).slice(0, n);
+  const ranked = stats.filter(x => x && x.sample >= 3).sort((a, b) => b.min - a.min);
+  // hockey: a goalie plays more minutes than anyone, but a league rosters only so many: its goalie spots and one more a team
+  const keepers = isHockey() ? ranked.filter(x => x.sv || x.sa).sort((a, b) => b.gs * b.sample - a.gs * a.sample).slice(0, (fxPickable().length || 12) * (state.slots.filter(s => s === 'G').length + 1)) : [];
+  const pool = isHockey() ? [...ranked.filter(x => !(x.sv || x.sa)).slice(0, n - keepers.length), ...keepers] : ranked.slice(0, n);
   if (pool.length < 20) return { ...BASE_DEFAULT };
   const spread = (xs, m) => Math.max(Math.sqrt(sum(xs.map(x => (x - m) ** 2)) / xs.length), 0.02);
   const out = {};
@@ -410,7 +475,9 @@ function projectSide(players, dates, fixedIds) {
   let games = 0;
   for (const d of dates) {
     // a finished game: available means he played; otherwise anyone not ruled Out whose team plays
-    const avail = ranked.filter(p => playsOn(p, d) && (gameFinal(p, d) ? !!actualLine(p, d) : p.status !== 'Out'));
+    let avail = ranked.filter(p => playsOn(p, d) && (gameFinal(p, d) ? !!actualLine(p, d) : p.status !== 'Out'));
+    // goalies: worth what they're likely to play (daily lineups fit the best who can play), and not at all once ruled out
+    if (isHockey()) avail = avail.map(p => ({ p, v: value(p) * (gameFinal(p, d) ? 1 : startChance(p, d)) })).filter(x => !isGoalie(x.p) || x.v).sort((a, b) => b.v - a.v).map(x => x.p);
     let active;
     if (fixedIds) active = avail.filter(p => fixedIds.has(p.id));
     else {
@@ -419,15 +486,15 @@ function projectSide(players, dates, fixedIds) {
     }
     for (const p of active) {
       const line = gameFinal(p, d) ? actualLine(p, d) : null;
-      if (line) { for (const k of COUNT_KEYS) tot[k] += line[k] || 0; continue; }
-      const g = perGame(p);
-      for (const k of COUNT_KEYS) { tot[k] += g.m[k]; vr[k] += g.sd[k] ** 2; left[k] += g.m[k]; }
+      if (line) { for (const k of COUNT_KEYS) tot[k] += line[k] || 0; games++; continue; }
+      const g = perGame(p), c = startChance(p, d); // (a goalie counts by his chance of starting, which also widens his spread)
+      for (const k of COUNT_KEYS) { tot[k] += c * g.m[k]; vr[k] += c * (g.sd[k] ** 2 + g.m[k] ** 2) - (c * g.m[k]) ** 2; left[k] += c * g.m[k]; }
+      games += c;
     }
-    games += active.length;
     days.push({ date: d, active: new Set(active.map(p => p.id)), avail: new Set(avail.map(p => p.id)) });
   }
   if (isOneGame()) return { ...oneGameSide(ranked, days), days };
-  return { tot, vr, left, games, days };
+  return { tot, vr, left, games: Math.round(games), days };
 }
 
 // One-game leagues (Sleeper): each lineup slot counts one game of the week, not all of them. A player's game already
@@ -545,7 +612,7 @@ function playerFromRaw(raw, extra = {}) {
 // ----- Locked weekly lineups -----
 // Rough worth of starting a player for the week: games × value (against not playing); one game in one-game leagues
 function weeklyPriority(p, dates) {
-  return p.status === 'Out' ? -1 : (isOneGame() ? Math.min(1, gamesIn(p, dates)) : gamesIn(p, dates)) * Math.max(value(p), 0.01);
+  return p.status === 'Out' ? -1 : (isOneGame() ? Math.min(1, gamesIn(p, dates)) : expectedGames(p, dates)) * Math.max(value(p), 0.01);
 }
 
 function fitsSlots(ids, players) {

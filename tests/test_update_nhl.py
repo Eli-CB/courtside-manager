@@ -76,6 +76,34 @@ class Season(unittest.TestCase):
         self.assertEqual(weeks, [1, 1, 2])
 
 
+class Goalies(unittest.TestCase):
+    gs = N.LINE_KEYS.index('gs') + 2
+
+    def game(self, d, *starters):
+        return {'d': d, 'home': 'A', 'away': 'B', 'rows': [[pid, team, 60.0] + [0] * (self.gs - 3) + [1] for pid, team in starters]}
+
+    def test_recent_starts_count_most_and_last_season_only_a_little(self):
+        boxes = {str(i): self.game(f'2026-10-0{i}', (1 if i < 5 else 2, 'A')) for i in range(1, 10)}
+        prev = {str(i): {'s': [50 if i == 1 else 10] + [0] * (N.STAT_KEYS.index('gs') - 1) + [1]} for i in (1, 2)}
+        shares, last = N.goalie_shares(boxes, {'A': [1, 2]}, prev)
+        self.assertGreater(shares[2], shares[1], 'his last five starts outweigh four before them and last season')
+        self.assertEqual(round(shares[1] + shares[2], 2), 1)
+        self.assertEqual(last['A'], [2, '2026-10-09'])
+
+    def test_before_any_games_last_season_decides_and_a_goalie_new_to_the_league_gets_a_share(self):
+        prev = {'1': {'s': [40] + [0] * (N.STAT_KEYS.index('gs') - 1) + [1]}}
+        shares, last = N.goalie_shares({}, {'A': [1, 3]}, prev)
+        self.assertEqual(shares, {1: 1.0, 3: 0.0})
+        self.assertEqual(N.goalie_shares({}, {'A': [3, 4]}, {})[0], {3: 0.5, 4: 0.5})
+        self.assertEqual(last, {})
+
+    def test_a_goalie_who_left_counts_only_for_who_is_here(self):
+        boxes = {'1': self.game('2026-10-01', (9, 'A')), '2': self.game('2026-10-02', (1, 'A'))}
+        shares, _ = N.goalie_shares(boxes, {'A': [1, 2]}, {})
+        self.assertNotIn(9, shares)
+        self.assertGreater(shares[1], shares[2])
+
+
 class Names(unittest.TestCase):
     table = N.by_name([('Sebastian Aho', 'CAR', 'C', 'car'), ('Sebastian Aho', 'PIT', 'D', 'pit'), ('Elias Pettersson', 'VAN', 'C', 'f'),
                        ('Elias N. Pettersson', 'VAN', 'D', 'd'), ('Joe Veleno', 'NYR', 'C', 'veleno'), ('Connor McDavid', 'EDM', 'C', 'mcdavid')])

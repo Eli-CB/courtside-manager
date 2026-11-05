@@ -53,6 +53,10 @@ LOG_KEYS = ['date', 'matchup', 'wl'] + LINE_KEYS + ['type']
 SD_KEYS = [k for k in LINE_KEYS if k not in ('min', 'gs')]
 SD_MIN = 10  # a game counts for the spreads from this many minutes (a goalie's mop-up relief can stay out)
 BOX_VERSION = 2  # goalies' own columns
+# Who starts in goal: a share of the team's recent starts, each game worth this much of the next newer one, plus this many
+# games' worth of last season's shares. Chosen on 2025-26's and this season's starts, from each team's Monday, by how well
+# they name each game's starter (js/nba.js: startChain carries on from these).
+GOALIE_DECAY, GOALIE_PRIOR = .85, 1
 
 
 def get_json(url, params=None, tries=3, timeout=40):
@@ -280,6 +284,33 @@ def full_name(name):
     return ' '.join(x for i, x in enumerate(w) if i == 0 or len(x) > 1)
 
 
+def goalie_shares(boxes, goalies, prev):
+    """goalies: {team: [ids on its roster]}, prev: last season's archive -> ({id: his share of the team's starts},
+    {team: [who started its last game, that day]})."""
+    gs = LINE_KEYS.index('gs') + 2
+    started = {}
+    for g in sorted(boxes.values(), key=lambda g: g['d']):
+        for r in g['rows']:
+            if len(r) > gs and r[gs]:
+                started.setdefault(r[1], []).append((r[0], g['d']))
+    shares, last = {}, {}
+    gp, per_gs = STAT_KEYS.index('gp'), STAT_KEYS.index('gs')
+    for team, ids in goalies.items():
+        seq = started.get(team, [])
+        if seq:
+            last[team] = list(seq[-1])
+        recent = dict.fromkeys(ids, 0)
+        for j, (pid, _) in enumerate(reversed(seq)):
+            if pid in recent:
+                recent[pid] += GOALIE_DECAY ** j
+        before = {i: (prev[str(i)]['s'][gp] * prev[str(i)]['s'][per_gs] if str(i) in prev else 0) for i in ids}
+        all_before = sum(before.values())
+        total = sum(recent.values()) + GOALIE_PRIOR
+        for i in ids:
+            shares[i] = round((recent[i] + GOALIE_PRIOR * (before[i] / all_before if all_before else 1 / len(ids))) / total, 3)
+    return shares, last
+
+
 def find(table, name, team, pos):
     """A player by name, team and role; else initial + last name, team and role (Joe and Joseph); else by name alone
     (he may have moved) when that name is one person. Names aren't enough: two Sebastian Ahos play in the NHL, and two
@@ -390,6 +421,16 @@ def main():
     inj = optional('Injury report (ESPN)', injuries, None)
     espn = optional('Birth dates and ESPN ids (ESPN rosters)', espn_rosters, {})
 
+    # goalies on a roster now can start; one sent down or out for good has no share
+    goalies = {}
+    for pid, r in index.items():
+        if r['pos'] == 'G':
+            goalies.setdefault(r['team'], []).append(pid)
+    shares, last_start = goalie_shares(boxes, goalies, prev)
+    for team, x in last_start.items():
+        if team in team_sched:
+            team_sched[team]['lg'] = x
+
     # off the rosters now but still in fantasy: the sent-down and waived (their last team) and the long-term injured
     # (ESPN has them on theirs, on its rosters or injury report). Last season's players with neither have left the league.
     latest = {}
@@ -414,6 +455,7 @@ def main():
              'exp': start_year - b['first'] if b.get('first') else 1 if str(pid) in prev else 0}
         nat = r['nat'] or b.get('nat') or was.get('nat')
         if nat: p['nat'] = nat
+        if pid in shares: p['st'] = shares[pid]
         if pid in cur:
             p['cur'], p['l10'] = cur[pid], l10[pid]
             p['log'] = logs[pid][:5]

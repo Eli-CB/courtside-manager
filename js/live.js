@@ -27,7 +27,10 @@ function espnGames(sb) {
     const side = Object.fromEntries(e.competitions[0].competitors.map(t => [t.homeAway, t]));
     const tri = t => espnTri(t.team);
     const start = new Date(e.date);
-    return { id: e.id, d: usDay(start), start, home: tri(side.home), away: tri(side.away), hs: +side.home.score || 0, as: +side.away.score || 0, state: e.status.type.state, detail: e.status.type.shortDetail, period: +e.status.period || 0, clock: +e.status.clock || 0 };
+    // hockey: ESPN's starting goalies, Expected and then Confirmed
+    const goalie = t => { const g = (t.probables || []).find(x => x.name === 'probableStartingGoalie'); return g && g.athlete ? { a: g.athlete, sure: !!g.status && g.status.type === 'confirmed' } : null; };
+    return { id: e.id, d: usDay(start), start, home: tri(side.home), away: tri(side.away), hs: +side.home.score || 0, as: +side.away.score || 0, state: e.status.type.state, detail: e.status.type.shortDetail, period: +e.status.period || 0, clock: +e.status.clock || 0,
+      goalies: { [tri(side.home)]: goalie(side.home), [tri(side.away)]: goalie(side.away) } };
   });
 }
 

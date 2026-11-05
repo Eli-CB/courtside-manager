@@ -100,6 +100,11 @@ const SPORTS = {
     espnTeams: { LA: 'LAK', NJ: 'NJD', SJ: 'SJS', TB: 'TBL' }, // ESPN's codes that aren't the NHL's
     game: { minutes: 60, periods: 3, tag: 'P' },
     soonTabs: ['recap', 'draft', 'awards', 'trade'],
+    // added to an (i) popup
+    infoMore: {
+      win: `<p><b>Goalies.</b> A goalie counts by his chance of starting each game: his share of his team's recent starts, much lower the night after he plays (a team's goalie started both games of a back-to-back 7% of the time in 2025-26), lower after any start. Once ESPN names the starter, that's who counts. This week's starts usually come within about one of the guess.</p>`,
+      dots: `<p>A goalie's games show his team's schedule: hover a game for his chance of starting it. The number on the right is the starts he's expected to play.</p>`,
+    },
     // Fantrax's stats by scoring group (goals and assists are in both): short names first, then its category codes
     fxStats: {
       HOCKEY_SKATING: {

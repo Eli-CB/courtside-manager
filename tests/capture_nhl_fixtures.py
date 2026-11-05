@@ -13,6 +13,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
 from update_data import norm_name  # noqa: E402
+from update_nhl import goalie_shares  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIX = os.path.join(ROOT, 'tests', 'fixtures')
@@ -75,7 +76,7 @@ def main(lid):
     with open(os.path.join(ROOT, 'data', 'nhl', 'players.json'), encoding='utf-8') as f:
         data = json.load(f)
     last = {norm_name(ids[k]['name'].split(', ')[0]) for k in keep if k in ids}
-    data['players'] = [p for p in data['players'] if any(norm_name(p['name']).endswith(x) for x in last)]
+    data['players'] = [p for p in data['players'] if 'st' in p or any(norm_name(p['name']).endswith(x) for x in last)]  # every goalie: they share a team's starts
     who = {p['id'] for p in data['players']}
     for p in data['players']:
         p.pop('log', None)
@@ -85,6 +86,24 @@ def main(lid):
     box['who'] = {}
     box['games'] = {gid: {**g, 'rows': [r for r in g['rows'] if r[0] in who]} for gid, g in box['games'].items() if g['d'] <= LAST_DAY}
     put(os.path.join(FIX, 'nhl'), 'boxscores.json', box)
+    # who starts in goal, as of the fixtures' day
+    with open(os.path.join(ROOT, 'data', 'nhl', 'seasons', f"{data['prevSeason']}.json"), encoding='utf-8') as f:
+        prev = json.load(f)['players']
+    goalies = {}
+    for p in data['players']:
+        if 'st' in p:
+            goalies.setdefault(p['team'], []).append(p['id'])
+    with open(os.path.join(ROOT, 'data', 'nhl', 'boxscores.json'), encoding='utf-8') as f:
+        full = {k: g for k, g in json.load(f)['games'].items() if g['d'] <= LAST_DAY}
+    shares, last = goalie_shares(full, goalies, prev)
+    for p in data['players']:
+        if 'st' in p:
+            p['st'] = shares[p['id']]
+    for t in data['teams'].values():
+        t.pop('lg', None)
+    for team, x in last.items():
+        data['teams'][team]['lg'] = x
+    put(os.path.join(FIX, 'nhl'), 'players.json', data)
     print(len(info['playerInfo']), 'league players,', len(data['players']), 'NHL players,', len(box['games']), 'games')
 
 
