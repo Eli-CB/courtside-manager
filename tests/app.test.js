@@ -2432,3 +2432,47 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   assert.ok(!st.demo && !st.fxTeam && st.players.length === 0);
   assert.ok(a.needsLanding());
 });
+
+test("ESPN failing again and again reaches the error log, a visitor's own connection doesn't", async () => {
+  const setup = async ({ own = true, online = true } = {}) => {
+    const a = loadApp();
+    await a.ready();
+    a.location.hostname = 'leaguelayer.com';
+    a.navigator.onLine = online;
+    const real = a.fetch, sent = [], net = { espn: false };
+    a.fetch = (u, o) => {
+      const s = String(u);
+      if (s.includes('/errors')) { sent.push(JSON.parse(o.body)); return Promise.resolve({}); }
+      if (s === 'index.html') return own ? Promise.resolve({ ok: true }) : Promise.reject(new Error('offline'));
+      if (s.includes('site.api.espn.com') && !net.espn) return Promise.resolve({ ok: false, status: 403 });
+      return real(u, o);
+    };
+    a.get('ui').tab = 'dashboard';
+    const poll = async n => { for (let i = 0; i < n; i++) await a.pollLive(); clearTimeout(a.get('live').timer); };
+    return { a, sent, net, poll };
+  };
+  const { sent, poll } = await setup();
+  await poll(2);
+  assert.equal(sent.length, 0, 'a blip says nothing');
+  await poll(1);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].msg, 'ESPN live scores failing (NBA): ESPN answered 403');
+  await poll(4);
+  assert.equal(sent.length, 1, 'once a visit');
+  // recovering starts the count again
+  const b = await setup();
+  await b.poll(2);
+  b.net.espn = true;
+  await b.poll(1);
+  assert.equal(b.a.get('live').error, '');
+  b.net.espn = false;
+  await b.poll(2);
+  assert.equal(b.sent.length, 0);
+  // the visitor's own connection isn't ESPN's problem
+  const off = await setup({ own: false });
+  await off.poll(3);
+  assert.equal(off.sent.length, 0, 'this site is out of reach too');
+  const plane = await setup({ online: false });
+  await plane.poll(3);
+  assert.equal(plane.sent.length, 0, 'offline');
+});

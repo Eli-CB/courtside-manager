@@ -125,6 +125,17 @@ async function readBoxes(games) {
   return failed.length;
 }
 
+// ESPN's feed is unofficial: it can block the site or change shape, and a visitor only sees a note. Failing LIVE_FAILS
+// updates in a row (blocked, or its answers no longer read) goes to the error log, once a visit, unless it's this
+// visitor's own connection: offline, or this site doesn't answer either.
+const LIVE_FAILS = 3;
+async function noteLiveFailure(msg) {
+  live.fails = (live.fails || 0) + 1;
+  if (live.fails !== LIVE_FAILS || navigator.onLine === false) return;
+  const here = await fetch('index.html', { method: 'HEAD', cache: 'no-store' }).catch(() => null);
+  if (here && here.ok) reportError(`ESPN live scores failing (${SPORT.name}): ${msg}`, 'js/live.js');
+}
+
 async function pollLive() {
   clearTimeout(live.timer);
   live.timer = null;
@@ -149,8 +160,10 @@ async function pollLive() {
     }
     live.at = Date.now();
     live.error = '';
+    live.fails = 0;
   } catch (e) {
     live.error = e.message || "couldn't reach ESPN";
+    await noteLiveFailure(live.error);
   } finally {
     live.busy = false;
   }
