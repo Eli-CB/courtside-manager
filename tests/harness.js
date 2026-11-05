@@ -1,5 +1,6 @@
 // Loads the site's scripts (js/*.js) in Node with a stand-in page, saved Fantrax/NBA responses instead of the network,
 // and a fixed clock, so the tests exercise the same code the site runs.
+process.env.TZ = 'America/New_York'; // the clock below reads the same on any machine (GitHub's run on UTC, where it's already Tuesday)
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
