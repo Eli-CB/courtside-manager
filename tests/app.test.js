@@ -2508,3 +2508,131 @@ test("the demo's teams go by made-up names, and connecting the league for real b
   assert.equal(new Set(big.teams.map(t => t.name)).size, 20);
   assert.equal(big.teams[19].name, 'Team 20');
 });
+
+// ----- Football: a real Sleeper league, cut down, its team names replaced (tests/capture_nfl_fixtures.py) -----
+const FOOTBALL = '999000000000000001';
+async function footballApp() {
+  const a = loadApp();
+  await a.ready();
+  await a.connectLeague(FOOTBALL);
+  a.adoptTeam(a.fxLeague().teams[0].id);
+  a.get('ui').tab = 'standings';
+  await a.loadBoxes();
+  quiet(a);
+  return a;
+}
+
+test("a Sleeper league says its sport: football's rules, weeks and players come from it", async () => {
+  const a = loadApp();
+  await a.ready();
+  const { league } = await a.fetchSleeperLeague(FOOTBALL);
+  assert.equal(league.sport, 'nfl');
+  assert.equal(a.get('SPORT').key, 'nba', 'reading it changes nothing');
+  const b = await footballApp(), L = b.fxLeague(), st = b.get('state');
+  assert.equal(b.get('SPORT').key, 'nfl');
+  assert.equal(st.slots.join(), 'QB,RB,RB,WR,WR,TE,FLX,K,DEF');
+  assert.equal(st.benchSize, 5);
+  assert.equal(b.tabList().map(t => t[0]).join(), 'dashboard,week,recap,standings,awards');
+  assert.equal(Object.values(L.rosters).flat().filter(x => !x.nba).length, 0, 'every rostered player matched');
+  assert.equal(L.points.pass_td, 4);
+  assert.equal(L.points.rec, 0.5);
+  // weeks run Tuesday to Monday night: the clock's Monday evening is still that week
+  assert.equal(b.dayOffset('2026-10-27'), 0);
+  assert.equal(b.weekStart(), '2026-10-20');
+  assert.equal(b.fxPeriodFor(b.weekStart()).n, 7);
+  assert.equal(b.matchDates().join(), L.periods.find(p => p.n === 7) && (() => { const out = []; for (let d = '2026-10-20'; d <= '2026-10-26'; d = b.addDays(d, 1)) out.push(d); return out.join(); })());
+  // a field goal is a stat here, not a basketball shot
+  assert.equal(b.statVal({ fgm: 2 }, 'fgm'), 2);
+  // ids as the site needs them, a defense's too
+  assert.ok(b.get('NBA').players.every(p => Number.isInteger(p.id)));
+  const d = b.get('NBA').players.find(p => p.pos[0] === 'DEF');
+  assert.ok(d.id >= 900000 && d.slp === d.team);
+  assert.ok(!d.name.includes(' '), `a defense goes by its team: ${d.name}`);
+});
+
+test("football's weekly scores come out as Sleeper's, in every finished week", async () => {
+  const a = await footballApp();
+  const L = a.fxLeague();
+  const [weeks, G] = await Promise.all([a.loadRosterWeeks(L), a.loadGameLog('cur')]);
+  quiet(a);
+  const LL = { ...L, weeks, fidNba: a.currentFidNba() };
+  let n = 0;
+  for (const w of [1, 2, 3, 4, 5, 6]) {
+    const real = JSON.parse(readFixture(`sleeper/league_${FOOTBALL}_matchups_${w}.json`));
+    const R = a.benchSwaps(LL, G, weeks, L.periods.find(p => p.n === w), L.matchups[w].flat());
+    for (const x of R) {
+      const m = real.find(y => String(y.roster_id) === x.tid);
+      assert.ok(Math.abs(a.lineFp(x.tot) - m.points) < 0.011, `week ${w}, ${x.tid}: ${a.lineFp(x.tot)} against ${m.points}`);
+      n++;
+    }
+  }
+  assert.ok(n >= 50, `${n} team-weeks`);
+});
+
+test('football on the page: lines in words, finished weeks, this week, byes and live points', async () => {
+  const a = await footballApp();
+  const L = a.fxLeague(), ui = a.get('ui'), st = a.get('state');
+  // how a line reads
+  assert.equal(a.fullLine({ pass_yd: 245, pass_td: 2, gp1: 1 }, false).join(', '), '245 pass yd, 2 pass TD');
+  assert.equal(a.fullLine({ gp1: 1 }, false).join(), 'no stats');
+  // every page here
+  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), recap: () => a.viewRecap(), standings: () => a.viewStandings(), awards: () => a.viewAwards() })) {
+    ui.tab = tab;
+    make();
+    await new Promise(r => setTimeout(r, 40));
+    const html = make();
+    quiet(a);
+    assert.ok(!/undefined|NaN|\[object/.test(html.replace(/<[^>]*>/g, ' ')), `${tab} has only real numbers`);
+  }
+  ui.tab = 'standings';
+  assert.match(a.withViewedTeam(a.viewWeek, true), /Football projections are on the way/);
+  quiet(a);
+  // the player card
+  const qb = a.get('NBA').players.find(p => p.pos[0] === 'QB' && p.cur), def = a.get('NBA').players.find(p => p.pos[0] === 'DEF');
+  assert.equal(a.cardStats(qb)[0][0], 'Pass yd');
+  assert.equal(a.cardStats(def)[0][0], 'Sacks');
+  assert.deepEqual([...a.gameStats(qb, { pass_yd: 300 })[0]], ['300 pass yd']);
+  // ESPN's scoreboard, with football's team codes and a player's points from Sleeper before the box scores have them
+  assert.equal(a.espnTri({ id: '13', abbreviation: 'WSH' }), 'WAS');
+  assert.equal(a.espnTri({ id: '13', abbreviation: 'LV' }), 'LV', "not basketball's team of that id");
+  const p = st.players[0], raw = a.nbaById.get(p.nbaId), day = a.matchDates().find(d => a.playsOn(raw, d));
+  if (day) {
+    const box = a.get('BOX');
+    box.day.delete(raw.id);
+    L.slpWeek = { n: 7, pts: { [raw.slp]: 17.3 }, at: Date.now() };
+    a.get('live').games = [{ d: day, home: raw.team, away: 'XXX', state: 'in', start: new Date() }];
+    a.footballLines(L);
+    assert.equal(a.lineFp(a.lineOn(p, day)), 17.3);
+    // and it's in the week's big score and his row, as Sleeper's points change during the game
+    ui.tab = 'dashboard'; ui.dashRange = 'week';
+    const before = a.viewDashboard();
+    quiet(a);
+    assert.match(before, /17\.3/);
+    L.slpWeek = { n: 7, pts: { [raw.slp]: 24.1 }, at: Date.now() };
+    const after = a.viewDashboard();
+    quiet(a);
+    assert.match(after, /24\.1/);
+    ui.tab = 'standings';
+    a.get('live').games = [];
+  }
+  // a player on bye says so
+  const bye = st.players.find(x => !a.matchDates().some(d => a.playsOn(x, d)));
+  if (bye) { ui.tab = 'dashboard'; ui.dashRange = 'week'; assert.match(a.viewDashboard(), />Bye</); quiet(a); ui.tab = 'standings'; }
+});
+
+test('football and the other sports leave each other alone', async () => {
+  const a = await footballApp();
+  await a.switchLeague(CATS9);
+  quiet(a);
+  assert.equal(a.get('SPORT').key, 'nba');
+  assert.equal(a.get('POSITIONS')[0], 'PG');
+  assert.equal(a.dayOffset('2026-10-26'), 0, 'basketball weeks start on Monday');
+  assert.equal(a.statVal({ fgPct: 0.5, fga: 10 }, 'fgm'), 5);
+  assert.equal(a.tabList().length, 9);
+  await assert.rejects(a.connectLeague('999000000000000099'), /didn't find that league/);
+  assert.equal(a.get('SPORT').key, 'nba');
+  await a.switchLeague(FOOTBALL);
+  quiet(a);
+  assert.equal(a.get('SPORT').key, 'nfl');
+  assert.equal(a.get('state').slots.length, 9);
+});

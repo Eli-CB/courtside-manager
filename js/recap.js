@@ -15,6 +15,7 @@ const finishedPeriods = L => (L.periods || []).filter(p => periodOver(p) && ((L.
 // week's with its %), minutes first
 function fullLine(s, perGame) {
   const g = perGame ? s.gp1 || 1 : 1, v = (k, d) => fmt(lineStat(s, k) / g, perGame ? 1 : d);
+  if (isFootball()) { const w = footballWords(s, g); return w.length ? w : ['no stats']; }
   const parts = [`${v('min', 0)} MIN`];
   const goalie = isHockey() && !!(s.sa || s.gs); // hockey: a skater's line or a goalie's, not both
   for (const c of scoreCats()) {
@@ -139,7 +140,7 @@ const recapUrl = (L, n) => `${location.origin}${location.pathname}?league=${enco
 
 // What Share sends: the standouts only (everyone already has the results in their league)
 function recapText(L, X) {
-  return [`🏀 ${L.name} · Week ${X.period.n} standouts`, '', ...recapItems(X).map(x => `${x.e} ${x.label}: ${x.text}`)].join('\n\n');
+  return [`${SPORT.emoji} ${L.name} · Week ${X.period.n} standouts`, '', ...recapItems(X).map(x => `${x.e} ${x.label}: ${x.text}`)].join('\n\n');
 }
 
 function viewRecap() {

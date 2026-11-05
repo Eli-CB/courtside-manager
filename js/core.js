@@ -202,7 +202,7 @@ const pctOf = (p, c) => { const att = statVal(p, c.att); return att ? statVal(p,
 const leaguePoints = () => { const L = fxLeague(); return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
 const isPoints = () => !!leaguePoints();
 function statVal(p, k) {
-  if (k === 'fgm') return p.fgPct * p.fga;
+  if (k === 'fgm' && !isFootball()) return p.fgPct * p.fga; // (football's fgm: field goals made)
   if (k === 'ftm') return p.ftPct * p.fta;
   if (k === 'gp1') return p.min || p.pts ? 1 : 0;
   if (DERIVED[k]) return sum(Object.entries(DERIVED[k]).map(([b, c]) => statVal(p, b) * c));

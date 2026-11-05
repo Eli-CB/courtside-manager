@@ -6,7 +6,7 @@
 
 const SPORTS = {
   nba: {
-    key: 'nba', name: 'NBA', data: 'data/', fantrax: 'NBA',
+    key: 'nba', name: 'NBA', emoji: '🏀', data: 'data/', fantrax: 'NBA',
     positions: ['PG', 'SG', 'SF', 'PF', 'C'],
     slotTypes: ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'],
     elig: { PG: ['PG'], SG: ['SG'], SF: ['SF'], PF: ['PF'], C: ['C'], G: ['PG', 'SG'], F: ['SF', 'PF'], FLX: ['PG', 'SG', 'SF', 'PF', 'C'] },
@@ -52,6 +52,7 @@ const SPORTS = {
     espn: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/',
     game: { minutes: 48, periods: 4, tag: 'Q' }, // a game's length and what its periods are called on a live clock
     // the stat columns of a table of per-game or season stats (past rosters), then its percentages: [key, label, makes, attempts]
+    soonTabs: [], // tabs this sport doesn't have yet
     tableStats: [['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'], ['tpm', '3PM'], ['to', 'TO']],
     tablePct: [['fgPct', 'FG%', 'fgm', 'fga'], ['ftPct', 'FT%', 'ftm', 'fta']],
     teamColors: {
@@ -69,7 +70,7 @@ const SPORTS = {
   // A game's stats, data/nhl (scripts/update_nhl.py): a goalie's own goals, assists and penalty minutes have their own
   // keys (gg, ag, gpim), so a league can score them apart from a skater's and no total mixes them; gt is his hours played.
   nhl: {
-    key: 'nhl', name: 'NHL', data: 'data/nhl/', fantrax: 'NHL',
+    key: 'nhl', name: 'NHL', emoji: '🏒', data: 'data/nhl/', fantrax: 'NHL',
     positions: ['C', 'LW', 'RW', 'D', 'G'],
     slotTypes: ['C', 'LW', 'RW', 'W', 'F', 'D', 'G', 'FLX'],
     elig: { C: ['C'], LW: ['LW'], RW: ['RW'], W: ['LW', 'RW'], F: ['C', 'LW', 'RW'], D: ['D'], G: ['G'], FLX: ['C', 'LW', 'RW', 'D'] },
@@ -101,6 +102,7 @@ const SPORTS = {
     espn: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/',
     espnTeams: { LA: 'LAK', NJ: 'NJD', SJ: 'SJS', TB: 'TBL' }, // ESPN's codes that aren't the NHL's
     game: { minutes: 60, periods: 3, tag: 'P' },
+    soonTabs: [],
     tableStats: [['min', 'MIN'], ['g', 'G'], ['a', 'A'], ['sog', 'SOG'], ['hit', 'HIT'], ['blk', 'BLK'], ['w', 'W'], ['so', 'SO']],
     tablePct: [['svPct', 'SV%', 'sv', 'sa']],
     goalieCats: ['gs', 'w', 'l', 'otl', 'sol', 'so', 'ga', 'gaa', 'sv', 'sa', 'svPct'],
@@ -138,6 +140,54 @@ const SPORTS = {
       VAN: ['#00205B', '#00843D'], VGK: ['#B4975A', '#333F42'], WPG: ['#041E42', '#7B303E'], WSH: ['#041E42', '#C8102E'],
     },
   },
+
+  // Football: Sleeper leagues. A week is Tuesday to Monday night (weekShift), one game a player. A line's stats are named as
+  // in a league's Sleeper scoring settings, so stats × scoring gives its points exactly, its bonuses and a defense's
+  // brackets (points allowed) included; the stats are the daily job's (data/nfl), filled in here when it loads (fetchSport).
+  // No past seasons, projections or Fantrax yet; a team defense is a player, with a number made from its team code.
+  nfl: {
+    key: 'nfl', name: 'NFL', emoji: '🏈', data: 'data/nfl/', fantrax: 'NFL',
+    positions: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'],
+    slotTypes: ['QB', 'RB', 'WR', 'TE', 'WRRB', 'WRTE', 'FLX', 'SFLX', 'K', 'DEF'],
+    elig: { QB: ['QB'], RB: ['RB'], WR: ['WR'], TE: ['TE'], K: ['K'], DEF: ['DEF'], WRRB: ['WR', 'RB'], WRTE: ['WR', 'TE'], FLX: ['RB', 'WR', 'TE'], SFLX: ['QB', 'RB', 'WR', 'TE'] },
+    defaultSlots: ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLX', 'K', 'DEF'],
+    slpSlots: { FLEX: 'Flx', WRRB_FLEX: 'WRRB', REC_FLEX: 'WRTE', SUPER_FLEX: 'SFLX' }, // Sleeper's slot names
+    broadPos: {},
+    cats: [],
+    baseDefault: {},
+    playerKeys: [], countKeys: ['gp1'], // the daily file's stats
+    fields: ['games'],
+    statLabel: {}, // a league's points are the one column: dozens of stats score
+    derived: {},
+    pctCats: {},
+    negCats: [],
+    catOrder: [],
+    boxCols: null,
+    tableStats: [],
+    tablePct: [],
+    espn: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/',
+    espnTeams: { WSH: 'WAS' },
+    game: { minutes: 60, periods: 4, tag: 'Q' },
+    weekShift: 1,
+    soonTabs: ['roster', 'players', 'draft', 'trade'],
+    // how a line reads: [stat, word], and which a position's card shows: [label, stat]
+    words: [['pass_yd', 'pass yd'], ['pass_td', 'pass TD'], ['pass_int', 'INT'], ['rush_yd', 'rush yd'], ['rush_td', 'rush TD'], ['rec', 'rec'], ['rec_yd', 'rec yd'], ['rec_td', 'rec TD'],
+      ['fgm', 'FG'], ['xpm', 'XP'], ['sack', 'sacks'], ['int', 'INT'], ['def_td', 'def TD'], ['pts_allow', 'pts allowed']],
+    card: {
+      QB: [['Pass yd', 'pass_yd'], ['Pass TD', 'pass_td'], ['INT', 'pass_int'], ['Rush yd', 'rush_yd'], ['Rush TD', 'rush_td']],
+      K: [['FG', 'fgm'], ['XP', 'xpm']],
+      DEF: [['Sacks', 'sack'], ['INT', 'int'], ['Pts allowed', 'pts_allow']],
+      other: [['Rush yd', 'rush_yd'], ['Rush TD', 'rush_td'], ['Rec', 'rec'], ['Rec yd', 'rec_yd'], ['Rec TD', 'rec_td']],
+    },
+    teamColors: {
+      ARI: ['#97233F', '#000000'], ATL: ['#A71930', '#000000'], BAL: ['#241773', '#9E7C0C'], BUF: ['#00338D', '#C60C30'], CAR: ['#0085CA', '#101820'], CHI: ['#0B162A', '#C83803'],
+      CIN: ['#FB4F14', '#000000'], CLE: ['#311D00', '#FF3C00'], DAL: ['#003594', '#869397'], DEN: ['#FB4F14', '#002244'], DET: ['#0076B6', '#B0B7BC'], GB: ['#203731', '#FFB612'],
+      HOU: ['#03202F', '#A71930'], IND: ['#002C5F', '#A2AAAD'], JAX: ['#006778', '#D7A22A'], KC: ['#E31837', '#FFB81C'], LAC: ['#0080C6', '#FFC20E'], LAR: ['#003594', '#FFA300'],
+      LV: ['#000000', '#A5ACAF'], MIA: ['#008E97', '#FC4C02'], MIN: ['#4F2683', '#FFC62F'], NE: ['#002244', '#C60C30'], NO: ['#D3BC8D', '#101820'], NYG: ['#0B2265', '#A71930'],
+      NYJ: ['#125740', '#000000'], PHI: ['#004C54', '#A5ACAF'], PIT: ['#000000', '#FFB612'], SEA: ['#002244', '#69BE28'], SF: ['#AA0000', '#B3995D'], TB: ['#D50A0A', '#34302B'],
+      TEN: ['#0C2340', '#4B92DB'], WAS: ['#5A1414', '#FFB612'],
+    },
+  },
 };
 
 // The sport on screen, and its tables as the plain names the rest of the site reads
@@ -150,5 +200,6 @@ function setSport(key) {
 }
 setSport('nba');
 const isHockey = () => SPORT.key === 'nhl';
+const isFootball = () => SPORT.key === 'nfl';
 // a hockey player who plays goal
 const isGoalie = p => isHockey() && !!p && (p.pos || []).includes('G');

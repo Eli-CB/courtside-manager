@@ -665,9 +665,9 @@ function viewWeek() {
   ${staleOpp && fxOpponentFor(start) ? `<div class="sample-banner"><span>Showing your opponent from the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="fx-load-opp">Load this week's opponent</button></div>` : ''}
   <div class="week-stack">
     ${fxStrip(ctx)}
-    ${past || `${scoreboard}
+    ${past || (isFootball() ? `<div class="card"><div class="empty"><strong>Football projections are on the way</strong>This week's scores are on the <a href="#dashboard">Dashboard</a>, finished weeks here.</div></div>` : `${scoreboard}
     ${matchupBoard(ctx)}
     ${over ? '' : weekly ? lineupSection(ctx) : dailyCards}
-    ${over || (ctx.locked && weekly) ? '' : pickupsCard()}`}
+    ${over || (ctx.locked && weekly) ? '' : pickupsCard()}`)}
   </div>`;
 }

@@ -19,8 +19,8 @@ const live = { day: null, games: [], lines: new Map(), done: new Set(), read: ne
 // ESPN lists tip-offs in UTC; 5 hours back always lands on the US game date (as the daily data job does)
 const usDay = t => new Date(t - 5 * 36e5).toISOString().slice(0, 10);
 
-// ESPN's team as the data's: basketball by its id, hockey by its code
-const espnTri = t => (isHockey() ? SPORT.espnTeams[t.abbreviation] || t.abbreviation : ESPN_TEAMS[t.id] || t.abbreviation);
+// ESPN's team as the data's: basketball by its id, the others by its code
+const espnTri = t => (SPORT.espnTeams ? SPORT.espnTeams[t.abbreviation] || t.abbreviation : ESPN_TEAMS[t.id] || t.abbreviation);
 
 function espnGames(sb) {
   return (sb.events || []).map(e => {
@@ -146,11 +146,14 @@ async function pollLive() {
     const sb = await getJson(SPORT.espn + 'scoreboard', 'ESPN');
     live.games = espnGames(sb);
     live.day = (sb.day && sb.day.date) || (live.games[0] && live.games[0].d) || live.day;
-    await readBoxes(live.games.filter(g => g.state !== 'pre' && !live.done.has(g.id) && !savedFinal(g) && boxDue(g)));
+    // (football: only the scoreboard. Its live points come from Sleeper, in the league's scoring: footballLines)
+    if (isFootball()) {
+      for (const g of live.games) if (g.state === 'post') live.done.add(g.id);
+    } else await readBoxes(live.games.filter(g => g.state !== 'pre' && !live.done.has(g.id) && !savedFinal(g) && boxDue(g)));
     // yesterday and earlier days of this week that the saved box scores don't have yet: once each (a miss is
     // tried next time)
     const today = todayIso();
-    const days = new Set([addDays(today, -1), ...matchDates(mondayOf(today)).filter(d => d < today)]);
+    const days = new Set(isFootball() ? [] : [addDays(today, -1), ...matchDates(mondayOf(today)).filter(d => d < today)]);
     for (const d of [...days].filter(d => d !== live.day && !live.done.has(d))) {
       if (![...teamDates].some(([t, ds]) => ds.has(d) && !(BOX && BOX.finals.has(`${d} ${t}`)))) { live.done.add(d); continue; }
       try {

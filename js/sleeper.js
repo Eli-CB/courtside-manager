@@ -20,10 +20,14 @@ const SLEEPER_OTHER = { bonus_pt_40p: '40+ point games', bonus_pt_50p: '50+ poin
 
 // One-game bonuses: [Sleeper's key, our stat, at least]. A game's are in its fantasy points (gameBonus), not projected.
 const SLEEPER_BONUS = [['bonus_pt_40p', 'pts', 40], ['bonus_pt_50p', 'pts', 50], ['bonus_reb_20p', 'reb', 20], ['bonus_ast_15p', 'ast', 15]];
-function sleeperScoring(ss) {
+function sleeperScoring(ss, sport = 'nba') {
   const points = {}, other = [], bonus = [];
   for (const [k, v] of Object.entries(ss || {})) {
     if (!+v) continue;
+    if (sport === 'nfl') { // scored by the stat's own name; one not in the data (a stat no game has had yet) is 0 anyway
+      points[k] = +v;
+      continue;
+    }
     const b = SLEEPER_BONUS.find(x => x[0] === k);
     if (b) bonus.push([b[1], b[2], +v]);
     if (SLEEPER_STATS[k]) points[SLEEPER_STATS[k]] = (points[SLEEPER_STATS[k]] || 0) + +v;
@@ -52,11 +56,16 @@ function countedIndex(lines, pts) {
 
 // The league's weeks with their dates: Sleeper's week n is the n-th Monday-to-Sunday week from opening night. A league
 // plays from its start week through the playoffs, a week a round.
-function sleeperPeriods(s, dayOne) {
+// Football: its schedule's weeks (the daily file's), Tuesday to Monday night.
+function sleeperPeriods(s, dayOne, weeks) {
   const first = Math.max(1, +s.start_week || 1);
   const rounds = +s.playoff_teams > 1 ? Math.ceil(Math.log2(+s.playoff_teams)) : 0;
   const last = (+s.playoff_week_start || 22) - 1 + rounds;
   const out = [];
+  if (weeks) {
+    for (const [n, [start, end]] of Object.entries(weeks)) if (+n >= first && +n <= last) out.push({ n: +n, start, end, lock: `${start}T00:00:00`, endAt: `${end}T23:59:00` });
+    return out.sort((a, b) => a.n - b.n);
+  }
   let start = dayOne;
   for (let n = 1; n <= last; n++) {
     const dow = new Date(start + 'T12:00:00').getDay(); // 0 = Sunday
@@ -71,16 +80,18 @@ function sleeperPeriods(s, dayOne) {
 const sleeperWeekNow = periods => (periods.find(p => todayIso() <= p.end) || periods[periods.length - 1] || {}).n || 1;
 
 // Sleeper's slot names -> the ones fxSlot understands ('UTIL' is any position)
-const sleeperSlot = x => (x === 'UTIL' ? 'Util' : String(x).replace(/_/g, '/'));
+const sleeperSlot = (x, sport = 'nba') => (x === 'UTIL' ? 'Util' : (SPORTS[sport].slpSlots || {})[x] || String(x).replace(/_/g, '/'));
 
 async function fetchSleeperLeague(id) {
   let lg;
   try { lg = await slpGet(`league/${encodeURIComponent(id)}`); } catch (e) { throw e; }
   if (!lg || !lg.league_id) throw new Error('League not found');
-  if (lg.sport && lg.sport !== 'nba') throw new Error(`that's a Sleeper ${String(lg.sport).toUpperCase()} league, not basketball`);
+  if (lg.sport && lg.sport !== 'nba' && lg.sport !== 'nfl') throw new Error(`that's a Sleeper ${String(lg.sport).toUpperCase()} league, not basketball or football`);
+  // that sport's data, without changing the page (switchLeague opens it)
+  const sport = lg.sport === 'nfl' ? 'nfl' : 'nba', D = SPORT.key === sport && NBA ? NBA : await fetchSport(sport);
   const s = lg.settings || {};
-  const dayOne = nbaGameDays()[0] || todayIso();
-  const periods = sleeperPeriods(s, dayOne);
+  const dayOne = [...new Set(Object.values(D.teams || {}).flatMap(t => t.dates || []))].sort()[0] || todayIso();
+  const periods = sleeperPeriods(s, dayOne, sport === 'nfl' ? D.weeks : null);
   const cur = sleeperWeekNow(periods);
   const weeksWanted = [cur - 1, cur, cur + 1].filter(n => periods.some(p => p.n === n));
   const [rostersRaw, users, draftPicks, draft, ...weeks] = await Promise.all([
@@ -93,7 +104,8 @@ async function fetchSleeperLeague(id) {
 
   // Sleeper ids -> NBA.com players (the daily data file carries each player's), names for anyone not matched
   const toNba = {}, names = {};
-  for (const raw of NBA.players) if (raw.slp) { toNba[raw.slp] = raw.id; names[raw.slp] = raw.name; }
+  const byId = new Map(D.players.map(r => [r.id, r]));
+  for (const raw of D.players) if (raw.slp) { toNba[raw.slp] = raw.id; names[raw.slp] = raw.name; }
   for (const p of draftPicks || []) {
     const m = p.metadata || {};
     if (p.player_id && !names[p.player_id]) names[p.player_id] = `${m.first_name || ''} ${m.last_name || ''}`.trim();
@@ -101,7 +113,7 @@ async function fetchSleeperLeague(id) {
   const rostered = new Set(rosters.flatMap(r => r.players || []));
   const fxPlayers = {};
   // Sleeper's own positions (its lineups follow them), else NBA.com's
-  for (const [sid, nba] of Object.entries(toNba)) fxPlayers[nba] = { id: sid, st: rostered.has(sid) ? 'T' : 'A', pos: (nbaById.get(nba) || {}).slpPos || [] };
+  for (const [sid, nba] of Object.entries(toNba)) fxPlayers[nba] = { id: sid, st: rostered.has(sid) ? 'T' : 'A', pos: (byId.get(nba) || {}).slpPos || [] };
 
   const userOf = new Map((users || []).map(u => [u.user_id, u]));
   const teamName = r => {
@@ -115,7 +127,7 @@ async function fetchSleeperLeague(id) {
   const startSlots = pos.filter(x => x !== 'BN' && x !== 'IR');
   const nBench = pos.filter(x => x === 'BN').length;
   const constraints = {};
-  for (const x of startSlots) { const k = sleeperSlot(x); constraints[k] = { maxActive: ((constraints[k] || {}).maxActive || 0) + 1 }; }
+  for (const x of startSlots) { const k = sleeperSlot(x, sport); constraints[k] = { maxActive: ((constraints[k] || {}).maxActive || 0) + 1 }; }
   const rosterInfo = {
     positionConstraints: constraints, maxTotalActivePlayers: startSlots.length, maxTotalReservePlayers: nBench,
     maxTotalPlayers: startSlots.length + nBench + (+s.reserve_slots || 0),
@@ -123,7 +135,7 @@ async function fetchSleeperLeague(id) {
   const item = (sid, slot, st) => ({ fid: sid, nba: toNba[sid] || null, name: names[sid] || `Player ${sid}`, slot, st });
   const leagueRosters = Object.fromEntries(rosters.map(r => {
     const starters = r.starters || [], ir = new Set(r.reserve || []);
-    const out = starters.map((sid, i) => (sid && sid !== '0' ? item(sid, sleeperSlot(startSlots[i] || 'UTIL'), 'ACTIVE') : null)).filter(Boolean);
+    const out = starters.map((sid, i) => (sid && sid !== '0' ? item(sid, sleeperSlot(startSlots[i] || 'UTIL', sport), 'ACTIVE') : null)).filter(Boolean);
     const seen = new Set(out.map(x => x.fid));
     for (const sid of r.players || []) if (!seen.has(sid)) out.push(item(sid, '', ir.has(sid) ? 'INJURED_RESERVE' : 'RESERVE'));
     return [String(r.roster_id), out];
@@ -150,9 +162,9 @@ async function fetchSleeperLeague(id) {
 
   const draftAt = draft && draft.start_time ? new Date(draft.start_time).toISOString() : null;
   const league = {
-    id, source: 'sleeper', name: String(lg.name || '').trim(), scoring: 'POINTS',
+    id, source: 'sleeper', sport, name: String(lg.name || '').trim(), scoring: 'POINTS',
     historyId: null, year: +lg.season || null,
-    ...sleeperScoring(lg.scoring_settings),
+    ...sleeperScoring(lg.scoring_settings, sport),
     oneGame: true, gameMode: +s.game_mode === 0 ? 'pick' : 'lockin',
     teams, periods,
     lockDays: 1, // lineups change day by day until a game is locked in
@@ -204,7 +216,8 @@ function sleeperWeekRosters(ms) {
 // 2 minutes (it's one small request), so a game locked in shows up without a full reload.
 let slpWeekLoad = null;
 function sleeperWeekFresh(L) {
-  if (!L || L.source !== 'sleeper' || slpWeekLoad || (L.slpWeek && Date.now() - L.slpWeek.at < 120000)) return;
+  // (football: as often as the rest of its live scores, these being them)
+  if (!L || L.source !== 'sleeper' || slpWeekLoad || (L.slpWeek && Date.now() - L.slpWeek.at < (isFootball() ? 30000 : 120000))) return;
   const n = sleeperWeekNow(L.periods);
   slpWeekLoad = slpGet(`league/${L.id}/matchups/${n}`).then(ms => {
     const pts = {};
@@ -212,6 +225,24 @@ function sleeperWeekFresh(L) {
     L.slpWeek = { n, pts, at: Date.now() };
     if (ui.tab === 'dashboard') render();
   }).catch(() => { L.slpWeek = { ...(L.slpWeek || { n, pts: {} }), at: Date.now() }; }).finally(() => { slpWeekLoad = null; });
+}
+
+// Football: this week's points before the morning's box scores have them, as lines on the day each player's game is. Only the
+// points: Sleeper keeps them current, in the league's own scoring. A game not started has none yet.
+function footballLines(L) {
+  if (!isFootball() || !L.slpWeek) return;
+  const p = L.periods.find(x => x.n === L.slpWeek.n), today = todayIso();
+  if (!p) return;
+  const days = [];
+  for (let d = p.start; d <= p.end; d = addDays(d, 1)) days.push(d);
+  for (const raw of NBA.players) {
+    const pts = raw.slp != null ? L.slpWeek.pts[raw.slp] : null, d = days.find(x => playsOn(raw, x));
+    if (pts == null || !d || (BOX && (BOX.day.get(raw.id) || new Map()).has(d))) continue;
+    const g = live.games.find(x => x.d === d && (x.home === raw.team || x.away === raw.team));
+    if (!(d < today || (g && g.state !== 'pre') || +pts)) continue;
+    if (!live.lines.has(d)) live.lines.set(d, new Map());
+    live.lines.get(d).set(raw.id, { gp1: 1, min: 0, bonus: +pts });
+  }
 }
 
 // One-game leagues: the one game of a player's that counts among his lines this period (oldest first), with its

@@ -1,6 +1,6 @@
 # League Layer: notes for working on this repo
 
-Fantasy basketball (Fantrax, public ESPN leagues, Sleeper) and hockey (Fantrax) weekly matchup site. Static GitHub Pages site, no build step, no backend.
+Fantasy basketball (Fantrax, public ESPN leagues, Sleeper), hockey (Fantrax) and football (Sleeper, part of the site so far) weekly matchup site. Static GitHub Pages site, no build step, no backend.
 Live: https://leaguelayer.com (domain on Cloudflare, DNS only, set in the repo's Pages settings; the old
 eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/courtside-manager:
 the site was Courtside Manager until Oct 2026; the repo and every `courtside-*` storage key keep the old name so nobody's
@@ -95,6 +95,14 @@ saved leagues are lost). Owner's league:
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
+- NFL (Sleeper leagues only; stages 1-2 of 5 done: data, then Standings, Dashboard scores, Recap, Awards, past weeks. `soonTabs` hides Roster,
+  Players, Draft and Trades; Matchups shows finished weeks only. Next: projections from Sleeper's weekly feed, then Draft, Trades, past seasons, then
+  Fantrax). `scripts/update_nfl.py` (own step in the daily job, as hockey's) builds `data/nfl/`: players from Sleeper's list (too big for a browser: 14 MB), schedule
+  from ESPN, stats by week from Sleeper's undocumented `api.sleeper.com/stats`. A line's stats keep Sleeper's names, the same as a league's `scoring_settings`, so
+  `L.points` is simply those settings and `lineFp` gives the league's exact points, bonuses and defense brackets included: 80 team-weeks of a real league matched Sleeper's
+  to the hundredth. `statKeys` come from the file (`fetchSport` fills `countKeys`, `playerKeys`). A league is `oneGame`, which already means one game a week per slot, with no
+  Game of the week. Weeks are Tuesday to Monday (`weekShift`, in `dayOffset`), from the file's `weeks`. During a game the points come from Sleeper's matchups (`footballLines`:
+  lines holding only `bonus`), every 30 s; ESPN gives only the game clock (scoreboard, no box scores). A team defense is a player, id 900000 + its team's index, `slp` its code.
 - NHL (Fantrax leagues only; every tab and past seasons, as basketball; "Just browse" and the demo are NBA only). Goalies: a team's game isn't each
   goalie's. `startChance(p, d)` (nba.js) is 1 for skaters; a goalie's comes from `startChain(team)`, game by game from the team's last
   (`teams[t].lg`): his share of recent starts (`raw.st`, `goalie_shares` in the job; roster goalies only, anyone Out shares nothing), cut

@@ -406,13 +406,13 @@ async function switchLeague(input) {
   if (!id) throw new Error(BAD_LEAGUE_ID);
   await needNba();
   // the league's sport has to be on screen before the league can be: nothing's drawn until both are (ui.hold), and
-  // a league that doesn't load leaves the sport as it was. Only Fantrax has hockey; the other sites read basketball's tables.
+  // a league that doesn't load leaves the sport as it was. Fantrax and Sleeper leagues say their sport; the other sites are basketball.
   // (coming from the demo, nothing is kept: its team was only borrowed, even if this is the same league)
   const cur = currentLeagueId(), was = SPORT.key, fromDemo = !!state.demo;
   let res;
   ui.hold = true;
   try {
-    if (leagueSourceOf(id) !== 'fantrax') await useSport('nba');
+    if (!['fantrax', 'sleeper'].includes(leagueSourceOf(id))) await useSport('nba');
     res = await getLeague(id);
     await useSport(res.league.sport || 'nba');
   } catch (e) {

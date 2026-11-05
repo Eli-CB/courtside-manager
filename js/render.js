@@ -81,7 +81,7 @@ function leagueMenu() {
 const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const TABS_BROWSE = [['players', 'Players']]; // browsing without a league
-const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW);
+const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
 let seasonCtx = null; // set while a past season renders: { basis, label }

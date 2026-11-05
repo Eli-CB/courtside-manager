@@ -28,6 +28,7 @@ function fakeFetch(url) {
   const u = new URL(String(url), 'http://localhost/');
   let body = null;
   if (u.pathname.includes('/data/nhl/')) body = readFixture('nhl/' + u.pathname.split('/').pop());
+  else if (u.pathname.includes('/data/nfl/')) body = readFixture('nfl/' + u.pathname.split('/').pop());
   else if (u.pathname.endsWith('/data/players.json')) body = readFixture('players.json');
   else if (u.pathname.endsWith('/data/boxscores.json')) body = readFixture('boxscores.json');
   else if (u.pathname.includes('/data/seasons/')) body = readFixture('seasons/' + u.pathname.split('/').pop());

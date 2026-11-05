@@ -72,7 +72,9 @@ const actions = {
     if (!item) return;
     $('#infoTitle').textContent = item[0];
     // some are written from live numbers; they're worded for basketball, the league's sport named here
-    $('#infoBody').innerHTML = (typeof item[1] === 'function' ? item[1]() : item[1]).replace(/\bNBA\b/g, SPORT.name) + ((SPORT.infoMore || {})[el.dataset.key] || '');
+    let html = (typeof item[1] === 'function' ? item[1]() : item[1]).replace(/\bNBA\b/g, SPORT.name);
+    if (isFootball()) html = html.replace(/<p><b>Sleeper leagues<\/b>[\s\S]*?<\/p>/g, ''); // (about one game among several, in basketball)
+    $('#infoBody').innerHTML = html + ((SPORT.infoMore || {})[el.dataset.key] || '');
     const d = $('#infoDialog');
     if (!d.open) d.showModal();
   },

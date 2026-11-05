@@ -7,7 +7,7 @@ sprite instead of hundreds of separate images:
 
 Run after scripts/update_data.py (it reads data/players.json):
   python scripts/build_images.py
-Or for the NHL, after scripts/update_nhl.py (the same files in data/nhl):
+Or for the NHL or NFL, after their data jobs (the same files in data/nhl, data/nfl):
   python scripts/build_images.py nhl
 Needs Pillow (python -m pip install pillow).
 """
@@ -24,7 +24,8 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NHL = sys.argv[1:] == ['nhl']
-DATA = os.path.join(ROOT, 'data', 'nhl') if NHL else os.path.join(ROOT, 'data')
+NFL = sys.argv[1:] == ['nfl']
+DATA = os.path.join(ROOT, 'data', sys.argv[1]) if NHL or NFL else os.path.join(ROOT, 'data')
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
     'Referer': 'https://www.nba.com/',
@@ -41,8 +42,14 @@ def fetch(url):
         return None
 
 
-def headshot(pid):
-    raw = fetch(f'https://assets.nhle.com/mugs/nhl/latest/{pid}.png' if NHL else f'https://cdn.nba.com/headshots/nba/latest/260x190/{pid}.png')
+def nfl_logo(team):
+    return f'https://sleepercdn.com/images/team_logos/nfl/{team.lower()}.png'
+
+
+def headshot(p):
+    pid = p['id']
+    raw = fetch((nfl_logo(p['team']) if p['pos'] == ['DEF'] else f"https://sleepercdn.com/content/nfl/players/thumb/{p['slp']}.jpg") if NFL
+                else f'https://assets.nhle.com/mugs/nhl/latest/{pid}.png' if NHL else f'https://cdn.nba.com/headshots/nba/latest/260x190/{pid}.png')
     if not raw:
         return None
     try:
@@ -61,7 +68,7 @@ def main():
 
     ids = [p['id'] for p in players]
     with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
-        shots = list(pool.map(headshot, ids))
+        shots = list(pool.map(headshot, players))
     got = [(pid, img) for pid, img in zip(ids, shots) if img is not None]
     print(f'headshots: {len(got)}/{len(ids)}')
 
@@ -73,10 +80,17 @@ def main():
 
     teams = {}
     for p in players:
-        if p.get('team') and p.get('tid'):
-            teams[p['team']] = p['tid']
+        if p.get('team') and (p.get('tid') or NFL):
+            teams[p['team']] = p.get('tid')
     logos = {}
     for tri, tid in sorted(teams.items()):
+        if NFL:  # a small picture, not a drawing
+            png = fetch(nfl_logo(tri))
+            if png:
+                out = io.BytesIO()
+                Image.open(io.BytesIO(png)).convert('RGBA').resize((64, 64), Image.LANCZOS).save(out, 'PNG', optimize=True)
+                logos[tri] = 'data:image/png;base64,' + base64.b64encode(out.getvalue()).decode()
+            continue
         svg = fetch(f'https://assets.nhle.com/logos/nhl/svg/{tri}_light.svg' if NHL else f'https://cdn.nba.com/logos/nba/{tid}/primary/L/logo.svg')
         if svg and b'<svg' in svg[:2000]:
             logos[tri] = 'data:image/svg+xml;base64,' + base64.b64encode(svg).decode()

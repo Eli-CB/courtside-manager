@@ -208,6 +208,7 @@ function dashMatchupCard() {
   if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');
   if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
   sleeperWeekFresh(L);
+  footballLines(L);
   const one = isOneGame(); // Sleeper: one game a week counts for each starter
   const D = dashDays();
   // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Until one is picked: today once its games have started,
@@ -304,8 +305,11 @@ function dashMatchupCard() {
     let game;
     if (range === 'week') {
       const left = D.all.filter(d => playsOn(p, d) && !lineOn(p, d) && (d > today || (d === today && !gameFinal(p, d) && !(liveGame(p, d) && liveGame(p, d).state === 'post')))).length;
+      const fbDay = isFootball() ? D.all.find(d => playsOn(p, d)) : null;
       const toCome = isGoalie(p) ? `about ${fmt(expectedGames(p, D.all.filter(d => d >= today && !gameFinal(p, d))), 1)}` : left;
       game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${toCome} left` : ''}${liveOn(p, today) && lineOn(p, today) ? ` · ${liveStatus(p, today)}` : ''}`;
+      // football: his one game, or his bye
+      if (isFootball()) game = fbDay ? `${fmtDay(fbDay).split(',')[0]} ${dashGame(p, fbDay)}` : 'Bye';
     } else game = dashGame(p, dates[0]);
     const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
     return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
@@ -794,7 +798,7 @@ function pastSeasonTotals(L, G) {
 }
 
 function seasonTotalsCard(L, standings) {
-  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${leagueLineupMode(L) === 'daily' ? "day's" : "week's"} starting lineups</span></div>`;
+  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${leagueLineupMode(L) === 'daily' && !isFootball() ? "day's" : "week's"} starting lineups</span></div>`;
   const note = msg => `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
   let teams;
   if (seasonCtx) {
@@ -1090,6 +1094,7 @@ function valueRanks() {
 
 // The player card's columns: [label, a season's per-game average, a game's number, the games table's label if it's another]
 function cardStats(raw) {
+  if (isFootball()) return (SPORT.card[raw.pos[0]] || SPORT.card.other).map(([label, k]) => [label, s => fmt(s[k] || 0), o => o[k] || 0]);
   const n = k => [k.toUpperCase(), s => fmt(s[k]), o => o[k]];
   const two = (label, k) => [label, s => fmt(s[k], 2), o => o[k]];
   if (isGoalie(raw)) {
@@ -1103,8 +1108,11 @@ function cardStats(raw) {
   return [['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], n('pts'), n('reb'), n('ast'), n('stl'), n('blk'), ['3PM', s => fmt(s.tpm), o => o.tpm], n('to'),
     ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0), o => `${o.fgm}-${o.fga}`, 'FG'], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0), o => `${o.ftm}-${o.fta}`, 'FT']];
 }
+// Football's line in words: what the player did, the rest left out
+const footballWords = (s, per = 1) => SPORT.words.filter(([k]) => s[k]).map(([k, w]) => `${fmt(s[k] / per, per > 1 ? 1 : 0)} ${w}`);
 // A game's numbers as words: [the main ones, the ones in gray]
 function gameStats(raw, o) {
+  if (isFootball()) return [footballWords(o), []];
   if (isGoalie(raw)) return [[`${o.sv || 0} saves on ${o.sa || 0}`, `${o.ga || 0} GA`], [o.w ? 'Win' : o.l ? 'Loss' : o.otl ? 'OT loss' : o.sol ? 'Shootout loss' : o.so ? 'Shutout' : ''].filter(Boolean)];
   if (isHockey()) return [[`${o.g || 0} G`, `${o.a || 0} A`, `${o.sog || 0} SOG`, `${o.hit || 0} HIT`, `${o.blk || 0} BLK`], [`${(o.pm > 0 ? '+' : '') + (o.pm || 0)}`, `${o.pim || 0} PIM`]];
   return [[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`], [`${o.fgm}-${o.fga} FG`, `${o.ftm}-${o.fta} FT`]];
@@ -1142,7 +1150,7 @@ function showPlayerDetail(nbaId) {
   const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td>${CS.map(([, , g]) => `<td class="num">${g(o)}</td>`).join('')}${valCell(lineValue(o))}</tr>`).join('');
   $('#detailBody').innerHTML = `
     <div class="detail-head">
-      <div class="detail-id">${headshot({ nbaId: raw.id, name: raw.name }, 64)}<div><h2>${esc(raw.name)}</h2><p class="muted" style="margin:2px 0 0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)} · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}</p>${cardOwner(raw)}</div></div>
+      <div class="detail-id">${headshot({ nbaId: raw.id, name: raw.name }, 64)}<div><h2>${esc(raw.name)}</h2><p class="muted" style="margin:2px 0 0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</p>${cardOwner(raw)}</div></div>
       <div>${raw.inj ? `<span class="badge ${raw.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(raw.inj.label)}</span>` : '<span class="badge good">Healthy</span>'}</div>
     </div>
     ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small">${esc(raw.inj.note)} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}

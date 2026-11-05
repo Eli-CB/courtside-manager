@@ -83,6 +83,12 @@ async function fetchSport(key, fresh = false) {
   const data = await r.json();
   if (!data || !Array.isArray(data.players)) throw new Error('bad data');
   for (const raw of data.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
+  if (key === 'nfl') { // football's stats are whatever Sleeper scores: the file names them
+    const T = SPORTS.nfl, keys = data.statKeys.slice(1);
+    T.playerKeys = keys;
+    T.countKeys = [...keys, 'gp1'];
+    if (SPORT === T) setSport('nfl');
+  }
   if (data.league && data.league.scoringSystem) Object.assign(data.league, fxScoring(data.league.scoringSystem));
   data.siteLeague = data.league;
   return (sportFiles[key] = data);
@@ -245,7 +251,8 @@ let teamDates = new Map();
 const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayIso = () => isoDay(new Date());
 function addDays(iso, n) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoDay(d); }
-const dayOffset = iso => (new Date(iso + 'T12:00:00').getDay() + 6) % 7; // Mon = 0
+// days into the week (Monday = 0, or Tuesday in football, whose weeks end with Monday night's game)
+const dayOffset = iso => (new Date(iso + 'T12:00:00').getDay() + 6 - (SPORT.weekShift || 0)) % 7;
 const mondayOf = iso => addDays(iso, -dayOffset(iso));
 
 // The matchup week to show: this week, or next week once this week's matchup days are over
