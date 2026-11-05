@@ -466,6 +466,14 @@ function adoptTeam(teamId) {
 /* ---------- The demo: the site's own league, seen as one of its teams ---------- */
 // Every tab needs a team, so the demo starts as one: the best record with a matchup this week. It stays out of the
 // visitor's own leagues, and the team picker just changes which team it's seen as.
+// It's a real league, so its teams go by made-up names, on the copy on this page only: connecting the league for real
+// loads it afresh with its own.
+const DEMO_TEAMS = ['Buzzer Beaters', 'Fast Breakers', 'Glass Cleaners', 'Rim Rockers', 'Triple Threats', 'Sharpshooters', 'Bench Mob',
+  'Alley Oops', 'Pick and Rollers', 'Full Court Press', 'Crossover Kings', 'Sixth Men', 'Baseline Bombers', 'Paint Patrol', 'Shot Clocks', 'Backboard Bullies'];
+function demoNames(L) {
+  const names = new Map(L.teams.map((t, i) => [t.id, DEMO_TEAMS[i] || `Team ${i + 1}`]));
+  for (const t of [...L.teams, ...(L.standings || [])]) t.name = names.get(t.id) || t.name;
+}
 function demoTeam() {
   const L = fxLeague(), order = [...(L.standings || []).map(s => s.id), ...L.teams.map(t => t.id)];
   return order.find(id => fxRoster(id).length && fxOpponentFor(weekStart(), id)) || order.find(id => fxRoster(id).length) || order[0];

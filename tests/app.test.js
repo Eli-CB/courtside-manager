@@ -2476,3 +2476,32 @@ test("ESPN failing again and again reaches the error log, a visitor's own connec
   await plane.poll(3);
   assert.equal(plane.sent.length, 0, 'offline');
 });
+
+test("the demo's teams go by made-up names, and connecting the league for real brings its own back", async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  const st = a.get('state'), ui = a.get('ui');
+  ui.tab = 'standings';
+  const real = a.get('NBA').league.teams.map(t => t.name);
+  await a.actions['land-demo']();
+  clearTimeout(a.get('live').timer);
+  const L = a.fxLeague(), site = L.id;
+  assert.equal(new Set(L.teams.map(t => t.name)).size, L.teams.length, 'each its own');
+  assert.ok(!L.teams.some(t => real.includes(t.name)));
+  assert.ok(!(L.standings || []).some(s => real.includes(s.name)));
+  assert.ok(!real.includes(st.teamName) && !real.includes(st.opp.name), 'your team and your opponent too');
+  const pages = [a.viewDashboard(), a.viewStandings(), a.withViewedTeam(a.viewWeek, true), a.viewTrade(), a.demoNote()].join(' ');
+  clearTimeout(a.get('live').timer);
+  for (const name of real) assert.ok(!pages.includes(a.esc(name)), `${name} on a page`);
+  // leaving, then connecting the same league
+  a.actions['demo-exit']();
+  clearTimeout(a.get('live').timer);
+  await a.switchLeague(site);
+  assert.deepEqual([...a.fxLeague().teams.map(t => t.name)], real);
+  // more teams than names still gets a name each
+  const big = { teams: Array.from({ length: 20 }, (x, i) => ({ id: `t${i}`, name: 'x' })) };
+  a.demoNames(big);
+  assert.equal(new Set(big.teams.map(t => t.name)).size, 20);
+  assert.equal(big.teams[19].name, 'Team 20');
+});

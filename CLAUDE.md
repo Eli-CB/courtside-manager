@@ -86,7 +86,7 @@ saved leagues are lost). Owner's league:
     league in `state.pastSeasons[historyId]`, never as a league; `foldPastSeasons` moves old duplicates there
   - actions: `actions` (data-action handlers), event wiring, `route()`, `init()`
   - Demo (`state.demo`, the landing page's "Explore a basketball demo league"): the daily file's site league, seen as a team (`demoTeam`: the
-    best record with a matchup) so every tab has something to show; never in `savedLeagues`, the team picker changes the team, `demo-exit` or
+    best record with a matchup) so every tab has something to show, its teams under made-up names (`demoNames`, in memory only); never in `savedLeagues`, the team picker changes the team, `demo-exit` or
     connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
   - No league (`state.browse`, the landing page's "Just browse players"): `fxLeague()` is null (the daily file's site
     league stays loaded for the demo), `clearLeaguePlayers()` drops its rosters/positions from the players, the tabs are

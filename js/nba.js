@@ -134,7 +134,7 @@ async function loadNba(fresh = false) {
     }
     if (state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
     if (state.fxTeam) syncLeagueRules();
-    if (state.demo && !state.fxTeam && fxLeague()) adoptTeam(demoTeam()); // a demo from before it had a team
+    if (state.demo && fxLeague()) { demoNames(fxLeague()); adoptTeam(state.fxTeam || demoTeam()); } // back in the demo: its names, today's rosters
     const migrate = state.fxTeam && !state.demo && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
     if (migrate) rememberLeague(NBA.league.id, NBA.league);
     const folded = foldPastSeasons();
