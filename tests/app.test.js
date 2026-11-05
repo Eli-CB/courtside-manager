@@ -2488,6 +2488,8 @@ test("the demo's teams go by made-up names, and connecting the league for real b
   clearTimeout(a.get('live').timer);
   const L = a.fxLeague(), site = L.id;
   assert.equal(new Set(L.teams.map(t => t.name)).size, L.teams.length, 'each its own');
+  assert.equal(L.name, 'Demo League');
+  assert.equal(a.recapFileName(L, { period: { n: 1 } }).startsWith('demo-league'), true);
   assert.ok(!L.teams.some(t => real.includes(t.name)));
   assert.ok(!(L.standings || []).some(s => real.includes(s.name)));
   assert.ok(!real.includes(st.teamName) && !real.includes(st.opp.name), 'your team and your opponent too');
@@ -2499,6 +2501,7 @@ test("the demo's teams go by made-up names, and connecting the league for real b
   clearTimeout(a.get('live').timer);
   await a.switchLeague(site);
   assert.deepEqual([...a.fxLeague().teams.map(t => t.name)], real);
+  assert.equal(a.fxLeague().name, 'Keepers and Creepers');
   // more teams than names still gets a name each
   const big = { teams: Array.from({ length: 20 }, (x, i) => ({ id: `t${i}`, name: 'x' })) };
   a.demoNames(big);

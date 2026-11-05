@@ -61,7 +61,7 @@ function leagueMenu() {
     <div class="lm-pop">
       <div class="lm-sec">Leagues</div>
       ${saved.map(l => `<div class="lm-row"><button type="button" class="lm-item${l.id === cur ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${l.id === cur ? '✓ ' : ''}${esc(l.name)}</button>${l.id !== cur ? `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>` : ''}</div>${l.id === cur ? seasons : ''}`).join('')}
-      ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)} <span class="muted">(demo)</span></span></div>` : ''}
+      ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)}</span></div>` : ''}
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
       <div class="lm-sec">Stats used ${infoBtn('projection')}</div>

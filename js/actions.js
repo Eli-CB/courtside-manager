@@ -237,7 +237,7 @@ const actions = {
       await switchLeague(site.id);
       ui.addingLeague = false;
       if (!state.fxTeam) { state.demo = true; demoNames(fxLeague()); adoptTeam(demoTeam()); }
-      commit(`Exploring ${site.name}`);
+      commit(`Exploring ${fxLeague().name}`);
       location.hash = '#dashboard';
     } catch (e) { toast(e.message); }
   },
