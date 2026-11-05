@@ -20,7 +20,7 @@ function buildAlerts() {
   const over = activeCount() - rosterLimit();
   if (over > 0) a.push({ lvl: 'bad', msg: `Roster is ${over} over the ${rosterLimit()}-player limit. Drop or IL someone.` });
   // lineup advice lives on Matchups, where it plays to the actual matchup
-  if (NBA && state.opp.players.length && state.lineupMode === 'weekly') {
+  if (NBA && state.opp.players.length && (state.lineupMode === 'weekly' || isFootball())) {
     const ctx = weekContext();
     const better = ctx.bestIds && [...ctx.bestIds].some(id => !ctx.setIds.has(id));
     if (better) a.push({ lvl: 'warn', msg: `A better lineup for this week takes you from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> to win.`, action: 'go-week', label: 'See it' });

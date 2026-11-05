@@ -68,7 +68,7 @@ const actions = {
     render();
   },
   info(el) {
-    const item = INFO[el.dataset.key];
+    const item = (SPORT.infoOver || {})[el.dataset.key] || INFO[el.dataset.key];
     if (!item) return;
     $('#infoTitle').textContent = item[0];
     // some are written from live numbers; they're worded for basketball, the league's sport named here

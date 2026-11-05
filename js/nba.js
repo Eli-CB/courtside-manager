@@ -86,7 +86,7 @@ async function fetchSport(key, fresh = false) {
   if (key === 'nfl') { // football's stats are whatever Sleeper scores: the file names them
     const T = SPORTS.nfl, keys = data.statKeys.slice(1);
     T.playerKeys = keys;
-    T.countKeys = [...keys, 'gp1'];
+    T.countKeys = [...new Set([...keys, ...(data.projKeys || [])]), 'gp1', 'bonus', 'fpsd']; // (bonus: live points; fpsd: footballProj)
     if (SPORT === T) setSport('nfl');
   }
   if (data.league && data.league.scoringSystem) Object.assign(data.league, fxScoring(data.league.scoringSystem));
@@ -101,6 +101,7 @@ function useData(data) {
   for (const raw of NBA.players) { nbaById.set(raw.id, raw); nbaByName.set(normName(raw.name), raw.id); }
   teamDates = new Map(Object.entries(NBA.teams || {}).map(([t, v]) => [t, new Set(v.dates || [])]));
   countNames();
+  projMemo.clear();
   baseMemo.clear(); // new stats, new baselines
   BASE = baseNow();
 }
@@ -471,6 +472,45 @@ function perGame(p) {
   return { m, sd };
 }
 
+// ----- Football: a week is one game, and a player's is Sleeper's projection -----
+const footballWeek = d => +(Object.entries(NBA.weeks || {}).find(([, w]) => w[0] <= d && d <= w[1]) || [0])[0];
+const projMemo = new Map();
+// { m: his projected stats, sd: { fpsd: how far his week lands from them, in points } }. A week the daily file has no
+// projections for: his season average. A week it has them, but none for him: nothing (he isn't expected to play).
+function footballProj(p, dates) {
+  const w = footballWeek(dates[0]), key = `${p.nbaId}|${w}`;
+  if (projMemo.has(key)) return projMemo.get(key);
+  const raw = nbaById.get(p.nbaId), row = raw && raw.proj && raw.proj[w], m = { gp1: 1 };
+  if (row) NBA.projKeys.forEach((k, i) => { if (row[i]) m[k] = row[i]; });
+  else if (raw && !(NBA.projWeeks || []).includes(w)) { const s = statObj(raw.cur) || {}; for (const k of SPORT.playerKeys) if (s[k]) m[k] = s[k]; }
+  const out = { m, sd: { fpsd: SPORT.projSd[(raw ? raw.pos : p.pos || [])[0]] || 6 } };
+  projMemo.set(key, out);
+  return out;
+}
+// His projected points for a week (nothing on a bye or listed Out), in the league's own scoring
+const footballPts = (p, dates) => (gamesIn(p, dates) && p.status !== 'Out' ? lineFp(footballProj(p, dates).m) : 0);
+// His game in those days now. state: bye, pre (not started), in, post. line: his points so far. left: the share of it left.
+function footballNow(p, dates) {
+  const d = dates.find(x => playsOn(p, x));
+  if (!d) return { state: 'bye' };
+  const g = liveGame(p, d), line = actualLine(p, d) || liveLines(d).get(p.nbaId) || null;
+  if (gameFinal(p, d) || d < todayIso() || (g && g.state === 'post')) return { d, state: 'post', line };
+  return g && g.state === 'in' ? { d, state: 'in', line, left: gameMinLeft(g) / SPORT.game.minutes } : { d, state: 'pre', line: null };
+}
+// One side's entry for the week: what he's scored, and what share of his projection is still to come
+function footballEntry(p, dates) {
+  const g = footballProj(p, dates), now = footballNow(p, dates), line = now.line || {};
+  const share = now.state === 'pre' ? 1 : now.state === 'in' ? now.left : 0;
+  return { p, line, g, share, fp: lineFp(line) + share * lineFp(g.m) };
+}
+// The best lineup: the most projected points. A player is locked once his game starts: a starter stays, a bench player can't come in.
+function bestFootballIds(players, dates) {
+  const on = new Set([...state.lineup, ...(state.opp.starters || [])]), stateOf = p => footballNow(p, dates).state;
+  const locked = players.filter(p => on.has(p.id) && (stateOf(p) === 'in' || stateOf(p) === 'post'));
+  const open = players.filter(p => stateOf(p) === 'pre' && p.status !== 'Out').sort((a, b) => footballPts(b, dates) - footballPts(a, dates));
+  return new Set(fillSlots([...locked, ...open], state.slots).filter(Boolean));
+}
+
 // Finished games: whether a player's team has played that day, and his real line (null: he didn't play)
 const gameFinal = (p, d) => !!(BOX && p.team && BOX.finals.has(`${d} ${p.team}`));
 const actualLine = (p, d) => (BOX && p.nbaId ? (BOX.day.get(p.nbaId) || new Map()).get(d) || null : null);
@@ -495,7 +535,7 @@ function projectSide(players, dates, fixedIds) {
       const ids = new Set(fillSlots(avail, state.slots).filter(Boolean));
       active = avail.filter(p => ids.has(p.id));
     }
-    for (const p of active) {
+    for (const p of isFootball() ? [] : active) { // (football: oneGameSide)
       const line = gameFinal(p, d) ? actualLine(p, d) : null;
       if (line) { for (const k of COUNT_KEYS) tot[k] += line[k] || 0; games++; continue; }
       const g = perGame(p), c = startChance(p, d); // (a goalie counts by his chance of starting, which also widens his spread)
@@ -513,10 +553,11 @@ function projectSide(players, dates, fixedIds) {
 // come, projected. The best of those fill the slots, one player each.
 function oneGameSide(players, days) {
   const tot = Object.fromEntries(COUNT_KEYS.map(k => [k, 0])), vr = { ...tot }, left = { ...tot };
-  const cands = [];
+  const cands = [], dates = days.map(x => x.date);
   for (const p of players) {
     const on = days.filter(x => x.active.has(p.id));
     if (!on.length) continue;
+    if (isFootball()) { cands.push(footballEntry(p, dates)); continue; }
     const played = on.map(x => (gameFinal(p, x.date) ? actualLine(p, x.date) : null)).filter(Boolean);
     const toCome = on.some(x => !gameFinal(p, x.date));
     const g = perGame(p), c = oneGameLine(p, played);
@@ -530,7 +571,10 @@ function oneGameSide(players, days) {
     if (!seated.has(x.p.id)) continue;
     games++;
     if (x.line) for (const k of COUNT_KEYS) tot[k] += x.line[k] || 0;
-    else for (const k of COUNT_KEYS) { tot[k] += x.g.m[k]; vr[k] += x.g.sd[k] ** 2; left[k] += x.g.m[k]; }
+    if (!x.g) continue;
+    const c = x.share == null ? 1 : x.share; // (football: a game partly played counts the rest of its projection)
+    for (const [k, v] of Object.entries(x.g.m)) { tot[k] += c * v; left[k] += c * v; }
+    for (const [k, v] of Object.entries(x.g.sd)) vr[k] += c * v ** 2;
   }
   return { tot, vr, left, games };
 }
@@ -550,7 +594,8 @@ const pctNoise = (c, x) => (c.rate ? x : 1.3 * x * (1 - x));
 const FP_RHO = 0.35;
 function fpTotals(S) {
   const sc = foldPoints(leaguePoints());
-  const a = sum(Object.entries(sc).map(([k, v]) => (S.tot[k] || 0) * v));
+  const a = sum(Object.entries(sc).map(([k, v]) => (S.tot[k] || 0) * v)) + (S.tot.bonus || 0);
+  if (isFootball()) return { a, vr: S.vr.fpsd || 0 }; // players' weeks, not stat by stat: there are dozens
   const parts = Object.entries(sc).map(([k, v]) => v * Math.sqrt(S.vr[k] || 0));
   const vr = (1 - FP_RHO) * sum(parts.map(x => x * x)) + FP_RHO * sum(parts) ** 2;
   return { a, vr };
@@ -623,6 +668,7 @@ function playerFromRaw(raw, extra = {}) {
 // ----- Locked weekly lineups -----
 // Rough worth of starting a player for the week: games × value (against not playing); one game in one-game leagues
 function weeklyPriority(p, dates) {
+  if (isFootball()) return p.status === 'Out' ? -1 : Math.max(footballPts(p, dates), gamesIn(p, dates) ? 0.01 : 0);
   return p.status === 'Out' ? -1 : (isOneGame() ? Math.min(1, gamesIn(p, dates)) : expectedGames(p, dates)) * Math.max(value(p), 0.01);
 }
 
@@ -634,6 +680,7 @@ function fitsSlots(ids, players) {
 // Best set of starters for a locked week. With an opponent, polish it by trying
 // starter/bench swaps that raise the expected category score.
 function bestWeeklyIds(players, dates, them) {
+  if (isFootball()) return bestFootballIds(players, dates);
   const cands = players.filter(p => p.status !== 'Out').sort((a, b) => weeklyPriority(b, dates) - weeklyPriority(a, dates));
   let cur = new Set(fillSlots(cands, state.slots).filter(Boolean));
   if (!them) return cur;

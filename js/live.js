@@ -108,8 +108,10 @@ const savedFinal = g => !!(BOX && BOX.finals.has(`${g.d} ${g.home}`));
 const espnDate = d => d.replace(/-/g, '');
 // The Dashboard's matchup or Performances (Players) is on screen and shows games from today (Today, This week, or
 // not picked yet: each opens on Today once games have started)
-const liveTab = () => ui.tab === 'dashboard' || ui.tab === 'players';
-const liveWanted = () => !document.hidden && (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && ui.perfRange !== 'day' && ui.perfRange !== 'avg');
+// (and football's Matchups this week: its projections follow the games)
+const footballWeekTab = () => ui.tab === 'week' && isFootball() && !ui.weekShift;
+const liveTab = () => ui.tab === 'dashboard' || ui.tab === 'players' || footballWeekTab();
+const liveWanted = () => !document.hidden && (footballWeekTab() || (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && !['day', 'avg', 'proj'].includes(ui.perfRange)));
 
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {

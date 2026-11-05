@@ -37,6 +37,34 @@ class Stats(unittest.TestCase):
         self.assertEqual(N.espn_tri('KC'), 'KC')
 
 
+class Projections(unittest.TestCase):
+    def test_a_projection_keeps_what_leagues_score(self):
+        s = N.projected({'adp_dd_ppr': 3, 'pos_adp_dd_ppr': 1, 'gp': 1, 'pts_half_ppr': 20.2, 'rec': 5.3, 'rush_yd': 89.094, 'bonus_rec_rb': 5.3, 'cmp_pct': 66, 'pts_allow_14_20': 1})
+        self.assertEqual(s, {'rec': 5.3, 'rush_yd': 89.09, 'bonus_rec_rb': 5.3, 'pts_allow_14_20': 1})
+
+    def test_kicks_are_named_as_leagues_score_them(self):
+        s = N.projected({'fga': 2.72, 'fgm': 2.36, 'fgm_50p': 0.46, 'fgmiss_50p': 0.13})
+        self.assertEqual(s['fgm_50_59'], 0.46)
+        self.assertEqual(s['fgmiss'], 0.36)
+
+    def feed(self, weeks):
+        real = N.get_json
+        N.get_json = lambda url, **kw: weeks.get(int(url.split('?')[0].rsplit('/', 1)[1]), [])
+        self.addCleanup(setattr, N, 'get_json', real)
+
+    def test_players_without_a_game_are_left_out_and_rows_lose_trailing_zeros(self):
+        self.feed({9: [{'player_id': '4034', 'stats': {'gp': 1, 'rec': 6, 'rec_yd': 70}}, {'player_id': 'KC', 'stats': {'gp': 1, 'sack': 3}}, {'player_id': '99', 'stats': {'adp_dd_ppr': 999}}],
+                   10: [{'player_id': '4034', 'stats': {'gp': 1, 'rec': 5}}]})
+        p = N.projections('2026', 9, {'KC': N.DEF_IDS})
+        self.assertEqual(p['projWeeks'], [9, 10, 11])
+        self.assertEqual(p['projKeys'], ['rec', 'rec_yd', 'sack'])
+        self.assertEqual(p['rows'], {4034: {'9': [6, 70], '10': [5]}, N.DEF_IDS: {'9': [0, 0, 3]}})
+
+    def test_the_season_ends_the_weeks_asked_for(self):
+        self.feed({})
+        self.assertEqual(N.projections('2026', 18, {})['projWeeks'], [18])
+
+
 class Injuries(unittest.TestCase):
     def test_who_is_out_and_who_might_play(self):
         self.assertEqual(N.injury({'injury_status': 'IR', 'injury_body_part': 'Knee'})['status'], 'Out')

@@ -17,6 +17,7 @@ FIX = os.path.join(ROOT, 'tests', 'fixtures')
 API = 'https://api.sleeper.app/v1/'
 FAKE = '999000000000000001'
 LAST_DAY = '2026-10-26'  # the test clock's day: the fixtures stop there
+PROJ_WEEK = 7  # the test clock's week: its projections and the next ones
 WEEKS = range(1, 9)
 
 
@@ -30,6 +31,21 @@ def put(folder, name, data):
     os.makedirs(folder, exist_ok=True)
     with open(os.path.join(folder, name), 'w', encoding='utf-8') as f:
         json.dump(data, f, separators=(',', ':'), ensure_ascii=False)
+
+
+def add_projections(data):
+    """The projections of the test clock's week and after, onto a cut-down data file (the daily job's are for today's)."""
+    sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+    import update_nfl
+    defs = {p['slp']: p['id'] for p in data['players'] if p['pos'] == ['DEF']}
+    who = {p['id'] for p in data['players']}
+    proj = update_nfl.projections(data['season'], PROJ_WEEK, defs)
+    data.update(projKeys=proj['projKeys'], projWeeks=proj['projWeeks'])
+    for p in data['players']:
+        p.pop('proj', None)
+        if p['id'] in proj['rows']:
+            p['proj'] = proj['rows'][p['id']]
+    return who
 
 
 def main(lid):
@@ -58,7 +74,7 @@ def main(lid):
     with open(os.path.join(ROOT, 'data', 'nfl', 'players.json'), encoding='utf-8') as f:
         data = json.load(f)
     data['players'] = [p for p in data['players'] if p['slp'] in keep]
-    who = {p['id'] for p in data['players']}
+    who = add_projections(data)
     put(os.path.join(FIX, 'nfl'), 'players.json', data)
     with open(os.path.join(ROOT, 'data', 'nfl', 'boxscores.json'), encoding='utf-8') as f:
         box = json.load(f)

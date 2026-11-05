@@ -144,7 +144,8 @@ const SPORTS = {
   // Football: Sleeper leagues. A week is Tuesday to Monday night (weekShift), one game a player. A line's stats are named as
   // in a league's Sleeper scoring settings, so stats × scoring gives its points exactly, its bonuses and a defense's
   // brackets (points allowed) included; the stats are the daily job's (data/nfl), filled in here when it loads (fetchSport).
-  // No past seasons, projections or Fantrax yet; a team defense is a player, with a number made from its team code.
+  // A week's projection is Sleeper's, in the same names (the daily file's proj: nba.js, footballProj), so it scores exactly as
+  // the league does. No past seasons or Fantrax yet; a team defense is a player, with a number made from its team code.
   nfl: {
     key: 'nfl', name: 'NFL', emoji: '🏈', data: 'data/nfl/', fantrax: 'NFL',
     positions: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'],
@@ -169,7 +170,26 @@ const SPORTS = {
     espnTeams: { WSH: 'WAS' },
     game: { minutes: 60, periods: 4, tag: 'Q' },
     weekShift: 1,
-    soonTabs: ['roster', 'players', 'draft', 'trade'],
+    soonTabs: ['draft', 'trade'],
+    // How far a starter's week lands from his projection. A real league's 80 team-weeks missed by 7.8 (QB), 7.6 (RB), 7.8 (WR),
+    // 6 (TE), 5.2 (K) and 6 (DEF); those are × 0.8 here, or a team's week would swing more than it did: matchup margins
+    // missed by 24 points, where nine players moving independently make 30.
+    projSd: { QB: 6.2, RB: 6.1, WR: 6.2, TE: 4.8, K: 4.2, DEF: 4.8 },
+    // (i) texts that replace basketball's
+    infoOver: {
+      win: ['Win chances', `
+        <p><b>Projected score.</b> Each starter counts his projection for the week, Sleeper's own, in your league's scoring. They're updated every morning. A finished game counts its real points, and a game in progress its points so far plus the projection for the time left. Anyone on a bye or listed Out counts zero.</p>
+        <p><b>Beyond the next few weeks</b> there are no projections yet, so a player's season average stands in.</p>
+        <p><b>Win chance.</b> The chance of outscoring them on a bell curve. The spread comes from how far projections missed a real league's starters over its first 8 weeks: about 8 points for a quarterback, running back or receiver, 5 to 6 for a tight end, kicker or defense. On those weeks the team projected ahead won 25 of 40 matchups, so even a big favorite can lose.</p>
+        <p><b>Lineups.</b> Both teams' starters as set on Sleeper.</p>`],
+      suggest: ['How lineup suggestions work', `
+        <p><b>The lineup.</b> Your highest-projected players who fit your slots. Anyone on a bye or listed Out doesn't count.</p>
+        <p><b>Locked players.</b> Once a player's game starts he's locked: a starter stays where he is, and a bench player can't come in.</p>
+        <p><b>Questionable players</b> keep their projection, so check the news before kickoff.</p>`],
+      dots: ['Lineups', `
+        <p>Each player's game and his number for the week: his <b>projection</b> before kickoff, his <b>points so far</b> once it starts, and his <b>final points</b> after.</p>
+        <p>Bye means no game this week.</p>`],
+    },
     // how a line reads: [stat, word], and which a position's card shows: [label, stat]
     words: [['pass_yd', 'pass yd'], ['pass_td', 'pass TD'], ['pass_int', 'INT'], ['rush_yd', 'rush yd'], ['rush_td', 'rush TD'], ['rec', 'rec'], ['rec_yd', 'rec yd'], ['rec_td', 'rec TD'],
       ['fgm', 'FG'], ['xpm', 'XP'], ['sack', 'sacks'], ['int', 'INT'], ['def_td', 'def TD'], ['pts_allow', 'pts allowed']],

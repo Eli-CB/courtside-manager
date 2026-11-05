@@ -646,6 +646,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .tip-warn::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--b2b); margin-right: 6px; vertical-align: 0; }
 .dots i[data-tip] { cursor: default; }
 .bmeta-g[data-tip] { cursor: default; }
+.bmeta.fb { grid-template-columns: minmax(0, 1fr) auto; }
+.fb-game { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dots-legend { display: inline-flex; align-items: center; gap: 4px; }
 .tag { font-size: .7rem; font-weight: 800; padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
 .tag.up { background: var(--good-soft); color: var(--good); }
@@ -681,6 +683,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
   .bname .pname { font-size: .82rem; }
   .board:not(.stats) .bmeta-info { display: none; }
   .board:not(.stats) .bmeta { grid-template-columns: auto 2.2em; justify-content: space-between; }
+  .board:not(.stats) .bmeta.fb { grid-template-columns: minmax(0, 1fr) auto; }
+  .fb-day { display: none; } /* a phone's column only fits the opponent */
   .cat-table .pbar-cell { min-width: 190px; }
   .swap-net { margin-left: 0; }
 }

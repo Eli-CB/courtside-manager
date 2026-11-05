@@ -408,8 +408,15 @@ function perfRows(dates) {
 
 // Per game: every NBA player's average game (the stats chosen under Stats used), valued as one game
 function seasonRows() {
-  return nbaPlayers().filter(p => p.min).map(p => ({ raw: nbaById.get(p.nbaId), g: p.gp || 0, tot: statLine(p), z: isPoints() ? {} : catWins(p), v: value(p), per: true }))
+  return nbaPlayers().filter(p => (isFootball() ? p.gp : p.min)).map(p => ({ raw: nbaById.get(p.nbaId), g: p.gp || 0, tot: statLine(p), z: isPoints() ? {} : catWins(p), v: value(p), per: true }))
     .filter(r => r.raw);
+}
+
+// Football's Projected: this week's projection of everyone who has one, in the same rows
+function projRows() {
+  const dates = matchDates(weekStartAt(0));
+  return nbaPlayers().map(p => ({ p, v: footballPts(p, dates) })).filter(x => x.v > 0 && footballNow(x.p, dates).state === 'pre')
+    .map(({ p, v }) => ({ raw: nbaById.get(p.nbaId), g: 1, tot: {}, z: {}, v, per: true, game: footballGame(p, dates) }));
 }
 
 let perfOrder = { sig: '', ids: [] }; // the rows last shown, in order
@@ -421,14 +428,15 @@ function topPerformancesCard() {
   // the buttons: Today, the last game day before it, This week. Until one is picked: today once its games have
   // started, else the last game day
   // ... This season (every game so far, added up) and Per game: everyone's average game, for finding anyone
-  const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This week'], P.year.length && ['year', 'This season'], ['avg', 'Per game']].filter(Boolean);
-  const range = opts.some(([k]) => k === ui.perfRange) ? ui.perfRange : P.started || !P.day ? opts[0][0] : 'day';
-  const avg = range === 'avg', weekly = range === 'week' || range === 'year'; // weekly: several days added up
+  const football = isFootball();
+  const opts = [football && ['proj', 'Projected'], P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This week'], P.year.length && ['year', 'This season'], ['avg', 'Per game']].filter(Boolean);
+  const range = opts.some(([k]) => k === ui.perfRange) ? ui.perfRange : football && !P.started ? 'proj' : P.started || !P.day ? opts.find(([k]) => k !== 'proj')[0] : 'day';
+  const proj = range === 'proj', avg = range === 'avg' || proj, weekly = range === 'week' || range === 'year'; // weekly: several days added up
   const dates = avg ? [] : range === 'year' ? P.year : range === 'week' ? P.week : [range === 'today' ? today : P.day];
   const day = dates[0];
   const updated = range === 'day' || avg ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
     : live.at ? ` · updated ${fmtTime(live.at)}` : '';
-  const when = avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly ? `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
+  const when = proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly ? `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
   const toggle = opts.length > 1 ? `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="perf-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>` : '';
 
   // who rosters each player, and where in that team's lineup he is now (active or on the bench)
@@ -458,7 +466,7 @@ function topPerformancesCard() {
   const pts = leaguePoints();
   // an average starter's games over these days (the season: every day since opening night; Per game: one)
   const span = range === 'year' ? Math.round((Date.parse(today) - Date.parse(dates[0])) / 864e5) + 1 : dates.length;
-  const expected = weekly ? WEEK_GAMES * span / 7 : 1;
+  const expected = weekly ? (football ? 1 : WEEK_GAMES) * span / 7 : 1;
   const par = pts ? fpBase()[0] * expected : 0;
   const cats = scoreCats().filter(c => !c.fp);
   // a column sorts by what it adds: its category contribution, or its fantasy points, so best-first works for TO too
@@ -484,7 +492,7 @@ function topPerformancesCard() {
     : `Categories won: what ${weekly ? 'his games' : 'the game'} added to winning a week's categories, against not playing (an even matchup). Below 0: his team would have done better without ${weekly ? 'them' : 'it'}`);
 
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
-  const rows = avg ? seasonRows() : perfRows(dates);
+  const rows = proj ? projRows() : avg ? seasonRows() : perfRows(dates);
   // every range, among everyone in it: 🚀 the best in each category and 🔥 the second best (as many as 3 tied),
   // 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's average, so
   // volume counts), everything else by the number. Per game only counts regulars (3+ games, 15+ minutes a game).
@@ -551,11 +559,11 @@ function topPerformancesCard() {
   const first = live.games.filter(g => g.d === day && g.state === 'pre').sort((a, b) => a.start - b.start)[0];
   const waiting = range === 'today' && !rows.length ? `<p class="muted small" style="margin:0">${live.at || live.error ? `No games have started yet.${first ? ` First tip-off ${fmtTime(first.start)}.` : ''}` : "Loading today's games…"}</p>` : '';
   const table = !rows.length ? waiting : !shown.length ? '<p class="muted small" style="margin:0">No players match these filters.</p>' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
-      <thead><tr>${th('name', 'Player', 'pf-name')}${cats.map(c => th(c.key, c.label, 'sc')).join('')}${th('v', pts ? 'FP' : 'Value', 'num pf-v')}</tr></thead>
+      <thead><tr>${th('name', 'Player', 'pf-name')}${cats.map(c => th(c.key, c.label, 'sc')).join('')}${th('v', proj ? 'Proj' : pts ? 'FP' : 'Value', 'num pf-v')}</tr></thead>
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 28)}<div class="bmain">
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button></div>
-          <div class="pmeta">${avg ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · ${who(r.raw.id)}</div></div></div></td>
+          <div class="pmeta">${proj ? `${esc(r.game)} · ` : avg ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
@@ -634,7 +642,7 @@ function slotBadge(slot) {
 function sortList(list, sortState) {
   const { key, dir } = sortState;
   const slotRank = p => { const s = slotOf(p); return s === 'IL' ? 99 : s === 'BN' ? 50 : state.lineup.indexOf(p.id); };
-  const get = p => key === 'value' ? value(p) : key === 'slot' ? slotRank(p) : key === 'name' ? p.name.toLowerCase() : key === 'status' ? STATUSES.indexOf(p.status) : key === 'tag' ? p.tag.toLowerCase() : key === 'fp' ? fantasyPoints(p) : statVal(p, key);
+  const get = p => key === 'proj' ? footballPts(p, matchDates(weekStartAt(0))) : key === 'value' ? value(p) : key === 'slot' ? slotRank(p) : key === 'name' ? p.name.toLowerCase() : key === 'status' ? STATUSES.indexOf(p.status) : key === 'tag' ? p.tag.toLowerCase() : key === 'fp' ? fantasyPoints(p) : statVal(p, key);
   return [...list].sort((a, b) => { const x = get(a), y = get(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
 }
 
@@ -664,7 +672,7 @@ function statCells(p) {
 // The roster as a team profile: minutes, then whatever the league scores, each cell shaded by how
 // much the player helps (green) or hurts (red) it next to an average rostered player
 function rosterCols() {
-  return [['name', 'Player'], ['status', 'Status'], ['slot', 'Slot'], ['min', 'MIN'], ...scoreCats().map(c => [c.key, c.label]), ...(isPoints() ? [] : [['value', '']])];
+  return [['name', 'Player'], ['status', 'Status'], ['slot', 'Slot'], ...(isFootball() ? [['proj', 'Proj']] : [['min', 'MIN']]), ...scoreCats().map(c => [c.key, c.label]), ...(isPoints() ? [] : [['value', '']])];
 }
 
 function viewRoster() {
@@ -672,14 +680,16 @@ function viewRoster() {
   const act = state.players.filter(p => !state.il.includes(p.id));
   const cats = scoreCats();
   const fmtC = (c, v) => (c.pct ? fmtPct(v) : fmt(v, c.dec || 1));
+  const football = isFootball(), week = matchDates(weekStartAt(0)); // (football: this week's projection, and totals for who starts)
   const total = c => {
+    if (football) return sum(starters().map(p => statOf(p, c)));
     if (!c.pct) return sum(act.map(p => statOf(p, c)));
     const att = sum(act.map(p => statVal(p, c.att)));
     return att ? sum(act.map(p => statVal(p, c.made))) / att : 0;
   };
   return `
   <div class="week-stack">
-  ${strengthsCard()}
+  ${football ? '' : strengthsCard()}
   <div class="card">
     <div class="card-head"><h2>Players ${infoBtn('value')}</h2><span class="muted small">${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR · per game, green helps, red hurts</span></div>
     ${list.length ? `<div class="table-wrap"><table class="roster-table">
@@ -687,12 +697,12 @@ function viewRoster() {
       <tbody>${list.map(p => `<tr${state.il.includes(p.id) ? ' class="muted-row"' : ''}>
         <td class="player">${playerCell(p)}</td>
         <td>${statusBadge(p)}</td><td>${slotBadge(slotOf(p))}</td>
-        <td class="num">${fmt(p.min, 0)}</td>
+        ${football ? `<td class="num">${gamesIn(p, week) ? fmt(footballPts(p, week), 1) : '<span class="muted">Bye</span>'}</td>` : `<td class="num">${fmt(p.min, 0)}</td>`}
         ${cats.map(c => `<td class="num rc" style="${shade(contribZ(p, c.key, 1, false))}" title="${esc(statTip(p, c, 1, false))}">${fmtC(c, statOf(p, c))}</td>`).join('')}
         ${isPoints() ? '' : `<td class="num"><b>${fmtValue(value(p))}</b></td>`}
         </tr>`).join('')}
       </tbody>
-      <tfoot><tr><td colspan="4"><b>Active totals</b></td>
+      <tfoot><tr>${football ? `<td colspan="3"><b>Starters</b></td><td class="num"><b>${fmt(sum(starters().map(p => footballPts(p, week))), 1)}</b></td>` : '<td colspan="4"><b>Active totals</b></td>'}
         ${cats.map(c => `<td class="num"><b>${fmtC(c, total(c))}</b></td>`).join('')}${isPoints() ? '' : '<td></td>'}</tr></tfoot>
     </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from ${sourceName()}. Use ↻ Reload from ${sourceName()} in the ⚙ menu to pull the latest.</div>`}
   </div>
@@ -978,8 +988,10 @@ function recommendedAdds() {
     .map(x => playerFromRaw(nbaById.get(x.nbaId)));
   const dropWins = drop && w ? catWins(drop) : null;
   const helps = p => { if (!dropWins) return []; const pw = catWins(p); return scoreCats().filter(c => (pw[c.key] || 0) - (dropWins[c.key] || 0) > 0.01).map(c => c.label); };
-  const adds = pool.filter(p => p.status !== 'Out')
-    .map(p => ({ p, gain: worth(p) - base, helps: helps(p) }))
+  // football: each against the weakest at his position (a kicker's points aren't a receiver's)
+  const fbDrop = p => { const list = act.filter(x => x.pos[0] === p.pos[0]); return list.length ? list.reduce((a, b) => (worth(a) <= worth(b) ? a : b)) : null; };
+  const adds = pool.filter(p => p.status !== 'Out' && (!isFootball() || fbDrop(p)))
+    .map(p => ({ p, gain: worth(p) - (isFootball() ? worth(fbDrop(p)) : base), helps: helps(p), drop: isFootball() ? fbDrop(p) : drop }))
     .filter(x => x.gain > 0).sort((a, b) => b.gain - a.gain).slice(0, 3);
 
   let stash = null;
@@ -999,7 +1011,7 @@ function recommendedCard() {
   const gainTxt = g => (isPoints() ? `${signed(g, 1)} FP/G` : `${fmtValue(g)} value`);
   const rows = r.adds.map(x => `<li class="rec">
       <div class="rec-who">${playerCell(x.p)}</div>
-      <div class="rec-why">${fx(x.p)} ${r.drop ? `<span>for ${inlinePlayer(r.drop, esc(r.drop.name))}</span> <b class="pos-good">${gainTxt(x.gain)}</b>` : '<span>open roster spot</span>'}${x.helps.length ? `<div class="muted small">helps ${x.helps.join(', ')}</div>` : ''}</div>
+      <div class="rec-why">${fx(x.p)} ${x.drop ? `<span>for ${inlinePlayer(x.drop, esc(x.drop.name))}</span> <b class="pos-good">${gainTxt(x.gain)}</b>` : '<span>open roster spot</span>'}${x.helps.length ? `<div class="muted small">helps ${x.helps.join(', ')}</div>` : ''}</div>
     </li>`);
   if (r.stash) rows.push(`<li class="rec">
       <div class="rec-who">${playerCell(r.stash.p)}</div>
@@ -1157,6 +1169,7 @@ function showPlayerDetail(nbaId) {
     <div class="proj-grid" style="margin-top:12px">
       <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
       ${isGoalie(raw) ? `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? `about ${fmt(raw.inj && raw.inj.status === 'Out' ? 0 : expectedGames({ ...raw, nbaId: raw.id }, matchDates(weekStartAt(0)).filter(d => d >= todayIso() && !gameFinal(raw, d))), 1)}` : '—'}</div><div class="pc-rank">${t ? `of ${t.left} games` : ''}</div></div>`
+    : isFootball() ? (() => { const week = matchDates(weekStartAt(0)), p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, week) ? fmt(footballPts(p, week), 1) : 'Bye'}</div></div>`; })()
     : `<div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>`}
       ${(() => {
         // his value, and under it his rank among every NBA player this season (per game: regulars only)

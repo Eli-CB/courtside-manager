@@ -4,6 +4,9 @@ Sources (all public, no API key):
   - Sleeper: every player (ids, positions, injuries) and each week's stats. Its stats use the same names as a Sleeper
     league's scoring settings, so stats × scoring gives each league's own points exactly (checked on a real league:
     1,187 player-weeks, none off by more than 0.01). Its weekly stats by position aren't a documented API.
+    Its weekly projections (Rotowire's, as Sleeper shows them) name their stats the same way, so a projection × a league's
+    scoring is that league's projected points. Checked on a real league's 80 team-weeks: 0.7 points off on average, and it
+    picked the winner of 25 of 40 matchups. Also not a documented API; if it fails, the site goes by season averages.
   - ESPN: the schedule, scores and bye weeks
 
 Writes data/nfl/players.json and data/nfl/boxscores.json, laid out like the NBA's files. A week runs Tuesday to Monday
@@ -28,16 +31,19 @@ OUT = os.path.join(DATA, 'players.json')
 BOX_CACHE = os.path.join(DATA, 'boxscores.json')
 SLEEPER = 'https://api.sleeper.app/v1/'
 SLEEPER_STATS = 'https://api.sleeper.com/stats/nfl/'
+SLEEPER_PROJ = 'https://api.sleeper.com/projections/nfl/'
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/'
 ESPN_TEAMS = {'WSH': 'WAS'}  # ESPN's codes that aren't Sleeper's
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; LeagueLayer data job)'}
 POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
 WEEKS = 18
+PROJ_WEEKS = 3  # this week and the next two: Sleeper moves on to a new week a day or so after the site does
 BOX_VERSION = 1
 DEF_IDS = 900000  # a team defense's Sleeper id is its team code; the site's player ids are numbers
 # Sleeper's stats that no league scores: ranks, percentages, longest plays, rates
 NOT_SCORED = re.compile(r'^(pos_rank|rank_|pts_(std|half_ppr|ppr)$|gms_active$|gp$|gs$|.*_lng$|.*_pct$|.*_ypa$|.*_ypc$|.*_ypt$|.*_yar$|.*_rtg$|.*per_play|.*_air_yd$|'
                         r'opp_|down_|g2g_|rz_|tm_|.*_snp$|.*_rz_|.*_lng_)')
+NOT_PROJECTED = re.compile(r'^(adp_|pos_adp_|cmp_pct$)')
 INJURED_OUT = {'out', 'ir', 'pup', 'sus', 'na', 'dnr', 'cov'}
 
 
@@ -108,6 +114,47 @@ def scored(stats):
     return {k: v for k, v in stats.items() if v and isinstance(v, (int, float)) and not NOT_SCORED.match(k)}
 
 
+def projected(stats):
+    """A projection's stats as leagues score them. Kicks differ from real stats: a projection has one 50+ range and only
+    misses by distance, where leagues also score 50-59 yards and misses as a whole."""
+    st = {k: round(v, 2) for k, v in stats.items() if v and isinstance(v, (int, float)) and not NOT_SCORED.match(k) and not NOT_PROJECTED.match(k)}
+    if st.get('fgm_50p'):
+        st.setdefault('fgm_50_59', st['fgm_50p'])
+    if st.get('fga'):
+        st.setdefault('fgmiss', round(st['fga'] - st.get('fgm', 0), 2))
+    return {k: v for k, v in st.items() if v}
+
+
+def projections(season, week, defs):
+    """{projKeys, projWeeks, rows: {player id: {week: [stats in projKeys' order]}}}: this week's and the next ones'. Anyone
+    without a game that week has no gp in the feed. Rows drop trailing zeros, the most common stats first."""
+    q = '&'.join(f'position[]={p}' for p in POSITIONS)
+    first = max(week, 1)
+    weeks = [w for w in range(first, first + PROJ_WEEKS) if w <= WEEKS]
+    by_week = {}
+    for w in weeks:
+        rows = get_json(SLEEPER_PROJ + f'{season}/{w}?season_type=regular&{q}')
+        by_week[w] = {}
+        for r in rows:
+            pid = defs.get(r['player_id']) or player_id(r['player_id'])
+            if pid and (r.get('stats') or {}).get('gp'):
+                by_week[w][pid] = projected(r['stats'])
+    seen = {}
+    for lines in by_week.values():
+        for st in lines.values():
+            for k in st:
+                seen[k] = seen.get(k, 0) + 1
+    keys = sorted(seen, key=lambda k: (-seen[k], k))
+    out = {}
+    for w, lines in by_week.items():
+        for pid, st in lines.items():
+            row = [per_game(st.get(k, 0)) for k in keys]
+            while row and row[-1] == 0:
+                row.pop()
+            out.setdefault(pid, {})[str(w)] = row
+    return {'projKeys': keys, 'projWeeks': weeks, 'rows': out}
+
+
 def box_scores(season, games):
     """Finished weeks' lines, cached in data/nfl/boxscores.json. The last two weeks are asked for again each run, for stat
     corrections. {espn game id: {d, w, home, away, hs, as, rows: [[player id, team, ...keys]]}}. keys only grow, the most
@@ -173,6 +220,9 @@ def main():
     log('- Schedule (ESPN)...')
     games = schedule_games()
     week, teams, _ = schedule(today, games)
+    for g in sorted(games, key=lambda x: x['date']):  # each team's opponents, in the order of its dates
+        teams[g['home']].setdefault('opps', []).append(f"vs {g['away']}")
+        teams[g['away']].setdefault('opps', []).append(f"@{g['home']}")
     codes = sorted(teams)
     log(f'  {len(games)} games, {len(codes)} teams')
 
@@ -185,9 +235,17 @@ def main():
             lines.setdefault(r[0], []).append(r[2:] + [0] * (len(keys) - len(r) + 2))
     log(f'  {len(box["games"])} games, {len(keys)} stats')
 
+    def_id = def_ids(games)
+    log('- Projections (Sleeper)...')
+    try:
+        proj = projections(season, int(state.get('week') or 1), def_id)
+        log(f'  weeks {proj["projWeeks"]}, {len(proj["rows"])} players, {len(proj["projKeys"])} stats')
+    except Exception as e:  # the site falls back on season averages
+        log(f'  failed: {e}')
+        proj = {'projKeys': [], 'projWeeks': [], 'rows': {}}
+
     log('- Players (Sleeper)...')
     everyone = get_json(SLEEPER + 'players/nfl', timeout=120)
-    def_id = def_ids(games)
     players = []
     for sid, p in everyone.items():
         pos = p.get('position')
@@ -215,12 +273,14 @@ def main():
             while cur[-1] == 0:
                 cur.pop()
             out['cur'] = cur
+        if pid in proj['rows']:
+            out['proj'] = proj['rows'][pid]
         players.append(out)
 
     data = {
         'sport': 'nfl', 'updated': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
-        'season': season, 'prevSeason': str(int(season) - 1), 'sources': ['Sleeper stats', 'ESPN schedule'],
-        'statKeys': ['gp'] + keys, 'logKeys': [], 'sdKeys': [],
+        'season': season, 'prevSeason': str(int(season) - 1), 'sources': ['Sleeper stats and projections', 'ESPN schedule'],
+        'statKeys': ['gp'] + keys, 'projKeys': proj['projKeys'], 'projWeeks': proj['projWeeks'], 'logKeys': [], 'sdKeys': [],
         'week': week, 'weeks': {str(k): v for k, v in sorted(week_of(games).items())}, 'teams': teams, 'players': players, 'league': None,
     }
     tmp = OUT + '.tmp'

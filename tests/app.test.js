@@ -2532,7 +2532,7 @@ test("a Sleeper league says its sport: football's rules, weeks and players come 
   assert.equal(b.get('SPORT').key, 'nfl');
   assert.equal(st.slots.join(), 'QB,RB,RB,WR,WR,TE,FLX,K,DEF');
   assert.equal(st.benchSize, 5);
-  assert.equal(b.tabList().map(t => t[0]).join(), 'dashboard,week,recap,standings,awards');
+  assert.equal(b.tabList().map(t => t[0]).join(), 'dashboard,week,recap,roster,players,standings,awards');
   assert.equal(Object.values(L.rosters).flat().filter(x => !x.nba).length, 0, 'every rostered player matched');
   assert.equal(L.points.pass_td, 4);
   assert.equal(L.points.rec, 0.5);
@@ -2576,7 +2576,7 @@ test('football on the page: lines in words, finished weeks, this week, byes and 
   assert.equal(a.fullLine({ pass_yd: 245, pass_td: 2, gp1: 1 }, false).join(', '), '245 pass yd, 2 pass TD');
   assert.equal(a.fullLine({ gp1: 1 }, false).join(), 'no stats');
   // every page here
-  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), recap: () => a.viewRecap(), standings: () => a.viewStandings(), awards: () => a.viewAwards() })) {
+  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), recap: () => a.viewRecap(), standings: () => a.viewStandings(), awards: () => a.viewAwards(), roster: () => a.viewRoster(), players: () => a.viewPlayers() })) {
     ui.tab = tab;
     make();
     await new Promise(r => setTimeout(r, 40));
@@ -2585,7 +2585,6 @@ test('football on the page: lines in words, finished weeks, this week, byes and 
     assert.ok(!/undefined|NaN|\[object/.test(html.replace(/<[^>]*>/g, ' ')), `${tab} has only real numbers`);
   }
   ui.tab = 'standings';
-  assert.match(a.withViewedTeam(a.viewWeek, true), /Football projections are on the way/);
   quiet(a);
   // the player card
   const qb = a.get('NBA').players.find(p => p.pos[0] === 'QB' && p.cur), def = a.get('NBA').players.find(p => p.pos[0] === 'DEF');
@@ -2618,6 +2617,142 @@ test('football on the page: lines in words, finished weeks, this week, byes and 
   // a player on bye says so
   const bye = st.players.find(x => !a.matchDates().some(d => a.playsOn(x, d)));
   if (bye) { ui.tab = 'dashboard'; ui.dashRange = 'week'; assert.match(a.viewDashboard(), />Bye</); quiet(a); ui.tab = 'standings'; }
+});
+
+// The week ahead, with no game of it played yet: the fixture's next week
+async function footballNextWeek() {
+  const a = await footballApp(), ui = a.get('ui');
+  ui.weekShift = 1;
+  const dates = a.matchDates();
+  return { a, ui, dates, st: a.get('state'), L: a.fxLeague(), NBA: a.get('NBA') };
+}
+
+test("football's projections: Sleeper's stats in the league's scoring, a week at a time", async () => {
+  const { a, dates, st, L, NBA } = await footballNextWeek();
+  const week = a.footballWeek(dates[0]);
+  assert.equal(week, 8);
+  assert.ok(NBA.projWeeks.includes(week));
+  const raw = NBA.players.find(r => r.pos[0] === 'WR' && r.proj && r.proj[week] && r.proj[week].length > 5), p = a.playerFromRaw(raw);
+  // stats × the league's scoring: a half point a catch, a tenth a yard, six a touchdown...
+  const row = Object.fromEntries(NBA.projKeys.map((k, i) => [k, raw.proj[week][i] || 0]));
+  const by = (row.rec || 0) * 0.5 + (row.rec_yd || 0) * 0.1 + (row.rush_yd || 0) * 0.1 + (row.rec_td || 0) * 6 + (row.rush_td || 0) * 6 + (row.fum_lost || 0) * -2 + (row.rec_2pt || 0) * 2 + (row.rush_2pt || 0) * 2;
+  assert.ok(Math.abs(a.footballPts(p, dates) - by) < 0.01, `${a.footballPts(p, dates)} vs ${by}`);
+  // a bye is nothing, and Out is nothing
+  assert.equal(a.footballPts({ ...p, team: 'XXX' }, dates), 0);
+  assert.equal(a.footballPts({ ...p, status: 'Out' }, dates), 0);
+  // a team's week adds its starters' projections, and the win chance comes from the positions' spreads
+  const ctx = a.weekContext();
+  const fp = a.fpTotals(ctx.asSet), starters = st.players.filter(x => ctx.setIds.has(x.id) && a.gamesIn(x, dates) && x.status !== 'Out');
+  assert.ok(Math.abs(fp.a - a.get('sum')(starters.map(x => a.footballPts(x, dates)))) < 0.01);
+  assert.ok(fp.vr > 5 ** 2 * starters.length && fp.vr < 7 ** 2 * starters.length, `${fp.vr}`);
+  assert.ok(ctx.hasOpp, 'the real opponent');
+  assert.ok(ctx.oSet.win > 0.02 && ctx.oSet.win < 0.98, `${ctx.oSet.win}`);
+  assert.equal(ctx.oSet.points, true);
+  // a week the file doesn't have: season averages, and it says so
+  const later = a.matchDates(a.weekStartAt(6)), s = a.nbaStats(raw, 'cur');
+  assert.ok(!NBA.projWeeks.includes(a.footballWeek(later[0])));
+  assert.ok(Math.abs(a.lineFp(a.footballProj(p, later).m) - a.fantasyPoints(s)) < 0.01);
+  a.get('ui').tab = 'week'; a.get('ui').weekShift = 6;
+  assert.match(a.withViewedTeam(a.viewWeek, true), /No projections for this week yet: season averages/);
+  quiet(a);
+});
+
+test('football without projections in the file still works, on season averages', async () => {
+  const a = await footballApp(), NBA = a.get('NBA');
+  NBA.projKeys = []; NBA.projWeeks = [];
+  a.get('projMemo').clear();
+  for (const r of NBA.players) delete r.proj;
+  const ui = a.get('ui');
+  ui.tab = 'week'; ui.weekShift = 1;
+  const html = a.withViewedTeam(a.viewWeek, true);
+  quiet(a);
+  assert.match(html, /season averages/);
+  assert.ok(!/undefined|NaN|\[object/.test(html.replace(/<[^>]*>/g, ' ')));
+  ui.tab = 'players'; ui.perfRange = 'proj';
+  assert.ok(a.viewPlayers());
+  quiet(a);
+});
+
+test('football lineups: the best projected fit, byes and Out left out, and a started game locks', async () => {
+  const { a, dates, st } = await footballNextWeek();
+  const ids = a.bestWeeklyIds(st.players, dates, null);
+  assert.ok(ids.size >= st.slots.length - 1, `${ids.size} of ${st.slots.length}: a spot only stays empty with nobody to fill it`);
+  assert.ok(![...ids].map(a.byId).some(p => !a.gamesIn(p, dates) || p.status === 'Out'), 'nobody on a bye or Out starts');
+  // nobody left on the bench outscores a starter he could replace: every spot filled, best first
+  const qb = st.players.filter(p => p.pos[0] === 'QB').sort((x, y) => a.footballPts(y, dates) - a.footballPts(x, dates)).filter(p => a.gamesIn(p, dates) && p.status !== 'Out');
+  assert.ok(ids.has(qb[0].id));
+  // a benched star's game starting: he can't come in, and a starter whose game started stays
+  const game = p => ({ id: p.team, d: dates.find(x => a.playsOn(p, x)), home: p.team, away: 'XXX', state: 'in', start: new Date(), period: 2, clock: 450 });
+  const live = a.get('live');
+  const bench = st.players.find(p => !st.lineup.includes(p.id) && ids.has(p.id));
+  if (bench) {
+    live.games = [game(bench)];
+    assert.equal(a.footballNow(bench, dates).state, 'in');
+    assert.ok(!a.bestWeeklyIds(st.players, dates, null).has(bench.id));
+  }
+  const on = a.byId(st.lineup.find(id => { const p = a.byId(id); return p && a.gamesIn(p, dates); }));
+  live.games = [game(on)];
+  assert.ok(a.bestWeeklyIds(st.players, dates, null).has(on.id));
+  live.games = [];
+});
+
+test('football in a game: real points, the rest of the projection, and final', async () => {
+  const { a, dates, st } = await footballNextWeek();
+  const p = st.players.find(x => st.lineup.includes(x.id) && a.gamesIn(x, dates) && a.footballPts(x, dates) > 3), d = dates.find(x => a.playsOn(p, x));
+  const proj = a.footballPts(p, dates), live = a.get('live');
+  assert.equal(a.footballEntry(p, dates).fp, proj, 'before kickoff: the projection');
+  live.lines.set(d, new Map([[p.nbaId, { gp1: 1, min: 0, bonus: 9 }]]));
+  live.games = [{ id: '1', d, home: p.team, away: 'XXX', state: 'in', start: new Date(), period: 3, clock: 450 }];
+  const half = a.footballEntry(p, dates); // halfway through the third: 3/8 of the game to go
+  assert.ok(Math.abs(half.share - 0.375) < 0.001, `${half.share}`);
+  assert.ok(Math.abs(half.fp - (9 + 0.375 * proj)) < 0.01);
+  const ctx0 = a.projectSide(st.players, dates, new Set([p.id]));
+  assert.ok(Math.abs(a.fpTotals(ctx0).a - (9 + 0.375 * proj)) < 0.01, 'live points are in the team score');
+  assert.ok(Math.abs(ctx0.vr.fpsd - 0.375 * a.footballProj(p, dates).sd.fpsd ** 2) < 0.01, 'and only the time left is uncertain');
+  live.games[0].state = 'post';
+  assert.equal(a.footballEntry(p, dates).fp, 9);
+  live.games = []; live.lines.clear();
+});
+
+test('football tabs: the board, swaps, Roster, Players and adds speak in projected points', async () => {
+  const { a, ui, dates, st } = await footballNextWeek();
+  ui.tab = 'week';
+  const week = a.withViewedTeam(a.viewWeek, true);
+  quiet(a);
+  assert.match(week, /to win the week/);
+  assert.match(week, /<b>[\d.]+<\/b> projected/);
+  assert.ok(!/starter games|schedule dots|Per game<\/button>/i.test(week));
+  // a starter out for the week: the swap says what it's worth
+  const out = st.players.find(p => st.lineup.includes(p.id) && a.gamesIn(p, dates));
+  const swapIn = st.players.find(p => !st.lineup.includes(p.id) && p.pos[0] === out.pos[0] && a.gamesIn(p, dates) && p.status !== 'Out');
+  if (swapIn) {
+    const was = out.status;
+    out.status = 'Out';
+    const html = a.withViewedTeam(a.viewWeek, true);
+    quiet(a);
+    out.status = was;
+    assert.match(html, /projects [\d.]+ to /);
+    assert.match(html, / proj</);
+  }
+  // Roster: this week's game and projection, with no category strengths
+  ui.tab = 'roster'; ui.weekShift = 0;
+  const r = a.viewRoster();
+  assert.match(r, />Proj</);
+  assert.ok(!/Category strengths/.test(r));
+  ui.rosterSort = { key: 'proj', dir: -1 };
+  assert.ok(a.viewRoster());
+  // Players: the week's projections, ranked; no minutes
+  ui.tab = 'players'; ui.perfRange = 'proj';
+  const p = a.viewPlayers();
+  quiet(a);
+  assert.match(p, /aria-pressed="true">Projected</);
+  assert.ok(!/\bmin\b/.test(p.replace(/<[^>]*>/g, ' ')), 'no minutes in football');
+  // every add is for the weakest at his own position
+  const adds = a.recommendedAdds();
+  assert.ok(adds.adds.length);
+  for (const x of adds.adds) assert.equal(x.p.pos[0], x.drop.pos[0]);
+  assert.ok(a.get('INFO').win[1].includes('per-game'), "basketball's text is still basketball's");
+  assert.match(a.get('SPORT').infoOver.win[1], /Projected score/);
 });
 
 test('football and the other sports leave each other alone', async () => {

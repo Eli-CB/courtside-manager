@@ -223,7 +223,7 @@ function sleeperWeekFresh(L) {
     const pts = {};
     for (const m of ms || []) Object.assign(pts, m.players_points || {});
     L.slpWeek = { n, pts, at: Date.now() };
-    if (ui.tab === 'dashboard') render();
+    if (ui.tab === 'dashboard' || (ui.tab === 'week' && isFootball())) render();
   }).catch(() => { L.slpWeek = { ...(L.slpWeek || { n, pts: {} }), at: Date.now() }; }).finally(() => { slpWeekLoad = null; });
 }
 
