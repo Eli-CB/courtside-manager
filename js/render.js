@@ -135,7 +135,7 @@ function ctxBar() {
     const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
     const shown = viewing ? ui.viewA : state.fxTeam;
     teamSel = `<select class="ctx-team" data-change="${state.fxTeam ? 'fx-view' : 'fx-team'}" aria-label="${state.fxTeam ? 'Team to view' : 'Your team'}">
-      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}</option>`).join('')}
+      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam && !state.demo ? ' (you)' : ''}</option>`).join('')}
     </select>${viewing ? '<span class="badge">Viewing only</span><button class="link-btn small" data-action="fx-view-mine">Back to my team</button>' : ''}`;
   }
   $('#ctxTeam').innerHTML = teamSel;
@@ -149,8 +149,9 @@ function ctxBar() {
     isPoints() && L.pointsOther && L.pointsOther.length ? `<span title="Not projected: ${esc(L.pointsOther.join(', '))}">some scoring stats not projected</span>` : '',
     !isPoints() && L.catsOther && L.catsOther.length ? `<span title="Not projected: ${esc(L.catsOther.join(', '))}">${L.catsOther.length === 1 ? 'one category' : 'some categories'} not projected</span>` : '',
   ].filter(Boolean);
-  $('#ctxMeta').innerHTML = notes.length ? `<span>${notes.join(' · ')}</span>` : '';
-  $('#ctxMeta').hidden = !notes.length;
+  const demo = demoNote();
+  $('#ctxMeta').innerHTML = `${demo}${notes.length ? `<span>${notes.join(' · ')}</span>` : ''}`;
+  $('#ctxMeta').hidden = !notes.length && !demo;
 }
 
 // Settings (the gear at the right of the tab bar): data freshness, reloading the league, the theme

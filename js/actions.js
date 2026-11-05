@@ -236,10 +236,17 @@ const actions = {
     try {
       await switchLeague(site.id);
       ui.addingLeague = false;
-      if (!state.fxTeam) state.demo = true;
+      if (!state.fxTeam) { state.demo = true; adoptTeam(demoTeam()); }
       commit(`Exploring ${site.name}`);
-      location.hash = '#week';
+      location.hash = '#dashboard';
     } catch (e) { toast(e.message); }
+  },
+  // out of the demo, to connect a league of their own
+  'demo-exit'() {
+    Object.assign(state, { demo: false, leagueChosen: false, fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp() });
+    ui.viewA = null; ui.viewB = null;
+    location.hash = '';
+    commit();
   },
   async 'league-switch'(el) {
     const id = el.dataset.id;
@@ -438,7 +445,10 @@ document.addEventListener('toggle', e => {
 
 document.addEventListener('change', e => {
   const el = e.target;
-  if (el.dataset.change === 'fx-view') {
+  if (el.dataset.change === 'fx-view' && state.demo) { // the demo's team is whichever is picked
+    adoptTeam(el.value);
+    commit(`Now playing as ${state.teamName}`);
+  } else if (el.dataset.change === 'fx-view') {
     ui.viewA = el.value && el.value !== state.fxTeam ? el.value : null;
     ui.viewB = null;
     if (ui.viewA && !VIEW_TABS.includes(ui.tab)) location.hash = '#dashboard';

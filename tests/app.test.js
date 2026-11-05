@@ -2383,7 +2383,7 @@ test('the landing page offers both sports, and says so when a league is on a sit
   const html = a.viewLanding();
   assert.match(html, /fantasy basketball or hockey week/);
   assert.match(html, /basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax/);
-  assert.match(html, /Just browse NBA players/);
+  assert.match(html, /just browse NBA players/);
   await assert.rejects(a.connectLeague('https://fantasy.espn.com/hockey/league?leagueId=12345678'), /Hockey works with Fantrax leagues/);
 });
 
@@ -2396,4 +2396,39 @@ test("a season's memos don't cross sports", async () => {
   assert.equal(a.get('gameLogs')['2025-26'], undefined);
   assert.equal(a.get('archives')['2025-26'], undefined);
   assert.equal(a.get('SPORT').tableStats.map(x => x[1]).slice(1, 3).join(), 'PTS,REB');
+});
+
+test('the demo: every tab filled in as a team, and leaving it keeps nothing', async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  const st = a.get('state'), ui = a.get('ui');
+  ui.tab = 'standings';
+  assert.ok(a.needsLanding());
+  assert.match(a.viewLanding(), /Explore a basketball demo league/);
+  await a.actions['land-demo']();
+  clearTimeout(a.get('live').timer);
+  assert.ok(st.demo && st.fxTeam && st.players.length > 0, 'a team, not an empty league');
+  assert.ok(!a.needsLanding());
+  assert.ok(a.fxOpponentFor(a.weekStart(), st.fxTeam), 'with a matchup this week');
+  assert.ok(st.opp.players.length > 0);
+  assert.equal((st.savedLeagues || []).length, 0, "it isn't one of the visitor's leagues");
+  for (const make of [() => a.viewDashboard(), () => a.viewRoster(), () => a.withViewedTeam(a.viewWeek, true), () => a.viewTrade()]) {
+    const html = make();
+    clearTimeout(a.get('live').timer);
+    assert.ok(!/Pick your team|No players yet|Your roster is empty/.test(html));
+  }
+  assert.match(a.demoNote(), /Demo league[\s\S]*data-action="demo-exit"/);
+  assert.ok(a.demoNote().includes(a.fxTeamName(st.fxTeam)));
+  // connecting that same league for real still asks whose team is yours
+  const borrowed = st.fxTeam;
+  await a.switchLeague(a.get('NBA').siteLeague.id);
+  assert.ok(!st.demo && !st.fxTeam, `kept ${borrowed}?`);
+  // and the way out
+  await a.actions['land-demo']();
+  assert.ok(st.demo && st.fxTeam);
+  a.actions['demo-exit']();
+  clearTimeout(a.get('live').timer);
+  assert.ok(!st.demo && !st.fxTeam && st.players.length === 0);
+  assert.ok(a.needsLanding());
 });
