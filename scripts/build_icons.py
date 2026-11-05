@@ -1,7 +1,7 @@
 """Draws the League Layer logo ("Sheet": two tilted Ls, the second a thin edge under the first).
 
 Run after changing the shapes or colors: writes icons/logo.svg (the source), icons/favicon.svg (the
-16 px cut, also inline in index.html's <link rel="icon">) and the three PNGs. Needs Pillow.
+16 px cut with no background, also inline in index.html's <link rel="icon">) and the three PNGs. Needs Pillow.
 """
 from math import hypot
 from pathlib import Path
@@ -38,13 +38,20 @@ def in_safe_zone(shapes):
     return [[(SIZE / 2 + (x - cx) * k, SIZE / 2 + (y - cy) * k) for x, y in s] for s in shapes]
 
 
-def svg(shapes, radius=0):
-    corner = f' rx="{radius}"' if radius else ""
+def svg(shapes):
     polys = "".join(
         f'<polygon points="{" ".join(f"{x:.2f},{y:.2f}".replace(".00", "") for x, y in s)}" fill="{c}"/>'
         for s, c in zip(shapes, (MAIN, EDGE)))
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {SIZE} {SIZE}">'
-            f'<rect width="{SIZE}" height="{SIZE}"{corner} fill="{TILE}"/>{polys}</svg>\n')
+            f'<rect width="{SIZE}" height="{SIZE}" fill="{TILE}"/>{polys}</svg>\n')
+
+
+def favicon(shapes):
+    """Just the two Ls, filling the tab's icon. The first follows the tab's color: white would vanish on a light tab."""
+    main, edge = (" ".join(f"{x},{y}" for x, y in s) for s in shapes)
+    return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 9.5 52 52">'
+            f'<style>.a{{fill:{TILE}}}@media (prefers-color-scheme:dark){{.a{{fill:{MAIN}}}}}</style>'
+            f'<polygon class="a" points="{main}"/><polygon fill="{EDGE}" points="{edge}"/></svg>\n')
 
 
 def png(shapes, size, name):
@@ -59,7 +66,7 @@ def png(shapes, size, name):
 def main():
     home = in_safe_zone(SHEET)
     (ICONS / "logo.svg").write_text(svg(home), encoding="utf-8")
-    (ICONS / "favicon.svg").write_text(svg(SHEET_16, radius=12), encoding="utf-8")
+    (ICONS / "favicon.svg").write_text(favicon(SHEET_16), encoding="utf-8")
     png(home, 192, "icon-192.png")
     png(home, 512, "icon-512.png")
     png(home, 180, "apple-touch-icon.png")

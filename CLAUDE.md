@@ -129,7 +129,7 @@ saved leagues are lost). Owner's league:
   one on his team in his role keeps him; `homePos` is the NHL's position, as a league's overwrites `pos`). Long-term injured aren't on NHL rosters: ESPN's rosters and injury report put them on a team. Tests:
   `tests/test_update_nhl.py` (Python), the last tests in `app.test.js`; fixtures from `tests/capture_nhl_fixtures.py` (team names replaced).
 - Logo ("Sheet": two tilted Ls, the second a thin edge under the first; "Ink" colors, chosen for now): `scripts/build_icons.py` draws it and writes `icons/logo.svg`,
-  `icons/favicon.svg` (a 16 px cut with a wider gap, also inline in index.html: copy it there if it changes) and the three PNGs. On a home screen the mark stays inside the middle 80% circle.
+  `icons/favicon.svg` (a 16 px cut with a wider gap and no background, the first L dark on a light tab and white on a dark one, also inline in index.html: copy it there if it changes) and the three PNGs. On a home screen the mark stays inside the middle 80% circle.
 - Home screen: `manifest.webmanifest` + `icons/` + the tags in index.html make the site install full screen (`canInstall`, the settings menu's Install the app:
   the browser's offer, or steps for an iPhone, which keeps the app's storage apart from Safari's, so a league is connected once more there). No service worker on purpose: every
   visit is the live site. An installed app has no refresh button, so returning after 3 hours reloads it (`appStale`).
