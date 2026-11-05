@@ -310,6 +310,8 @@ function foldPastSeasons() {
 // What the league form connects: a league, or an earlier season of one, opened under its league. A past season
 // whose league isn't here yet is kept for when it is, and returned as { label, name } so the form can ask for it.
 async function connectLeague(input) {
+  // (only Fantrax has hockey here; an ESPN hockey league's ID would be read as a basketball one)
+  if (/espn\.com\/hockey/i.test(String(input))) throw new Error("ESPN hockey leagues aren't supported yet. Hockey works with Fantrax leagues.");
   const id = parseLeagueId(input);
   if (!id) throw new Error(BAD_LEAGUE_ID);
   if (leagueSourceOf(id) === 'fantrax') {
@@ -476,10 +478,10 @@ function viewLanding() {
   const adding = ui.addingLeague && state.fxTeam, forSeason = adding && ui.addingLeague === 'season' && fxLeague();
   const step1 = chosen ? '' : `
       <p class="land-step">${forSeason ? 'Add a season' : adding ? 'Add a league' : 'League Layer'}</p>
-      <h1>${forSeason ? 'Add an earlier season' : adding ? 'Connect another league' : 'Plan your fantasy basketball week'}</h1>
+      <h1>${forSeason ? 'Add an earlier season' : adding ? 'Connect another league' : 'Plan your fantasy basketball or hockey week'}</h1>
       <p class="muted">${forSeason ? `Each season of <b>${esc(forSeason.name)}</b> has its own Fantrax league ID: open that season on Fantrax and copy the part of the address after <b>/league/</b>.`
         : adding ? 'Enter its league ID. Each league keeps its own team and notes, and earlier seasons go under their league in the menu at the top.'
-        : "Connect your Fantrax, ESPN or Sleeper league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
+        : "Connect your league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
       <form class="land-form" data-form="land-league">
         <label class="field" for="landLeague">${forSeason ? "That season's league ID or address" : 'League ID or address'}
           <input id="landLeague" name="leagueId" placeholder="${forSeason ? 'Fantrax league ID' : 'Fantrax, ESPN or Sleeper league ID'}" autocomplete="off" spellcheck="false" autofocus>
@@ -499,7 +501,7 @@ function viewLanding() {
         <span class="land-url">sleeper.com/leagues/<b>1234567890123456789</b>/matchup</span></p>
         <p>Pasting the whole address works too.</p>
       </details>
-      <p class="small muted land-foot">Built for head-to-head leagues on Fantrax, ESPN and Sleeper. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>
-      ${adding ? '' : '<p class="small muted land-browse">No league to connect? <button class="link-btn" data-action="land-browse">Just browse players</button></p>'}`;
+      <p class="small muted land-foot">Built for head-to-head leagues: basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a demo league instead</button>' : ''}</p>
+      ${adding ? '' : '<p class="small muted land-browse">No league to connect? <button class="link-btn" data-action="land-browse">Just browse NBA players</button></p>'}`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
 }

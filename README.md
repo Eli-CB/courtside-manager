@@ -1,6 +1,6 @@
 # League Layer
 
-A weekly matchup optimizer for 9-category head-to-head fantasy basketball. It pulls your Fantrax or public ESPN league, real NBA stats, injuries and the schedule, then shows:
+A weekly matchup optimizer for head-to-head fantasy basketball (Fantrax, public ESPN, Sleeper) and hockey (Fantrax). It pulls your league, real NBA or NHL stats, injuries and the schedule, then shows:
 
 - **Dashboard:** the day's essentials: action items, injury news for your players, and the latest game day's best single games across the NBA (free agents included) and worst games by rostered players, with who has each player
 - **Matchups:** both lineups side by side, projected category totals, win chances, and which starters to use

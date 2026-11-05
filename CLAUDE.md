@@ -92,8 +92,7 @@ saved leagues are lost). Owner's league:
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
-- NHL (Fantrax leagues only; every tab and past seasons, as basketball). Not announced yet: the landing page says basketball, a
-  pasted hockey ID just works. Goalies: a team's game isn't each
+- NHL (Fantrax leagues only; every tab and past seasons, as basketball; "Just browse" and the demo are NBA only). Goalies: a team's game isn't each
   goalie's. `startChance(p, d)` (nba.js) is 1 for skaters; a goalie's comes from `startChain(team)`, game by game from the team's last
   (`teams[t].lg`): his share of recent starts (`raw.st`, `goalie_shares` in the job; roster goalies only, anyone Out shares nothing), cut
   for whoever started the game before (×0.1 on a back-to-back: the same goalie started the second night 7% of the time in 2025-26;

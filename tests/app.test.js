@@ -2377,6 +2377,16 @@ test('hockey trades and waivers weigh a goalie by the games he plays; past seaso
   assert.ok(a.statCells({ min: 20, g: 0.5, a: 0.5, sog: 3, hit: 1, blk: 1, sv: 0, sa: 0 }).includes('0.5'));
 });
 
+test('the landing page offers both sports, and says so when a league is on a site without hockey', async () => {
+  const a = loadApp();
+  await a.ready();
+  const html = a.viewLanding();
+  assert.match(html, /fantasy basketball or hockey week/);
+  assert.match(html, /basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax/);
+  assert.match(html, /Just browse NBA players/);
+  await assert.rejects(a.connectLeague('https://fantasy.espn.com/hockey/league?leagueId=12345678'), /Hockey works with Fantrax leagues/);
+});
+
 test("a season's memos don't cross sports", async () => {
   const a = await hockeyApp();
   a.get('gameLogs')['2025-26'] = { made: 'up' };
