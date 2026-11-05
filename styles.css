@@ -844,6 +844,8 @@ body.landing .tabs, body.landing .nav-btn { visibility: hidden; } /* no sections
 .land-help { margin: 4px 0 14px; font-size: .9rem; }
 .land-help summary { cursor: pointer; color: var(--accent); font-weight: 600; }
 .land-help p { margin: 8px 0 0; color: var(--muted); }
+.install-steps { margin: 0 0 12px; padding-left: 22px; }
+.install-steps li { margin: 6px 0; }
 .land-url { display: inline-block; margin-top: 4px; font-family: ui-monospace, Consolas, monospace; font-size: .85rem; color: var(--text); background: var(--surface-2); padding: 3px 8px; border-radius: 6px; word-break: break-all; }
 .land-foot { margin: 0 !important; padding-top: 14px; border-top: 1px solid var(--border); }
 .land-browse { margin: 8px 0 0 !important; }

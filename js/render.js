@@ -154,6 +154,13 @@ function ctxBar() {
   $('#ctxMeta').hidden = !notes.length && !demo;
 }
 
+// ----- On a phone's home screen -----
+// The site installs as it is (manifest.webmanifest): no app store, and no service worker, so every visit is the live site.
+// Android and desktop Chrome offer to install it and say so (beforeinstallprompt); an iPhone only does it from its Share menu.
+const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIos = () => /iP(hone|ad|od)/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const canInstall = () => !isInstalled() && (!!ui.installPrompt || isIos());
+
 // Settings (the gear at the right of the tab bar): data freshness, reloading the league, the theme
 // What this site keeps in the browser (about 5 MB is allowed), counted in characters
 // (league data from Fantrax and ESPN: what "Clear saved league data" removes)
@@ -172,6 +179,7 @@ const TIP_URL = 'https://ko-fi.com/leaguelayerdev'; // tips (also in index.html'
 const menuIcon = d => `<svg class="lm-ico" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const ICON_RELOAD = menuIcon('<path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 3.5v5h-5"/>');
 const ICON_MAIL = menuIcon('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>');
+const ICON_PHONE = menuIcon('<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>');
 const ICON_COFFEE = menuIcon('<path d="M4 10h12v4.5a4.5 4.5 0 0 1-4.5 4.5h-3A4.5 4.5 0 0 1 4 14.5z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c-.8 1 .8 2-.1 3M12 3.5c-.8 1 .8 2-.1 3"/>');
 const FEEDBACK_EMAIL = 'feedback@leaguelayer.com', FEEDBACK_SUBJECT = 'League Layer feedback';
 function feedbackDetails() {
@@ -205,6 +213,9 @@ function gearMenu() {
   if (!el) return;
   const wasOpen = el.querySelector('details') && el.querySelector('details').open;
   const advOpen = !!(el.querySelector('.gear-adv') && el.querySelector('.gear-adv').open);
+  // the phone's status bar follows the site's theme, as chosen here, not only the device's
+  const colorNow = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = colorNow === 'dark' ? '#171b23' : '#ffffff'; });
   const dark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
   const league = fxLeague() && !needsLanding() && !state.demo;
   el.innerHTML = `<details class="gear"${wasOpen ? ' open' : ''}>
@@ -218,6 +229,7 @@ function gearMenu() {
       <button type="button" class="lm-item gear-toggle" data-action="toggle-clock" role="switch" aria-checked="${ui.clock24}"><span>24-hour time<span class="gear-sub">tip-offs and update times as ${fmtTime('2026-11-02T19:30:00')}</span></span><span class="gear-switch${ui.clock24 ? ' on' : ''}" aria-hidden="true"></span></button>
       <div class="lm-sec">Help</div>
       <button type="button" class="lm-item" data-action="feedback">${ICON_MAIL}Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></button>
+      ${canInstall() ? `<button type="button" class="lm-item" data-action="install-app">${ICON_PHONE}Install the app<span class="gear-sub">on your home screen, full screen with no browser bars</span></button>` : ''}
       <a class="lm-item" href="${TIP_URL}" target="_blank" rel="noopener">${ICON_COFFEE}Buy me a coffee<span class="gear-sub">tips keep League Layer free, on Ko-fi</span></a>
       <details class="gear-adv"${advOpen ? ' open' : ''}><summary class="lm-sec">Advanced</summary>
         <div class="gear-row">${NBA ? `NBA stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable'}</div>

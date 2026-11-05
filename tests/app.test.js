@@ -2636,3 +2636,34 @@ test('football and the other sports leave each other alone', async () => {
   assert.equal(a.get('SPORT').key, 'nfl');
   assert.equal(a.get('state').slots.length, 9);
 });
+
+test('the site installs to a home screen: its manifest, the offer in the menu, iPhone steps, and staying fresh', async () => {
+  const fs = require('fs'), path = require('path'), root = path.join(__dirname, '..');
+  const m = JSON.parse(fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8'));
+  assert.equal(m.display, 'standalone');
+  assert.equal(m.start_url, '/');
+  for (const i of m.icons) assert.ok(fs.existsSync(path.join(root, i.src)), i.src);
+  assert.ok(m.icons.some(i => i.sizes === '192x192') && m.icons.some(i => i.sizes === '512x512'));
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  assert.match(html, /rel="manifest" href="manifest.webmanifest"/);
+  assert.ok(fs.existsSync(path.join(root, html.match(/apple-touch-icon" href="([^"]+)"/)[1])));
+
+  const a = loadApp();
+  await a.ready();
+  const ui = a.get('ui');
+  assert.equal(a.canInstall(), false, 'no offer, not an iPhone');
+  let shown = 0;
+  ui.installPrompt = { prompt() { shown++; }, userChoice: Promise.resolve({ outcome: 'accepted' }) };
+  assert.equal(a.canInstall(), true);
+  await a.actions['install-app']();
+  assert.equal(shown, 1);
+  assert.equal(ui.installPrompt, null);
+  a.navigator.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)';
+  assert.equal(a.canInstall(), true, 'an iPhone: steps');
+  await a.actions['install-app']();
+  // installed: nothing to offer, and a stale app loads again
+  a.navigator.standalone = true;
+  assert.equal(a.isInstalled(), true);
+  assert.equal(a.canInstall(), false);
+  assert.equal(a.appStale(), false, 'just opened');
+});

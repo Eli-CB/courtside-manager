@@ -128,6 +128,9 @@ saved leagues are lost). Owner's league:
   C vs D; `hockeyRole`). A namesake with no data here must not take a player's id (`matchPlayers`: two entries on one player, the
   one on his team in his role keeps him; `homePos` is the NHL's position, as a league's overwrites `pos`). Long-term injured aren't on NHL rosters: ESPN's rosters and injury report put them on a team. Tests:
   `tests/test_update_nhl.py` (Python), the last tests in `app.test.js`; fixtures from `tests/capture_nhl_fixtures.py` (team names replaced).
+- Home screen: `manifest.webmanifest` + `icons/` + the tags in index.html make the site install full screen (`canInstall`, the settings menu's Install the app:
+  the browser's offer, or steps for an iPhone, which keeps the app's storage apart from Safari's, so a league is connected once more there). No service worker on purpose: every
+  visit is the live site. An installed app has no refresh button, so returning after 3 hours reloads it (`appStale`).
 - `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
   in page order with fake fetch (fixtures) and a fixed clock (2026-10-26 20:00 ET). Fixtures in
   `tests/fixtures` (refresh: `python tests/capture_fixtures.py`). Every push to main runs them in the site workflow's

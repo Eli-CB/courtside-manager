@@ -78,6 +78,23 @@ const actions = {
     const d = $('#infoDialog');
     if (!d.open) d.showModal();
   },
+  // Install the app: the browser's own offer where it has one, else how to on an iPhone
+  async 'install-app'() {
+    $('#gearMenu details')?.removeAttribute('open');
+    const offer = ui.installPrompt;
+    if (offer) {
+      ui.installPrompt = null;
+      offer.prompt();
+      await offer.userChoice.catch(() => null);
+      render();
+      return;
+    }
+    $('#infoTitle').textContent = 'Install League Layer';
+    $('#infoBody').innerHTML = `<ol class="install-steps"><li>In Safari, tap the <b>Share</b> button.</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li><li>Open League Layer from your home screen.</li></ol>
+      <p class="muted small">It opens full screen. Your iPhone keeps it apart from the browser, so you'll connect your league once more there.</p>`;
+    const d = $('#infoDialog');
+    if (!d.open) d.showModal();
+  },
   'go-week'() { location.hash = '#week'; },
   'go-recap'() { ui.recapWeek = null; location.hash = '#recap'; },
   // the previous or next finished week's recap
@@ -422,6 +439,15 @@ function setNav(open) {
   $('.nav-btn').setAttribute('aria-expanded', open);
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('nav-open')) setNav(false); });
+
+// The browser's offer to install, kept for the settings menu's Install the app
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ui.installPrompt = e; if (state) render(); });
+window.addEventListener('appinstalled', () => { ui.installPrompt = null; if (state) render(); });
+// An installed app has no refresh button and can sit open for days: coming back to it after a few hours, it loads again
+// for the day's stats and any new version. A browser tab is left alone.
+const OPENED_AT = Date.now(), APP_STALE = 3 * 36e5;
+const appStale = () => isInstalled() && Date.now() - OPENED_AT > APP_STALE;
+document.addEventListener('visibilitychange', () => { if (!document.hidden && appStale()) location.reload(); });
 
 document.addEventListener('click', e => {
   // a tap outside a popup (on its backdrop) closes it
