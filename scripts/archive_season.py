@@ -22,7 +22,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from update_data import SD_KEYS, STAT_KEYS, dash_stats, game_logs, get_json, result_rows, season_str  # noqa: E402
+from update_data import SD_KEYS, STAT_KEYS, dash_stats, game_logs, get_json, result_rows, season_str, write_season_index  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'data', 'seasons')
@@ -88,11 +88,6 @@ def archive_games(season):
     print(f'{season} games: {len(rows)} lines, {os.path.getsize(path) // 1024} KB')
 
 
-def write_index():
-    seasons = sorted(f[:-5] for f in os.listdir(OUT) if f.endswith('.json') and f != 'index.json' and not f.endswith('-games.json'))
-    with open(os.path.join(OUT, 'index.json'), 'w', encoding='utf-8') as f:
-        json.dump(seasons, f)
-    print('index:', ', '.join(seasons))
 
 
 def main():
@@ -103,7 +98,7 @@ def main():
     for y in range(first, last + 1):
         archive(season_str(y))
         archive_games(season_str(y))
-    write_index()
+    print('index:', ', '.join(write_season_index(OUT)))
 
 
 if __name__ == '__main__':

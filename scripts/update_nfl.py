@@ -19,12 +19,10 @@ import json
 import os
 import re
 import sys
-import time
-import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from update_data import log, schedule  # noqa: E402
+from update_data import fetch_json, log, per_game, schedule  # noqa: E402
 
 DATA = os.path.join(ROOT, 'data', 'nfl')
 OUT = os.path.join(DATA, 'players.json')
@@ -48,15 +46,7 @@ INJURED_OUT = {'out', 'ir', 'pup', 'sus', 'na', 'dnr', 'cov'}
 
 
 def get_json(url, tries=3, timeout=60):
-    last = None
-    for i in range(tries):
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=timeout) as r:
-                return json.loads(r.read())
-        except Exception as e:
-            last = e
-            time.sleep(2 + i * 3)
-    raise RuntimeError(f'{url[:90]}... failed: {last!r}')
+    return fetch_json(url, tries, timeout, HEADERS)
 
 
 def player_id(sid):
@@ -204,11 +194,6 @@ def injury(p):
         return None
     note = ' '.join(x for x in (p.get('injury_body_part'), p.get('injury_notes')) if x)
     return {'status': 'Out' if raw.lower() in INJURED_OUT else 'DTD', 'label': raw, 'note': note, 'date': '', 'back': ''}
-
-
-def per_game(v):
-    v = round(v, 2)
-    return int(v) if v == int(v) else v
 
 
 def main():

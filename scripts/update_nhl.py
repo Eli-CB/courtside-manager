@@ -18,12 +18,10 @@ import datetime as dt
 import json
 import os
 import sys
-import time
 import urllib.parse
-import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from update_data import log, name_key, norm_name, schedule, season_str  # noqa: E402
+from update_data import fetch_json, log, name_key, norm_name, per_game, schedule, season_str, write_season_index  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data', 'nhl')
@@ -63,15 +61,7 @@ GOALIE_DECAY, GOALIE_PRIOR = .85, 1
 def get_json(url, params=None, tries=3, timeout=40):
     if params:
         url += '?' + urllib.parse.urlencode(params)
-    last = None
-    for i in range(tries):
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=timeout) as r:
-                return json.loads(r.read())
-        except Exception as e:
-            last = e
-            time.sleep(2 + i * 3)
-    raise RuntimeError(f'{url[:90]}... failed: {last!r}')
+    return fetch_json(url, tries, timeout, HEADERS)
 
 
 def report(name, start, end):
@@ -201,11 +191,6 @@ def full(r):
     return r[2:] + [0] * (len(LINE_KEYS) - len(r) + 2)
 
 
-def per_game(v):
-    v = round(v, 2)
-    return int(v) if v == int(v) else v
-
-
 def average(lines):
     n = len(lines)
     return [n] + [round(sum(x[0] for x in lines) / n, 1)] + [per_game(sum(x[i] for x in lines) / n) for i in range(1, len(LINE_KEYS))]
@@ -295,15 +280,9 @@ def archive(season):
         json.dump({'season': season, 'statKeys': STAT_KEYS, 'sdKeys': SD_KEYS, 'players': players}, f, separators=(',', ':'), ensure_ascii=False)
     with open(games_path, 'w', encoding='utf-8') as f:
         json.dump({'season': season, 'v': BOX_VERSION, 'start': games[0]['gameDate'], 'teams': teams, 'keys': LINE_KEYS, 'players': game_rows}, f, separators=(',', ':'))
-    write_index()
+    write_season_index(SEASONS)
     log(f'  {len(players)} players, {os.path.getsize(path) // 1024} + {os.path.getsize(games_path) // 1024} KB')
     return players
-
-
-def write_index():
-    seasons = sorted(f[:-5] for f in os.listdir(SEASONS) if f.endswith('.json') and f != 'index.json' and not f.endswith('-games.json'))
-    with open(os.path.join(SEASONS, 'index.json'), 'w', encoding='utf-8') as f:
-        json.dump(seasons, f)
 
 
 def role(pos):

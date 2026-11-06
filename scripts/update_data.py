@@ -100,17 +100,31 @@ def get_json(url, params=None, tries=3, timeout=40):
     return fetch_json(url, tries, timeout)
 
 
-def fetch_json(url, tries, timeout):
+def fetch_json(url, tries, timeout, headers=None):
     last = None
     for i in range(tries):
         try:
-            req = urllib.request.Request(url, headers=HEADERS)
+            req = urllib.request.Request(url, headers=headers or HEADERS)
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read())
         except Exception as e:  # network hiccups and stats.nba.com throttling
             last = e
             time.sleep(2 + i * 3)
     raise RuntimeError(f'{url[:90]}... failed: {last!r}')
+
+
+def per_game(v):
+    """A stat as the data files keep it: two decimals, a whole number without any."""
+    v = round(v, 2)
+    return int(v) if v == int(v) else v
+
+
+def write_season_index(folder):
+    """index.json: the seasons in a folder of archives. Returns them."""
+    seasons = sorted(f[:-5] for f in os.listdir(folder) if f.endswith('.json') and f != 'index.json' and not f.endswith('-games.json'))
+    with open(os.path.join(folder, 'index.json'), 'w', encoding='utf-8') as f:
+        json.dump(seasons, f)
+    return seasons
 
 
 def result_rows(data, idx=0):
