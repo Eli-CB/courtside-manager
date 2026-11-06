@@ -232,7 +232,7 @@ function gearMenu() {
       ${canInstall() ? `<button type="button" class="lm-item" data-action="install-app">${ICON_PHONE}Install the app<span class="gear-sub">on your home screen, full screen with no browser bars</span></button>` : ''}
       <a class="lm-item" href="${TIP_URL}" target="_blank" rel="noopener">${ICON_COFFEE}Buy me a coffee<span class="gear-sub">tips keep League Layer free, on Ko-fi</span></a>
       <details class="gear-adv"${advOpen ? ' open' : ''}><summary class="lm-sec">Advanced</summary>
-        <div class="gear-row">${NBA ? `NBA stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : 'NBA data unavailable'}</div>
+        <div class="gear-row">${NBA ? `${SPORT.name} stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : `${SPORT.name} data unavailable`}</div>
         <div class="gear-row">Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
         <button type="button" class="lm-item" data-action="clear-saved">Clear saved league data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
       </details>

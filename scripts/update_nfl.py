@@ -38,7 +38,7 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; LeagueLayer data job)'}
 POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
 WEEKS = 18
 PROJ_WEEKS = 3  # this week and the next two: Sleeper moves on to a new week a day or so after the site does
-BOX_VERSION = 1
+BOX_VERSION = 2  # 2: only games a player was in, not ones he was merely listed active for
 DEF_IDS = 900000  # a team defense's Sleeper id is its team code; the site's player ids are numbers
 # Sleeper's stats that no league scores: ranks, percentages, longest plays, rates
 NOT_SCORED = re.compile(r'^(pos_rank|rank_|pts_(std|half_ppr|ppr)$|gms_active$|gp$|gs$|.*_lng$|.*_pct$|.*_ypa$|.*_ypc$|.*_ypt$|.*_yar$|.*_rtg$|.*per_play|.*_air_yd$|'
@@ -104,10 +104,11 @@ def schedule_games():
 
 
 def week_stats(season, week):
-    """[{player_id, team, stats}] for players in a game that week."""
+    """[{player_id, team, stats}] for players in a game that week. gp says he played: gms_active is on for anyone on an
+    active roster, injured starters who sat included, and with it a game he missed would count in his averages."""
     q = '&'.join(f'position[]={p}' for p in POSITIONS)
     rows = get_json(SLEEPER_STATS + f'{season}/{week}?season_type=regular&{q}')
-    return [r for r in rows if (r.get('stats') or {}).get('gms_active') or (r.get('stats') or {}).get('gp')]
+    return [r for r in rows if (r.get('stats') or {}).get('gp')]
 
 
 def scored(stats):
@@ -240,9 +241,9 @@ def main():
     try:
         proj = projections(season, int(state.get('week') or 1), def_id)
         log(f'  weeks {proj["projWeeks"]}, {len(proj["rows"])} players, {len(proj["projKeys"])} stats')
-    except Exception as e:  # the site falls back on season averages
+    except Exception as e:  # the site falls back on season averages, and the run fails at the end so someone hears of it
         log(f'  failed: {e}')
-        proj = {'projKeys': [], 'projWeeks': [], 'rows': {}}
+        proj = {'projKeys': [], 'projWeeks': [], 'rows': {}, 'failed': str(e)}
 
     log('- Players (Sleeper)...')
     everyone = get_json(SLEEPER + 'players/nfl', timeout=120)
@@ -288,6 +289,8 @@ def main():
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     os.replace(tmp, OUT)
     log(f'Wrote {OUT}: {len(players)} players, {os.path.getsize(OUT) // 1024} KB; box scores {os.path.getsize(BOX_CACHE) // 1024} KB')
+    if proj.get('failed'):
+        raise RuntimeError(f'written, but with no projections: {proj["failed"]}')
 
 
 if __name__ == '__main__':

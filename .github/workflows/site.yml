@@ -33,7 +33,10 @@ jobs:
         with:
           python-version: '3.12'
 
+      # each sport runs apart: if one fails, the others still go out, and the last step fails the run so GitHub says so
       - name: Pull NBA, ESPN and Fantrax data
+        id: nba
+        continue-on-error: true
         run: python scripts/update_data.py
 
       - name: Rebuild headshots and logos (1st of the month, new players, or when asked)
@@ -48,8 +51,8 @@ jobs:
             echo "Skipping images today"
           fi
 
-      # hockey runs apart: if it fails, the basketball data still goes out
       - name: Pull NHL and ESPN data
+        id: nhl
         continue-on-error: true
         run: python scripts/update_nhl.py
 
@@ -66,6 +69,7 @@ jobs:
           fi
 
       - name: Pull NFL data
+        id: nfl
         continue-on-error: true
         run: python scripts/update_nfl.py
 
@@ -97,6 +101,12 @@ jobs:
             done
             exit 1
           fi
+
+      - name: Fail the run if a sport's data didn't update
+        if: steps.nba.outcome == 'failure' || steps.nhl.outcome == 'failure' || steps.nfl.outcome == 'failure'
+        run: |
+          echo "::error::Data refresh failed. NBA: ${{ steps.nba.outcome }}, NHL: ${{ steps.nhl.outcome }}, NFL: ${{ steps.nfl.outcome }}"
+          exit 1
 
   test:
     # every run tests what's on main now, data runs too: a commit whose own run failed mustn't go out with the next data

@@ -97,7 +97,7 @@ saved leagues are lost). Owner's league:
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 - NFL (Sleeper leagues only; stages 1-3 of 5 done: data; Standings, Dashboard scores, Recap, Awards, past weeks; then projections on Matchups, Roster and
   Players. `soonTabs` hides Draft and Trades. Next: Draft, Trades, past seasons, then Fantrax). `scripts/update_nfl.py` (own step in the daily job, as hockey's) builds `data/nfl/`: players from Sleeper's list (too big for a browser: 14 MB), schedule
-  from ESPN, stats by week from Sleeper's undocumented `api.sleeper.com/stats`. A line's stats keep Sleeper's names, the same as a league's `scoring_settings`, so
+  from ESPN, stats by week from Sleeper's undocumented `api.sleeper.com/stats`. A game counts only with its `gp`: `gms_active` is on for anyone on an active roster, injured starters included. A line's stats keep Sleeper's names, the same as a league's `scoring_settings`, so
   `L.points` is simply those settings and `lineFp` gives the league's exact points, bonuses and defense brackets included: 80 team-weeks of a real league matched Sleeper's
   to the hundredth. `statKeys` come from the file (`fetchSport` fills `countKeys`, `playerKeys`). A league is `oneGame`, which already means one game a week per slot, with no
   Game of the week. Weeks are Tuesday to Monday (`weekShift`, in `dayOffset`), from the file's `weeks`. During a game the points come from Sleeper's matchups (`footballLines`:
@@ -183,7 +183,8 @@ saved leagues are lost). Owner's league:
 - stats.nba.com blocks GitHub runners. Past seasons live in `data/seasons/<season>.json` + `-games.json`
   (2016-17..2025-26), made on the owner's PC. Each fall archive the season just ended:
   `python scripts/archive_season.py 2026-27`.
-- Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data.
+- Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data. Each sport's refresh
+  runs apart; one that fails (or NFL projections failing) fails the run at the end, so GitHub says so, and the rest still publishes.
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
 - `__BUILD__` in index.html and js/core.js is replaced at deploy with the hash of the last commit that changed `index.html`, `styles.css` or `js/` (cache busting; not the latest commit: the daily data commits mustn't make visitors download the code again).

@@ -576,8 +576,8 @@ function newsCard() {
   mine.sort((a, b) => (b.inj.date || '').localeCompare(a.inj.date || ''));
   const out = mine.filter(p => p.inj.status === 'Out').length;
   const body = mine.length ? `<ul class="alerts">${mine.slice(0, 6).map(p => `<li class="alert ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${headshot(p, 32)}<span class="grow"><b>${esc(p.name)}</b> <span class="badge ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(p.inj.label)}</span><br><span class="small">${esc(p.inj.note)}</span> <span class="muted small">${p.inj.date ? fmtDay(p.inj.date) : ''}</span></span></li>`).join('')}</ul>`
-    : `<p class="muted small" style="margin:0">${NBA ? 'None of your players are on the injury report.' : 'Injury news appears here when live NBA data is available.'}</p>`;
-  const sub = !NBA ? 'when NBA data is available' : !mine.length ? 'none of your players' : `${mine.length} of your players${out ? ` · ${out} out` : ''}`;
+    : `<p class="muted small" style="margin:0">${NBA ? 'None of your players are on the injury report.' : `Injury news appears here when live ${SPORT.name} data is available.`}</p>`;
+  const sub = !NBA ? `when ${SPORT.name} data is available` : !mine.length ? 'none of your players' : `${mine.length} of your players${out ? ` · ${out} out` : ''}`;
   return dashFold('news', 'Injury news', sub, `${body}<p class="muted small df-src">Your players · from ESPN</p>`, mine.length ? (out ? 'bad' : 'warn') : '');
 }
 

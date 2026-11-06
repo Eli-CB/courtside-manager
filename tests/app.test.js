@@ -2576,7 +2576,7 @@ test('football on the page: lines in words, finished weeks, this week, byes and 
   const L = a.fxLeague(), ui = a.get('ui'), st = a.get('state');
   // how a line reads
   assert.equal(a.fullLine({ pass_yd: 245, pass_td: 2, gp1: 1 }, false).join(', '), '245 pass yd, 2 pass TD');
-  assert.equal(a.fullLine({ gp1: 1 }, false).join(), 'no stats');
+  assert.equal(a.fullLine({ gp1: 1 }, false).join(), 'played, no stats');
   // every page here
   for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), recap: () => a.viewRecap(), standings: () => a.viewStandings(), awards: () => a.viewAwards(), roster: () => a.viewRoster(), players: () => a.viewPlayers() })) {
     ui.tab = tab;

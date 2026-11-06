@@ -37,6 +37,16 @@ class Stats(unittest.TestCase):
         self.assertEqual(N.espn_tri('KC'), 'KC')
 
 
+class WeekStats(unittest.TestCase):
+    def test_a_game_counts_only_if_he_played(self):
+        real = N.get_json
+        N.get_json = lambda url, **kw: [{'player_id': '1', 'stats': {'gp': 1, 'gms_active': 1, 'off_snp': 34}},
+                                        {'player_id': '2', 'stats': {'gms_active': 1}},  # on the active roster, never played
+                                        {'player_id': 'KC', 'stats': {'gp': 1, 'sack': 3}}]  # defenses have no gms_active
+        self.addCleanup(setattr, N, 'get_json', real)
+        self.assertEqual([r['player_id'] for r in N.week_stats('2026', 8)], ['1', 'KC'])
+
+
 class Projections(unittest.TestCase):
     def test_a_projection_keeps_what_leagues_score(self):
         s = N.projected({'adp_dd_ppr': 3, 'pos_adp_dd_ppr': 1, 'gp': 1, 'pts_half_ppr': 20.2, 'rec': 5.3, 'rush_yd': 89.094, 'bonus_rec_rb': 5.3, 'cmp_pct': 66, 'pts_allow_14_20': 1})
