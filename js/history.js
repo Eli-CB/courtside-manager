@@ -2,6 +2,10 @@
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
+const LOADING_GAMES = '<div class="card"><div class="empty"><strong>Loading the season’s games…</strong></div></div>';
+// what a player added, in an award's breakdown
+const awardAmount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
+
 // ----- A past season week by week: who each team had, who started, and how they got them -----
 // Fantrax shares every lineup period's rosters but no transaction log; Sleeper each week's matchups, with every
 // player's points (sleeperWeekRosters). A player's stint on a team,
@@ -601,7 +605,7 @@ function viewPastRosters() {
   if (L.weeks && L.season && seasonCtx.basis) {
     if (!(L.season in gameLogs)) {
       loadGameLog(L.season).then(() => { if (ui.tab === 'rosters' && ui.season) render(); });
-      return '<div class="card"><div class="empty"><strong>Loading the season’s games…</strong></div></div>';
+      return LOADING_GAMES;
     }
     if (gameLogs[L.season]) return pastStarters(L, gameLogs[L.season], tid, r, teams);
   }
@@ -677,12 +681,11 @@ function awardRows(list, val, meta) {
 function waiverDetail(T, txt) {
   const ps = [...(T.waiverList || [])].sort((a, b) => b.v - a.v);
   if (!ps.length) return '<p class="muted">No pickups started yet.</p>';
-  const amount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
   const meta = p => `${p.games} G · ${p.weeks} wk${p.weeks === 1 ? '' : 's'}`;
   const up = ps.filter(p => p.v > 0), down = ps.filter(p => p.v <= 0).reverse();
   return `<p class="aw-break-total"><b>${esc(txt)}</b> from ${ps.length} pickup${ps.length === 1 ? '' : 's'} who started</p>
-    ${up.length ? `<h3 class="sub">Helped</h3>${awardRows(up.slice(0, 10), amount, meta)}` : ''}
-    ${down.length ? `<h3 class="sub">Hurt or did nothing</h3>${awardRows(down.slice(0, 10), amount, meta)}` : ''}
+    ${up.length ? `<h3 class="sub">Helped</h3>${awardRows(up.slice(0, 10), awardAmount, meta)}` : ''}
+    ${down.length ? `<h3 class="sub">Hurt or did nothing</h3>${awardRows(down.slice(0, 10), awardAmount, meta)}` : ''}
     <p class="muted small">Games in the weeks each pickup started (G · weeks started).</p>`;
 }
 function heartDetail(T, txt) {
@@ -741,12 +744,11 @@ function managerDetail(T, txt) {
 function draftDetail(T, txt) {
   const ps = [...(T.draftList || [])].sort((a, b) => b.v - a.v);
   if (!ps.length) return '<p class="muted">No picks to grade.</p>';
-  const amount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
   const meta = p => `Rd ${p.round}, #${p.pick} · ${p.games} G${p.dropped ? ` · dropped wk ${p.dropped}` : ''}`;
   const best = ps.filter(p => p.v > 0).slice(0, 10), worst = ps.filter(p => p.v <= 0 && !best.includes(p)).reverse().slice(0, 5);
   return `<p class="aw-break-total"><b>${esc(txt)}</b> from ${ps.length} pick${ps.length === 1 ? '' : 's'}</p>
-    ${best.length ? `<h3 class="sub">Best picks</h3>${awardRows(best, amount, meta)}` : ''}
-    ${worst.length ? `<h3 class="sub">Worst picks</h3>${awardRows(worst, amount, meta)}` : ''}
+    ${best.length ? `<h3 class="sub">Best picks</h3>${awardRows(best, awardAmount, meta)}` : ''}
+    ${worst.length ? `<h3 class="sub">Worst picks</h3>${awardRows(worst, awardAmount, meta)}` : ''}
     <p class="muted small">${isPoints() ? 'Fantasy points' : "Value above a replacement-level starter"} from each pick's games until he was first dropped, through trades (round and pick · games).</p>`;
 }
 function streetDetail(T, txt) {
@@ -908,7 +910,7 @@ function viewAwards() {
   const L = fxLeague();
   if (L.weeks && L.season && !(L.season in gameLogs)) {
     loadGameLog(L.season).then(() => { if (ui.tab === 'awards') render(); });
-    return '<div class="card"><div class="empty"><strong>Loading the season’s games…</strong></div></div>';
+    return LOADING_GAMES;
   }
   const me = myTeamId();
   const awards = seasonAwards();

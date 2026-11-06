@@ -2,6 +2,9 @@
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
+// Whether a menu's fold was open, so drawing it again keeps it that way
+const isOpen = (el, sel = 'details') => !!(el.querySelector(sel) && el.querySelector(sel).open);
+
 /* =========================================================
    Alerts
    ========================================================= */
@@ -44,7 +47,7 @@ function leagueMenu() {
   const cur = currentLeagueId();
   const saved = state.savedLeagues || [];
   const site = NBA && NBA.siteLeague;
-  const wasOpen = el.querySelector('details') && el.querySelector('details').open;
+  const wasOpen = isOpen(el);
   const P = pastSeason();
   // the current league's seasons, under it (Fantrax leagues: the others don't share past seasons)
   let seasons = '';
@@ -211,8 +214,8 @@ function waiverPopup() {
 function gearMenu() {
   const el = $('#gearMenu');
   if (!el) return;
-  const wasOpen = el.querySelector('details') && el.querySelector('details').open;
-  const advOpen = !!(el.querySelector('.gear-adv') && el.querySelector('.gear-adv').open);
+  const wasOpen = isOpen(el);
+  const advOpen = isOpen(el, '.gear-adv');
   // the phone's status bar follows the site's theme, as chosen here, not only the device's
   const colorNow = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = colorNow === 'dark' ? '#171b23' : '#ffffff'; });

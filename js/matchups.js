@@ -503,11 +503,16 @@ function pickupIdeas(ctx) {
   return out.sort((a, b) => b.score - a.score).slice(0, 5);
 }
 
+// Trying a free agent means setting a whole lineup with him, and football's Matchups redraws every 30 s during games:
+// a live redraw keeps the list it has, as the same players are still out there
+let pickMemo = { key: '', ideas: [] };
 function pickupsCard() {
   if (!NBA) return '';
   const ctx = weekContext();
   if (!ctx.hasOpp) return '';
-  const ideas = pickupIdeas(ctx).filter(x => x.score > 0.001);
+  const key = [ctx.dates[0], state.opp.fxId, ...ctx.mine.map(p => p.id)].join();
+  const ideas = live.hold && pickMemo.key === key ? pickMemo.ideas : pickupIdeas(ctx).filter(x => x.score > 0.001);
+  pickMemo = { key, ideas };
   return `
     <div class="card">
       <div class="card-head"><h2>Pickup ideas for this week</h2><span class="muted small">vs ${esc(state.opp.name || 'your opponent')} · ${fxLeague() ? 'free agents and waivers in your league' : 'if available in your league'}</span></div>

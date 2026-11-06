@@ -224,7 +224,7 @@ function sleeperWeekFresh(L) {
     for (const m of ms || []) Object.assign(pts, m.players_points || {});
     L.slpWeek = { n, pts, at: Date.now() };
     noteLiveOk('Sleeper live points');
-    if (ui.tab === 'dashboard' || (ui.tab === 'week' && isFootball())) render();
+    if (ui.tab === 'dashboard' || (ui.tab === 'week' && isFootball())) { live.hold = true; try { render(); } finally { live.hold = false; } }
   }).catch(e => {
     L.slpWeek = { ...(L.slpWeek || { n, pts: {} }), at: Date.now() };
     noteLiveFailure(e.message || "couldn't reach Sleeper", 'Sleeper live points');

@@ -372,9 +372,10 @@ const startWords = (p, d) => { const c = startChance(p, d); return c >= 0.97 ? '
 // spots, the ones with the most minutes), from that season's per-game stats: this season's smart blend, or a past
 // season's archive while one shows, so seasons never mix. Percentages measure (% − average) × attempts.
 const baseMemo = new Map(); // "season|pool size" -> BASE
+const rosterSpots = () => (fxPickable().length || 12) * (state.slots.length + (state.benchSize ?? 5)); // the league's, all teams
 function baseNow() {
   const season = seasonCtx && String(seasonCtx.basis || '').startsWith('arch:') ? seasonCtx.basis.slice(5) : 'cur';
-  const n = (fxPickable().length || 12) * (state.slots.length + (state.benchSize ?? 5));
+  const n = rosterSpots();
   const key = `${season}|${n}`;
   if (baseMemo.has(key)) return baseMemo.get(key);
   const A = season !== 'cur' ? archives[season] : null;
@@ -455,7 +456,7 @@ function catWins(s) {
 // The per-game value of the best player a league leaves on waivers (the first past its teams × roster spots)
 function waiverValue() {
   const vals = nbaPlayers().filter(p => p.gp).map(p => (isGoalie(p) ? gameWorth(p) : p.val)).sort((a, b) => b - a);
-  const n = (fxPickable().length || 12) * (state.slots.length + (state.benchSize ?? 5));
+  const n = rosterSpots();
   return vals.length > n ? vals[n] : 0;
 }
 // How much a stat swings from game to game for a player who averages m

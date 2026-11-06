@@ -17,6 +17,9 @@ function goWeek(shift) {
   else { state.opp.week = weekStart(); commit(); }
 }
 
+// The league and the recap a button's week is for
+const recapOn = el => { const L = fxLeague(); return { L, X: L && recaps.get(`${L.id}|${+el.dataset.week}`) }; };
+
 const actions = {
   'nav-toggle'(el) { setNav(!document.body.classList.contains('nav-open')); },
   'clear-saved'() {
@@ -106,7 +109,7 @@ const actions = {
   },
   // the recap as a picture, in a popup: share it, copy it, save it, or send the text and link instead
   async 'recap-share'(el) {
-    const L = fxLeague(), X = L && recaps.get(`${L.id}|${+el.dataset.week}`);
+    const { L, X } = recapOn(el);
     if (!X) return;
     el.disabled = true;
     try {
@@ -135,7 +138,7 @@ const actions = {
   },
   // the text and link: on phones the share sheet (the league chat is one tap away); elsewhere copied
   async 'recap-text'(el) {
-    const L = fxLeague(), X = L && recaps.get(`${L.id}|${+el.dataset.week}`);
+    const { L, X } = recapOn(el);
     if (!X) return;
     const text = recapText(L, X), url = recapUrl(L, X.period.n);
     if (navigator.share && matchMedia('(pointer: coarse)').matches) {

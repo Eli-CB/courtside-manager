@@ -2757,6 +2757,18 @@ test('football tabs: the board, swaps, Roster, Players and adds speak in project
   assert.match(a.get('SPORT').infoOver.win[1], /Projected score/);
 });
 
+test('a live redraw keeps the pickup ideas it has: each one sets a whole lineup', async () => {
+  const { a } = await footballNextWeek(), live = a.get('live');
+  const fresh = a.pickupsCard(), memo = a.get('pickMemo');
+  assert.ok(memo.ideas.length, 'the fixture has some');
+  a.set('pickMemo', { ...memo, ideas: memo.ideas.slice(0, 1) });
+  live.hold = true;
+  const held = a.pickupsCard();
+  live.hold = false;
+  assert.ok(held.length < fresh.length, 'the list it had, not a new one');
+  assert.equal(a.pickupsCard(), fresh, 'anything else works them out again');
+});
+
 test("football's day: Monday night's game stays in its week past midnight, and abroad", async () => {
   const a = await footballApp();
   a.setClock('2026-10-27T00:30:00-04:00'); // overtime in New York; 5:30 on Tuesday morning in London
@@ -2840,6 +2852,11 @@ test('the site installs to a home screen: its manifest, the offer in the menu, i
   assert.equal(a.isInstalled(), true);
   assert.equal(a.canInstall(), false);
   assert.equal(a.appStale(), false, 'just opened');
+  a.setClock('2026-10-27T00:00:01-04:00'); // four hours on
+  assert.equal(a.appStale(), true);
+  a.navigator.standalone = false;
+  assert.equal(a.appStale(), false, 'a browser tab has a refresh button');
+  a.setClock();
 });
 
 // Each site's loader builds the same league, and every tab reads it without asking which site it came from
