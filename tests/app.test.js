@@ -2804,3 +2804,58 @@ test('the site installs to a home screen: its manifest, the offer in the menu, i
   assert.equal(a.canInstall(), false);
   assert.equal(a.appStale(), false, 'just opened');
 });
+
+// Each site's loader builds the same league, and every tab reads it without asking which site it came from
+function checkLeague(L, label) {
+  const at = what => `${label}: ${what}`;
+  assert.ok(L && typeof L.id === 'string' && L.id && typeof L.name === 'string' && L.name, at('an id and a name'));
+  assert.ok(['fantrax', 'espn', 'sleeper', 'yahoo'].includes(L.source), at(`source ${L.source}`));
+  assert.ok(typeof L.scoring === 'string' && L.scoring, at('its scoring type'));
+  assert.ok(Array.isArray(L.cats) ? L.cats.length : L.points && Object.keys(L.points).length, at('categories or point values'));
+  assert.ok(Number.isFinite(L.lockDays) && L.lockDays >= 1, at('how often lineups lock'));
+  // teams, and everything that names one
+  assert.ok(L.teams.length >= 2, at('teams'));
+  const ids = new Set(L.teams.map(t => t.id));
+  assert.equal(ids.size, L.teams.length, at('team ids are unique'));
+  for (const t of L.teams) assert.ok(t.id && typeof t.name === 'string' && t.name, at('each team has an id and a name'));
+  assert.deepEqual(Object.keys(L.rosters).filter(id => !ids.has(id)), [], at('rosters are for its teams'));
+  for (const r of L.standings) {
+    assert.ok(ids.has(r.id), at(`standings team ${r.id}`));
+    for (const k of ['rank', 'w', 'l', 't']) assert.ok(Number.isFinite(r[k]), at(`standings ${k}`));
+  }
+  // weeks: in order, each with its dates and a full lock time
+  assert.ok(L.periods.length, at('weeks'));
+  L.periods.forEach((p, i) => {
+    assert.ok(Number.isInteger(p.n) && (!i || p.n > L.periods[i - 1].n), at('weeks are numbered in order'));
+    assert.match(p.start, /^\d{4}-\d\d-\d\d$/, at('a week starts on a date'));
+    assert.ok(p.end >= p.start, at('a week ends after it starts'));
+    assert.ok(p.lock && p.endAt && p.endAt > p.lock, at('a week has a lock and an end time'));
+  });
+  const weeks = new Set(L.periods.map(p => String(p.n)));
+  for (const [n, games] of Object.entries(L.matchups)) {
+    assert.ok(weeks.has(n), at(`matchups for week ${n} are of a week it has`));
+    for (const m of games) for (const id of m) assert.ok(ids.has(id), at(`week ${n} names team ${id}`));
+  }
+  // players on rosters
+  const players = Object.values(L.rosters).flat();
+  assert.ok(players.length || label === 'Fantrax daily', at('players')); // (that league hasn't drafted)
+  for (const p of players) {
+    assert.ok(p.fid != null && p.fid !== '' && typeof p.name === 'string', at('a rostered player has an id and a name'));
+    assert.ok(typeof p.st === 'string' && p.st, at(`${p.name}'s status`));
+  }
+  // what a lineup can hold
+  const R = L.rosterInfo;
+  assert.ok(Object.keys(R.positionConstraints).length, at('lineup slots'));
+  assert.ok(R.maxTotalActivePlayers >= 1 && R.maxTotalPlayers >= R.maxTotalActivePlayers, at('roster limits'));
+  assert.ok(L.draft === null || Array.isArray(L.draft.picks), at('picks, or no draft yet'));
+}
+
+test('every site loads into the same league', async () => {
+  yahooSignedIn();
+  for (const [label, id] of [['Fantrax categories', CATS9], ['Fantrax points', POINTS], ['Fantrax daily', DAILY], ['ESPN', ESPN], ['Sleeper', SLEEPER], ['Yahoo', YAHOO]]) {
+    checkLeague(await app.useLeague(id), label);
+  }
+  app.localStorage.removeItem('courtside-yahoo');
+  checkLeague((await hockeyApp()).fxLeague(), 'hockey');
+  checkLeague((await footballApp()).fxLeague(), 'football');
+});
