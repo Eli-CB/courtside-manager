@@ -292,24 +292,6 @@ function rowTags(p, ctx, side, starter) {
   return '';
 }
 
-// Football's game in a few words: "@KC Sun", or Bye
-function footballGame(p, dates, html) {
-  const d = dates.find(x => playsOn(p, x)), T = teamInfo(p.team);
-  if (!d) return 'Bye';
-  const vs = T && T.opps ? T.opps[T.dates.indexOf(d)] : '';
-  return `${vs ? `${vs} ` : ''}${html ? '<span class="fb-day">' : ''}${fmtDay(d).split(',')[0]}${html ? '</span>' : ''}`;
-}
-// Football's line under a player: his game, and his number for the week: projected, so far, or final
-function footballMeta(p, ctx) {
-  const now = footballNow(p, ctx.dates), line = now.line || {};
-  const on = now.state === 'in' ? `<span class="lv-dot" aria-hidden="true"></span>` : '';
-  const [num, tip] = now.state === 'bye' ? ['—', 'No game this week']
-    : now.state === 'pre' ? [p.status === 'Out' ? '0' : fmt(footballPts(p, ctx.dates), 1), p.status === 'Out' ? "Listed Out, so he's not projected" : 'Projected points']
-    : now.state === 'in' ? [fmt(lineFp(line), 1), `So far, with ${fmt(now.left * lineFp(footballProj(p, ctx.dates).m), 1)} projected in the time left`]
-    : [fmt(lineFp(line), 1), now.line ? 'Final points' : "His team played, but he didn't score"];
-  return `<div class="bmeta fb"><span class="fb-game">${posTags(p.pos)} ${footballGame(p, ctx.dates, true)}</span><b class="bmeta-g" data-tip="${esc(tip)}">${on}${num}</b></div>`;
-}
-
 // Schedule view: one cell per player, slot-aligned with the opponent
 function boardCell(p, ctx, side, starter) {
   if (!p) return `<td class="bcell"><span class="muted small">${side === 'them' && !ctx.hasOpp ? '' : 'Empty'}</span></td>`;

@@ -227,24 +227,6 @@ function sleeperWeekFresh(L) {
   }).catch(() => { L.slpWeek = { ...(L.slpWeek || { n, pts: {} }), at: Date.now() }; }).finally(() => { slpWeekLoad = null; });
 }
 
-// Football: this week's points before the morning's box scores have them, as lines on the day each player's game is. Only the
-// points: Sleeper keeps them current, in the league's own scoring. A game not started has none yet.
-function footballLines(L) {
-  if (!isFootball() || !L.slpWeek) return;
-  const p = L.periods.find(x => x.n === L.slpWeek.n), today = todayIso();
-  if (!p) return;
-  const days = [];
-  for (let d = p.start; d <= p.end; d = addDays(d, 1)) days.push(d);
-  for (const raw of NBA.players) {
-    const pts = raw.slp != null ? L.slpWeek.pts[raw.slp] : null, d = days.find(x => playsOn(raw, x));
-    if (pts == null || !d || (BOX && (BOX.day.get(raw.id) || new Map()).has(d))) continue;
-    const g = live.games.find(x => x.d === d && (x.home === raw.team || x.away === raw.team));
-    if (!(d < today || (g && g.state !== 'pre') || +pts)) continue;
-    if (!live.lines.has(d)) live.lines.set(d, new Map());
-    live.lines.get(d).set(raw.id, { gp1: 1, min: 0, bonus: +pts });
-  }
-}
-
 // One-game leagues: the one game of a player's that counts among his lines this period (oldest first), with its
 // bonus points: Sleeper's points for him this week say which (countedIndex)
 function oneGameLine(p, lines) {

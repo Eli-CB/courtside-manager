@@ -57,13 +57,6 @@ function seasonRows() {
     .filter(r => r.raw);
 }
 
-// Football's Projected: this week's projection of everyone who has one, in the same rows
-function projRows() {
-  const dates = matchDates(weekStartAt(0));
-  return nbaPlayers().map(p => ({ p, v: footballPts(p, dates) })).filter(x => x.v > 0 && footballNow(x.p, dates).state === 'pre')
-    .map(({ p, v }) => ({ raw: nbaById.get(p.nbaId), g: 1, tot: {}, z: {}, v, per: true, game: footballGame(p, dates) }));
-}
-
 let perfOrder = { sig: '', ids: [] }; // the rows last shown, in order
 // every range, among everyone in it: 🚀 the best in each category and 🔥 the second best (as many as 3 tied),
 // 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's average, so
@@ -417,8 +410,6 @@ function cardStats(raw) {
   return [['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], n('pts'), n('reb'), n('ast'), n('stl'), n('blk'), ['3PM', s => fmt(s.tpm), o => o.tpm], n('to'),
     ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0), o => `${o.fgm}-${o.fga}`, 'FG'], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0), o => `${o.ftm}-${o.fta}`, 'FT']];
 }
-// Football's line in words: what the player did, the rest left out
-const footballWords = (s, per = 1) => SPORT.words.filter(([k]) => s[k]).map(([k, w]) => `${fmt(s[k] / per, per > 1 ? 1 : 0)} ${w}`);
 // A game's numbers as words: [the main ones, the ones in gray]
 function gameStats(raw, o) {
   if (isFootball()) return [footballWords(o), []];

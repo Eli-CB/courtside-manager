@@ -473,43 +473,6 @@ function perGame(p) {
 }
 
 // ----- Football: a week is one game, and a player's is Sleeper's projection -----
-const footballWeek = d => +(Object.entries(NBA.weeks || {}).find(([, w]) => w[0] <= d && d <= w[1]) || [0])[0];
-const projMemo = new Map();
-// { m: his projected stats, sd: { fpsd: how far his week lands from them, in points } }. A week the daily file has no
-// projections for: his season average. A week it has them, but none for him: nothing (he isn't expected to play).
-function footballProj(p, dates) {
-  const w = footballWeek(dates[0]), key = `${p.nbaId}|${w}`;
-  if (projMemo.has(key)) return projMemo.get(key);
-  const raw = nbaById.get(p.nbaId), row = raw && raw.proj && raw.proj[w], m = { gp1: 1 };
-  if (row) NBA.projKeys.forEach((k, i) => { if (row[i]) m[k] = row[i]; });
-  else if (raw && !(NBA.projWeeks || []).includes(w)) { const s = statObj(raw.cur) || {}; for (const k of SPORT.playerKeys) if (s[k]) m[k] = s[k]; }
-  const out = { m, sd: { fpsd: SPORT.projSd[(raw ? raw.pos : p.pos || [])[0]] || 6 } };
-  projMemo.set(key, out);
-  return out;
-}
-// His projected points for a week (nothing on a bye or listed Out), in the league's own scoring
-const footballPts = (p, dates) => (gamesIn(p, dates) && p.status !== 'Out' ? lineFp(footballProj(p, dates).m) : 0);
-// His game in those days now. state: bye, pre (not started), in, post. line: his points so far. left: the share of it left.
-function footballNow(p, dates) {
-  const d = dates.find(x => playsOn(p, x));
-  if (!d) return { state: 'bye' };
-  const g = liveGame(p, d), line = actualLine(p, d) || liveLines(d).get(p.nbaId) || null;
-  if (gameFinal(p, d) || d < todayIso() || (g && g.state === 'post')) return { d, state: 'post', line };
-  return g && g.state === 'in' ? { d, state: 'in', line, left: gameMinLeft(g) / SPORT.game.minutes } : { d, state: 'pre', line: null };
-}
-// One side's entry for the week: what he's scored, and what share of his projection is still to come
-function footballEntry(p, dates) {
-  const g = footballProj(p, dates), now = footballNow(p, dates), line = now.line || {};
-  const share = now.state === 'pre' ? 1 : now.state === 'in' ? now.left : 0;
-  return { p, line, g, share, fp: lineFp(line) + share * lineFp(g.m) };
-}
-// The best lineup: the most projected points. A player is locked once his game starts: a starter stays, a bench player can't come in.
-function bestFootballIds(players, dates) {
-  const on = new Set([...state.lineup, ...(state.opp.starters || [])]), stateOf = p => footballNow(p, dates).state;
-  const locked = players.filter(p => on.has(p.id) && (stateOf(p) === 'in' || stateOf(p) === 'post'));
-  const open = players.filter(p => stateOf(p) === 'pre' && p.status !== 'Out').sort((a, b) => footballPts(b, dates) - footballPts(a, dates));
-  return new Set(fillSlots([...locked, ...open], state.slots).filter(Boolean));
-}
 
 // Finished games: whether a player's team has played that day, and his real line (null: he didn't play)
 const gameFinal = (p, d) => !!(BOX && p.team && BOX.finals.has(`${d} ${p.team}`));
