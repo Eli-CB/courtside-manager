@@ -61,10 +61,11 @@ function fakeFetch(url) {
 
 function loadApp() {
   const store = new Map();
+  let clock = NOW;
   const RealDate = Date;
   class FixedDate extends RealDate {
-    constructor(...a) { super(...(a.length ? a : [NOW])); }
-    static now() { return NOW; }
+    constructor(...a) { super(...(a.length ? a : [clock])); }
+    static now() { return clock; }
   }
   const document = {
     documentElement: new El(), body: new El(),
@@ -103,6 +104,7 @@ function loadApp() {
     },
   });
   app.get = expr => ctx.__get(expr);
+  app.setClock = at => { clock = at === undefined ? NOW : Date.parse(at); };
   app.set = (name, value) => { ctx.__value = value; ctx.__get(`${name} = globalThis.__value`); };
   app.ready = () => ctx.__get('nbaLoading');
   // load a Fantrax, ESPN, Sleeper or Yahoo league from the fixtures and make it the current one

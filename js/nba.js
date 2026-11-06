@@ -250,7 +250,9 @@ function fillSlots(cands, slots) {
 let teamDates = new Map();
 
 const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const todayIso = () => isoDay(new Date());
+// Football's day is the schedule's: US time, turning over at 9:00 UTC (4 or 5 a.m. Eastern). Monday night's game stays in its
+// week past midnight or abroad, where it's already Tuesday when it kicks off.
+const todayIso = () => (SPORT.weekShift ? new Date(Date.now() - 9 * 36e5).toISOString().slice(0, 10) : isoDay(new Date()));
 function addDays(iso, n) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoDay(d); }
 // days into the week (Monday = 0, or Tuesday in football, whose weeks end with Monday night's game)
 const dayOffset = iso => (new Date(iso + 'T12:00:00').getDay() + 6 - (SPORT.weekShift || 0)) % 7;

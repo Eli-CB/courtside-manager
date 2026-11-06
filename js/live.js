@@ -127,11 +127,13 @@ async function readBoxes(games) {
 // updates in a row (blocked, or its answers no longer read) goes to the error log, once a visit, unless it's this
 // visitor's own connection: offline, or this site doesn't answer either.
 const LIVE_FAILS = 3;
-async function noteLiveFailure(msg) {
-  live.fails = (live.fails || 0) + 1;
-  if (live.fails !== LIVE_FAILS || navigator.onLine === false) return;
+const feedFails = {};
+const noteLiveOk = (feed = 'ESPN live scores') => { feedFails[feed] = 0; };
+async function noteLiveFailure(msg, feed = 'ESPN live scores') {
+  feedFails[feed] = (feedFails[feed] || 0) + 1;
+  if (feedFails[feed] !== LIVE_FAILS || navigator.onLine === false) return;
   const here = await fetch('index.html', { method: 'HEAD', cache: 'no-store' }).catch(() => null);
-  if (here && here.ok) reportError(`ESPN live scores failing (${SPORT.name}): ${msg}`, 'js/live.js');
+  if (here && here.ok) reportError(`${feed} failing (${SPORT.name}): ${msg}`, 'js/live.js');
 }
 
 async function pollLive() {
@@ -161,7 +163,7 @@ async function pollLive() {
     }
     live.at = Date.now();
     live.error = '';
-    live.fails = 0;
+    noteLiveOk();
   } catch (e) {
     live.error = e.message || "couldn't reach ESPN";
     await noteLiveFailure(live.error);

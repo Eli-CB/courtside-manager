@@ -2757,6 +2757,43 @@ test('football tabs: the board, swaps, Roster, Players and adds speak in project
   assert.match(a.get('SPORT').infoOver.win[1], /Projected score/);
 });
 
+test("football's day: Monday night's game stays in its week past midnight, and abroad", async () => {
+  const a = await footballApp();
+  a.setClock('2026-10-27T00:30:00-04:00'); // overtime in New York; 5:30 on Tuesday morning in London
+  assert.equal(a.todayIso(), '2026-10-26');
+  assert.equal(a.weekStart(), '2026-10-20');
+  a.setClock('2026-10-27T06:00:00-04:00');
+  assert.equal(a.todayIso(), '2026-10-27');
+  assert.equal(a.weekStart(), '2026-10-27');
+  a.setClock();
+  // the other sports go by the device's clock
+  app.setClock('2026-10-27T00:30:00-04:00');
+  assert.equal(app.todayIso(), '2026-10-27');
+  app.setClock();
+});
+
+test("Sleeper's live points failing says so, like ESPN's scores", async () => {
+  const a = await footballApp(), L = a.fxLeague(), real = a.fetch, sent = [], net = { up: false };
+  a.location.hostname = 'leaguelayer.com';
+  a.fetch = (u, o) => {
+    const s = String(u);
+    if (s.includes('/errors')) { sent.push(JSON.parse(o.body)); return Promise.resolve({}); }
+    if (s === 'index.html') return Promise.resolve({ ok: true });
+    if (s.includes('/matchups/') && !net.up) return Promise.resolve({ ok: false, status: 404 });
+    return real(u, o);
+  };
+  const ask = async () => { L.slpWeek = null; a.sleeperWeekFresh(L); await a.get('slpWeekLoad'); await new Promise(r => setTimeout(r, 5)); };
+  a.get('feedFails')['Sleeper live points'] = 0;
+  await ask(); await ask();
+  assert.equal(sent.length, 0, 'a blip says nothing');
+  await ask();
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].msg, /^Sleeper live points failing \(NFL\): /);
+  net.up = true;
+  await ask();
+  assert.equal(a.get('feedFails')['Sleeper live points'], 0, 'recovering starts the count again');
+});
+
 test('football and the other sports leave each other alone', async () => {
   const a = await footballApp();
   await a.switchLeague(CATS9);

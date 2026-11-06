@@ -70,6 +70,7 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
         shots = list(pool.map(headshot, players))
     got = [(pid, img) for pid, img in zip(ids, shots) if img is not None]
+    none = [pid for pid, img in zip(ids, shots) if img is None]  # looked for and not there: refresh_images.sh waits for the monthly run
     print(f'headshots: {len(got)}/{len(ids)}')
 
     rows = math.ceil(len(got) / COLS)
@@ -97,7 +98,7 @@ def main():
     print(f'logos: {len(logos)}/{len(teams)}')
 
     with open(os.path.join(DATA, 'images.json'), 'w', encoding='utf-8') as f:
-        json.dump({'size': SIZE, 'cols': COLS, 'ids': [pid for pid, _ in got], 'logos': logos}, f, separators=(',', ':'))
+        json.dump({'size': SIZE, 'cols': COLS, 'ids': [pid for pid, _ in got], 'none': none, 'logos': logos}, f, separators=(',', ':'))
     for name in ('headshots.webp', 'images.json'):
         print(name, os.path.getsize(os.path.join(DATA, name)) // 1024, 'KB')
 

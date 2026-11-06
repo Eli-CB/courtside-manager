@@ -223,8 +223,12 @@ function sleeperWeekFresh(L) {
     const pts = {};
     for (const m of ms || []) Object.assign(pts, m.players_points || {});
     L.slpWeek = { n, pts, at: Date.now() };
+    noteLiveOk('Sleeper live points');
     if (ui.tab === 'dashboard' || (ui.tab === 'week' && isFootball())) render();
-  }).catch(() => { L.slpWeek = { ...(L.slpWeek || { n, pts: {} }), at: Date.now() }; }).finally(() => { slpWeekLoad = null; });
+  }).catch(e => {
+    L.slpWeek = { ...(L.slpWeek || { n, pts: {} }), at: Date.now() };
+    noteLiveFailure(e.message || "couldn't reach Sleeper", 'Sleeper live points');
+  }).finally(() => { slpWeekLoad = null; });
 }
 
 // One-game leagues: the one game of a player's that counts among his lines this period (oldest first), with its
