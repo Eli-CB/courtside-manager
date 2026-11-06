@@ -138,7 +138,7 @@ function dashFold(key, title, sub, body, dot = '') {
 function recapFold() {
   const fresh = freshRecap();
   return fresh ? dashFold('recap', `Week ${fresh.n} recap`, 'is in, ready to share',
-    `<p class="muted small">Player and game of the week, bench regret, the best all-play week and every final, ready to share with the league.</p><button type="button" class="btn sm primary" data-action="go-recap">See the recap</button>`, 'good') : '';
+    `<p class="muted small">${isOneGame() ? 'Player of the week' : 'Player and game of the week'}, bench regret${isPoints() ? '' : ', the best all-play week'} and every final, ready to share with the league.</p><button type="button" class="btn sm primary" data-action="go-recap">See the recap</button>`, 'good') : '';
 }
 
 // ----- The Dashboard's matchup: both lineups slot by slot, for today, the last game day or the week so far -----

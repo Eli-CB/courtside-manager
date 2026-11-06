@@ -126,7 +126,8 @@ function recapItems(X) {
     add('🪑', 'Bench regret', `<b>${esc(team(r.tid))}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
       `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`);
   }
-  if (X.allPlay && X.teams > 2) {
+  // Best week: a category week is hard to read from the finals; a points week is just the top score, there for all to see
+  if (X.allPlay && X.teams > 2 && !isPoints()) {
     // matchups won against every other team's week, not categories
     const a = X.allPlay, n = X.teams - 1;
     const beat = `${a.w === n ? `every other team (${n} of ${n})` : `${a.w} of ${n} teams`}${a.t ? `, tied ${a.t}` : ''}`;

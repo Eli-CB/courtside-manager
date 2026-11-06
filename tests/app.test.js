@@ -1893,6 +1893,8 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     assert.ok(!html.includes('Game of the week') && html.includes('Player of the week'));
     assert.ok(X.missed.every(x => x.games === 1 && x.sched === 1), 'Street clothes: a start without any game');
     if (X.missed.length) assert.ok(html.includes('started without playing a game'));
+    // a points week's best is the top score, already in the finals; the share text and the image come from the same list
+    assert.ok(X.allPlay && !app.recapItems(X).some(x => x.label === 'Best week') && !html.includes('Best week') && !app.recapText(L, X).includes('Best week'));
   } finally { ui.tab = 'dashboard'; }
   // Awards so far run on the same weeks
   ui.tab = 'awards';
