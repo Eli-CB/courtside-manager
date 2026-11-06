@@ -99,11 +99,18 @@ jobs:
           fi
 
   test:
-    # a code push publishes only once the tests pass (scheduled runs change only data, which the tests don't read)
-    if: github.event_name == 'push'
+    # every run tests what's on main now, data runs too: a commit whose own run failed mustn't go out with the next data
+    needs: refresh
+    if: always() && needs.refresh.result != 'cancelled'
     runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -113,7 +120,7 @@ jobs:
   deploy:
     needs: [refresh, test]
     # publish even if the data pull failed, so the site keeps the last good data; never code whose tests failed
-    if: always() && needs.refresh.result != 'cancelled' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    if: always() && needs.refresh.result != 'cancelled' && needs.test.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -121,7 +128,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          # the commit the tests passed on: main may have moved since
+          ref: ${{ needs.test.outputs.sha }}
           # the history (no file contents) says when the code last changed
           fetch-depth: 0
           filter: blob:none

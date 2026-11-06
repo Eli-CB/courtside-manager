@@ -1,6 +1,6 @@
 name: Tests
 
-# pushes to main are tested by the site workflow, before it publishes (site.yml); this covers pull requests
+# main is tested by the site workflow on every run, before it publishes (site.yml); this covers pull requests
 on:
   pull_request:
 
