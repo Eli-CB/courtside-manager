@@ -776,7 +776,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .cs-tag.up { color: var(--good); }
 .cs-tag.down { color: var(--bad); }
 .cs-p { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; } /* photo, name and number on one line */
-.cs-name { display: inline-flex; align-items: center; font-weight: 600; }
+.cs-name { display: inline-flex; align-items: center; font-weight: 600; color: var(--text); } /* a player: black, as everywhere; orange is for your team */
+.cs-name:hover { text-decoration: underline; }
 .cs-rank { white-space: nowrap; }
 .cs-avg, .show-sm-inline { display: none; }
 .cs-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
