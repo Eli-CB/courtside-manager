@@ -288,12 +288,17 @@ function render() {
   document.querySelectorAll(inner).forEach((el, i) => { [el.scrollTop, el.scrollLeft] = scrolls[i] || [0, 0]; });
 }
 
-// Long performance tables show their first 5 rows (and a peek of the 6th, so it's clear they scroll).
-// Rows change height when names or stats wrap, so this measures them; it runs again when the window resizes.
+// The Players table, the tab's one card, is as tall as the screen under the top bar: scrolled up to it, it fills the page
+// and scrolls inside (its header and the name and value columns stay put). Never under 5 rows and a peek of the 6th,
+// measured, as rows change height when names or stats wrap. Runs again when the window resizes.
 function fitPerfLists() {
-  document.querySelectorAll('.perf-wrap.scroll').forEach(wrap => {
+  const wraps = [...document.querySelectorAll('.perf-wrap.scroll')];
+  if (!wraps.length) return;
+  const bar = $('.topbar'), room = window.innerHeight - (bar ? bar.getBoundingClientRect().height : 0) - 16;
+  wraps.forEach(wrap => {
     const sixth = wrap.querySelectorAll('tbody tr')[5];
-    if (sixth) wrap.style.maxHeight = `${sixth.getBoundingClientRect().top - wrap.getBoundingClientRect().top + wrap.scrollTop + 22}px`;
+    const least = sixth ? sixth.getBoundingClientRect().top - wrap.getBoundingClientRect().top + wrap.scrollTop + 22 : 0;
+    wrap.style.maxHeight = `${Math.max(least, room)}px`;
   });
 }
 
