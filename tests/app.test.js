@@ -220,9 +220,9 @@ test("Matchups steps through the league's matchup weeks and its teams", async ()
     assert.ok(nav.includes('>Week 2 (this week)<') && nav.includes('selected>Week 1<'), nav);
     assert.ok(/data-step="-1"[^>]*disabled/.test(nav) && !/data-step="1"[^>]*disabled/.test(nav), 'the first week: only forward');
   } finally { ui.weekShift = 0; }
-  // the opponent picker is the same control: step buttons around a league-bar dropdown
-  const strip = app.fxStrip(app.weekContext());
-  assert.ok(strip.includes('class="stepper"') && strip.includes('class="ctx-team" data-change="fx-opp"') && strip.includes('data-action="fx-cycle"'), strip);
+  // the opponent is picked where their name is on the scoreboard: the week's real one marked
+  const pick = app.fxOppPicker(app.weekContext());
+  assert.ok(pick.includes('data-change="fx-opp"') && / \(this week\)<\/option>/.test(pick), pick);
 });
 
 test('short names never collide', () => {

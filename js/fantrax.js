@@ -575,35 +575,45 @@ function withViewedTeam(fn, week = false) {
   try { return fn(); } finally { state = saved; ui.viewing = false; }
 }
 
-function fxStrip(ctx) {
-  const L = fxLeague();
-  if (!L) return '';
-  if (!state.fxTeam) return `<div class="fx-strip"><span>Pick your team at the top to load your roster and matchup.</span></div>`;
+// Plan Ahead's opponent, picked where their name is on the scoreboard: the week's real one (marked) or any other team, to
+// see how the week would go against them
+function fxOppPicker(ctx) {
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
-  const opp = fxOpponentFor(ctx.start, leftId); // the left team's real opponent this week
-  const over = ctx.dates[ctx.dates.length - 1] < todayIso(); // a finished week: no lineup to set, its own rosters
-  const shown = nextRosterPeriod(ctx.start) || L.rosterPeriod; // whose lineups these are
-  const stale = !over && L.rosterPeriod && opp && opp.period !== shown;
-  const teams = fxPickable();
+  const opp = fxOpponentFor(ctx.start, leftId); // the left team's real opponent that week
   const cur = state.opp.fxId;
-  const hypo = cur && (!opp || cur !== opp.id);
-  const back = ui.viewing ? 'fx-view-actual' : 'fx-load-opp';
-  return `<div class="fx-strip">
-    <span class="fx-vs">
-      <b>${esc(fxTeamName(leftId))}</b>
-      <span class="muted">vs</span>
-      ${stepper('fx-cycle', 'team', `<select class="ctx-team" data-change="fx-opp" aria-label="Compare against">${cur ? '' : '<option value="">Pick a team</option>'}${teams.filter(t => t.id !== leftId).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id ? ` (${['last week', 'this week', 'next week'][ui.weekShift + 1] || 'that week'})` : ''}</option>`).join('')}</select>`)}
-      ${hypo ? `<span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${back}">Back to ${esc(opp.name)}</button>` : ''}` : opp && cur ? `<span class="badge accent">Week ${opp.period} matchup</span>` : ''}
-      ${stale ? `<span class="muted small">rosters as of week ${shown}</span>` : ''}
-    </span>${ctx.locked && !over ? lockNote(ctx) : ''}</div>`;
+  const when = ['last week', 'this week', 'next week'][ui.weekShift + 1] || 'that week';
+  return `<select class="ctx-team sb-opp" data-change="fx-opp" aria-label="Opponent">${cur ? '' : '<option value="">Pick a team</option>'}${fxPickable().filter(t => t.id !== leftId)
+    .map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id ? ` (${when})` : ''}</option>`).join('')}</select>`;
 }
 
-// Weekly lineups locked: when, and a jump to next week, at the right of the matchup bar
-function lockNote(ctx) {
-  const t = lockTime(ctx.start);
-  const when = `${t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtTime(t)}`;
-  return `<span class="actions fx-lock"><span class="muted small" title="Starters locked ${esc(when)}, so this shows the lineups as set. Suggestions pick up again for next week.">Lineups locked</span>${weekShifts().some(s => s > ui.weekShift) ? '<button class="btn sm" data-action="week-shift" data-step="1">Plan next week →</button>' : ''}</span>`;
+// Under the opponent: a team that isn't the week's real opponent says so, with the way back
+function fxOppNote(ctx) {
+  const leftId = ui.viewing ? ui.viewA : state.fxTeam;
+  const opp = fxOpponentFor(ctx.start, leftId), cur = state.opp.fxId;
+  if (!cur || (opp && cur === opp.id)) return '';
+  return `<div class="sb-opp-note"><span class="badge warn">Hypothetical</span>${opp ? ` <button class="link-btn small" data-action="${ui.viewing ? 'fx-view-actual' : 'fx-load-opp'}">Back to ${esc(opp.name)}</button>` : ''}</div>`;
 }
+
+// Next to the week's dates: lineups locked (weekly leagues, once the week starts) and whose rosters these are
+function fxWeekNotes(ctx) {
+  const L = fxLeague();
+  if (!L || !state.fxTeam) return '';
+  const leftId = ui.viewing ? ui.viewA : state.fxTeam;
+  const opp = fxOpponentFor(ctx.start, leftId);
+  const over = ctx.dates[ctx.dates.length - 1] < todayIso();
+  const shown = nextRosterPeriod(ctx.start) || L.rosterPeriod;
+  const out = [];
+  if (ctx.locked && !over) {
+    const t = lockTime(ctx.start);
+    const when = `${t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtTime(t)}`;
+    out.push(`<span title="Starters locked ${esc(when)}, so this shows the lineups as set. Suggestions pick up again for next week.">lineups locked</span>`);
+  }
+  if (!over && L.rosterPeriod && opp && opp.period !== shown) out.push(`rosters as of week ${shown}`);
+  return out.map(x => ` · ${x}`).join('');
+}
+
+// No team picked yet: the one thing to do
+const fxNoTeam = () => (fxLeague() && !state.fxTeam ? '<div class="fx-strip"><span>Pick your team at the top to load your roster and matchup.</span></div>' : '');
 
 function validateLineup() {
   const ids = new Set(state.players.map(p => p.id));

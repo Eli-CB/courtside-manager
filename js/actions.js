@@ -53,16 +53,6 @@ const actions = {
     if (!opp) return toast(`No ${sourceName()} matchup found for this week`);
     loadFxTeam(opp.id);
   },
-  'fx-cycle'(el) {
-    const leftId = viewingOther() ? ui.viewA : state.fxTeam;
-    const others = fxPickable().filter(t => t.id !== leftId);
-    if (!others.length) return;
-    const curId = viewingOther() ? (ui.viewB || (fxOpponentFor(weekStart(), ui.viewA) || {}).id) : state.opp.fxId;
-    const i = others.findIndex(t => t.id === curId);
-    const step = +el.dataset.step;
-    const next = others[i === -1 ? (step > 0 ? 0 : others.length - 1) : (i + step + others.length) % others.length];
-    if (viewingOther()) { ui.viewB = next.id; render(); } else loadFxTeam(next.id);
-  },
   'fx-view-mine'() { ui.viewA = null; ui.viewB = null; render(); },
   'fx-view-actual'() { ui.viewB = null; render(); },
   'stat-sort'(el) {

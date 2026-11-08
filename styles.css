@@ -560,6 +560,10 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .sb-main { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; }
 .sb-side.right { text-align: right; }
 .sb-label { font-weight: 700; color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-label .sb-opp { max-width: 100%; font-size: .85rem; font-weight: 700; padding-top: 3px; padding-bottom: 3px; text-overflow: ellipsis; } /* the opponent, picked in place */
+.sb-side.right .sb-label { overflow: visible; }
+.sb-opp-note { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 8px; margin-top: 4px; font-size: .78rem; }
+.sb-pick { margin-top: 14px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
 .sb-score { font-size: 2.6rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .sb-vs { text-align: center; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; padding-bottom: 8px; }
 .odds { height: 12px; border-radius: 999px; background: var(--bad); opacity: .9; overflow: hidden; margin-top: 14px; }

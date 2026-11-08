@@ -655,12 +655,12 @@ function viewWeek() {
       <div class="sb-main">
         <div class="sb-side"><div class="sb-label">${esc(state.teamName)}</div><div class="sb-score">${fmt(oBest.expected, isPoints() ? 0 : 1)}</div></div>
         <div class="sb-vs">${over ? `${isPoints() ? 'points' : 'cats'}<br>with today's<br>lineups` : `projected<br>${isPoints() ? 'points' : 'cats'}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}`}</div>
-        <div class="sb-side right"><div class="sb-label">${esc(state.opp.name || 'Opponent')}</div><div class="sb-score">${isPoints() ? fmt(oBest.opp, 0) : fmt(oBest.n - oBest.expected, 1)}</div></div>
+        <div class="sb-side right"><div class="sb-label">${fxLeague() && state.fxTeam ? fxOppPicker(ctx) : esc(state.opp.name || 'Opponent')}</div>${fxLeague() && state.fxTeam ? fxOppNote(ctx) : ''}<div class="sb-score">${isPoints() ? fmt(oBest.opp, 0) : fmt(oBest.n - oBest.expected, 1)}</div></div>
       </div>
       ${over ? '' : `<div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
       <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>`}
       ${changed && !over ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'points' : 'cats'} · ${pctTxt(oSet.win)} to win${isFootball() ? '' : ` · ${asSet.games} starter games`}</div></div>` : ''}
-    </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `This week you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from ${sourceName()}</button>` : `${sourceName()} has no matchup for you this week.`}</div></div>`;
+    </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `${ui.weekShift === 1 ? 'Next week' : ui.weekShift ? 'That week' : 'This week'} you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from ${sourceName()}</button>` : `${sourceName()} has no matchup for you ${ui.weekShift === 1 ? 'next week' : ui.weekShift ? 'that week' : 'this week'}.`}${fxLeague() && state.fxTeam ? `<div class="sb-pick">Or compare against ${fxOppPicker(ctx)}</div>` : ''}</div></div>`;
 
   // Daily-lineup leagues keep the day-by-day swap list (not one-game leagues: more games don't count there)
   let dailyCards = '';
@@ -683,13 +683,13 @@ function viewWeek() {
   <div class="page-head">
     <div>
       <h1>${ui.weekShift === 0 ? 'This week' : ui.weekShift === 1 ? 'Next week' : ui.weekShift === -1 ? 'Last week' : 'Week of ' + fmtDay(start)}</h1>
-      <p>${range}</p>
+      <p>${range}${fxWeekNotes(ctx)}</p>
     </div>
     <div class="week-nav">${weekPicker()}</div>
   </div>
   ${staleOpp && fxOpponentFor(start) ? `<div class="sample-banner"><span>Showing your opponent from the week of <b>${fmtDay(state.opp.week)}</b>.</span><button class="btn sm" data-action="fx-load-opp">Load this week's opponent</button></div>` : ''}
   <div class="week-stack">
-    ${fxStrip(ctx)}
+    ${fxNoTeam()}
     ${past || `${scoreboard}
     ${matchupBoard(ctx)}
     ${over ? '' : weekly ? lineupSection(ctx) : dailyCards}
