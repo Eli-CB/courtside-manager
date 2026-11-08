@@ -52,8 +52,8 @@ function fakeFetch(url) {
     // Sleeper: /v1/<path> answers from tests/fixtures/sleeper/<path with / as _>.json
     body = readFixture(`sleeper/${u.pathname.replace(/^\/v1\//, '').replace(/\//g, '_')}.json`);
   } else if (u.hostname === 'lm-api-reads.fantasy.espn.com') {
-    const league = u.pathname.match(/\/leagues\/(\d+)$/);
-    body = league ? readFixture(`espn/${league[1]}/league.json`) : u.pathname.endsWith('/players') ? readFixture('espn/players.json') : null;
+    const league = u.pathname.match(/\/leagues\/(\d+)$/), game = u.pathname.includes('/games/ffl/') ? 'espn-ffl' : 'espn';
+    body = league ? readFixture(`${game}/${league[1]}/league.json`) : u.pathname.endsWith('/players') ? readFixture('espn/players.json') : null;
   }
   const ok = body != null;
   return Promise.resolve({ ok, status: ok ? 200 : 404, text: async () => body, json: async () => JSON.parse(body) });

@@ -235,7 +235,7 @@ function dashMatchupCard() {
   if (!L) return '';
   if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');
   if (!BOX) return card('', loadingLine('Loading the latest box scores…'));
-  sleeperWeekFresh(L);
+  leagueWeekFresh(L);
   footballLines(L);
   const D = dashDays();
   // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Until one is picked: today once its games have started,

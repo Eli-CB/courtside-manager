@@ -16,13 +16,14 @@ Run:  python scripts/update_nfl.py
 """
 import datetime as dt
 import json
+import math
 import os
 import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from update_data import fetch_json, log, per_game, schedule  # noqa: E402
+from update_data import fetch_json, log, norm_name, per_game, schedule  # noqa: E402
 
 DATA = os.path.join(ROOT, 'data', 'nfl')
 OUT = os.path.join(DATA, 'players.json')
@@ -31,12 +32,17 @@ SLEEPER = 'https://api.sleeper.app/v1/'
 SLEEPER_STATS = 'https://api.sleeper.com/stats/nfl/'
 SLEEPER_PROJ = 'https://api.sleeper.com/projections/nfl/'
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/'
+ESPN_FANTASY = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/'
+# ESPN fantasy's team numbers (a D/ST's player id is -16000 less its team's)
+ESPN_NFL_TEAMS = {1: 'ATL', 2: 'BUF', 3: 'CHI', 4: 'CIN', 5: 'CLE', 6: 'DAL', 7: 'DEN', 8: 'DET', 9: 'GB', 10: 'TEN', 11: 'IND', 12: 'KC', 13: 'LV',
+                  14: 'LAR', 15: 'MIA', 16: 'MIN', 17: 'NE', 18: 'NO', 19: 'NYG', 20: 'NYJ', 21: 'PHI', 22: 'ARI', 23: 'PIT', 24: 'LAC', 25: 'SF',
+                  26: 'SEA', 27: 'TB', 28: 'WAS', 29: 'CAR', 30: 'JAX', 33: 'BAL', 34: 'HOU'}
 ESPN_TEAMS = {'WSH': 'WAS'}  # ESPN's codes that aren't Sleeper's
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; LeagueLayer data job)'}
 POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
 WEEKS = 18
 PROJ_WEEKS = 3  # this week and the next two: Sleeper moves on to a new week a day or so after the site does
-BOX_VERSION = 2  # 2: only games a player was in, not ones he was merely listed active for
+BOX_VERSION = 3  # 2: only games a player was in, not ones he was merely listed active for; 3: ESPN's defense stats
 DEF_IDS = 900000  # a team defense's Sleeper id is its team code; the site's player ids are numbers
 # Sleeper's stats that no league scores: ranks, percentages, longest plays, rates
 NOT_SCORED = re.compile(r'^(pos_rank|rank_|pts_(std|half_ppr|ppr)$|gms_active$|gp$|gs$|.*_lng$|.*_pct$|.*_ypa$|.*_ypc$|.*_ypt$|.*_yar$|.*_rtg$|.*per_play|.*_air_yd$|'
@@ -105,6 +111,65 @@ def scored(stats):
     return {k: v for k, v in stats.items() if v and isinstance(v, (int, float)) and not NOT_SCORED.match(k)}
 
 
+# ESPN scores a team defense by points allowed in brackets of its own (14-17, 18-21, 22-27, 35-45, 46+) where Sleeper's are
+# 14-20, 21-27 and 35+, and its fumble recoveries include special teams': a defense's line carries those too, so an ESPN
+# league's scoring is a plain sum like any other (js/espn.js). The other brackets are the same on both.
+ESPN_BRACKETS = (('pts_allow_14_17', 14, 17), ('pts_allow_18_21', 18, 21), ('pts_allow_22_27', 22, 27), ('pts_allow_35_45', 35, 45), ('pts_allow_46p', 46, 999))
+PTS_ALLOW_SD = 9.5  # how far a defense's points allowed land from its projection, for a projection's brackets
+
+
+def espn_defense(stats, is_def):
+    """A defense's stats with ESPN's brackets and fumble recoveries added (a game's: 1 in one bracket; a projection's, with
+    projected=True: each bracket's chance, from the points it's projected to allow)."""
+    if not is_def:
+        return stats
+    out = dict(stats)
+    out['def_fum_rec'] = (stats.get('fum_rec') or 0) + (stats.get('def_st_fum_rec') or 0)
+    pa = stats.get('pts_allow')
+    if pa is None:
+        pa = 0 if stats.get('pts_allow_0') else None
+    if pa is not None:
+        for k, lo, hi in ESPN_BRACKETS:
+            if lo <= pa <= hi:
+                out[k] = 1
+    return out
+
+
+def espn_defense_odds(stats):
+    """A defense's projection with ESPN's brackets as chances: points allowed spread around the projection."""
+    out = dict(stats)
+    out['def_fum_rec'] = (stats.get('fum_rec') or 0) + (stats.get('def_st_fum_rec') or 0)
+    mean = stats.get('pts_allow')
+    if mean is not None:
+        cdf = lambda x: 0.5 * (1 + math.erf((x - mean) / (PTS_ALLOW_SD * math.sqrt(2))))
+        for k, lo, hi in ESPN_BRACKETS:
+            out[k] = round(cdf(hi + 0.5) - cdf(lo - 0.5), 3)
+    return out
+
+
+def espn_ids(season, players):
+    """ESPN's player ids, for ESPN leagues (js/espn.js): Sleeper's list has a quarter of them; the rest are matched from
+    ESPN's own list by name and team, else by a name only one player has. Returns how many were added."""
+    headers = {**HEADERS, 'X-Fantasy-Filter': json.dumps({'filterActive': {'value': True}})}
+    rows = fetch_json(ESPN_FANTASY + f'{season}/players?scoringPeriodId=0&view=players_wl', 3, 60, headers)
+    by_team, by_name = {}, {}
+    for x in rows:
+        if x.get('id', 0) > 0:
+            name = norm_name(x.get('fullName') or '')
+            by_team.setdefault((name, ESPN_NFL_TEAMS.get(x.get('proTeamId'), '')), []).append(x['id'])
+            by_name.setdefault(name, []).append(x['id'])
+    added = 0
+    for p in players:
+        if p.get('espn') or p['pos'] == ['DEF']:
+            continue
+        name = norm_name(p['name'])
+        ids = by_team.get((name, p['team'])) or (by_name[name] if len(by_name.get(name, [])) == 1 else None)
+        if ids and len(ids) == 1:
+            p['espn'] = ids[0]
+            added += 1
+    return added
+
+
 def projected(stats):
     """A projection's stats as leagues score them. Kicks differ from real stats: a projection has one 50+ range and only
     misses by distance, where leagues also score 50-59 yards and misses as a whole."""
@@ -129,7 +194,7 @@ def projections(season, week, defs):
         for r in rows:
             pid = defs.get(r['player_id']) or player_id(r['player_id'])
             if pid and (r.get('stats') or {}).get('gp'):
-                by_week[w][pid] = projected(r['stats'])
+                by_week[w][pid] = projected(espn_defense_odds(r['stats']) if r['player_id'] in defs else r['stats'])
     seen = {}
     for lines in by_week.values():
         for st in lines.values():
@@ -166,7 +231,7 @@ def box_scores(season, games):
         rows = week_stats(season, w)
         seen = {}
         for r in rows:
-            for k in scored(r['stats']):
+            for k in scored(espn_defense(r['stats'], r['player_id'].isalpha())):
                 seen[k] = seen.get(k, 0) + 1
         cache['keys'] += sorted((k for k in seen if k not in cache['keys']), key=lambda k: -seen[k])
         cache['games'] = {gid: g for gid, g in cache['games'].items() if g['w'] != w}
@@ -175,7 +240,7 @@ def box_scores(season, games):
             g, pid = by_team.get((w, team)), defs.get(sid) or player_id(sid)
             if not g or not pid:
                 continue
-            st = scored(r['stats'])
+            st = scored(espn_defense(r['stats'], sid.isalpha()))
             row = [pid, team] + [st.get(k, 0) for k in cache['keys']]
             while row[-1] == 0 and len(row) > 2:
                 row.pop()
@@ -263,6 +328,14 @@ def main():
             out['proj'] = proj['rows'][pid]
         players.append(out)
 
+    trouble = []
+    log('- ESPN player ids (ESPN fantasy)...')
+    try:
+        log(f'  {espn_ids(season, players)} matched by name, {sum(1 for p in players if p.get("espn"))} in all')
+    except Exception as e:  # ESPN leagues lose their unmatched players for a day; the run fails at the end
+        log(f'  failed: {e}')
+        trouble.append(f'ESPN ids: {e}')
+
     data = {
         'sport': 'nfl', 'updated': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
         'season': season, 'prevSeason': str(int(season) - 1), 'sources': ['Sleeper stats and projections', 'ESPN schedule'],
@@ -275,7 +348,9 @@ def main():
     os.replace(tmp, OUT)
     log(f'Wrote {OUT}: {len(players)} players, {os.path.getsize(OUT) // 1024} KB; box scores {os.path.getsize(BOX_CACHE) // 1024} KB')
     if proj.get('failed'):
-        raise RuntimeError(f'written, but with no projections: {proj["failed"]}')
+        trouble.append(f'no projections: {proj["failed"]}')
+    if trouble:
+        raise RuntimeError('written, but with ' + '; '.join(trouble))
 
 
 if __name__ == '__main__':

@@ -7,6 +7,41 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 import update_nfl as N  # noqa: E402
 
 
+class EspnIds(unittest.TestCase):
+    def test_sleepers_id_stays_and_the_rest_match_by_name_and_team(self):
+        real = N.fetch_json
+        N.fetch_json = lambda *a, **kw: [{'id': 1, 'fullName': 'Jaxon Smith-Njigba', 'proTeamId': 26}, {'id': 2, 'fullName': 'Josh Allen', 'proTeamId': 2},
+                                         {'id': 3, 'fullName': 'Josh Allen', 'proTeamId': 30}, {'id': 4, 'fullName': 'Mike Williams', 'proTeamId': 1},
+                                         {'id': 5, 'fullName': 'Mike Williams', 'proTeamId': 2}, {'id': -16026, 'fullName': 'Seahawks D/ST', 'proTeamId': 26}]
+        self.addCleanup(setattr, N, 'fetch_json', real)
+        players = [{'name': 'Jaxon Smith-Njigba', 'team': 'SEA', 'pos': ['WR']}, {'name': 'Josh Allen', 'team': 'BUF', 'pos': ['QB'], 'espn': 99},
+                   {'name': 'Josh Allen', 'team': 'JAX', 'pos': ['LB']}, {'name': 'Mike Williams', 'team': 'NYJ', 'pos': ['WR']},
+                   {'name': 'Seahawks', 'team': 'SEA', 'pos': ['DEF']}]
+        self.assertEqual(N.espn_ids('2026', players), 2)
+        self.assertEqual([p.get('espn') for p in players], [1, 99, 3, None, None])
+
+
+class EspnDefense(unittest.TestCase):
+    def test_a_game_lands_in_one_of_espns_brackets(self):
+        st = N.espn_defense({'pts_allow': 17, 'fum_rec': 1, 'def_st_fum_rec': 1, 'pts_allow_14_20': 1}, True)
+        self.assertEqual(st['pts_allow_14_17'], 1)
+        self.assertNotIn('pts_allow_18_21', st)
+        self.assertEqual(st['def_fum_rec'], 2)
+        self.assertEqual(st['pts_allow_14_20'], 1, "Sleeper's stay")
+        self.assertEqual(N.espn_defense({'pts_allow': 46}, True)['pts_allow_46p'], 1)
+        self.assertEqual(N.espn_defense({'pts_allow_0': 1}, True).get('pts_allow_14_17'), None)
+
+    def test_only_a_defense(self):
+        self.assertEqual(N.espn_defense({'rec': 5, 'fum_rec': 1}, False), {'rec': 5, 'fum_rec': 1})
+
+    def test_a_projection_spreads_its_brackets(self):
+        st = N.espn_defense_odds({'pts_allow': 20})
+        odds = [st[k] for k, _, _ in N.ESPN_BRACKETS]
+        self.assertGreater(st['pts_allow_18_21'], st['pts_allow_35_45'])
+        self.assertLess(sum(odds), 1)
+        self.assertGreater(sum(odds), 0.4)
+
+
 class Weeks(unittest.TestCase):
     def game(self, d, w):
         return {'date': d, 'week': w}

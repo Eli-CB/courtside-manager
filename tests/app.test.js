@@ -2769,6 +2769,47 @@ test('a live redraw keeps the pickup ideas it has: each one sets a whole lineup'
   assert.equal(a.pickupsCard(), fresh, 'anything else works them out again');
 });
 
+const ESPN_FOOTBALL = '999000001'; // a real public ESPN football league, its names replaced (tests/capture_espn_football_fixtures.py)
+
+test('an ESPN football league: not one ESPN knows as basketball, so read as football', async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.connectLeague(ESPN_FOOTBALL);
+  const L = a.fxLeague(), st = a.get('state');
+  assert.equal(a.get('SPORT').key, 'nfl');
+  assert.equal(L.source, 'espn');
+  checkLeague(L, 'ESPN football');
+  assert.equal(Object.values(L.rosters).flat().filter(x => !x.nba).length, 0, 'every rostered player matched, D/STs too');
+  assert.deepEqual([...st.slots].sort(), ['DEF', 'FLX', 'K', 'QB', 'RB', 'RB', 'TE', 'WR', 'WR'].sort());
+  assert.equal(st.benchSize, 7);
+  // the league's own weeks: NFL weeks, from week 9 when it began
+  assert.equal(L.periods[0].n, 9);
+  assert.equal(L.periods[0].start, '2026-11-03');
+  assert.equal(L.periods[0].end, '2026-11-09');
+  // its scoring, in the data's stat names: PPR, and ESPN's D/ST brackets
+  for (const [k, v] of Object.entries({ rec: 1, rec_yd: 0.1, pass_yd: 0.04, pass_td: 4, pass_int: -2, fum_lost: -2, xpm: 1, fgm_40_49: 4, fgm_50_59: 5,
+    pts_allow_0: 5, pts_allow_14_17: 1, pts_allow_28_34: -1, pts_allow_46p: -5, yds_allow_100_199: 3, yds_allow_550p: -7, int: 2, sack: 1, def_fum_rec: 2, def_st_td: 6 })) {
+    assert.equal(L.points[k], v, k);
+  }
+  assert.ok(!('fum_rec' in L.points) && !('pts_allow_18_21' in L.points), "an offense's fumble recovery scores nothing; 18-21 allowed is 0");
+  assert.equal(L.pointsOther.join(), 'ESPN stat 209', 'a stat the data lacks is named, as not projected (a rare defense one here)');
+  // ESPN's own points for two of its player-weeks (2026 week 8 and week 3): a receiver, and a D/ST with a punt return TD
+  assert.ok(Math.abs(a.lineFp({ rec: 6, rec_yd: 118, rec_td: 1 }) - 23.8) < 1e-9);
+  assert.ok(Math.abs(a.lineFp({ pts_allow: 16, pts_allow_14_17: 1, pts_allow_14_20: 1, sack: 6, int: 2, def_st_td: 1, yds_allow_200_299: 1 }) - 19) < 1e-9);
+  // live points are ESPN's, by each player's ESPN id
+  const raw = a.get('NBA').players.find(r => r.fx && r.fx.st === 'T' && r.pos[0] === 'WR');
+  assert.equal(a.leagueFid(L, raw), String(raw.espn));
+  assert.equal(L.slpWeek.n, 9);
+  // every tab draws
+  const ui = a.get('ui');
+  for (const tab of ['dashboard', 'week', 'roster', 'players', 'standings', 'recap']) {
+    ui.tab = tab;
+    const html = tab === 'week' ? a.withViewedTeam(a.viewWeek, true) : { dashboard: a.viewDashboard, roster: a.viewRoster, players: a.viewPlayers, standings: a.viewStandings, recap: a.viewRecap }[tab]();
+    quiet(a);
+    assert.ok(html && !/undefined|NaN|\[object/.test(html.replace(/<[^>]*>/g, ' ')), tab);
+  }
+});
+
 test("football's day: Monday night's game stays in its week past midnight, and abroad", async () => {
   const a = await footballApp();
   a.setClock('2026-10-27T00:30:00-04:00'); // overtime in New York; 5:30 on Tuesday morning in London

@@ -30,6 +30,13 @@ saved leagues are lost). Owner's league:
     (`matchPlayers`), which site an ID is on (`leagueSourceOf`, `parseLeagueId`, `sourceName`), `getJson` (shared retries)
   - espn: `fetchEspnLeague` turns a public ESPN league into the same league shape (`source: 'espn'`), so every
     tab works unchanged. "fx" names (`fxLeague`, `raw.fx`, `fxTeamSide`) mean "the league's site", either one.
+    ESPN football (`fetchEspnFootball`, `sport: 'nfl'`): an ID ESPN answers 404 as basketball is asked for as football (one extra request). Weeks are NFL weeks from
+    the file's `weeks` (ESPN's scoring periods), players the file's by `espn` id (the job matches ESPN's player list by name and team: Sleeper's has a quarter of
+    them; a D/ST is -16000 less its team's number, `espnFootballId`), scoring `ESPN_FFL_STATS` (ESPN stat id -> the data's names; D/ST-only stats at ESPN's
+    D/ST points; a TE/RB/WR reception premium as Sleeper's bonus_rec_*). The job adds ESPN's own points-allowed brackets (14-17, 18-21, 22-27, 35-45, 46+)
+    and `def_fum_rec` (special teams' included) to a defense's lines (`espn_defense`). Checked on a real league: 1,169 of 1,170 player-weeks matched ESPN's
+    points (the one: a sack counted differently). Live points: ESPN's per week, in `L.slpWeek` like Sleeper's (`espnWeekFresh`, `leagueWeekFresh`, every 30 s).
+    Category football isn't read. No Recap, Awards or Season totals (as ESPN basketball).
   - sleeper: `fetchSleeperLeague` (api.sleeper.app, CORS-open, no sign-in; IDs are 15-20 digits, `source: 'sleeper'`).
     Sleeper basketball is points only and counts ONE game a week per lineup slot (Lock-In: the game locked in after it's
     played, else the last of the week; Game Pick: the one picked): `L.oneGame`, `isOneGame()`. Projections (`oneGameSide`

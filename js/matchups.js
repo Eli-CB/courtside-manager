@@ -635,9 +635,9 @@ function viewWeek() {
   }
   // once the week has started, finished games count their real box scores (loaded on first need)
   if (!BOX && matchDates()[0] <= todayIso()) loadBoxes().then(() => { if (ui.tab === 'week') render(); }).catch(() => {});
-  if (isFootball() && fxLeague()) { // the week's games as they're played: Sleeper's points, ESPN's clock
+  if (isFootball() && fxLeague()) { // the week's games as they're played: the league site's points, ESPN's clock
     startLive();
-    sleeperWeekFresh(fxLeague());
+    leagueWeekFresh(fxLeague());
     footballLines(fxLeague());
   }
   const ctx = weekContext();
