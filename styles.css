@@ -769,12 +769,14 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .cs-row[aria-expanded="true"] td { border-bottom-color: transparent; }
 .cs-detail td { padding: 0 0 10px; }
 /* an opened category: who helped and who hurt, in a panel under its row */
-.cs-who { font-size: .85rem; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; margin-left: 1.3em; padding: 8px 12px; background: var(--surface-2); border-radius: 8px; }
+.cs-who { font-size: .85rem; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; margin-left: 1.3em; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.cs-detail:hover { background: none; } /* the panel isn't a row: hovering it, or its category's row, doesn't run one into the other */
 .cs-grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .cs-tag { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .cs-tag.up { color: var(--good); }
 .cs-tag.down { color: var(--bad); }
-.cs-p { white-space: nowrap; }
+.cs-p { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; } /* photo, name and number on one line */
+.cs-name { display: inline-flex; align-items: center; font-weight: 600; }
 .cs-rank { white-space: nowrap; }
 .cs-avg, .show-sm-inline { display: none; }
 .cs-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
