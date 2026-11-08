@@ -759,8 +759,8 @@ test('performances: today, the last game day before it, and this week once it ha
   assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: null, year: ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'] }, "Monday before tip-off: last night was last week's");
   await onDay('2026-10-26', () => {
     const html = app.topPerformancesCard();
-    assert.ok(html.includes('data-range="today"') && html.includes('>Yesterday<') && !html.includes('data-range="week"'), 'Today and Yesterday; no week yet');
-    assert.ok(html.includes('class="on" data-action="perf-range" data-range="day"') && html.includes('Last night'), "before tip-off it opens on last night's games");
+    assert.ok(html.includes('value="today"') && html.includes('>Yesterday<') && !html.includes('value="week"'), 'Today and Yesterday; no period yet');
+    assert.ok(html.includes('<option value="day" selected>') && html.includes('Last night'), "before tip-off it opens on last night's games");
     app.ui.perfRange = 'today';
     try {
       assert.ok(app.topPerformancesCard().includes("Loading today's games"), 'today, before ESPN has answered');
@@ -768,7 +768,8 @@ test('performances: today, the last game day before it, and this week once it ha
   });
   await onDay('2026-10-21', () => {
     const toggle = app.topPerformancesCard();
-    assert.ok(toggle.includes('data-range="week"') && toggle.includes('class="on" data-action="perf-range" data-range="today"'), "all three, on today once its games have started");
+    assert.ok(toggle.includes('value="week"') && toggle.includes('<option value="today" selected>'), "all of them, on today once its games have started");
+    assert.ok(!toggle.includes('data-action="perf-per"'), 'one day: no Totals / Per game');
   });
 });
 
@@ -819,7 +820,13 @@ test("performances: this week adds up each player's games", async () => {
   try {
     const html = await onDay('2026-10-25', () => app.topPerformancesCard());
     assert.match(html, /\d G · \d+ min/, 'rows show games played');
-  } finally { app.ui.perfRange = null; }
+    // per game: each player's games over the period, averaged
+    app.ui.perfPer = true;
+    const per = await onDay('2026-10-25', () => app.topPerformancesCard());
+    assert.match(per, / · per game/);
+    assert.match(per, /aria-pressed="true">Per game</);
+    assert.match(per, /\d+ GP · /, 'games played, as the season per game shows them');
+  } finally { app.ui.perfRange = null; app.ui.perfPer = false; }
 });
 
 test('performances: value is categories won against not playing, every category weighing the same', async () => {
@@ -1122,8 +1129,12 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
   const count = html => +html.match(/· (?:\d+ of )?(\d+) players?</)[1];
   try {
     let html = app.topPerformancesCard();
-    assert.ok(html.includes('data-range="avg"') && html.includes('>Per game<'), 'Per game is one of the ranges');
-    assert.ok(html.indexOf('>This week<') < html.indexOf('>This season<') && html.indexOf('>This season<') < html.indexOf('>Per game<'), 'This season after This week');
+    assert.ok(html.indexOf('>This period<') < html.indexOf('>This season<'), 'This season after This period, in the menu');
+    ui.perfRange = 'year';
+    html = app.topPerformancesCard();
+    assert.ok(html.includes('data-action="perf-per" data-per="0" aria-pressed="true">Totals<') && html.includes('>Per game<'), 'the season: Totals, or Per game');
+    ui.perfPer = true;
+    assert.equal(app.topPerformancesCard(), (ui.perfRange = 'avg', ui.perfPer = false, app.topPerformancesCard()), "the season per game is the old Per game");
     ui.perfRange = 'avg';
     html = app.topPerformancesCard();
     const rows = app.seasonRows();
@@ -1299,7 +1310,7 @@ test("performances: today's games from ESPN's box scores, read in the browser as
       assert.equal(rows.length, app.liveLines(day).size, "everyone who's played today");
       assert.equal(rows.find(r => r.raw.id === raw.id).tot.pts, line.pts);
       const html = app.topPerformancesCard();
-      assert.ok(html.includes('class="on" data-action="perf-range" data-range="today"'), 'it opens on today once games have started');
+      assert.ok(html.includes('<option value="today" selected>'), 'it opens on today once games have started');
       assert.ok(html.includes('lv-dot') && html.includes('Halftime') && html.includes('Q4 2:08') && html.includes('updated '), 'the clock of each game still on');
       // a live update keeps the rows in place; anything else sorts them again
       const order = h => [...h.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(m => m[1]);
@@ -2779,7 +2790,7 @@ test('football tabs: the board, swaps, Roster, Players and adds speak in project
   ui.tab = 'players'; ui.perfRange = 'proj';
   const p = a.viewPlayers();
   quiet(a);
-  assert.match(p, /aria-pressed="true">Projected</);
+  assert.match(p, /<option value="proj" selected>Projected</);
   assert.ok(!/\bmin\b/.test(p.replace(/<[^>]*>/g, ' ')), 'no minutes in football');
   // Players is the table alone: pickup ideas are Matchups' (each for the weakest at his own position)
   assert.ok(!/Recommended adds/.test(p));

@@ -61,10 +61,10 @@ let perfOrder = { sig: '', ids: [] }; // the rows last shown, in order
 // every range, among everyone in it: 🚀 the best in each category and 🔥 the second best (as many as 3 tied),
 // 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's average, so
 // volume counts), everything else by the number. Per game only counts regulars (3+ games, 15+ minutes a game).
-function perfBadges(rows, { range, day, avg }) {
+function perfBadges(rows, { range, day, avg, perWeek }) {
   const today = todayIso(), yesterday = addDays(today, -1), cats = scoreCats().filter(c => !c.fp);
   const badges = new Map();
-  const night = range === 'avg' ? 'per game' : range === 'year' ? 'this season' : range === 'week' ? 'this week'
+  const night = range === 'avg' ? 'per game' : range === 'year' ? 'this season' : range === 'week' ? (perWeek ? 'per game this period' : 'this period')
     : day === today ? 'today' : day === yesterday ? 'last night' : `on ${fmtDay(day)}`;
   const pool = avg ? rows.filter(r => r.g >= 3 && r.tot.min >= 15) : rows;
   const tiers = (list, f) => { const m = new Map(); for (const r of list) { const v = +f(r).toFixed(6); m.set(v, [...(m.get(v) || []), r]); } return [...m].sort((a, b) => b[0] - a[0]).map(x => x[1]); };
@@ -105,19 +105,25 @@ function topPerformancesCard() {
   const card = (head, body) => `<div class="card"><div class="card-head"><h2>Players ${infoBtn('perf')}</h2>${head}${LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : ''}</div>${body}</div>`;
   if (!BOX) return card('', loadingLine('Loading the latest box scores…'));
   const P = perfDays();
-  // the buttons: Today, the last game day before it, This week. Until one is picked: today once its games have
-  // started, else the last game day
-  // ... This season (every game so far, added up) and Per game: everyone's average game, for finding anyone
+  // When: a menu of Today, the last game day before it, This period (the matchup's days so far) and This season (football:
+  // Projected first). Until one is picked: today once its games have started, else the last game day. A period or the
+  // season adds the games up, or (Per game) shows each player's average game: the season's from the stats chosen under
+  // Stats used (range 'avg', as projections use them), a period's from its games.
   const football = isFootball();
-  const opts = [football && ['proj', 'Projected'], P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This week'], P.year.length && ['year', 'This season'], ['avg', 'Per game']].filter(Boolean);
-  const range = opts.some(([k]) => k === ui.perfRange) ? ui.perfRange : football && !P.started ? 'proj' : P.started || !P.day ? opts.find(([k]) => k !== 'proj')[0] : 'day';
-  const proj = range === 'proj', avg = range === 'avg' || proj, weekly = range === 'week' || range === 'year'; // weekly: several days added up
+  const opts = [football && ['proj', 'Projected'], P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This period'], ['year', 'This season']].filter(Boolean);
+  const want = ui.perfRange === 'avg' ? 'year' : ui.perfRange;
+  const chosen = opts.some(([k]) => k === want) ? want : football && !P.started ? 'proj' : P.started || !P.day ? opts.find(([k]) => k !== 'proj')[0] : 'day';
+  const many = chosen === 'week' || chosen === 'year';
+  const per = many && (ui.perfRange === 'avg' || ui.perfPer || (chosen === 'year' && !P.year.length)); // (no games yet: averages)
+  const range = chosen === 'year' && per ? 'avg' : chosen, perWeek = chosen === 'week' && per;
+  const proj = range === 'proj', avg = range === 'avg' || proj, weekly = !perWeek && (range === 'week' || range === 'year'); // weekly: several days added up
   const dates = avg ? [] : range === 'year' ? P.year : range === 'week' ? P.week : [range === 'today' ? today : P.day];
   const day = dates[0];
   const updated = range === 'day' || avg ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
     : live.at ? ` · updated ${fmtTime(live.at)}` : '';
-  const when = proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly ? `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
-  const toggle = opts.length > 1 ? `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="perf-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>` : '';
+  const when = proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly || perWeek ? `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
+  const toggle = `<div class="perf-when-pick"><select class="ctx-team perf-range" data-change="perf-range" aria-label="Show games from">${opts.map(([k, l]) => `<option value="${k}" ${k === chosen ? 'selected' : ''}>${l}</option>`).join('')}</select>${many
+    ? `<div class="seg seg-sm" role="group" aria-label="Totals or per game">${[['0', 'Totals'], ['1', 'Per game']].map(([v, l]) => `<button type="button" class="${String(+per) === v ? 'on' : ''}" data-action="perf-per" data-per="${v}" aria-pressed="${String(+per) === v}">${l}</button>`).join('')}</div>` : ''}</div>`;
 
   // who rosters each player, and where in that team's lineup he is now (active or on the bench)
   const owner = new Map(), spot = new Map();
@@ -168,12 +174,14 @@ function topPerformancesCard() {
   const e = +expected.toFixed(1);
   const over = weekly ? `${e} game${e === 1 ? '' : 's'} over these days` : 'a game';
   const valTip = esc(pts ? `Fantasy points in your league; an average starter scores ${fmt(par, 1)} in ${over}`
-    : avg ? "Categories won by his average game: what it adds to winning a week's categories, against not playing"
+    : avg || perWeek ? "Categories won by his average game: what it adds to winning a week's categories, against not playing"
     : `Categories won: what ${weekly ? 'his games' : 'the game'} added to winning a week's categories, against not playing (an even matchup). Below 0: his team would have done better without ${weekly ? 'them' : 'it'}`);
 
   // everyone who played, ranked by value; the column sorted on picks which 50 show (Value ↑ for the worst)
-  const rows = proj ? projRows() : avg ? seasonRows() : perfRows(dates);
-  const badges = perfBadges(rows, { range, day, avg });
+  // a period per game: each player's games there, averaged (makes and attempts too, so his percentages stand)
+  const perGame = r => { const g = r.g || 1, by = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v / g])); return { ...r, tot: by(r.tot), z: by(r.z), v: r.v / g, per: true }; };
+  const rows = proj ? projRows() : avg ? seasonRows() : perWeek ? perfRows(dates).map(perGame) : perfRows(dates);
+  const badges = perfBadges(rows, { range, day, avg, perWeek });
   const legend = badges.size ? '<p class="muted small pf-legend">🚀 best · 🔥 2nd best in a category · 🧊 worst shooting · 🧈 most turnovers</p>' : '';
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
   // filter by team (yours, this matchup's opponent's, the others') and by where players are: active, bench, or
@@ -192,7 +200,7 @@ function topPerformancesCard() {
   const sorted = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
   // a live update keeps the rows where they were (numbers and ranks change in place; anyone new goes below) so the
   // table doesn't jump while it's read; anything you do sorts it again
-  const sig = [range, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine, ui.perfQ, ui.perfPos, ui.perfTeam, JSON.stringify(ui.perfOnly)].join('|');
+  const sig = [range, perWeek, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine, ui.perfQ, ui.perfPos, ui.perfTeam, JSON.stringify(ui.perfOnly)].join('|');
   const cap = avg || range === 'year' ? 300 : 100; // rows shown: the top 300 over the season, 100 for a day or week
   let shown = sorted.slice(0, cap);
   if (live.hold && perfOrder.sig === sig) {
@@ -209,7 +217,7 @@ function topPerformancesCard() {
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 28)}<div class="bmain">
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button>${injBadge(r.raw.inj, 'by-name')}</div>
-          <div class="pmeta">${injBadge(r.raw.inj, 'in-meta')}${proj ? `${esc(r.game)} · ` : avg ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
+          <div class="pmeta">${injBadge(r.raw.inj, 'in-meta')}${proj ? `${esc(r.game)} · ` : avg || perWeek ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>

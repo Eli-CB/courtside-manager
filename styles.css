@@ -266,6 +266,10 @@ a { color: var(--accent); }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: -6px 0 10px; }
+/* when: the menu, and Totals / Per game beside it (one row, phones too) */
+.perf-when-pick { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.perf-when-pick .ctx-team { width: auto; min-width: 0; flex: 0 1 auto; }
+.perf-when-pick .seg { flex: none; }
 .flag { vertical-align: -2px; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
 .pc-owner { margin: 4px 0 0; font-size: .9rem; }
 .pc-how { display: block; margin-top: 2px; font-size: .85rem; } /* how he joined: drafted, kept, added, traded */

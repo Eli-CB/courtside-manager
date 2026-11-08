@@ -107,7 +107,7 @@ const liveLines = d => live.lines.get(d) || new Map();
 const savedFinal = g => !!(BOX && BOX.finals.has(`${g.d} ${g.home}`));
 const espnDate = d => d.replace(/-/g, '');
 const liveTab = () => ui.tab === 'dashboard' || ui.tab === 'players' || footballWeekTab();
-const liveWanted = () => !document.hidden && (footballWeekTab() || (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && !['day', 'avg', 'proj'].includes(ui.perfRange)));
+const liveWanted = () => !document.hidden && (footballWeekTab() || (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && !['day', 'avg', 'proj'].includes(ui.perfRange) && !(ui.perfRange === 'year' && ui.perfPer)));
 
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {

@@ -351,8 +351,9 @@ const actions = {
     ui.dashBench = !ui.dashBench;
     render();
   },
-  'perf-range'(el) {
-    ui.perfRange = el.dataset.range;
+  'perf-per'(el) {
+    ui.perfPer = el.dataset.per === '1';
+    if (ui.perfRange === 'avg') ui.perfRange = 'year';
     render();
   },
   'perf-only'(el) {
@@ -484,6 +485,9 @@ document.addEventListener('change', e => {
     render();
   } else if (el.dataset.change === 'week-pick') {
     goWeek(+el.value);
+  } else if (el.dataset.change === 'perf-range') {
+    ui.perfRange = el.value;
+    render();
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
