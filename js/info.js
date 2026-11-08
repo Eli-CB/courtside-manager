@@ -26,7 +26,7 @@ const INFO = {
     <p><b>Colors.</b> Green helps the category, red hurts it, getting stronger up to ±2.5 spreads. The Projected week row is shaded by your chance to win each category instead. Hover any number for the exact value.</p>`],
   dots: ['Schedule dots', `
     <p>One dot per matchup day, from the NBA schedule. <b>Filled</b> dots are games already played; <b>rings</b> are games still to come.</p>
-    <ul><li><b>Green:</b> a game that counts (a starter).</li><li><b>Grey:</b> a game on the bench, which doesn't count.</li>
+    <ul><li><b>Green:</b> a game. A bench player's games look the same, in his shaded row; they count only if he starts.</li>
     <li><b>Yellow:</b> a regular (20+ minutes a game) played well under his usual minutes: under 70% of his average and at least 8 fewer. Hover it for his minutes and the likely reason: an <b>injury</b> (he's been on the ESPN injury report since that game), a <b>blowout</b> (decided by 20 or more), <b>foul trouble</b> (5 or more fouls), or none of those, which usually means the coach's call.</li>
     <li><b>Light green ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
