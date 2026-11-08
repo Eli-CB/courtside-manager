@@ -253,6 +253,23 @@ test('draft grades per game and by season totals', async () => {
   ui.draftMode = 'game';
 });
 
+test('the tabs: Matchup is this week, Plan Ahead opens on next week until a week is picked', async () => {
+  const L = await app.useLeague(CATS9);
+  useTeam(L.standings[0].id);
+  const ui = app.get('ui');
+  const names = Object.fromEntries(app.tabList());
+  assert.equal(names.dashboard, 'Matchup');
+  assert.equal(names.week, 'Plan Ahead');
+  Object.assign(ui, { tab: 'week', weekShift: 0, weekChosen: false });
+  app.planAheadWeek();
+  assert.equal(ui.weekShift, 1, 'next week');
+  app.goWeek(0);
+  ui.weekChosen = true;
+  app.planAheadWeek();
+  assert.equal(ui.weekShift, 0, 'a week picked stays');
+  Object.assign(ui, { tab: 'dashboard', weekShift: 0, weekChosen: false });
+});
+
 test('a finished week projects exactly what happened', async () => {
   const L = await app.useLeague(CATS9);
   await app.loadBoxes();

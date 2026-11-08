@@ -81,7 +81,8 @@ function leagueMenu() {
 // Each Fantrax season is its own league. Past seasons are added by league ID (the league menu, or the league form,
 // which knows one) and kept per league (keyed by Fantrax's league history id); a past season gets its own tabs.
 // Fantrax leagues only, so far.
-const TABS_NOW = [['dashboard', 'Dashboard'], ['week', 'Matchups'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
+// (the addresses keep the tabs' old names, dashboard and week, so saved links still work)
+const TABS_NOW = [['dashboard', 'Matchup'], ['week', 'Plan Ahead'], ['recap', 'Recap'], ['roster', 'Roster'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const TABS_BROWSE = [['players', 'Players']]; // browsing without a league
 const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
@@ -228,7 +229,7 @@ function gearMenu() {
       <button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">rosters, lineups, matchups and standings</span></button>` : ''}
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
-      <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers in the Dashboard's matchup</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
+      <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers on the Matchup tab</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-clock" role="switch" aria-checked="${ui.clock24}"><span>24-hour time<span class="gear-sub">tip-offs and update times as ${fmtTime('2026-11-02T19:30:00')}</span></span><span class="gear-switch${ui.clock24 ? ' on' : ''}" aria-hidden="true"></span></button>
       <div class="lm-sec">Help</div>
       <button type="button" class="lm-item" data-action="feedback">${ICON_MAIL}Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></button>
@@ -243,8 +244,18 @@ function gearMenu() {
   </details>`;
 }
 
+// Plan Ahead opens on next week (the lineup still to set), until a week is picked there; a new league starts over
+function planAheadWeek() {
+  if (ui.tab !== 'week' || ui.weekChosen || ui.season || !fxLeague() || !NBA) return;
+  ui.weekChosen = true;
+  const shifts = weekShifts();
+  const next = shifts.includes(1) ? 1 : 0; // (after the last week: that one)
+  if (ui.weekShift !== next) goWeek(next);
+}
+
 function render() {
   if (ui.hold) return; // changing sports: the league isn't in place yet
+  planAheadWeek();
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
   leagueMenu();

@@ -5,8 +5,9 @@
 /* =========================================================
    Actions
    ========================================================= */
-// Show another week on Matchups (one of weekShifts)
+// Show another week on Plan Ahead (one of weekShifts)
 function goWeek(shift) {
+  ui.weekChosen = true;
   const shifts = weekShifts();
   ui.weekShift = Math.max(shifts[0], Math.min(shifts[shifts.length - 1], shift));
   // a new week brings its real opponent: a hypothetical belongs to the week it was set up in

@@ -65,14 +65,14 @@ saved leagues are lost). Owner's league:
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards (every award but Biggest punt and Even Steven: a team's name opens a breakdown: `awardDetails`, `award-team`), past Rosters
   - views: Roster, Standings + Season totals, Trades, shared table helpers, box score loading.
-  - dashboard: Dashboard (`dashMatchupCard`: Today / Yesterday show only who plays that day, each side one gapless column: starters, bench (tagged), Out/DNP;
+  - dashboard: the Matchup tab (`#dashboard`, was Dashboard; `dashMatchupCard`: Today / Yesterday show only who plays that day, each side one gapless column: starters, bench (tagged), Out/DNP;
     This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then
     one-line folds that open on tap (`dashFold`, open ones kept in `ui.dashFolds`): a fresh recap (`recapFold`), this week's waiver
     moves (`periodMoves`: last period's rosters vs this one's, Fantrax only) and injury news; then action items).
   - players: Players tab (`#players`, was Free Agents): one table (`topPerformancesCard`) of every NBA stat line of
     today / last game day / this week / this season (added up), or Per game (`seasonRows`: averages from the Stats used basis); top 300 for the season ranges, 100 otherwise; search, position and NBA team (pill-style menus), Rookies / Injured toggles,
     team / Active / Bench / Waivers filters, ranked by value (pickup ideas are only on Matchups). Player card: under his fantasy team, how he got there (`cardHow`: Keeper / Drafted round, pick / Waiver add / Traded from, with the week, from the weekly rosters; ESPN: the draft only)
-  - matchups: Matchups tab, schedule dots, stat tables, tooltips. A finished week shows no projections: its real
+  - matchups: the Plan Ahead tab (`#week`, was Matchups; opens on next week until a week is picked: `planAheadWeek`, `ui.weekChosen`), schedule dots, stat tables, tooltips. A finished week shows no projections: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history);
     leagues without weekly lineups (ESPN) show today's lineups labelled as such
   - A week is over (`periodOver`) at its end or once its last game day's box scores are all in: Fantrax ends a weekly

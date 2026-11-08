@@ -2,10 +2,10 @@
 
 A weekly matchup optimizer for head-to-head fantasy basketball (Fantrax, public ESPN, Sleeper) and hockey (Fantrax). It pulls your league, real NBA or NHL stats, injuries and the schedule, then shows:
 
-- **Dashboard:** the day's essentials: action items, injury news for your players, and the latest game day's best single games across the NBA (free agents included) and worst games by rostered players, with who has each player
-- **Matchups:** both lineups side by side, projected category totals, win chances, and which starters to use
+- **Matchup:** this week's matchup, live, then the day's essentials: action items, injury news for your players, and the latest game day's best single games across the NBA (free agents included) and worst games by rostered players, with who has each player
+- **Plan Ahead:** next week by default: both lineups side by side, projected category totals, win chances, and which starters to use
 - **Roster:** what your team is good and bad at: each category ranked against every team in the league, and every player's stats shaded by how much they help or hurt
-- **Free Agents:** recommended adds for your team (plus an injured player to stash when you have an open IR spot), then every free agent and waiver player, or every NBA player, with your league's position eligibility
+- **Players:** every player's stat lines, from today to the whole season, ranked by value, with filters for position, team and who's available
 - **Standings:** the league's standings, plus (Fantrax leagues) every team's season totals in each category from the players it actually started each week
 - **Awards:** this season's awards so far (and each past season's): best draft, best manager (actual wins vs an all-play record), Waiver Wire Wizard, Street Clothes, biggest punt, Even Steven and Unc Status, all from each week's starting lineups
 - **Trades:** what a deal with another team in your league does to your per-game production

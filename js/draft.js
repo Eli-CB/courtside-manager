@@ -430,6 +430,7 @@ async function switchLeague(input) {
   state.browse = false; // a league again, after browsing without one
   state.leagueChosen = true;
   ui.viewA = null; ui.viewB = null;
+  if (!wasCurrent) { ui.weekShift = 0; ui.weekChosen = false; } // Plan Ahead: next week again
   if (!wasCurrent) {
     const saved = state.leagueStates && state.leagueStates[id];
     if (saved) Object.assign(state, JSON.parse(JSON.stringify(saved)));

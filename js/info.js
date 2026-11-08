@@ -42,7 +42,7 @@ const INFO = {
     <li><b>Worst week:</b> the starter who did the least a game over the week (2 or more games), with his per-game line.</li>
     <li><b>Worst game:</b> the worst single game by a starter.</li>
     <li><b>Street clothes:</b> the starter who missed the most of his NBA team's games while in a starting lineup that week (injury, rest or coach's decision; the box scores can't tell which).</li>
-    <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Matchups).</li>
+    <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Plan Ahead, for a finished week).</li>
     <li><b>Best week</b> (category leagues): the team whose week would have beaten the most others. In a points league that's simply the top score in the finals.</li></ul>
     <p><b>Sleeper leagues</b> count one game a week for each starter, so a starter's week is the game that counted (the one whose fantasy points match Sleeper's for him that week, bonuses included). Player of the week is the best of those games and Worst game the worst; there's no separate Game of the week or Worst week. Street clothes is a starter who didn't play a game all week while his NBA team did, and a bench regret puts in the bench player's best game.</p>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
@@ -68,7 +68,7 @@ const INFO = {
     <p><b>Columns.</b> Everyone who played is ranked by value (the number by each name). Click a column to sort; the top 50 by that column show, so sort Value the other way for the worst. Categories sort by how much they helped, so the fewest turnovers and the most valuable shooting come first. Shooting shows makes-attempts; hover for the percentage.</p>
     <p><b>Filters.</b> By team: yours, this matchup's opponent and the other teams. By where players are: Active (in their team's starting lineup now), Bench (IR included) and Waivers (not on a roster in your league; they have no team, so the team filters don't hide them). Ranks stay out of everyone who played.</p>`],
   value: ['Player value', `
-    <p>Value is categories won per game: how much an average game of his adds to winning a week's categories, compared with not playing at all (the same as a single game on the Dashboard's Performances). A typical starter is about +0.2; the best players +0.4 or more.</p>
+    <p>Value is categories won per game: how much an average game of his adds to winning a week's categories, compared with not playing at all (the same as a single game on the Players tab). A typical starter is about +0.2; the best players +0.4 or more.</p>
     <p>Each category's share of an average team's week (your league's starters × 3.5 games) is divided by how far apart two teams usually finish in it, so every category weighs the same, as it does in the standings. Counting stats only add; turnovers take away, and FG% and FT% add or take away by shot volume against the league's average.</p>
     <p><b>Points leagues:</b> value is fantasy points per game (FP/G), using your league's points for each stat.</p>`],
   projection: ['Which stats are used', `
@@ -93,7 +93,7 @@ const INFO = {
     <li><b>Wks:</b> weeks in the starting lineup.</li>
     <li><b>GP:</b> games played in those weeks; every stat comes from just these games.</li>
     <li><b>Missed:</b> games his NBA team played in those weeks without him (injury, rest or a coach's decision).</li>
-    <li><b>Value:</b> each game valued like a single game on the Dashboard: categories won against not playing (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
+    <li><b>Value:</b> each game valued like a single game on the Players tab: categories won against not playing (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
   tradeValue: ['Value over a waiver player', `
     <p>Each player's value per game (see Player value) minus the best player your league leaves on waivers, since every player in a deal takes a roster spot someone off waivers could fill. So two good players for one star only wins if they're worth more than the star plus the waiver player you'd otherwise have.</p>
     <p>Within about 0.04 (2 fantasy points in points leagues) it's called roughly even. The table shows what happens to each category.</p>`],
@@ -112,7 +112,7 @@ const INFO = {
     <p>The week still underway doesn't count, and neither do playoff weeks. The totals come from box scores, which can differ slightly from Fantrax's (stat corrections, the odd game counted in a different week), so expect small gaps.</p>
     <p>Tap a team's name to see its luck week by week.</p>`],
   awWaiver: ['Waiver Wire Wizard', `
-    <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Dashboard (fantasy points in points leagues), added up.</p>
+    <p>What free-agent and waiver pickups did for the team that picked them up: every game a pickup played in a week he was in that team's <b>starting lineup</b>, each valued like a single game on the Players tab (fantasy points in points leagues), added up.</p>
     <p>A pickup who started one week counts for that week only, and he counts even if he was dropped later. Only games that hurt the team (below 0: very poor shooting and turnovers with little else) lower the total.</p>
     <p>Fantrax has no public transaction log, so this follows each player through every week's rosters: on his team from week 1 means drafted or kept; on another team's roster the week before he arrived means a <b>trade</b>, which doesn't count; on nobody's roster means a <b>pickup</b>. A player dropped and claimed by another team in the same week looks like a trade.</p>
     <p>Sleeper leagues count one game a week for each starter, so a pickup's week is the game that counted.</p>
@@ -130,7 +130,7 @@ const INFO = {
     <p>The most matchups lost by a single category (4-5, or 4-4-1 counts as a tie, not a loss). Points leagues: losses by less than 5% of the winning score. Counted from the box scores, so a week can differ slightly from your league site's.</p>
     <p>Tap a team's name to see each close loss.</p>`],
   awBench: ['Benchwarmer Blues', `
-    <p>The most value left on the bench: every game a player played in a week he wasn't in the team's starting lineup, valued like a single game on the Dashboard (fantasy points in points leagues). Not every bench game could have counted (someone had to sit), so it's how much a team's bench did, not how much it lost.</p>
+    <p>The most value left on the bench: every game a player played in a week he wasn't in the team's starting lineup, valued like a single game on the Players tab (fantasy points in points leagues). Not every bench game could have counted (someone had to sit), so it's how much a team's bench did, not how much it lost.</p>
     <p>Tap a team's name to see whose games sat.</p>`],
   awFan: ['Fan Boy', `
     <p>The biggest share of a team's starts from players on one NBA team. A start is a player in the starting lineup for a week, counted for the NBA team he played for that week, so a player traded mid-season counts for both.</p>
