@@ -296,6 +296,10 @@ function injBadge(inj, where = '') {
   return `<span class="badge inj ${inj.status === 'Out' ? 'bad' : 'warn'}${where ? ' ' + where : ''}" title="${esc(tip)}">${short}</span>`;
 }
 
+// A first-year player (no seasons in the league before this one; a football team defense isn't one), and his R by the name
+const isRookie = raw => !raw.exp && !(raw.pos && raw.pos[0] === 'DEF');
+const rookieBadge = (raw, where = '') => (isRookie(raw) ? `<span class="badge rk${where ? ' ' + where : ''}" title="Rookie">R</span>` : '');
+
 function statusBadge(p) {
   const cls = p.status === 'Out' ? 'bad' : p.status === 'DTD' ? 'warn' : 'good';
   return `<span class="badge ${cls}">${esc(p.status)}</span>`;

@@ -285,6 +285,10 @@ test('a player out or day-to-day says so in a few letters on the Players table',
   assert.equal(short({ status: 'Out', label: 'PUP' }), 'PUP');
   assert.match(app.injBadge({ status: 'Out', label: 'Out', note: 'Knee' }, 'by-name'), /class="badge inj bad by-name" title="Out: Knee"/);
   assert.equal(app.injBadge(null), '');
+  // a rookie gets an R; a veteran and a football team defense don't
+  assert.match(app.rookieBadge({ exp: 0, pos: ['G'] }, 'by-name'), /class="badge rk by-name" title="Rookie">R</);
+  assert.equal(app.rookieBadge({ exp: 3, pos: ['G'] }), '');
+  assert.equal(app.rookieBadge({ exp: 0, pos: ['DEF'] }), '');
 });
 
 test("a fantasy team's name opens its card: record, opponent, roster by spot, category ranks", async () => {
