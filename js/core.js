@@ -286,6 +286,16 @@ function totals(list, mult = () => 1) {
   return t;
 }
 
+// The injury report in a few letters, for tight rows (the full word and the news on hover): Q, D, IR, SUS, PUP, else OUT or DTD
+function injBadge(inj, where = '') {
+  if (!inj) return '';
+  const l = String(inj.label || '').toLowerCase();
+  const short = l === 'ir' || l.includes('reserve') ? 'IR' : l.startsWith('quest') ? 'Q' : l.startsWith('doubt') ? 'D' : l.startsWith('sus') ? 'SUS' : l === 'pup' ? 'PUP'
+    : inj.status === 'Out' ? 'OUT' : 'DTD';
+  const tip = [inj.label || inj.status, inj.note].filter(Boolean).join(': ');
+  return `<span class="badge inj ${inj.status === 'Out' ? 'bad' : 'warn'}${where ? ' ' + where : ''}" title="${esc(tip)}">${short}</span>`;
+}
+
 function statusBadge(p) {
   const cls = p.status === 'Out' ? 'bad' : p.status === 'DTD' ? 'warn' : 'good';
   return `<span class="badge ${cls}">${esc(p.status)}</span>`;

@@ -315,6 +315,9 @@ a { color: var(--accent); }
 .perf-table thead th.pf-name { z-index: 3; }
 .perf-table .pf-name .bname { flex-wrap: nowrap; }
 .perf-table .pf-name .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.badge.inj { flex: none; margin-left: 5px; padding: 0 5px; font-size: .64rem; line-height: 1.5; letter-spacing: .02em; } /* the name gives way, not the badge */
+.badge.inj.in-meta { display: none; margin: 0 4px 0 0; }
+@media (max-width: 640px) { .badge.inj.by-name { display: none; } .badge.inj.in-meta { display: inline-block; } } /* phones: under the name, which keeps its room */
 .perf-table .pf-name .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .perf-table .pf-v { position: sticky; right: 0; z-index: 1; background: var(--surface); padding-left: 8px; } /* the value stays in view too */
 .perf-table thead th.pf-v { z-index: 3; }

@@ -270,6 +270,19 @@ test('the tabs: Matchup is this week, Plan Ahead opens on next week until a week
   Object.assign(ui, { tab: 'dashboard', weekShift: 0, weekChosen: false });
 });
 
+test('a player out or day-to-day says so in a few letters on the Players table', () => {
+  const short = inj => app.injBadge(inj).replace(/<[^>]*>/g, '');
+  assert.equal(short({ status: 'Out', label: 'Out' }), 'OUT');
+  assert.equal(short({ status: 'DTD', label: 'Day-To-Day' }), 'DTD');
+  assert.equal(short({ status: 'Out', label: 'Injured Reserve' }), 'IR');
+  assert.equal(short({ status: 'Out', label: 'IR' }), 'IR');
+  assert.equal(short({ status: 'DTD', label: 'Questionable' }), 'Q');
+  assert.equal(short({ status: 'DTD', label: 'Doubtful' }), 'D');
+  assert.equal(short({ status: 'Out', label: 'PUP' }), 'PUP');
+  assert.match(app.injBadge({ status: 'Out', label: 'Out', note: 'Knee' }, 'by-name'), /class="badge inj bad by-name" title="Out: Knee"/);
+  assert.equal(app.injBadge(null), '');
+});
+
 test('a finished week projects exactly what happened', async () => {
   const L = await app.useLeague(CATS9);
   await app.loadBoxes();
