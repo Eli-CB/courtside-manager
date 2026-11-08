@@ -64,7 +64,7 @@ saved leagues are lost). Owner's league:
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
     archives (`data/seasons/`), game logs (`loadGameLog`; `'cur'` = this season's box scores via `boxGameLog`),
     all awards (every award but Biggest punt and Even Steven: a team's name opens a breakdown: `awardDetails`, `award-team`), past Rosters
-  - views: Roster, Standings + Season totals, Trades, shared table helpers, box score loading.
+  - views: Standings (+ Category strengths, `strengthsCard`, and Season totals; the Roster tab is gone, `#roster` and `#lineup` land here), Trades, shared table helpers, box score loading.
   - dashboard: the Matchup tab (`#dashboard`, was Dashboard; `dashMatchupCard`: Today / Yesterday show only who plays that day, each side one gapless column: starters, bench (tagged), Out/DNP;
     This period (the league's own) slot by slot; big score = period so far, ties count half, category table + each starter's game and line; then
     one-line folds that open on tap (`dashFold`, open ones kept in `ui.dashFolds`): a fresh recap (`recapFold`), this week's waiver

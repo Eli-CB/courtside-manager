@@ -543,7 +543,7 @@ async function switchSeason(id, wantTab) {
   }
   ui.season = id || null;
   const pick = wantTab || ui.tab;
-  const tab = pick === 'rosters' && !id ? 'roster' : pick;
+  const tab = pick === 'rosters' && !id ? 'standings' : pick;
   const want = seasonHash(tabList().some(([k]) => k === tab) ? tab : id ? 'standings' : 'dashboard', id);
   if (location.hash !== want) location.hash = want; else route();
 }

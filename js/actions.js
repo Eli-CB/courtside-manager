@@ -365,11 +365,6 @@ const actions = {
     nextSort(ui.totSort, key, key === 'team' ? -1 : 1);
     render();
   },
-  sort(el) {
-    const k = el.dataset.key;
-    nextSort(ui.rosterSort, k, ['name', 'slot', 'status', 'tag', 'to'].includes(k) ? 1 : -1);
-    render();
-  },
   export() {
     const box = $('#backupText');
     box.value = JSON.stringify(state);
@@ -568,9 +563,9 @@ function route() {
   }
   if (!sid && ui.season) { ui.season = null; ui.pastTeam = null; }
   let tab = hashTab || 'dashboard';
-  if (tab === 'lineup') tab = 'roster'; // the old Lineup tab now lives on Roster
+  if (tab === 'lineup' || tab === 'roster') tab = 'standings'; // the old Lineup and Roster tabs: their Category strengths is on Standings
   if (tab === 'live') tab = 'dashboard'; // and the old Live tab on Performances (Today)
-  if (tab === 'rosters' && !ui.season) tab = 'roster';
+  if (tab === 'rosters' && !ui.season) tab = 'standings';
   ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : state.browse ? 'players' : 'dashboard';
   if (!VIEW_TABS.includes(ui.tab)) { ui.viewA = null; ui.viewB = null; }
   render();

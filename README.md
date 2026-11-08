@@ -4,9 +4,8 @@ A weekly matchup optimizer for head-to-head fantasy basketball (Fantrax, public 
 
 - **Matchup:** this week's matchup, live, then the day's essentials: action items, injury news for your players, and the latest game day's best single games across the NBA (free agents included) and worst games by rostered players, with who has each player
 - **Plan Ahead:** next week by default: both lineups side by side, projected category totals, win chances, and which starters to use
-- **Roster:** what your team is good and bad at: each category ranked against every team in the league, and every player's stats shaded by how much they help or hurt
 - **Players:** every player's stat lines, from today to the whole season, ranked by value, with filters for position, team and who's available
-- **Standings:** the league's standings, plus (Fantrax leagues) every team's season totals in each category from the players it actually started each week
+- **Standings:** the league's standings, plus (Fantrax leagues) every team's season totals in each category from the players it actually started each week Category strengths (each category ranked against every team) sits under the standings.
 - **Awards:** this season's awards so far (and each past season's): best draft, best manager (actual wins vs an all-play record), Waiver Wire Wizard, Street Clothes, biggest punt, Even Steven and Unc Status, all from each week's starting lineups
 - **Trades:** what a deal with another team in your league does to your per-game production
 

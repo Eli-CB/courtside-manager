@@ -2156,9 +2156,9 @@ test('hockey: every tab shows real numbers, the player card speaks hockey', asyn
   const a = await hockeyApp();
   await a.loadBoxes();
   const ui = a.get('ui'), L = a.fxLeague();
-  assert.equal(a.tabList().length, 9);
+  assert.equal(a.tabList().length, 8);
   assert.equal(a.hasLineupHistory(L), true);
-  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), roster: () => a.viewRoster(), players: () => a.viewPlayers(), standings: () => a.viewStandings() })) {
+  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), players: () => a.viewPlayers(), standings: () => a.viewStandings() })) {
     ui.tab = tab;
     const html = make();
     quiet(a);
@@ -2246,7 +2246,7 @@ test('changing sports: each league comes back as it was, and one that does not l
   assert.equal(a.get('state').sport, 'nba');
   assert.equal(a.fxLeague().id, CATS9);
   assert.equal(a.get('state').slots.length, 8);
-  assert.equal(a.tabList().length, 9);
+  assert.equal(a.tabList().length, 8);
   const nbaTeam = a.get('state').fxTeam;
   await a.switchLeague(HOCKEY);
   quiet(a);
@@ -2433,7 +2433,7 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   assert.ok(a.fxOpponentFor(a.weekStart(), st.fxTeam), 'with a matchup this week');
   assert.ok(st.opp.players.length > 0);
   assert.equal((st.savedLeagues || []).length, 0, "it isn't one of the visitor's leagues");
-  for (const make of [() => a.viewDashboard(), () => a.viewRoster(), () => a.withViewedTeam(a.viewWeek, true), () => a.viewTrade()]) {
+  for (const make of [() => a.viewDashboard(), () => a.viewStandings(), () => a.withViewedTeam(a.viewWeek, true), () => a.viewTrade()]) {
     const html = make();
     clearTimeout(a.get('live').timer);
     assert.ok(!/Pick your team|No players yet|Your roster is empty/.test(html));
@@ -2552,7 +2552,7 @@ test("a Sleeper league says its sport: football's rules, weeks and players come 
   assert.equal(b.get('SPORT').key, 'nfl');
   assert.equal(st.slots.join(), 'QB,RB,RB,WR,WR,TE,FLX,K,DEF');
   assert.equal(st.benchSize, 5);
-  assert.equal(b.tabList().map(t => t[0]).join(), 'dashboard,week,recap,roster,players,standings,awards');
+  assert.equal(b.tabList().map(t => t[0]).join(), 'dashboard,week,recap,players,standings,awards');
   assert.equal(Object.values(L.rosters).flat().filter(x => !x.nba).length, 0, 'every rostered player matched');
   assert.equal(L.points.pass_td, 4);
   assert.equal(L.points.rec, 0.5);
@@ -2596,7 +2596,7 @@ test('football on the page: lines in words, finished weeks, this week, byes and 
   assert.equal(a.fullLine({ pass_yd: 245, pass_td: 2, gp1: 1 }, false).join(', '), '245 pass yd, 2 pass TD');
   assert.equal(a.fullLine({ gp1: 1 }, false).join(), 'played, no stats');
   // every page here
-  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), recap: () => a.viewRecap(), standings: () => a.viewStandings(), awards: () => a.viewAwards(), roster: () => a.viewRoster(), players: () => a.viewPlayers() })) {
+  for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), recap: () => a.viewRecap(), standings: () => a.viewStandings(), awards: () => a.viewAwards(), players: () => a.viewPlayers() })) {
     ui.tab = tab;
     make();
     await new Promise(r => setTimeout(r, 40));
@@ -2754,13 +2754,9 @@ test('football tabs: the board, swaps, Roster, Players and adds speak in project
     assert.match(html, /projects [\d.]+ to /);
     assert.match(html, / proj</);
   }
-  // Roster: this week's game and projection, with no category strengths
-  ui.tab = 'roster'; ui.weekShift = 0;
-  const r = a.viewRoster();
-  assert.match(r, />Proj</);
-  assert.ok(!/Category strengths/.test(r));
-  ui.rosterSort = { key: 'proj', dir: -1 };
-  assert.ok(a.viewRoster());
+  // Standings: no category strengths in football
+  ui.tab = 'standings'; ui.weekShift = 0;
+  assert.ok(!/Category strengths/.test(a.viewStandings()));
   // Players: the week's projections, ranked; no minutes
   ui.tab = 'players'; ui.perfRange = 'proj';
   const p = a.viewPlayers();
@@ -2823,9 +2819,9 @@ test('an ESPN football league: not one ESPN knows as basketball, so read as foot
   assert.equal(L.slpWeek.n, 9);
   // every tab draws
   const ui = a.get('ui');
-  for (const tab of ['dashboard', 'week', 'roster', 'players', 'standings', 'recap']) {
+  for (const tab of ['dashboard', 'week', 'players', 'standings', 'recap']) {
     ui.tab = tab;
-    const html = tab === 'week' ? a.withViewedTeam(a.viewWeek, true) : { dashboard: a.viewDashboard, roster: a.viewRoster, players: a.viewPlayers, standings: a.viewStandings, recap: a.viewRecap }[tab]();
+    const html = tab === 'week' ? a.withViewedTeam(a.viewWeek, true) : { dashboard: a.viewDashboard, players: a.viewPlayers, standings: a.viewStandings, recap: a.viewRecap }[tab]();
     quiet(a);
     assert.ok(html && !/undefined|NaN|\[object/.test(html.replace(/<[^>]*>/g, ' ')), tab);
   }
@@ -2876,7 +2872,7 @@ test('football and the other sports leave each other alone', async () => {
   assert.equal(a.get('POSITIONS')[0], 'PG');
   assert.equal(a.dayOffset('2026-10-26'), 0, 'basketball weeks start on Monday');
   assert.equal(a.statVal({ fgPct: 0.5, fga: 10 }, 'fgm'), 5);
-  assert.equal(a.tabList().length, 9);
+  assert.equal(a.tabList().length, 8);
   await assert.rejects(a.connectLeague('999000000000000099'), /didn't find that league/);
   assert.equal(a.get('SPORT').key, 'nba');
   await a.switchLeague(FOOTBALL);

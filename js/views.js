@@ -113,15 +113,6 @@ function slotBadge(slot) {
   return `<span class="slot-label ${cls}">${slot === 'FLX' ? 'Flx' : slot === 'BN' ? 'Res' : slot}</span>`;
 }
 
-/* ---------- Roster ---------- */
-
-function sortList(list, sortState) {
-  const { key, dir } = sortState;
-  const slotRank = p => { const s = slotOf(p); return s === 'IL' ? 99 : s === 'BN' ? 50 : state.lineup.indexOf(p.id); };
-  const get = p => key === 'proj' ? footballPts(p, matchDates(weekStartAt(0))) : key === 'value' ? value(p) : key === 'slot' ? slotRank(p) : key === 'name' ? p.name.toLowerCase() : key === 'status' ? STATUSES.indexOf(p.status) : key === 'tag' ? p.tag.toLowerCase() : key === 'fp' ? fantasyPoints(p) : statVal(p, key);
-  return [...list].sort((a, b) => { const x = get(a), y = get(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
-}
-
 // A sortable column header. down: whether this column is currently sorted biggest-first
 function sortTh(action, key, label, sort, { cls = 'num', tip = '', down, attrs = '', arrow = true } = {}) {
   const on = sort.key === key;
@@ -133,56 +124,9 @@ function nextSort(sort, key, firstDir) {
   else { sort.key = key; sort.dir = firstDir; }
 }
 
-function headerRow(cols, sortState, scope) {
-  return cols.map(([k, l]) => {
-    const isNum = !['name', 'status', 'slot', 'tag'].includes(k);
-    return sortTh('sort', k, k === 'value' ? valueLabel() : l, sortState, { cls: isNum ? 'num' : '', down: sortState.dir < 0, attrs: ` data-scope="${scope}"` });
-  }).join('');
-}
-
 function statCells(p) {
   return `${SPORT.tableStats.map(([k], i) => `<td class="num">${fmt(p[k] || 0, i ? 1 : 0)}</td>`).join('')}
     ${SPORT.tablePct.map(([, , m, a]) => `<td class="num">${fmtPct(p[a] ? statVal(p, m) / p[a] : 0)}</td>`).join('')}<td class="num"><b>${fmtValue(value(p))}</b></td>`;
-}
-
-// The roster as a team profile: minutes, then whatever the league scores, each cell shaded by how
-// much the player helps (green) or hurts (red) it next to an average rostered player
-function rosterCols() {
-  return [['name', 'Player'], ['status', 'Status'], ['slot', 'Slot'], ...(isFootball() ? [['proj', 'Proj']] : [['min', 'MIN']]), ...scoreCats().map(c => [c.key, c.label]), ...(isPoints() ? [] : [['value', '']])];
-}
-
-function viewRoster() {
-  const list = sortList(state.players, ui.rosterSort);
-  const act = state.players.filter(p => !state.il.includes(p.id));
-  const cats = scoreCats();
-  const fmtC = (c, v) => (c.pct ? fmtPct(v) : fmt(v, c.dec || 1));
-  const football = isFootball(), week = matchDates(weekStartAt(0)); // (football: this week's projection, and totals for who starts)
-  const total = c => {
-    if (football) return sum(starters().map(p => statOf(p, c)));
-    if (!c.pct) return sum(act.map(p => statOf(p, c)));
-    const att = sum(act.map(p => statVal(p, c.att)));
-    return att ? sum(act.map(p => statVal(p, c.made))) / att : 0;
-  };
-  return `
-  <div class="week-stack">
-  ${football ? '' : strengthsCard()}
-  <div class="card">
-    <div class="card-head"><h2>Players ${infoBtn('value')}</h2><span class="muted small">${activeCount()} of ${rosterLimit()} active · ${state.il.length}/${state.ilSize} on IR · per game, green helps, red hurts</span></div>
-    ${list.length ? `<div class="table-wrap"><table class="roster-table">
-      <thead><tr>${headerRow(rosterCols(), ui.rosterSort, 'roster')}</tr></thead>
-      <tbody>${list.map(p => `<tr${state.il.includes(p.id) ? ' class="muted-row"' : ''}>
-        <td class="player">${playerCell(p)}</td>
-        <td>${statusBadge(p)}</td><td>${slotBadge(slotOf(p))}</td>
-        ${football ? `<td class="num">${gamesIn(p, week) ? fmt(footballPts(p, week), 1) : '<span class="muted">Bye</span>'}</td>` : `<td class="num">${fmt(p.min, 0)}</td>`}
-        ${cats.map(c => `<td class="num rc" style="${shade(contribZ(p, c.key, 1, false))}" title="${esc(statTip(p, c, 1, false))}">${fmtC(c, statOf(p, c))}</td>`).join('')}
-        ${isPoints() ? '' : `<td class="num"><b>${fmtValue(value(p))}</b></td>`}
-        </tr>`).join('')}
-      </tbody>
-      <tfoot><tr>${football ? `<td colspan="3"><b>Starters</b></td><td class="num"><b>${fmt(sum(starters().map(p => footballPts(p, week))), 1)}</b></td>` : '<td colspan="4"><b>Active totals</b></td>'}
-        ${cats.map(c => `<td class="num"><b>${fmtC(c, total(c))}</b></td>`).join('')}${isPoints() ? '' : '<td></td>'}</tr></tfoot>
-    </table></div>` : `<div class="empty"><strong>No players on this roster</strong>Rosters come from ${sourceName()}. Use ↻ Reload from ${sourceName()} in the ⚙ menu to pull the latest.</div>`}
-  </div>
-  </div>`;
 }
 
 /* ---------- Standings ---------- */
@@ -201,6 +145,7 @@ function viewStandings() {
       }).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div>`}
   </div>
+  ${!ui.season && !isFootball() && state.players.length ? strengthsCard() : ''}
   ${L ? seasonTotalsCard(L, rows) : ''}`;
 }
 
