@@ -17,6 +17,16 @@
   <meta name="theme-color" content="#171b23" media="(prefers-color-scheme: dark)">
   <!-- ?v= is stamped with each deploy's version, so a refresh always fetches the new files -->
   <link rel="stylesheet" href="styles.css?v=__BUILD__">
+  <script>
+    // a mock of the shadcn/ui look (look-shadcn.css): ?look=shadcn turns it on, kept on this device; ?look=default turns it off
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search).get('look');
+        if (q) localStorage.setItem('courtside-look', q);
+        if (localStorage.getItem('courtside-look') === 'shadcn') document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"><link rel="stylesheet" href="look-shadcn.css?v=__BUILD__">');
+      } catch (e) { /* storage blocked: the site's own look */ }
+    })();
+  </script>
 </head>
 <body>
   <div id="ctxBar" class="ctx" hidden>
