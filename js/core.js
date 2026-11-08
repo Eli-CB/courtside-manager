@@ -175,6 +175,14 @@ function commit(msg) {
    Helpers
    ========================================================= */
 const $ = (sel, root = document) => root.querySelector(sel);
+// Loading: the logo's two Ls drop in from above and stack, the thin one first (styles.css: .ll-loader). Visitors who
+// ask for less motion see them fade in place instead.
+const LOGO_LS = '<polygon class="ll-edge" points="8,30 36,44 56,34 56,40 36,50 8,36"/><polygon class="ll-main" points="36,40 56,30 44,24 36,28 20,20 8,26"/>';
+const loaderMark = (cls = '') => `<svg class="ll-loader${cls ? ' ' + cls : ''}" viewBox="4 14 56 40" aria-hidden="true">${LOGO_LS}</svg>`;
+// a card that's waiting on something: the mark, what's loading, and anything more to say
+const loadingCard = (title, more = '') => `<div class="card"><div class="empty loading" role="status">${loaderMark()}<strong>${title}</strong>${more}</div></div>`;
+// one line inside a card, with a small mark
+const loadingLine = text => `<p class="muted small loading-line" role="status">${loaderMark('sm')}${text}</p>`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : '—');
 const fmtPct = n => (Number.isFinite(n) && n > 0 ? n.toFixed(3).replace(/^0/, '') : '—');

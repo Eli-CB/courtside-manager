@@ -460,6 +460,33 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 /* ---------- Empty ---------- */
 .empty { text-align: center; padding: 28px 16px; color: var(--muted); }
 .empty strong { display: block; color: var(--text); margin-bottom: 4px; font-size: 1rem; }
+/* Loading: the logo's Ls drop in from above and stack, the thin one first, hold, fade, and go again */
+.ll-loader { display: block; width: 56px; height: 40px; margin: 4px auto 14px; overflow: visible; }
+.ll-loader.sm { display: inline-block; width: 21px; height: 15px; margin: 0 7px 0 0; vertical-align: -3px; }
+.ll-loader .ll-main { fill: var(--text); }
+.ll-loader .ll-edge { fill: #7f8a9c; }
+.ll-loader polygon { animation: ll-drop-edge 1.8s infinite both; }
+.ll-loader .ll-main { animation-name: ll-drop-main; }
+.loading-line { margin: 0; }
+@keyframes ll-drop-edge {
+  0% { transform: translateY(-24px); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  22% { transform: translateY(0); opacity: 1; animation-timing-function: ease-out; }
+  27% { transform: translateY(-2px); animation-timing-function: ease-in; }
+  32%, 80% { transform: translateY(0); opacity: 1; }
+  94%, 100% { transform: translateY(0); opacity: 0; }
+}
+@keyframes ll-drop-main {
+  0%, 20% { transform: translateY(-24px); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  42% { transform: translateY(0); opacity: 1; animation-timing-function: ease-out; }
+  47% { transform: translateY(-2.5px); animation-timing-function: ease-in; }
+  52%, 80% { transform: translateY(0); opacity: 1; }
+  94%, 100% { transform: translateY(0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ll-loader polygon, .ll-loader .ll-main { animation: ll-fade 1.8s ease-in-out infinite; }
+  .ll-loader .ll-main { animation-delay: .3s; }
+}
+@keyframes ll-fade { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 
 /* ---------- Modal ---------- */
 .modal {

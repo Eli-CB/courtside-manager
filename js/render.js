@@ -251,7 +251,7 @@ function render() {
   gearMenu();
   ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
-  if (ui.pendingSeason) { $('#view').innerHTML = '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>'; return; }
+  if (ui.pendingSeason) { $('#view').innerHTML = loadingCard('Loading that season…'); return; }
   const nav = $('#tabs');
   const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : `now:${SPORT.key}`;
   if (nav.dataset.mode !== mode) {
@@ -263,7 +263,7 @@ function render() {
   $('#navCurrent').textContent = cur ? cur[1] : 'Menu';
   if (ui.season) {
     const past = { standings: viewStandings, awards: viewAwards, draft: viewDraft, rosters: viewPastRosters };
-    $('#view').innerHTML = pastSeason() ? withSeason(past[ui.tab] || viewStandings) : '<div class="card"><div class="empty"><strong>Loading that season…</strong></div></div>';
+    $('#view').innerHTML = pastSeason() ? withSeason(past[ui.tab] || viewStandings) : loadingCard('Loading that season…');
     return;
   }
   const early = preDraft();

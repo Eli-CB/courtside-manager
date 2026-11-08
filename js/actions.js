@@ -417,10 +417,11 @@ const forms = {
     const id = f.leagueId.value.trim();
     const msg = $('#landMsg');
     const btn = f.querySelector('button[type=submit]'), label = btn.textContent;
-    btn.disabled = true; btn.textContent = 'Connecting…'; msg.textContent = '';
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    msg.className = 'form-note'; msg.innerHTML = `${loaderMark('sm')}Reading your league…`;
     try {
       const wait = await connectLeague(id);
-      if (!wait) return;
+      if (!wait) { msg.textContent = ''; return; }
       msg.className = 'form-note';
       msg.textContent = `That's the ${wait.label} season of ${wait.name}. Enter this season's league ID and ${wait.label} will be under it.`;
       f.leagueId.value = '';

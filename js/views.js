@@ -292,7 +292,7 @@ function seasonTotalsCard(L, standings) {
     if (!L.weeks) return note("Fantrax didn't return this season's weekly rosters.");
     if (!L.season || !(L.season in gameLogs)) {
       if (L.season) loadGameLog(L.season).then(() => { if (ui.tab === 'standings' && ui.season) render(); });
-      return L.season ? note('Loading the season’s games…') : note(`No ${SPORT.name} game logs are saved for this season.`);
+      return L.season ? note(`${loaderMark('sm')}Loading the season’s games…`) : note(`No ${SPORT.name} game logs are saved for this season.`);
     }
     if (!gameLogs[L.season]) return note(`No ${SPORT.name} game logs are saved for this season (the site has 2016-17 on).`);
     teams = pastSeasonTotals(L, gameLogs[L.season]);
@@ -307,7 +307,7 @@ function seasonTotalsCard(L, standings) {
         .catch(e => { seasonTot[id] = { state: 'error', msg: e.message }; })
         .finally(() => { if (ui.tab === 'standings' && !ui.season) render(); });
     }
-    if (!S || S.state === 'loading') return note('Loading every lineup from Fantrax…');
+    if (!S || S.state === 'loading') return note(`${loaderMark('sm')}Loading every lineup from Fantrax…`);
     if (S.state === 'error') return note(`Couldn't load season totals (${esc(S.msg)}).`);
     teams = S.teams;
   }

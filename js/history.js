@@ -2,7 +2,7 @@
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
-const LOADING_GAMES = '<div class="card"><div class="empty"><strong>Loading the season’s games…</strong></div></div>';
+const LOADING_GAMES = loadingCard('Loading the season’s games…');
 // what a player added, in an award's breakdown
 const awardAmount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
 
@@ -892,7 +892,7 @@ function viewAwardsSoFar() {
       curAwards[L.id] = { weeks, fidNba: currentFidNba() };
     }).finally(() => { if (ui.tab === 'awards' && !ui.season) render(); });
   }
-  if (!C || C.loading) return '<div class="card"><div class="empty"><strong>Loading this season’s lineups and games…</strong></div></div>';
+  if (!C || C.loading) return loadingCard('Loading this season’s lineups and games…');
   if (!C.weeks || !gameLogs.cur) return '<div class="card"><div class="empty"><strong>No awards yet</strong>They start once the season’s first week of lineups and games is in.</div></div>';
   // run the awards on a copy of the league that carries this season's weeks
   const L2 = { ...L, weeks: C.weeks, season: 'cur', fidNba: C.fidNba };

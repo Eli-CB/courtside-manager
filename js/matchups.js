@@ -549,7 +549,7 @@ function pastWeekCard(start) {
   const head = `<div class="card-head"><h2>How week ${period.n} ended ${infoBtn('benchswaps')}</h2><span class="muted small">the week's real lineups and box scores</span></div>`;
   const note = msg => `<div class="card">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
   const P = pastWeeksOf(L);
-  if (P.state === 'loading') return note(`Loading the week's lineups from ${sourceName(L)}…`);
+  if (P.state === 'loading') return note(`${loaderMark('sm')}Loading the week's lineups from ${sourceName(L)}…`);
   if (P.state === 'error') return note(`Couldn't load the week's lineups (${esc(P.msg)}).`);
   const key = `${L.id}|${period.n}|${leftId}`;
   if (!pastReplays.has(key)) {
@@ -631,7 +631,7 @@ function weekPicker() {
 
 function viewWeek() {
   if (!NBA) {
-    return `<div class="card"><div class="empty"><strong>Loading schedule and stats…</strong>The matchup projector needs the ${SPORT.name} data file.</div></div>`;
+    return loadingCard('Loading schedule and stats…', `The matchup projector needs the ${SPORT.name} data file.`);
   }
   // once the week has started, finished games count their real box scores (loaded on first need)
   if (!BOX && matchDates()[0] <= todayIso()) loadBoxes().then(() => { if (ui.tab === 'week') render(); }).catch(() => {});

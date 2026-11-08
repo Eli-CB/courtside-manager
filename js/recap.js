@@ -155,7 +155,7 @@ function viewRecap() {
   if (!done.length) return empty('No finished weeks yet', 'The first recap appears once week 1 is over.');
   const period = done.find(p => p.n === ui.recapWeek) || done[done.length - 1];
   const P = pastWeeksOf(L);
-  if (P.state === 'loading') return empty(`Week ${period.n} recap`, `Loading the week's lineups from ${sourceName(L)}…`);
+  if (P.state === 'loading') return loadingCard(`Week ${period.n} recap`, `Loading the week's lineups from ${sourceName(L)}…`);
   if (P.state === 'error') return empty(`Week ${period.n} recap`, `Couldn't load the week's lineups (${esc(P.msg)}).`);
   const key = `${L.id}|${period.n}`;
   if (!recaps.has(key)) recaps.set(key, P.weeks && P.G ? buildRecap(L, P, period) : null);

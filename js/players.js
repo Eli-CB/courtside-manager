@@ -103,7 +103,7 @@ function perfFilters(owner, opp, rows) {
 function topPerformancesCard() {
   const today = todayIso(), yesterday = addDays(today, -1);
   const card = (head, body) => `<div class="card"><div class="card-head"><h2>Players ${infoBtn('perf')}</h2>${head}${LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : ''}</div>${body}</div>`;
-  if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
+  if (!BOX) return card('', loadingLine('Loading the latest box scores…'));
   const P = perfDays();
   // the buttons: Today, the last game day before it, This week. Until one is picked: today once its games have
   // started, else the last game day
@@ -220,7 +220,7 @@ function topPerformancesCard() {
 /* ---------- NBA players ---------- */
 function viewPlayers() {
   if (!NBA) {
-    return `<div class="card"><div class="empty"><strong>Loading player data…</strong>If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.</div></div>`;
+    return loadingCard('Loading player data…', "If this doesn't load, the data file is missing. Run <code>python scripts/update_data.py</code> and reload.");
   }
   // the latest games come from the box scores, loaded on first need; today's as they're played
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'players') render(); }).catch(() => {});

@@ -156,7 +156,7 @@ function draftList(title, list, mine, info) {
 
 function viewDraft() {
   const d = draftData();
-  if (d && d.loading) return `<div class="card"><div class="empty"><strong>Loading the season's games…</strong>The draft is graded by the games inside your league's season.</div></div>`;
+  if (d && d.loading) return loadingCard("Loading the season's games…", "The draft is graded by the games inside your league's season.");
   if (!d && fxLeague() && fxLeague().draftFailed) {
     return `<div class="card"><div class="empty"><strong>Couldn't load the draft</strong>${sourceName()} didn't answer when the league loaded.<br><br><button type="button" class="btn primary" data-action="draft-retry">Try again</button></div></div>`;
   }
@@ -380,7 +380,7 @@ function yahooLanding() {
     yahooLeagues().then(l => { yahoo.leagues = l; }).catch(e => { yahoo.leagues = { error: e.message }; }).finally(() => { if (needsLanding()) render(); });
   }
   const L = yahoo.leagues;
-  const body = L === 'loading' ? '<p class="small muted">Loading your Yahoo leagues…</p>'
+  const body = L === 'loading' ? loadingLine('Loading your Yahoo leagues…')
     : L.error ? `<p class="form-error">${L.error === 'yahoo sign-in' ? 'Yahoo signed you out. Sign in again.' : `Couldn't load your Yahoo leagues (${esc(L.error)}).`}</p>`
     : !L.length ? '<p class="small muted">No Yahoo basketball leagues this season on that account.</p>'
     : `<div class="land-teams">${L.map(l => `<button type="button" class="land-team" data-action="yahoo-pick" data-id="${esc(l.key)}">${esc(l.name)} <span class="muted small">${l.teams} teams</span></button>`).join('')}</div>`;

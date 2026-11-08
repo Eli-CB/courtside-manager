@@ -234,7 +234,7 @@ function dashMatchupCard() {
   const me = ui.viewing ? ui.viewA : state.fxTeam;
   if (!L) return '';
   if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');
-  if (!BOX) return card('', '<p class="muted small" style="margin:0">Loading the latest box scores…</p>');
+  if (!BOX) return card('', loadingLine('Loading the latest box scores…'));
   sleeperWeekFresh(L);
   footballLines(L);
   const D = dashDays();
@@ -317,7 +317,7 @@ function movesCard() {
   }
   const weeks = movesLoad.get(L);
   const title = `Waiver wire ${infoBtn('moves')}`;
-  if (!weeks) return dashFold('moves', title, 'loading…', `<p class="muted small" style="margin:0">Loading last week's rosters…</p>`);
+  if (!weeks) return dashFold('moves', title, 'loading…', loadingLine("Loading last week's rosters…"));
   const moves = periodMoves(L, weeks);
   if (!moves) return '';
   const me = ui.viewing ? ui.viewA : state.fxTeam;
