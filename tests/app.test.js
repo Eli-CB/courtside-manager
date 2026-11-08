@@ -253,18 +253,6 @@ test('draft grades per game and by season totals', async () => {
   ui.draftMode = 'game';
 });
 
-test('recommended adds beat the player they replace', async () => {
-  const L = await app.useLeague(CATS9);
-  useTeam(L.standings[0].id);
-  const r = app.recommendedAdds();
-  assert.ok(r.adds.length <= 3);
-  for (const x of r.adds) {
-    assert.ok(x.gain > 0);
-    assert.notEqual(x.p.status, 'Out');
-    assert.ok(!app.get('state').players.some(p => p.nbaId === x.p.nbaId), `${x.p.name} isn't already on the team`);
-  }
-});
-
 test('a finished week projects exactly what happened', async () => {
   const L = await app.useLeague(CATS9);
   await app.loadBoxes();
@@ -2749,10 +2737,13 @@ test('football tabs: the board, swaps, Roster, Players and adds speak in project
   quiet(a);
   assert.match(p, /aria-pressed="true">Projected</);
   assert.ok(!/\bmin\b/.test(p.replace(/<[^>]*>/g, ' ')), 'no minutes in football');
-  // every add is for the weakest at his own position
-  const adds = a.recommendedAdds();
-  assert.ok(adds.adds.length);
-  for (const x of adds.adds) assert.equal(x.p.pos[0], x.drop.pos[0]);
+  // Players is the table alone: pickup ideas are Matchups' (each for the weakest at his own position)
+  assert.ok(!/Recommended adds/.test(p));
+  ui.weekShift = 1; // next week: this one's games are all played
+  const ideas = a.pickupIdeas(a.weekContext());
+  ui.weekShift = 0;
+  assert.ok(ideas.length);
+  for (const x of ideas) assert.equal(x.p.pos[0], x.drop.pos[0]);
   assert.ok(a.get('INFO').win[1].includes('per-game'), "basketball's text is still basketball's");
   assert.match(a.get('SPORT').infoOver.win[1], /Projected score/);
 });
