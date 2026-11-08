@@ -174,7 +174,7 @@ saved leagues are lost). Owner's league:
   starts from one NBA team). Seasons never mix.
 - Static explanations go in (i) popups; on-screen text stays short and specific.
 - Mobile matters: check phone width (375px); no page-level sideways scroll.
-- The look (Nov 2026, chosen from a mock): shadcn/ui-style, in styles.css alone: zinc neutrals (`--bg`, `--surface`, `--border`, `--text`, `--muted`, `--ring`), Inter served from `fonts/` (OFL), quiet tabs, grey-track toggles with the chosen one raised, dark primary buttons, filters filled dark when on. Orange (`--accent`) is only for your own team and team things; player names stay black.
+- The look (Nov 2026, chosen from a mock): shadcn/ui-style, in styles.css alone: zinc neutrals (`--bg`, `--surface`, `--border`, `--text`, `--muted`, `--ring`), Inter served from `fonts/` (OFL), quiet tabs, grey-track toggles with the chosen one raised, dark primary buttons, filters filled dark when on. Orange (`--accent`) is only for your own team and team things; player names stay black. Phones (Nov 2026): sections run edge to edge with a line between (no boxes or gaps), and those after a tab's first one with a heading roll up to it (`rollCards`, render.js; open ones in `ui.rollOpen`; not Trades or award cards). A tab's own (i) is on the tab bar (`TAB_INFO`), not over its first card.
 
 ## Gotchas
 - ESPN (phase 1, Oct 2026): public leagues only; API is `lm-api-reads.fantasy.espn.com/apis/v3/games/fba/...`

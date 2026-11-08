@@ -296,9 +296,9 @@ function render() {
   document.querySelectorAll(inner).forEach((el, i) => { [el.scrollTop, el.scrollLeft] = scrolls[i] || [0, 0]; });
 }
 
-// MOCK (?flat=1, phones): the sections after a tab's first one with a heading roll up to that heading, opened by a tap
-// (which ones are open is kept for the visit: ui.rollOpen, by tab and heading)
-const flatPhone = () => typeof matchMedia === 'function' && document.documentElement.classList.contains('flat') && matchMedia('(max-width: 640px)').matches;
+// Phones: the sections after a tab's first one with a heading roll up to that heading, opened by a tap (which ones are
+// open is kept for the visit: ui.rollOpen, by tab and heading). Trades keeps both sides open; award cards don't roll.
+const flatPhone = () => typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
 function rollCards() {
   if (!flatPhone() || ui.tab === 'trade') return;
   let first = true;

@@ -969,28 +969,28 @@ a.lm-item { text-decoration: none; }
   .lm-pop { width: min(270px, calc(100vw - 32px)); }
 }
 
-/* ---------- MOCK (?flat=1): on phones, sections run edge to edge with a line between, no rounded boxes or gaps;
-   those after a tab's first one roll up to their heading ---------- */
+/* ---------- Phones: sections run edge to edge with a line between, no rounded boxes or gaps; those after a tab's
+   first one with a heading roll up to it (rollCards) ---------- */
 @media (max-width: 640px) {
-  html.flat { --bg: var(--surface); }
-  html.flat .container { padding-top: 0; }
-  html.flat #view > :first-child:not(.card):not(.dash-grid):not(.week-stack) { margin-top: 14px; }
-  html.flat #view .card { margin-inline: -16px; border-radius: 0; border-width: 0 0 1px; box-shadow: none; padding: 14px 16px; }
-  html.flat #view .card + .card { margin-top: 0; }
-  html.flat #view .dash-grid, html.flat #view .dash-folds, html.flat #view .week-stack, html.flat #view .week-grid,
-  html.flat #view .trade-grid, html.flat #view .grid { gap: 0; }
-  html.flat #view .card .card { margin-inline: 0; border-width: 1px; border-radius: var(--radius); }
-  html.flat #view .card.dash-fold { padding: 0; }
-  html.flat #view .dash-fold > summary { padding: 12px 16px; border-radius: 0; }
-  html.flat #view .table-wrap { margin: 0 -16px; padding: 0 16px; }
-  html.flat #view .awards > .card { margin-inline: -16px; }
+  :root { --bg: var(--surface); }
+  .container { padding-top: 0; }
+  #view > :first-child:not(.card):not(.dash-grid):not(.week-stack) { margin-top: 14px; }
+  #view .card { margin-inline: -16px; border-radius: 0; border-width: 0 0 1px; box-shadow: none; padding: 14px 16px; }
+  #view .card + .card { margin-top: 0; }
+  #view .dash-grid, #view .dash-folds, #view .week-stack, #view .week-grid,
+  #view .trade-grid, #view .grid { gap: 0; }
+  #view .card .card { margin-inline: 0; border-width: 1px; border-radius: var(--radius); }
+  #view .card.dash-fold { padding: 0; }
+  #view .dash-fold > summary { padding: 12px 16px; border-radius: 0; }
+  #view .table-wrap { margin: 0 -16px; padding: 0 16px; }
+  #view .awards > .card { margin-inline: -16px; }
   /* a section after the first: its heading, a chevron, and nothing else until tapped */
-  html.flat .card.rollable > .card-head > h2 { cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-  html.flat .card.rollable > .card-head > h2::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: .85rem; transition: transform .15s; }
-  html.flat .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(90deg); }
-  html.flat .card.rolled > :not(.card-head), html.flat .card.rolled > .card-head > :not(h2) { display: none; }
-  html.flat .card.rolled > .card-head { margin-bottom: 0; }
-  html.flat .card.rolled { padding-block: 12px; }
+  .card.rollable > .card-head > h2 { cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+  .card.rollable > .card-head > h2::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: .85rem; transition: transform .15s; }
+  .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(90deg); }
+  .card.rolled > :not(.card-head), .card.rolled > .card-head > :not(h2) { display: none; }
+  .card.rolled > .card-head { margin-bottom: 0; }
+  .card.rolled { padding-block: 12px; }
 }
 
 /* ---------- Phone tidy-up ---------- */

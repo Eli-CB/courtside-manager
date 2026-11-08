@@ -448,7 +448,7 @@ const OPENED_AT = Date.now(), APP_STALE = 3 * 36e5;
 const appStale = () => isInstalled() && Date.now() - OPENED_AT > APP_STALE;
 document.addEventListener('visibilitychange', () => { if (!document.hidden && appStale()) location.reload(); });
 
-// MOCK (?flat=1): a rolled-up section's heading opens or closes it (its own buttons and menus still work as they are)
+// Phones: a rolled-up section's heading opens or closes it (its own buttons and menus still work as they are)
 document.addEventListener('click', e => {
   const head = e.target.closest && e.target.closest('.card.rollable > .card-head');
   if (head && !e.target.closest('.info-btn') && (!e.target.closest('button, a, select, input, label, summary') || head.parentElement.classList.contains('rolled'))) toggleRoll(head.parentElement);
