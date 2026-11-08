@@ -409,7 +409,7 @@ function matchupBoard(ctx) {
     const irRows = ilPlayers().map(p => `<tr><th scope="row">${slotBadge('IL')}</th>${boardCell(p, ctx, 'me', false)}<td class="bcell"></td></tr>`).join('');
     body = `<div class="table-wrap"><table class="board">
         <colgroup><col class="c-slot"><col><col></colgroup>
-        <thead><tr><th></th><th>${esc(state.teamName)}</th><th>${esc(state.opp.name || 'Opponent')}</th></tr></thead>
+        <thead><tr><th></th><th>${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</th><th>${state.opp.fxId ? teamLink(state.opp.fxId, esc(state.opp.name)) : esc(state.opp.name || 'Opponent')}</th></tr></thead>
         <tbody>${rows}
           ${isFootball() ? `<tr class="board-tot"><th scope="row"></th><td><b>${fmt(fpTotals(ctx.asSet).a, 1)}</b> projected</td><td>${ctx.hasOpp ? `<b>${fmt(fpTotals(ctx.them).a, 1)}</b> projected` : ''}</td></tr>`
     : `<tr class="board-tot"><th scope="row"></th><td><b>${ctx.asSet.games}</b> starter games${ctx.bestIds && ctx.best.games !== ctx.asSet.games ? ` <span class="muted">(${ctx.best.games} suggested)</span>` : ''}</td><td>${ctx.hasOpp ? `<b>${ctx.them.games}</b> starter games` : ''}</td></tr>`}
@@ -561,7 +561,7 @@ function pastWeekCard(start) {
 
   const pts = leaguePoints();
   const cats = pts ? [{ label: 'FP' }] : scoreCats();
-  const name = tid => esc(fxTeamName(tid));
+  const name = tid => teamLink(tid);
   const scoreTxt = sc => (pts ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
   const outcome = sc => Math.sign(Math.round((sc.me - sc.opp) * 10));
   const verb = o => (o > 0 ? 'won' : o < 0 ? 'lost' : 'tied');
@@ -653,7 +653,7 @@ function viewWeek() {
   const scoreboard = hasOpp ? `
     <div class="card scoreboard">
       <div class="sb-main">
-        <div class="sb-side"><div class="sb-label">${esc(state.teamName)}</div><div class="sb-score">${fmt(oBest.expected, isPoints() ? 0 : 1)}</div></div>
+        <div class="sb-side"><div class="sb-label">${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</div><div class="sb-score">${fmt(oBest.expected, isPoints() ? 0 : 1)}</div></div>
         <div class="sb-vs">${over ? `${isPoints() ? 'points' : 'cats'}<br>with today's<br>lineups` : `projected<br>${isPoints() ? 'points' : 'cats'}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}`}</div>
         <div class="sb-side right"><div class="sb-label">${fxLeague() && state.fxTeam ? fxOppPicker(ctx) : esc(state.opp.name || 'Opponent')}</div>${fxLeague() && state.fxTeam ? fxOppNote(ctx) : ''}<div class="sb-score">${isPoints() ? fmt(oBest.opp, 0) : fmt(oBest.n - oBest.expected, 1)}</div></div>
       </div>

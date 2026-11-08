@@ -138,7 +138,7 @@ function topPerformancesCard() {
   const who = id => {
     const tid = owner.get(id);
     if (tid && (tid === mine || (opp && tid === opp.id)) && spot.get(id).st !== 'INJURED_RESERVE') return lineupBadge(id);
-    if (tid) return `<span class="perf-owner">${esc(fxTeamName(tid))}</span> ${lineupBadge(id)}`;
+    if (tid) return `<span class="perf-owner">${teamLink(tid)}</span> ${lineupBadge(id)}`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
@@ -248,7 +248,7 @@ function cardOwner(raw) {
     const x = r.find(y => y.nba === raw.id);
     if (!x) continue;
     const how = cardHow(L, raw, tid, x.fid);
-    return `<p class="pc-owner"><b>${esc(fxTeamName(tid))}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span>${how ? `<span class="pc-how muted">${esc(how)}</span>` : ''}</p>`;
+    return `<p class="pc-owner"><b>${teamLink(tid)}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span>${how ? `<span class="pc-how muted">${esc(how)}</span>` : ''}</p>`;
   }
   return raw.fx ? `<p class="pc-owner"><span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span></p>` : '';
 }
@@ -391,5 +391,6 @@ function showPlayerDetail(nbaId) {
     ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th>${CS.map(([h, , , gh]) => `<th class="num">${gh || h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   const d = $('#detailDialog');
   cardOpen = nbaId;
+  $('#detailKind').textContent = 'Player card';
   if (!d.open) d.showModal();
 }

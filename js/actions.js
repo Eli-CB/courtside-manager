@@ -325,6 +325,14 @@ const actions = {
   'player-detail'(el) { showPlayerDetail(+el.dataset.nba); },
 
   'close-detail'() { $('#detailDialog').close(); },
+  'team-card'(el) { showTeamCard(el.dataset.team); },
+  // a team from its card as Plan Ahead's opponent: the week Plan Ahead opens on, this team in place of the real one
+  'team-compare'(el) {
+    $('#detailDialog').close();
+    if (!ui.weekChosen) { const s = weekShifts(); ui.weekShift = s.includes(1) ? 1 : 0; ui.weekChosen = true; }
+    location.hash = '#week';
+    loadFxTeam(el.dataset.team);
+  },
   async 'refresh-data'(el) {
     el.disabled = true;
     el.textContent = 'Refreshing…';

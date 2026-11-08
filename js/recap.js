@@ -105,7 +105,7 @@ function recapItems(X) {
   const unit = isPoints() ? 'FP' : 'value';
   const stand = (e, label, x, perGame, cls = '') => {
     const parts = fullLine(x.line, perGame), head = perGame ? `${x.line.gp1} G, per game: ` : '';
-    add(e, label, `${name(x.p, true)} <span class="muted">${esc(team(x.tid))}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
+    add(e, label, `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
       `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}` });
   };
   if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
@@ -114,7 +114,7 @@ function recapItems(X) {
   if (X.dud) stand('🗑️', 'Worst game', X.dud, false, X.dud.v < 0 ? 'pos-bad' : '');
   if (X.missed && X.missed.length) {
     // nobody's photo: names in line with the text, as the others
-    const who = (x, html) => (html ? `${name({ nbaId: x.nba, name: x.name }, true)} <span class="muted">${esc(team(x.tid))}</span>` : `${x.name} (${team(x.tid)})`);
+    const who = (x, html) => (html ? `${name({ nbaId: x.nba, name: x.name }, true)} <span class="muted">${teamLink(x.tid)}</span>` : `${x.name} (${team(x.tid)})`);
     const g = X.missed[0].games, shown = X.missed.slice(0, 3), more = X.missed.length - shown.length;
     const list = html => shown.map(x => who(x, html)).join(', ') + (more ? ` and ${more} other${more === 1 ? '' : 's'}` : '');
     const tail = isOneGame() ? (X.missed.length > 1 ? 'each started without playing a game' : 'started without playing a game')
@@ -123,7 +123,7 @@ function recapItems(X) {
   }
   if (X.regret) {
     const r = X.regret, o = Math.sign(Math.round((r.sc.me - r.sc.opp) * 10)), res = o > 0 ? 'won' : 'tied';
-    add('🪑', 'Bench regret', `<b>${esc(team(r.tid))}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
+    add('🪑', 'Bench regret', `<b>${teamLink(r.tid)}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
       `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`);
   }
   // Best week: a category week is hard to read from the finals; a points week is just the top score, there for all to see
@@ -131,7 +131,7 @@ function recapItems(X) {
     // matchups won against every other team's week, not categories
     const a = X.allPlay, n = X.teams - 1;
     const beat = `${a.w === n ? `every other team (${n} of ${n})` : `${a.w} of ${n} teams`}${a.t ? `, tied ${a.t}` : ''}`;
-    add('📈', 'Best week', `<b>${esc(team(a.tid))}</b> would have beaten ${beat}`, `${team(a.tid)} would have beaten ${beat}`);
+    add('📈', 'Best week', `<b>${teamLink(a.tid)}</b> would have beaten ${beat}`, `${team(a.tid)} would have beaten ${beat}`);
   }
   return out;
 }
@@ -166,7 +166,7 @@ function viewRecap() {
   // every finished week, newest by default: ‹ Week 2 › steps back through the earlier ones
   const picker = done.length > 1 ? stepper('recap-step', 'week', `<select class="ctx-team" data-change="recap-week" aria-label="Week">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Week ${p.n}</option>`).join('')}</select>`,
     { first: period.n === done[0].n, last: period.n === done[done.length - 1].n }) : '';
-  const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${esc(fxTeamName(g.a))}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${esc(fxTeamName(g.b))}</span></li>`).join('');
+  const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}</span></li>`).join('');
   const items = recapItems(X).map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div><div class="rc-label">${x.label}</div>${x.html}</div></li>`).join('');
   return `<div class="card">
     <div class="card-head"><h2>Week ${period.n} standouts ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>

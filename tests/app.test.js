@@ -283,6 +283,24 @@ test('a player out or day-to-day says so in a few letters on the Players table',
   assert.equal(app.injBadge(null), '');
 });
 
+test("a fantasy team's name opens its card: record, opponent, roster by spot, category ranks", async () => {
+  const L = await app.useLeague(CATS9);
+  useTeam(L.standings[0].id);
+  const other = L.teams.find(t => t.id !== L.standings[0].id);
+  assert.match(app.viewStandings(), new RegExp(`data-action="team-card" data-team="${other.id}"`));
+  const html = app.teamCardHtml(other.id);
+  assert.ok(html.includes(app.esc(other.name)));
+  assert.match(html, /\d+-\d+(-\d+)? · \d+(st|nd|rd|th) of 10/);
+  assert.match(html, /Compare on Plan Ahead/);
+  assert.match(html, /By category/);
+  const side = app.fxTeamSide(other.id);
+  assert.equal((html.match(/data-action="player-detail"/g) || []).length, side.players.length, 'every player, each opening his card');
+  // a past season's names stay plain
+  app.get('ui').season = 'x';
+  assert.equal(app.teamLink(other.id), app.esc(other.name));
+  app.get('ui').season = null;
+});
+
 test('a finished week projects exactly what happened', async () => {
   const L = await app.useLeague(CATS9);
   await app.loadBoxes();
@@ -1184,7 +1202,7 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
     for (const tr of avg) {
       const tid = owners.get(+tr.match(/data-nba="(\d+)"/)[1]);
       assert.ok(tr.includes('<span class="badge bad" title="On injured reserve">IR</span>'), 'red IR badge');
-      assert.ok(tr.includes(`<span class="perf-owner">${app.esc(app.fxTeamName(tid))}</span>`), `${app.fxTeamName(tid)}'s IR player shows the team`);
+      assert.ok(tr.includes(`<span class="perf-owner">${app.teamLink(tid)}</span>`) && tr.includes(`data-action="team-card" data-team="${tid}"`), `${app.fxTeamName(tid)}'s IR player shows the team, a link to its card`);
     }
     assert.ok(html.indexOf('data-group="other"') < html.indexOf('pf-sep') && html.indexOf('pf-sep') < html.indexOf('data-group="fa"'), 'Waivers sits with Active and Bench');
     app.ui.perfShow.bench = false;

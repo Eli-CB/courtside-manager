@@ -252,7 +252,7 @@ function dashMatchupCard() {
   const half = (sc, k) => sc[k] + sc.ties / 2;
   // the big numbers are the matchup's: the period so far; the table and the players, the days picked
   const sc = B ? weekScore(A.tot, B.tot) : null, wk = B ? weekScore(A.week, B.week) : null;
-  const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${esc(S.name)}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div>${dashPaceChips(S, D)}</div></div>`;
+  const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${teamLink(S.tid, esc(S.name))}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div>${dashPaceChips(S, D)}</div></div>`;
   const head = `<div class="mu-board">
       ${big(A, wk && (pts ? wk.me : half(wk, 'me')))}
       <div class="mu-mid"></div>
@@ -325,7 +325,7 @@ function movesCard() {
   const tids = Object.keys(moves).sort((a, b) => (b === me) - (a === me) || moves[b].length - moves[a].length);
   const at = (readLeagueCache()[L.id] || {}).at;
   const move = m => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${m.kind === 'add' ? '+' : m.kind === 'drop' ? '−' : '⇄'}</span>${m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${m.nba}">${esc(m.name)}</button>`) : esc(m.name)}${m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>` : ''}<span class="sr-only">${m.kind === 'add' ? 'added' : m.kind === 'drop' ? 'dropped' : m.kind === 'trade' ? 'traded for' : 'traded away'}</span></li>`;
-  const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${esc(fxTeamName(tid))}</div>
+  const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${teamLink(tid)}</div>
       <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
     : '<p class="muted small" style="margin:0">No adds or drops since last week.</p>';
   // the line: how many adds and drops (a trade counts once), and yours

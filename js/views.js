@@ -140,13 +140,66 @@ function viewStandings() {
       <thead><tr><th class="num">#</th><th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">GB</th>${rows.some(r => r.pf != null) ? '<th class="num">Pts for</th>' : ''}</tr></thead>
       <tbody>${rows.map(r => {
         const g = r.w + r.l + r.t;
-        return `<tr${r.id === myTeamId() ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.id === myTeamId() ? ' <span class="muted small">(you)</span>' : ''}</td>
+        return `<tr${r.id === myTeamId() ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td><b>${teamLink(r.id, esc(r.name))}</b>${r.id === myTeamId() ? ' <span class="muted small">(you)</span>' : ''}</td>
           <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td>${rows.some(x => x.pf != null) ? `<td class="num">${r.pf != null ? fmt(r.pf, 1) : '—'}</td>` : ''}</tr>`;
       }).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div>`}
   </div>
   ${!ui.season && !isFootball() && state.players.length ? strengthsCard() : ''}
   ${L ? seasonTotalsCard(L, rows) : ''}`;
+}
+
+// ----- A fantasy team's card: its record, this week's opponent, its roster by lineup spot, and how it ranks in each category -----
+function showTeamCard(tid) {
+  const html = teamCardHtml(tid);
+  if (!html) return;
+  $('#detailBody').innerHTML = html;
+  $('#detailKind').textContent = 'Fantasy team';
+  cardOpen = null;
+  const d = $('#detailDialog');
+  if (!d.open) d.showModal();
+  $('#detailBody').scrollTop = 0;
+}
+function teamCardHtml(tid) {
+  const L = fxLeague();
+  if (!L || !fxPickable().some(t => t.id === tid)) return '';
+  const side = fxTeamSide(tid), me = tid === state.fxTeam;
+  const r = (L.standings || []).find(x => x.id === tid), n = fxPickable().length;
+  const opp = fxOpponentFor(weekStartAt(0), tid);
+  const football = isFootball(), week = matchDates(weekStartAt(0));
+  const byId = new Map(side.players.map(p => [p.id, p]));
+  // each player's worth: football's projection this week, points per game, or categories won per game
+  const worth = p => (football ? (gamesIn(p, week) ? `${fmt(footballPts(p, week), 1)}` : '<span class="muted">Bye</span>') : isPoints() ? fmt(fantasyPoints(p), 1) : fmtValue(value(p)));
+  const unit = football ? 'Proj' : isPoints() ? 'FP/G' : valueLabel();
+  const row = (p, slot) => `<tr${slot === 'IL' ? ' class="muted-row"' : ''}><td>${slotBadge(slot)}</td><td>${playerCell(p)}</td><td>${p.status !== 'Healthy' ? statusBadge(p) : ''}</td><td class="num"><b>${worth(p)}</b></td></tr>`;
+  const starters = side.lineup.map((id, i) => (id && byId.get(id) ? row(byId.get(id), state.slots[i]) : '')).join('');
+  const on = new Set([...side.lineup, ...side.il]);
+  const bench = side.players.filter(p => !on.has(p.id)).sort((a, b) => value(b) - value(a)).map(p => row(p, 'BN')).join('');
+  const ir = side.il.map(id => byId.get(id)).filter(Boolean).map(p => row(p, 'IL')).join('');
+  // its starters' totals in each category against every team's, ranked (as Category strengths ranks them)
+  let cats = '';
+  if (!football && !isPoints()) {
+    const raws = fxPickable().map(t => { const s = fxTeamSide(t.id); return { id: t.id, raw: teamRaw(s.players.filter(p => s.starters.includes(p.id))) }; }).filter(x => Object.keys(x.raw).length);
+    const mine = raws.find(x => x.id === tid);
+    if (mine && raws.length > 1) {
+      cats = `<h3 class="sub" style="margin-top:16px">By category <span class="muted small">starters, against every team</span></h3><div class="tc-cats">${scoreCats().map(c => {
+        const better = raws.filter(x => (c.neg ? x.raw[c.key] < mine.raw[c.key] : x.raw[c.key] > mine.raw[c.key]) && Math.abs(x.raw[c.key] - mine.raw[c.key]) > 1e-9).length;
+        const rank = better + 1;
+        return `<span class="tc-cat ${rank <= 3 ? 'pos-good' : rank > raws.length - 3 ? 'pos-bad' : ''}"><b>${c.label}</b> ${ordinal(rank)}</span>`;
+      }).join('')}</div>`;
+    }
+  }
+  const record = r ? `${r.w}-${r.l}${r.t ? '-' + r.t : ''} · ${ordinal(r.rank || 0)} of ${n}${r.pf != null ? ` · ${fmt(r.pf, 1)} points for` : ''}` : '';
+  return `
+    <div class="detail-head">
+      <div><h2>${esc(side.name)}${me ? ' <span class="muted small">(you)</span>' : ''}</h2><p class="muted" style="margin:2px 0 0">${record}</p>
+        <p style="margin:6px 0 0">${opp ? `This week vs <b>${teamLink(opp.id)}</b>` : '<span class="muted">No matchup this week</span>'}</p></div>
+      ${!me && state.fxTeam ? `<button type="button" class="btn sm" data-action="team-compare" data-team="${esc(tid)}">Compare on Plan Ahead</button>` : ''}
+    </div>
+    ${cats}
+    <h3 class="sub" style="margin-top:16px">Roster</h3>
+    <div class="table-wrap"><table class="tc-roster"><thead><tr><th></th><th>Player</th><th></th><th class="num">${unit}</th></tr></thead>
+      <tbody>${starters}${bench}${ir}</tbody></table></div>`;
 }
 
 // ----- Season totals: what each team's starters actually produced -----
@@ -286,7 +339,7 @@ function seasonTotalsCard(L, standings) {
     ${head}
     <div class="table-wrap"><table class="season-tot">
       <thead><tr>${th('team', 'Team', '')}${th('gp', 'Player games', 'num', 'Games played by the players in each starting lineup, added up')}${cols.map((c, j) => th(j, c.label)).join('')}${sc ? '' : th('rank', 'Avg rank', 'num', 'Average rank across the categories')}</tr></thead>
-      <tbody>${idx.map(i => { const x = list[i]; return `<tr${x.tid === myTeamId() ? ' class="me-row"' : ''}><td><b>${esc(fxTeamName(x.tid) || '')}</b></td><td class="num muted">${x.T.gp}</td>
+      <tbody>${idx.map(i => { const x = list[i]; return `<tr${x.tid === myTeamId() ? ' class="me-row"' : ''}><td><b>${teamLink(x.tid, esc(fxTeamName(x.tid) || ''))}</b></td><td class="num muted">${x.T.gp}</td>
         ${cols.map((c, j) => { const v = stats[j].vals[i]; return `<td class="num" style="${shade(stats[j].z(v))}" title="${c.label}: ${ordinal(stats[j].rank(v))} of ${list.length}">${c.fmt(v)}</td>`; }).join('')}
         ${sc ? '' : `<td class="num"><b>${fmt(avgRank(i), 1)}</b></td>`}</tr>`; }).join('')}</tbody>
     </table></div>

@@ -374,6 +374,12 @@ tbody tr:hover { background: var(--surface-2); }
 tr:last-child td { border-bottom: 0; }
 td.player { min-width: 170px; }
 .pname { font-weight: 600; }
+/* a fantasy team's name: looks like the text around it, underlined on hover, and opens the team's card */
+.team-link { color: inherit; font-weight: inherit; text-align: inherit; }
+.team-link:hover { text-decoration: underline; }
+.tc-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.tc-cat { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; white-space: nowrap; }
+.tc-roster td { vertical-align: middle; }
 .pmeta { color: var(--muted); font-size: .8rem; }
 
 .badge {

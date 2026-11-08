@@ -240,7 +240,7 @@ function viewDraft() {
   <div class="card" style="margin-top:16px">
     <div class="card-head"><h2>Draft board ${infoBtn('board')}</h2></div>
     <div class="table-wrap"><table class="dr-board">
-      <thead><tr><th></th>${cols.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${esc(fxTeamName(t))}</th>`).join('')}</tr></thead>
+      <thead><tr><th></th>${cols.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${teamLink(t)}</th>`).join('')}</tr></thead>
       <tbody>${board}</tbody>
     </table></div>
   </div>`;
