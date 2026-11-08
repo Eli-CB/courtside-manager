@@ -527,6 +527,8 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .modal form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
 .modal-head, .modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; }
 .modal-head { border-bottom: 1px solid var(--border); }
+/* a player's or fantasy team's card: its name is the dialog's title */
+.detail-title { margin: 0; min-width: 0; font-size: 1.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .modal-foot { border-top: 1px solid var(--border); justify-content: flex-end; }
 .modal-body { padding: 16px; overflow-y: auto; }
 
@@ -992,26 +994,6 @@ a.lm-item { text-decoration: none; }
   .card.rolled > :not(.card-head), .card.rolled > .card-head > :not(h2) { display: none; }
   .card.rolled > .card-head { margin-bottom: 0; }
   .card.rolled { padding-block: 12px; }
-}
-
-/* ---------- MOCK (?flat=1): the same flat sections on wider screens: no boxes, a line above each section, the page one
-   colour; columns side by side keep their gap; sections after the first roll up as on phones ---------- */
-@media (min-width: 641px) {
-  html.flat { --bg: var(--surface); }
-  html.flat #view .card { border: 0; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; padding: 18px 0; }
-  html.flat #view > .card:first-child, html.flat #view > :first-child > .card:first-child, html.flat #view > .trade-grid:first-child > .card { border-top: 0; padding-top: 0; }
-  html.flat #view .card + .card { margin-top: 0; }
-  html.flat #view .card .card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
-  html.flat #view .card.dash-fold { padding: 0; }
-  html.flat #view .dash-fold > summary { padding: 12px 0; border-radius: 0; }
-  html.flat #view .dash-fold > summary:hover { background: none; }
-  html.flat #view .dash-grid, html.flat #view .dash-folds, html.flat #view .week-stack { gap: 0; }
-  html.flat .card.rollable > .card-head > h2 { cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-  html.flat .card.rollable > .card-head > h2::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: .85rem; transition: transform .15s; }
-  html.flat .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(90deg); }
-  html.flat .card.rolled > :not(.card-head), html.flat .card.rolled > .card-head > :not(h2) { display: none; }
-  html.flat .card.rolled > .card-head { margin-bottom: 0; }
-  html.flat #view .card.rolled { padding-block: 14px; }
 }
 
 /* ---------- Phone tidy-up ---------- */

@@ -154,12 +154,15 @@ function showTeamCard(tid) {
   const html = teamCardHtml(tid);
   if (!html) return;
   $('#detailBody').innerHTML = html;
-  $('#detailKind').textContent = 'Fantasy team';
+  $('#detailTitle').innerHTML = teamCardTitle(tid);
   cardOpen = null;
   const d = $('#detailDialog');
   if (!d.open) d.showModal();
   $('#detailBody').scrollTop = 0;
 }
+// the card's title: the team's name, and (you) on your own
+const teamCardTitle = tid => `${esc(fxTeamName(tid))}${tid === state.fxTeam ? ' <span class="muted small">(you)</span>' : ''}`;
+
 function teamCardHtml(tid) {
   const L = fxLeague();
   if (!L || !fxPickable().some(t => t.id === tid)) return '';
@@ -192,7 +195,7 @@ function teamCardHtml(tid) {
   const record = r ? `${r.w}-${r.l}${r.t ? '-' + r.t : ''} · ${ordinal(r.rank || 0)} of ${n}${r.pf != null ? ` · ${fmt(r.pf, 1)} points for` : ''}` : '';
   return `
     <div class="detail-head">
-      <div><h2>${esc(side.name)}${me ? ' <span class="muted small">(you)</span>' : ''}</h2><p class="muted" style="margin:2px 0 0">${record}</p>
+      <div><p class="muted" style="margin:0">${record}</p>
         <p style="margin:6px 0 0">${opp ? `This week vs <b>${teamLink(opp.id)}</b>` : '<span class="muted">No matchup this week</span>'}</p></div>
       ${!me && state.fxTeam ? `<button type="button" class="btn sm" data-action="team-compare" data-team="${esc(tid)}">Compare on Plan Ahead</button>` : ''}
     </div>

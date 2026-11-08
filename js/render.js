@@ -298,7 +298,7 @@ function render() {
 
 // Phones: the sections after a tab's first one with a heading roll up to that heading, opened by a tap (which ones are
 // open is kept for the visit: ui.rollOpen, by tab and heading). Trades keeps both sides open; award cards don't roll.
-const flatPhone = () => typeof matchMedia === 'function' && (matchMedia('(max-width: 640px)').matches || document.documentElement.classList.contains('flat')); // MOCK: ?flat=1 everywhere
+const flatPhone = () => typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
 function rollCards() {
   if (!flatPhone() || ui.tab === 'trade') return;
   let first = true;
@@ -306,7 +306,7 @@ function rollCards() {
     const h = card.querySelector(':scope > .card-head > h2');
     if (!h || card.closest('dialog') || card.closest('.awards')) return;
     if (first) { first = false; return; }
-    // wider screens: a section beside another (Draft's best and worst picks) stays open, or its column would sit empty
+    // a section beside another (two columns) stays open, or its column would sit empty
     const top = card.getBoundingClientRect().top;
     if ([...card.parentElement.children].some(c => c !== card && c.classList.contains('card') && Math.abs(c.getBoundingClientRect().top - top) < 2)) return;
     const key = `${ui.tab}|${h.textContent.trim()}`, open = ui.rollOpen.has(key);

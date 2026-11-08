@@ -18,8 +18,6 @@
   <!-- ?v= is stamped with each deploy's version, so a refresh always fetches the new files -->
   <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css?v=__BUILD__">
-  <!-- MOCK: phones' flat sections on wider screens too, opt-in with ?flat=1 (?flat=0 turns it off), kept on this device -->
-  <script>try { const q = new URLSearchParams(location.search).get('flat'); if (q !== null) q === '1' ? localStorage.setItem('courtside-flat', '1') : localStorage.removeItem('courtside-flat'); if (localStorage.getItem('courtside-flat')) document.documentElement.classList.add('flat'); } catch (e) { /* ignore */ }</script>
 </head>
 <body>
   <div id="ctxBar" class="ctx" hidden>
@@ -45,9 +43,9 @@
     <p>Your leagues stay in your browser. Visits are counted without cookies, and if a page breaks, the error (with the page and league) is sent so it can be fixed.</p>
   </footer>
 
-  <dialog id="detailDialog" class="modal modal-lg">
+  <dialog id="detailDialog" class="modal modal-lg" aria-labelledby="detailTitle">
     <div class="modal-head">
-      <span class="muted small" id="detailKind">Player card</span>
+      <h2 class="detail-title" id="detailTitle"></h2>
       <button type="button" class="icon-btn" data-action="close-detail" aria-label="Close">✕</button>
     </div>
     <div class="modal-body" id="detailBody"></div>
