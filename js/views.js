@@ -72,7 +72,7 @@ function strengthsCard() {
     const tip = x => c.pct
       ? `${x.p.name}: ${fmtPct(pctOf(x.p, c))} on ${fmt(statVal(x.p, att), 1)} attempts a game, ${fmt(Math.abs(x.d), 1)} ${x.d > 0 ? 'more' : 'fewer'} makes a game than the ${league ? 'league' : 'typical'} average of ${fmtPct(ref)} would give`
       : `${x.p.name}: ${fmt(statOf(x.p, c), 1)} ${c.label} a game vs the ${league ? 'league' : 'typical'} average of ${fmt(ref, 1)} per ${starterBasis ? 'starter' : 'player'}`;
-    const who = list => list.map(x => `<span title="${esc(tip(x))}">${inlinePlayer(x.p, esc(lastName(x.p.name)))} <b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(pctOf(x.p, c)) : fmt(statOf(x.p, c), 1)}</b>${c.pct ? `<span class="muted"> on ${fmt(statVal(x.p, att), 1)} ${att.toUpperCase()}</span>` : ''}</span>`).join(', ') || '<span class="muted">—</span>';
+    const who = list => list.map(x => `<span class="cs-p" title="${esc(tip(x))}">${inlinePlayer(x.p, esc(lastName(x.p.name)))} <b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(pctOf(x.p, c)) : fmt(statOf(x.p, c), 1)}</b>${c.pct ? `<span class="muted small"> on ${fmt(statVal(x.p, att), 1)} ${att.toUpperCase()}</span>` : ''}</span>`).join('');
     const w = Math.min(Math.abs(z) / 2, 1) * 50; // bar edge = 2 spreads from the league average
     const pos = v => ((Math.max(-2.5, Math.min(2.5, gap(v))) + 2.5) / 5) * 100;
     const open = ui.csOpen.has(c.key);
@@ -85,7 +85,7 @@ function strengthsCard() {
       <td class="cs-strip"><div class="strip">${teams.map(t => `<span class="sdot${t.mine ? ' me' : ''}" style="left:${pos(t.raw[c.key]).toFixed(1)}%" title="${esc(t.name)}: ${fmtRaw(c, t.raw[c.key])}"></span>`).join('')}</div></td>` : ''}
     </tr>
     <tr class="cs-detail"${open ? '' : ' hidden'}><td colspan="${league ? 6 : 3}"><div class="cs-who">
-      ${drivers.length || drag.length ? `${drivers.length ? `<span>${who(drivers)}</span>` : ''}${drag.length ? `<span>${who(drag)}</span>` : ''}` : '<span class="muted">No one stands out</span>'}
+      ${drivers.length || drag.length ? `${drivers.length ? `<div class="cs-grp"><span class="cs-tag up">Helped</span>${who(drivers)}</div>` : ''}${drag.length ? `<div class="cs-grp"><span class="cs-tag down">Hurt</span>${who(drag)}</div>` : ''}` : '<span class="muted small">No one stands out</span>'}
     </div></td></tr>` };
   });
 
