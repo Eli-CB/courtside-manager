@@ -65,7 +65,7 @@ function emptyState() {
    ========================================================= */
 let state = null;
 const ui = { weekShift: 0, weekChosen: false, tab: 'dashboard', recapWeek: null, afterPick: null, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
-  dashRange: null, dashBench: false, perfRange: null, perfPer: false, perfQ: '', perfPos: '', perfTeam: '', perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
+  dashRange: null, dashBench: false, perfRange: null, perfPer: false, rollOpen: new Set(), perfQ: '', perfPos: '', perfTeam: '', perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
   perfShow: { me: true, opp: true, fa: true, other: true, active: true, bench: true } };
 ui.hideScores = (() => { try { return localStorage.getItem(SCORES_KEY) === '1'; } catch (e) { return false; } })();
 // 24-hour clock: as chosen in the settings menu, else as the device shows times

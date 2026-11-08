@@ -291,8 +291,36 @@ function render() {
   const inner = '.pick-list, .perf-wrap.scroll';
   const scrolls = [...document.querySelectorAll(inner)].map(el => [el.scrollTop, el.scrollLeft]);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
+  rollCards();
   fitPerfLists();
   document.querySelectorAll(inner).forEach((el, i) => { [el.scrollTop, el.scrollLeft] = scrolls[i] || [0, 0]; });
+}
+
+// MOCK (?flat=1, phones): the sections after a tab's first one with a heading roll up to that heading, opened by a tap
+// (which ones are open is kept for the visit: ui.rollOpen, by tab and heading)
+const flatPhone = () => typeof matchMedia === 'function' && document.documentElement.classList.contains('flat') && matchMedia('(max-width: 640px)').matches;
+function rollCards() {
+  if (!flatPhone() || ui.tab === 'trade') return;
+  let first = true;
+  document.querySelectorAll('#view .card').forEach(card => {
+    const h = card.querySelector(':scope > .card-head > h2');
+    if (!h || card.closest('dialog') || card.closest('.awards')) return;
+    if (first) { first = false; return; }
+    const key = `${ui.tab}|${h.textContent.trim()}`, open = ui.rollOpen.has(key);
+    card.classList.add('rollable');
+    card.classList.toggle('rolled', !open);
+    card.dataset.roll = key;
+    h.setAttribute('role', 'button');
+    h.tabIndex = 0;
+    h.setAttribute('aria-expanded', String(open));
+  });
+}
+function toggleRoll(card) {
+  const key = card.dataset.roll, open = card.classList.contains('rolled');
+  if (open) ui.rollOpen.add(key); else ui.rollOpen.delete(key);
+  card.classList.toggle('rolled', !open);
+  card.querySelector(':scope > .card-head > h2').setAttribute('aria-expanded', String(open));
+  fitPerfLists();
 }
 
 // The Players table, the tab's one card, is as tall as the screen under the top bar: scrolled up to it, it fills the page

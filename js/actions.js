@@ -448,6 +448,15 @@ const OPENED_AT = Date.now(), APP_STALE = 3 * 36e5;
 const appStale = () => isInstalled() && Date.now() - OPENED_AT > APP_STALE;
 document.addEventListener('visibilitychange', () => { if (!document.hidden && appStale()) location.reload(); });
 
+// MOCK (?flat=1): a rolled-up section's heading opens or closes it (its own buttons and menus still work as they are)
+document.addEventListener('click', e => {
+  const head = e.target.closest && e.target.closest('.card.rollable > .card-head');
+  if (head && !e.target.closest('.info-btn') && (!e.target.closest('button, a, select, input, label, summary') || head.parentElement.classList.contains('rolled'))) toggleRoll(head.parentElement);
+});
+document.addEventListener('keydown', e => {
+  const h = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.card.rollable > .card-head > h2');
+  if (h) { e.preventDefault(); toggleRoll(h.parentElement.parentElement); }
+});
 document.addEventListener('click', e => {
   // a tap outside a popup (on its backdrop) closes it
   if (e.target instanceof HTMLDialogElement && e.target.open) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { e.target.close(); return; } }
