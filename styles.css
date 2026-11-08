@@ -119,6 +119,9 @@ a { color: var(--accent); }
 .tabs a:hover { color: var(--text); }
 .tabs a.active { color: var(--text); border-bottom-color: var(--text); }
 .nav-btn { display: none; }
+/* a tab's (i), next to its name on the tab bar; on phones next to the menu button instead */
+.tabs .tab-info { align-self: center; flex: none; width: 18px; height: 18px; margin: 0 6px 0 -6px; font-size: 11px; }
+.tab-info-m { display: none; }
 
 .container {
   max-width: 1200px; margin: 0 auto; padding-block: 20px 32px; outline: none;
@@ -1020,6 +1023,9 @@ a.lm-item { text-decoration: none; }
   body.nav-open .tabs { display: flex; }
   .tabs a { padding: 12px; border-bottom: 0; border-radius: 8px; font-size: 1rem; color: var(--text); }
   .tabs a.active { background: var(--accent-soft); color: var(--accent); }
+  .tabs .tab-info { display: none; }
+  .tab-info-m { display: contents; }
+  .tab-info-m .info-btn { width: 28px; height: 28px; margin: 0; font-size: 13px; flex: none; }
   .top-right .icon-btn { width: 40px; height: 40px; }
   .ctx-inner { padding: 10px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); gap: 8px; }
   .ctx-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; width: 100%; }

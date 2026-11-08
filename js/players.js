@@ -102,7 +102,8 @@ function perfFilters(owner, opp, rows) {
 
 function topPerformancesCard() {
   const today = todayIso(), yesterday = addDays(today, -1);
-  const card = (head, body) => `<div class="card"><div class="card-head"><h2>Players ${infoBtn('perf')}</h2>${head}${LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : ''}</div>${body}</div>`;
+  const refresh = LOCAL ? '<button class="btn sm" data-action="refresh-data">Refresh stats</button>' : '';
+  const card = (head, body) => `<div class="card">${head || refresh ? `<div class="card-head">${head}${refresh}</div>` : ''}${body}</div>`;
   if (!BOX) return card('', loadingLine('Loading the latest box scores…'));
   const P = perfDays();
   // When: a menu of Today, the last game day before it, This period (the matchup's days so far) and This season (football:

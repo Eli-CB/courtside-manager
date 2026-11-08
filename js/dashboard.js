@@ -230,7 +230,7 @@ function dashWeekRows(C, A, B) {
 
 function dashMatchupCard() {
   const L = fxLeague(), today = todayIso(), yesterday = addDays(today, -1);
-  const card = (head, body) => `<div class="card mu-card"><div class="card-head"><h2>Matchup ${infoBtn('dashmatch')}</h2>${head}</div>${body}</div>`;
+  const card = (head, body) => `<div class="card mu-card">${head ? `<div class="card-head">${head}</div>` : ''}${body}</div>`;
   const me = ui.viewing ? ui.viewA : state.fxTeam;
   if (!L) return '';
   if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');
