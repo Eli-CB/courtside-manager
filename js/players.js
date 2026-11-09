@@ -61,7 +61,36 @@ let perfOrder = { sig: '', ids: [] }; // the rows last shown, in order
 // every range, among everyone in it: 🚀 the best in each category and 🔥 the second best (as many as 3 tied),
 // 🧊 the worst shooting and 🧈 the most turnovers. Shooting by what it added (makes over the league's average, so
 // volume counts), everything else by the number. Per game only counts regulars (3+ games, 15+ minutes a game).
-function perfBadges(rows, { range, day, avg, perWeek }) {
+// One night's games (Today, Yesterday) can also be once-a-season: a stat in the top 0.1% of every game this season (the
+// saved box scores) gets 🐐 and the 🚀 and 🔥 go to the next ones; turnovers that many, or shooting in the worst 0.1%,
+// get 💩 and the 🧈 or 🧊 go to the next. Not before 1,000 games are in, so the first week isn't all goats.
+const RARE = 0.001, RARE_MIN = 1000;
+let rareMemo = { key: null, cut: null };
+function rareCuts(cats) {
+  const key = `${BOX && BOX.day.size}|${BOX && BOX.finals.size}|${cats.map(c => c.key).join()}`;
+  if (rareMemo.key === key) return rareMemo.cut;
+  const lines = [];
+  if (BOX) for (const byDay of BOX.day.values()) for (const line of byDay.values()) lines.push(line);
+  let cut = null;
+  if (lines.length >= RARE_MIN) {
+    cut = {};
+    const q = (vals, p) => { vals.sort((a, b) => a - b); return vals[Math.min(vals.length - 1, Math.max(0, Math.floor(p * (vals.length - 1))))]; };
+    for (const c of cats) {
+      if (c.pct) {
+        const z = lines.filter(l => l[c.att]).map(l => catWins(l)[c.key] || 0);
+        if (z.length >= RARE_MIN) cut[c.key] = { hi: q(z, 1 - RARE), lo: q(z, RARE) };
+      } else {
+        const v = lines.map(l => lineStat(l, c.key));
+        const hi = q(v, 1 - RARE);
+        if (hi > 0) cut[c.key] = { hi };
+      }
+    }
+  }
+  rareMemo = { key, cut };
+  return cut;
+}
+
+function perfBadges(rows, { range, day, avg, perWeek, cuts: given }) {
   const today = todayIso(), yesterday = addDays(today, -1), cats = scoreCats().filter(c => !c.fp);
   const badges = new Map();
   const night = range === 'avg' ? 'per game' : range === 'year' ? 'this season' : range === 'week' ? (perWeek ? 'per game this period' : 'this period')
@@ -69,19 +98,33 @@ function perfBadges(rows, { range, day, avg, perWeek }) {
   const pool = avg ? rows.filter(r => r.g >= 3 && r.tot.min >= 15) : rows;
   const tiers = (list, f) => { const m = new Map(); for (const r of list) { const v = +f(r).toFixed(6); m.set(v, [...(m.get(v) || []), r]); } return [...m].sort((a, b) => b[0] - a[0]).map(x => x[1]); };
   const give = (rs, c, e, tip) => { if (rs && rs.length <= 3) for (const r of rs) badges.set(`${r.raw.id}|${c.key}`, [e, `${tip} ${night}`]); };
+  // one night only: the tiers at the start of a list that are once-a-season (each tier's first row stands for it)
+  const cuts = (range === 'today' || range === 'day') ? (given !== undefined ? given : rareCuts(cats)) : null;
+  const rare = (g, f, at) => { let n = 0; while (n < g.length && at(f(g[n][0]))) n++; return n; };
+  const RARE_TIP = 'one of the best games this season', AWFUL_TIP = 'one of the worst games this season';
   for (const c of cats) {
+    const cut = cuts && cuts[c.key];
     if (c.pct) {
       const g = tiers(pool.filter(r => r.tot[c.att] && r.z[c.key] != null), r => r.z[c.key]);
-      const low = g[g.length - 1];
-      give(g[0], c, '🚀', `Best ${c.label} shooting`);
-      if (g[0] && g[0].length === 1) give(g[1], c, '🔥', `2nd best ${c.label} shooting`);
-      if (low && g.length > 1 && low[0].z[c.key] < 0) give(low, c, '🧊', `Worst ${c.label} shooting`);
+      const up = cut ? rare(g, r => r.z[c.key], z => z >= cut.hi && z > 0) : 0;
+      for (let k = 0; k < up; k++) give(g[k], c, '🐐', `${c.label}: ${RARE_TIP},`);
+      give(g[up], c, '🚀', `Best ${c.label} shooting`);
+      if (g[up] && g[up].length === 1) give(g[up + 1], c, '🔥', `2nd best ${c.label} shooting`);
+      const low = [...g].reverse(), down = cut ? rare(low, r => r.z[c.key], z => z <= cut.lo && z < 0) : 0;
+      for (let k = 0; k < down; k++) give(low[k], c, '💩', `${c.label}: ${AWFUL_TIP},`);
+      if (low[down] && g.length > up + 1 && low[down][0].z[c.key] < 0) give(low[down], c, '🧊', `Worst ${c.label} shooting`);
       continue;
     }
     const g = tiers(pool.filter(r => lineStat(r.tot, c.key) > 0), r => lineStat(r.tot, c.key));
-    if (c.neg) { give(g[0], c, '🧈', `Most ${c.label}`); continue; }
-    give(g[0], c, '🚀', `Most ${c.label}`);
-    if (g[0] && g[0].length === 1) give(g[1], c, '🔥', `2nd most ${c.label}`);
+    const top = cut ? rare(g, r => lineStat(r.tot, c.key), v => v >= cut.hi) : 0;
+    if (c.neg) {
+      for (let k = 0; k < top; k++) give(g[k], c, '💩', `${fmt(lineStat(g[k][0].tot, c.key), 0)} ${c.label}: ${AWFUL_TIP},`);
+      give(g[top], c, '🧈', `Most ${c.label}`);
+      continue;
+    }
+    for (let k = 0; k < top; k++) give(g[k], c, '🐐', `${fmt(lineStat(g[k][0].tot, c.key), 0)} ${c.label}: ${RARE_TIP},`);
+    give(g[top], c, '🚀', `Most ${c.label}`);
+    if (g[top] && g[top].length === 1) give(g[top + 1], c, '🔥', `2nd most ${c.label}`);
   }
   return badges;
 }
@@ -198,7 +241,6 @@ function topPerformancesCard() {
   const perGame = r => { const g = r.g || 1, by = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v / g])); return { ...r, tot: by(r.tot), z: by(r.z), v: r.v / g, per: true }; };
   const rows = proj ? projRows() : avg ? seasonRows() : perWeek ? perfRows(dates).map(perGame) : perfRows(dates);
   const badges = perfBadges(rows, { range, day, avg, perWeek });
-  const legend = badges.size ? '<p class="muted small pf-legend">🚀 best · 🔥 2nd best in a category · 🧊 worst shooting · 🧈 most turnovers</p>' : '';
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
   // whose players (yours, the opponent's, the other teams', waivers: any of them) and, for rostered players, where they
   // are: active or bench (IR counts as bench); waivers have no lineup, so Active or Bench leaves them be
@@ -242,7 +284,7 @@ function topPerformancesCard() {
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
-    </table>${picked.length > shown.length ? `<div class="pf-more"><button type="button" class="btn sm" data-action="perf-more">Show ${Math.min(100, picked.length - shown.length)} more</button></div>` : ''}</div>${legend}`;
+    </table>${picked.length > shown.length ? `<div class="pf-more"><button type="button" class="btn sm" data-action="perf-more">Show ${Math.min(100, picked.length - shown.length)} more</button></div>` : ''}</div>`;
   // one bar: when, search, the menus and filters, then what's shown (at the end of the last line), wrapping as the screen narrows
   return card('', `<div class="perf-bar">${toggle}${filters}<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p></div>${table}`);
 }

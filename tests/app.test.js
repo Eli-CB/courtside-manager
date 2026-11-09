@@ -953,7 +953,7 @@ test('performances: every range marks each category leader with an emoji', async
   Object.assign(app.ui, { perfWhose: { me: true, opp: true, other: true, fa: true }, perfSpot: 'all', perfFiltOpen: false });
   try {
     const html = app.topPerformancesCard();
-    assert.match(html, /pf-legend/, 'a legend');
+    assert.doesNotMatch(html, /pf-legend/, 'no legend: the emoji say what they mark on hover');
     app.ui.perfSort = { key: 'v', dir: 1 }; // the worst too
     const cells = { ...cellsOf(html), ...cellsOf(app.topPerformancesCard()) };
     app.ui.perfSort = { key: 'fgPct', dir: 1 }; // the worst shooting
@@ -988,6 +988,19 @@ test('performances: every range marks each category leader with an emoji', async
     assert.equal((((yc[aLead.raw.id] || [])[pts] || '').match(/pf-emo[^>]*>([^<]+)</) || [])[1], '\u{1F680}', `per game: ${aLead.raw.name} leads in points among regulars`);
     assert.match(app.topPerformancesCard(), /title="Most PTS per game"/);
   } finally { app.ui.perfRange = null; Object.assign(app.ui, { perfWhose: { me: true, opp: true, other: true, fa: true }, perfSpot: 'all', perfFiltOpen: false }); app.ui.perfSort = { key: 'v', dir: -1 }; }
+});
+
+test('one night can be once-a-season: a goat bumps the rocket and fire down, a poop the butter', () => {
+  const row = (id, tot) => ({ raw: { id }, g: 1, tot: { min: 30, ...tot }, z: {}, v: 0 });
+  const rows = [row(1, { pts: 61, to: 11 }), row(2, { pts: 44, to: 6 }), row(3, { pts: 40, to: 5 }), row(4, { pts: 30, to: 2 })];
+  const get = (b, id, k) => (b.get(`${id}|${k}`) || [])[0];
+  let b = app.perfBadges(rows, { range: 'day', day: '2026-10-25', cuts: { pts: { hi: 50 }, to: { hi: 9 } } });
+  assert.equal([1, 2, 3].map(id => get(b, id, 'pts')).join(), ['\u{1F410}', '\u{1F680}', '\u{1F525}'].join(), 'goat, then rocket, then fire');
+  assert.equal([1, 2].map(id => get(b, id, 'to')).join(), ['\u{1F4A9}', '\u{1F9C8}'].join(), 'poop, then the butter');
+  b = app.perfBadges(rows, { range: 'day', day: '2026-10-25', cuts: { pts: { hi: 70 }, to: { hi: 15 } } });
+  assert.equal([1, 2].map(id => get(b, id, 'pts')).join(), ['\u{1F680}', '\u{1F525}'].join(), 'nothing once-a-season: as before');
+  b = app.perfBadges(rows, { range: 'year', cuts: { pts: { hi: 50 } } });
+  assert.equal(get(b, 1, 'pts'), '\u{1F680}', 'a week or the season: no goats');
 });
 
 test('performances: everyone who played in one table, top 100 by the sorted column, ranked by value', async () => {
