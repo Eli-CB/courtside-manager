@@ -22,9 +22,12 @@ function perfDays() {
   for (const [d, lines] of live.lines) if (lines.size) played.add(d);
   const day = [...played].filter(x => x < today).sort().pop() || null;
   const games = played.has(today) || [...teamDates.values()].some(ds => ds.has(today)) || live.games.some(g => g.d === today);
-  const week = matchDates(mondayOf(today)).filter(x => x <= today && played.has(x));
+  // This period: the matchup's game days so far, once there's more than one (one is just Today); until the new period's
+  // first game starts, the whole period before it (Last period), so the morning after still shows how it went
+  const cur = matchDates(mondayOf(today)), now = cur.filter(x => x <= today && played.has(x));
+  const last = now.length ? [] : matchDates(mondayOf(addDays(cur[0], -1))).filter(x => x < cur[0] && played.has(x));
   const year = [...played].filter(x => x <= today).sort(); // every game day of the season so far
-  return { today: games ? today : null, started: played.has(today) || live.games.some(g => g.d === today && g.state !== 'pre'), day, week: week.length > 1 ? week : null, year };
+  return { today: games ? today : null, started: played.has(today) || live.games.some(g => g.d === today && g.state !== 'pre'), day, week: now.length > 1 ? now : last.length ? last : null, weekPast: !now.length && !!last.length, year };
 }
 
 // Each player's lines over those days (the saved box scores, else ESPN's), added up, with what they added: fantasy
@@ -93,7 +96,8 @@ function rareCuts(cats) {
 function perfBadges(rows, { range, day, avg, perWeek, cuts: given }) {
   const today = todayIso(), yesterday = addDays(today, -1), cats = scoreCats().filter(c => !c.fp);
   const badges = new Map();
-  const night = range === 'avg' ? 'per game' : range === 'year' ? 'this season' : range === 'week' ? (perWeek ? 'per game this period' : 'this period')
+  const span = perfDays().weekPast ? 'last period' : 'this period';
+  const night = range === 'avg' ? 'per game' : range === 'year' ? 'this season' : range === 'week' ? (perWeek ? `per game ${span}` : span)
     : day === today ? 'today' : day === yesterday ? 'last night' : `on ${fmtDay(day)}`;
   const pool = avg ? rows.filter(r => r.g >= 3 && r.tot.min >= 15) : rows;
   const tiers = (list, f) => { const m = new Map(); for (const r of list) { const v = +f(r).toFixed(6); m.set(v, [...(m.get(v) || []), r]); } return [...m].sort((a, b) => b[0] - a[0]).map(x => x[1]); };
@@ -168,7 +172,7 @@ function topPerformancesCard() {
   // season adds the games up, or (Per game) shows each player's average game: the season's from the stats chosen under
   // Stats used (range 'avg', as projections use them), a period's from its games.
   const football = isFootball();
-  const opts = [football && ['proj', 'Projected'], P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', 'This period'], ['year', 'This season']].filter(Boolean);
+  const opts = [football && ['proj', 'Projected'], P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], P.week && ['week', P.weekPast ? 'Last period' : 'This period'], ['year', 'This season']].filter(Boolean);
   const want = ui.perfRange === 'avg' ? 'year' : ui.perfRange;
   const chosen = opts.some(([k]) => k === want) ? want : football && !P.started ? 'proj' : P.started || !P.day ? opts.find(([k]) => k !== 'proj')[0] : 'day';
   const many = chosen === 'week' || chosen === 'year';

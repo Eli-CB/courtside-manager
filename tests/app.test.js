@@ -761,12 +761,14 @@ test('performances: today, the last game day before it, and this week once it ha
   await app.loadBoxes();
   await app.useLeague(CATS9);
   const days = async iso => JSON.parse(JSON.stringify(await onDay(iso, () => app.perfDays())));
-  assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'], year: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
+  assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'], weekPast: false, year: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
   // Monday at noon (the same date in any US time zone and UTC)
-  assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: null, year: ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'] }, "Monday before tip-off: last night was last week's");
+  // ...and until the new period's first game, the period before it whole (Last period), to see how it all went
+  const first = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'];
+  assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: first, weekPast: true, year: first }, "Monday before tip-off: last night was last week's");
   await onDay('2026-10-26', () => {
     const html = app.topPerformancesCard();
-    assert.ok(html.includes('value="today"') && html.includes('>Yesterday<') && !html.includes('value="week"'), 'Today and Yesterday; no period yet');
+    assert.ok(html.includes('value="today"') && html.includes('>Yesterday<') && html.includes('<option value="week" >Last period</option>'), 'Today, Yesterday and Last period');
     assert.ok(html.includes('<option value="day" selected>') && html.includes('Last night'), "before tip-off it opens on last night's games");
     app.ui.perfRange = 'today';
     try {
