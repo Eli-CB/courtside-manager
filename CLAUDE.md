@@ -78,7 +78,7 @@ saved leagues are lost). Owner's league:
   - A week is over (`periodOver`) at its end or once its last game day's box scores are all in: Fantrax ends a weekly
     period Monday evening when the next locks, a day after its last games. Recap, awards, past-week cards use it.
   - recap: Recap tab: a finished week across the league (Player/Game of the week, Worst week (worst per game, 2+ G), Worst game, Street clothes (most games missed while starting), with full lines in the league's cats,
-    bench regret, best all-play week, then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share opens a popup with the
+    bench regret, best all-play week (categories only); points leagues add Carried (biggest share of a team's points, 20%+), Tough luck / Lucky win (best losing / worst winning score, on the wrong side of the middle) and Nail-biter (closest final under 5% of the winner, not a game already told as luck); hockey Goalie of the week and Hat trick, football Defense of the week; then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share opens a popup with the
     recap as a picture (`recapCanvas`: 1080 px PNG on a canvas, headshots from the sheet `IMG.sheet`; Share image / Copy image / Save
     image) or the text: the standouts + a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
     Fantrax and Sleeper. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
