@@ -1021,7 +1021,7 @@ a.lm-item { text-decoration: none; }
   /* Fantrax bar: team pickers fill the width */
   .fx-strip { padding: 10px 12px; }
   .fx-vs { width: 100%; }
-  .fx-vs .stepper, .week-nav, .week-nav .stepper { flex: 1 1 100%; }
+  .fx-vs .stepper { flex: 1 1 100%; } /* (Plan Ahead's week picker keeps its own width, beside the week's name) */
   .stepper .ctx-team, .fx-vs .stepper .ctx-team { flex: 1; width: auto; max-width: none; }
   .fx-strip .actions { width: 100%; }
   .fx-strip .actions .btn { flex: 1 1 auto; }

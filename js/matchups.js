@@ -620,10 +620,12 @@ function pastWeekCard(start) {
 // opponent picker marks this week's opponent
 function weekPicker() {
   const shifts = weekShifts();
+  // (phones: just the week, so the picker fits beside the heading, which already says this week or next)
+  const phone = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
   const opts = shifts.map(s => {
     const p = fxLeague() && fxLeague().periods ? fxPeriodFor(weekStartAt(s)) : null;
     const playoffs = p && fxLeague().playoffPeriod && p.n >= fxLeague().playoffPeriod;
-    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${s === 0 ? ' (this week)' : playoffs ? ' (playoffs)' : ''}</option>`;
+    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${phone ? '' : s === 0 ? ' (this week)' : playoffs ? ' (playoffs)' : ''}</option>`;
   });
   return stepper('week-shift', 'week', `<select class="ctx-team" data-change="week-pick" aria-label="Week">${opts.join('')}</select>`,
     { first: ui.weekShift <= shifts[0], last: ui.weekShift >= shifts[shifts.length - 1] });
@@ -644,7 +646,10 @@ function viewWeek() {
   const { start, dates, weekly, hasOpp, asSet, best, oSet, oBest, mine } = ctx;
   const today = todayIso();
   const staleOpp = hasOpp && state.opp.week && state.opp.week !== start;
-  const range = `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}`;
+  // the week's days (phones: Nov 9 – 15, short enough for the week picker beside it)
+  const first = dates[0], last = dates[dates.length - 1];
+  const range = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches
+    ? `${fmtMonthDay(first)} – ${first.slice(0, 7) === last.slice(0, 7) ? +last.slice(8) : fmtMonthDay(last)}` : `${fmtDay(first)} – ${fmtDay(last)}`;
   const winPct = Math.round(oBest.win * 100);
   const changed = weekly ? ctx.bestIds && ([...ctx.bestIds].some(id => !ctx.setIds.has(id)) || ctx.bestIds.size !== ctx.setIds.size) : best.games !== asSet.games;
 
