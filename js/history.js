@@ -691,7 +691,7 @@ function waiverDetail(T, txt) {
 function heartDetail(T, txt) {
   const ws = T.heart || [];
   if (!ws.length) return '<p class="muted">No close losses yet.</p>';
-  const score = x => (isPoints() ? `${fmt(-x.margin, 1)} FP short` : `L ${x.wa}–${x.wb}`);
+  const score = x => (isPoints() ? `${fmtFp(-x.margin)} FP short` : `L ${x.wa}–${x.wb}`);
   return `<p class="aw-break-total"><b>${esc(txt)}</b> ${isPoints() ? 'by less than 5% of the winning score' : 'by a single category'}</p>
     <ul class="aw-break">${ws.map(x => `<li><div class="bmain"><b>Week ${x.n}</b> <span class="muted">${score(x)} vs ${esc(fxTeamName(x.opp))}</span>
       <div class="muted small">would have beaten ${fmt(x.beat, x.beat % 1 ? 1 : 0)} of ${x.of} teams that week</div></div></li>`).join('')}</ul>

@@ -1003,6 +1003,19 @@ test('one night can be once-a-season: a goat bumps the rocket and fire down, a p
   assert.equal(get(b, 1, 'pts'), '\u{1F680}', 'a week or the season: no goats');
 });
 
+test("a league scored in whole points shows its scores without a .0; projections and averages keep theirs", async () => {
+  await app.useLeague(ESPN); // 1 a point, 2 an assist, -1 a missed shot...
+  assert.ok(app.wholePoints());
+  assert.equal(app.fmtFp(112), '112');
+  assert.equal(app.get('scoreLine')({ me: 112, opp: 98 }), '112–98');
+  await app.useLeague(POINTS); // 1.25 a rebound
+  assert.ok(!app.wholePoints());
+  assert.equal(app.fmtFp(112.25), '112.3');
+  assert.equal(app.get('scoreLine')({ me: 112.25, opp: 98 }), '112.3–98.0');
+  await app.useLeague(CATS9);
+  assert.ok(!app.wholePoints(), 'a category league has no points');
+});
+
 test('performances: everyone who played in one table, top 100 by the sorted column, ranked by value', async () => {
   await app.loadBoxes();
   const cell = (tr, i) => [...tr.matchAll(/<td class="sc"[^>]*>(?:<span[^>]*>[^<]*<\/span>)?([^<]*)</g)][i][1];

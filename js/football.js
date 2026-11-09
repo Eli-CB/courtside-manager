@@ -91,8 +91,8 @@ function footballMeta(p, ctx) {
   const on = now.state === 'in' ? `<span class="lv-dot" aria-hidden="true"></span>` : '';
   const [num, tip] = now.state === 'bye' ? ['—', 'No game this week']
     : now.state === 'pre' ? [p.status === 'Out' ? '0' : fmt(footballPts(p, ctx.dates), 1), p.status === 'Out' ? "Listed Out, so he's not projected" : 'Projected points']
-    : now.state === 'in' ? [fmt(lineFp(line), 1), `So far, with ${fmt(now.left * lineFp(footballProj(p, ctx.dates).m), 1)} projected in the time left`]
-    : [fmt(lineFp(line), 1), now.line ? 'Final points' : "His team played, but he didn't score"];
+    : now.state === 'in' ? [fmtFp(lineFp(line)), `So far, with ${fmt(now.left * lineFp(footballProj(p, ctx.dates).m), 1)} projected in the time left`]
+    : [fmtFp(lineFp(line)), now.line ? 'Final points' : "His team played, but he didn't score"];
   return `<div class="bmeta fb"><span class="fb-game">${posTags(p.pos)} ${footballGame(p, ctx.dates, true)}</span><b class="bmeta-g" data-tip="${esc(tip)}">${on}${num}</b></div>`;
 }
 

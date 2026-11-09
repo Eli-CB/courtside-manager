@@ -141,7 +141,7 @@ function viewStandings() {
       <tbody>${rows.map(r => {
         const g = r.w + r.l + r.t;
         return `<tr${r.id === myTeamId() ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td><b>${teamLink(r.id, esc(r.name))}</b>${r.id === myTeamId() ? ' <span class="muted small">(you)</span>' : ''}</td>
-          <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td>${rows.some(x => x.pf != null) ? `<td class="num">${r.pf != null ? fmt(r.pf, 1) : '—'}</td>` : ''}</tr>`;
+          <td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${r.t}</td><td class="num">${g ? fmt(((r.w + r.t / 2) / g) * 100, 0) + '%' : '—'}</td><td class="num">${r.gb ? fmt(r.gb, 1) : '—'}</td>${rows.some(x => x.pf != null) ? `<td class="num">${r.pf != null ? fmtFp(r.pf) : '—'}</td>` : ''}</tr>`;
       }).join('')}</tbody>
     </table></div>${waiverLine()}` : `<div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div>`}
   </div>
@@ -192,7 +192,7 @@ function teamCardHtml(tid) {
       }).join('')}</div>`;
     }
   }
-  const record = r ? `${r.w}-${r.l}${r.t ? '-' + r.t : ''} · ${ordinal(r.rank || 0)} of ${n}${r.pf != null ? ` · ${fmt(r.pf, 1)} points for` : ''}` : '';
+  const record = r ? `${r.w}-${r.l}${r.t ? '-' + r.t : ''} · ${ordinal(r.rank || 0)} of ${n}${r.pf != null ? ` · ${fmtFp(r.pf)} points for` : ''}` : '';
   return `
     <div class="detail-head">
       <div><p class="muted" style="margin:0">${record}</p>
@@ -318,7 +318,7 @@ function seasonTotalsCard(L, standings) {
   const sc = leaguePoints();
   const cols = sc
     ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ label: STAT_LABEL[k], neg: sc[k] < 0, val: T => tot(T, k), fmt: v => fmt(v, 0) })),
-      { label: 'FP', val: T => sum(Object.entries(sc).map(([k, v]) => tot(T, k) * v)), fmt: v => fmt(v, 1) }]
+      { label: 'FP', val: T => sum(Object.entries(sc).map(([k, v]) => tot(T, k) * v)), fmt: v => fmtFp(v) }]
     : scoreCats().map(c => ({ label: c.label, neg: c.neg,
       val: c.pct ? (T => (tot(T, c.att) ? tot(T, c.made) / tot(T, c.att) : 0)) : T => tot(T, c.key),
       fmt: c.pct ? fmtPct : v => fmt(v, c.dec ? 1 : 0) }));

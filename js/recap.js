@@ -123,7 +123,7 @@ function buildRecap(L, P, period) {
   };
 }
 
-const scoreLine = sc => (isPoints() ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
+const scoreLine = sc => (isPoints() ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
 
 // The standouts as { emoji, label, html, text for sharing }; a player's also { p, tid, stats } for the image. Names
 // are plain links (no photo), so they sit on the line with the text around them.
@@ -135,7 +135,7 @@ function recapItems(X) {
   const unit = isPoints() ? 'FP' : 'value';
   const stand = (e, label, x, perGame, cls = '') => {
     const parts = fullLine(x.line, perGame), head = perGame ? `${x.line.gp1} G, per game: ` : '';
-    add(e, label, `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
+    add(e, label, `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${isPoints() && !perGame ? fmtFp(x.v) : fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
       `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}` });
   };
   if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
@@ -165,16 +165,16 @@ function recapItems(X) {
   }
   if (X.carry) {
     const c = X.carry, pct = Math.round(c.share * 100);
-    add('🎒', 'Carried', `${name(c.p, true)} scored ${fmt(c.pts, 1)} of <b>${teamLink(c.tid)}</b>'s ${fmt(c.of, 1)} (${pct}%)`,
-      `${c.p.name} scored ${fmt(c.pts, 1)} of ${team(c.tid)}'s ${fmt(c.of, 1)} (${pct}%)`);
+    add('🎒', 'Carried', `${name(c.p, true)} scored ${fmtFp(c.pts)} of <b>${teamLink(c.tid)}</b>'s ${fmtFp(c.of)} (${pct}%)`,
+      `${c.p.name} scored ${fmtFp(c.pts)} of ${team(c.tid)}'s ${fmtFp(c.of)} (${pct}%)`);
   }
-  const final = g => `${fmt(g.sc.me, 1)}–${fmt(g.sc.opp, 1)}`;
+  const final = g => `${fmtFp(g.sc.me)}–${fmtFp(g.sc.opp)}`;
   if (X.unlucky) {
-    const g = X.unlucky, said = `scored ${fmt(g.sc.opp, 1)}, the ${g.place === 1 ? 'most' : ordinal(g.place) + ' most'} in the league, and still lost`;
+    const g = X.unlucky, said = `scored ${fmtFp(g.sc.opp)}, the ${g.place === 1 ? 'most' : ordinal(g.place) + ' most'} in the league, and still lost`;
     add('😩', 'Tough luck', `<b>${teamLink(g.b)}</b> ${said} to ${teamLink(g.a)} ${final(g)}`, `${team(g.b)} ${said} to ${team(g.a)} ${final(g)}`);
   }
   if (X.lucky) {
-    const g = X.lucky, said = `won with ${fmt(g.sc.me, 1)}, the ${g.place === X.teams ? 'fewest' : ordinal(g.place) + ' most'} in the league`;
+    const g = X.lucky, said = `won with ${fmtFp(g.sc.me)}, the ${g.place === X.teams ? 'fewest' : ordinal(g.place) + ' most'} in the league`;
     add('🍀', 'Lucky win', `<b>${teamLink(g.a)}</b> ${said}, over ${teamLink(g.b)} ${final(g)}`, `${team(g.a)} ${said}, over ${team(g.b)} ${final(g)}`);
   }
   if (X.close) {

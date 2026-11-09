@@ -63,7 +63,7 @@ function dashGame(p, d) {
 // nothing for a stat he didn't put up (no attempts, 0 blocks)
 // flash(key, value, makes): a class for a bubble whose number just changed (a live update)
 function lineChips(line, flash = () => '') {
-  const out = isPoints() ? [`<span class="mu-chip fp${flash('fp', lineFp(line))}"><b>${fmt(lineFp(line), 1)}</b> FP</span>`] : [];
+  const out = isPoints() ? [`<span class="mu-chip fp${flash('fp', lineFp(line))}"><b>${fmtFp(lineFp(line))}</b> FP</span>`] : [];
   for (const c of scoreCats()) {
     if (c.fp || !(c.pct ? line[c.att] : Math.round(lineStat(line, c.key) * 100))) continue;
     out.push(c.pct ? `<span class="mu-chip${flash(c.key, line[c.att] || 0, line[c.made] || 0)}"><b>${line[c.made] || 0}-${line[c.att] || 0}</b> ${c.label.replace('%', '')}</span>`
@@ -246,7 +246,7 @@ function dashMatchupCard() {
   const half = (sc, k) => sc[k] + sc.ties / 2;
   // the big numbers are the matchup's: the period so far; the table and the players, the days picked
   const sc = B ? weekScore(A.tot, B.tot) : null, wk = B ? weekScore(A.week, B.week) : null;
-  const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${teamLink(S.tid, esc(S.name))}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmt(n, 1) : n) : ''}</div>${dashPaceChips(S, D)}</div></div>`;
+  const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${teamLink(S.tid, esc(S.name))}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmtFp(n) : n) : ''}</div>${dashPaceChips(S, D)}</div></div>`;
   const head = `<div class="mu-board">
       ${big(A, wk && (pts ? wk.me : half(wk, 'me')))}
       <div class="mu-mid"></div>

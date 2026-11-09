@@ -178,7 +178,7 @@ function gameTip(p, line, d, bench) {
   return `<div class="tip-head">${Math.round(line.min)} min${bench ? ' <span class="tip-tag">bench, didn\'t count</span>' : ''}</div>
     <div>${gameStats(p, line)[0].join(' · ')}</div>
     <div class="tip-dim">${gameStats(p, line)[1].join(' · ')}</div>
-    ${isPoints() ? `<div class="tip-head">${fmt(lineFp(line), 1)} FP</div>` : ''}
+    ${isPoints() ? `<div class="tip-head">${fmtFp(lineFp(line))} FP</div>` : ''}
     ${short ? `<div class="tip-warn">Usually ${Math.round(p.min)} min: ${esc(short)}</div>` : ''}`;
 }
 
@@ -562,7 +562,7 @@ function pastWeekCard(start) {
   const pts = leaguePoints();
   const cats = pts ? [{ label: 'FP' }] : scoreCats();
   const name = tid => teamLink(tid);
-  const scoreTxt = sc => (pts ? `${fmt(sc.me, 1)}–${fmt(sc.opp, 1)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
+  const scoreTxt = sc => (pts ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
   const outcome = sc => Math.sign(Math.round((sc.me - sc.opp) * 10));
   const verb = o => (o > 0 ? 'won' : o < 0 ? 'lost' : 'tied');
   const [A, B] = R;
@@ -594,7 +594,7 @@ function pastWeekCard(start) {
     return `<td class="sc${cls}">${fmt(lineStat(s, c.key), 0)}</td>`;
   };
   const row = (x, bench) => `<tr class="${bench ? 'bench' : ''}"><td class="st-name"><div class="bplayer">${headshot(x.p, 24)}<div class="bmain"><div class="bname">${playerName(x.p)}</div></div></div></td>
-    <td class="num st-g">${x.line.gp1 || 0}</td>${cols.map(c => cell(x.line, c)).join('')}${pts ? `<td class="sc">${fmt(lineFp(x.line), 1)}</td>` : ''}</tr>`;
+    <td class="num st-g">${x.line.gp1 || 0}</td>${cols.map(c => cell(x.line, c)).join('')}${pts ? `<td class="sc">${fmtFp(lineFp(x.line))}</td>` : ''}</tr>`;
   const table = (S, O) => {
     const sc = weekScore(S.tot, O.tot);
     const lead = i => (sc.lead[i] > 0 ? ' pos-good' : sc.lead[i] < 0 ? ' pos-bad' : '');
@@ -602,7 +602,7 @@ function pastWeekCard(start) {
     return `<table class="stab pw-table">
       <thead><tr><th class="st-name">${name(S.tid)}</th><th class="num">G</th>${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}${pts ? '<th class="sc">FP</th>' : ''}</tr></thead>
       <tbody>${byG(S.starters).map(x => row(x, false)).join('')}</tbody>
-      <tbody class="pw-total"><tr><td class="st-name"><b>Week total</b></td><td class="num st-g"><b>${S.tot.gp1 || 0}</b></td>${cols.map((c, i) => cell(S.tot, c, pts ? '' : lead(i))).join('')}${pts ? `<td class="sc${lead(0)}">${fmt(lineFp(S.tot), 1)}</td>` : ''}</tr></tbody>
+      <tbody class="pw-total"><tr><td class="st-name"><b>Week total</b></td><td class="num st-g"><b>${S.tot.gp1 || 0}</b></td>${cols.map((c, i) => cell(S.tot, c, pts ? '' : lead(i))).join('')}${pts ? `<td class="sc${lead(0)}">${fmtFp(lineFp(S.tot))}</td>` : ''}</tr></tbody>
       ${S.bench.length ? `<tbody>${byG(S.bench).map(x => row(x, true)).join('')}</tbody>` : ''}
     </table>`;
   };

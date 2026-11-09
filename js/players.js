@@ -282,7 +282,7 @@ function topPerformancesCard() {
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button>${rookieBadge(r.raw, 'by-name')}${injBadge(r.raw.inj, 'by-name')}</div>
           <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${proj ? `${esc(r.game)} · ` : avg || perWeek ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today ? clock(r) : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
-        <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
+        <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? (avg || perWeek ? fmt(r.v, 1) : fmtFp(r.v)) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
     </table>${picked.length > shown.length ? `<div class="pf-more"><button type="button" class="btn sm" data-action="perf-more">Show ${Math.min(100, picked.length - shown.length)} more</button></div>` : ''}</div>`;
   // one bar: when, search, the menus and filters, then what's shown (at the end of the last line), wrapping as the screen narrows

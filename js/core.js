@@ -209,6 +209,10 @@ const pctOf = (p, c) => { const att = statVal(p, c.att); return att ? statVal(p,
 // Points leagues score fantasy points from the league's own values; category leagues their own categories
 const leaguePoints = () => { const L = fxLeague(); return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
 const isPoints = () => !!leaguePoints();
+// Real fantasy points, as the league counts them: a league whose every point value is a whole number only ever scores whole
+// points, so its scores show no ".0" (projections and averages keep their decimal everywhere)
+const wholePoints = () => { const P = leaguePoints(); return !!P && Object.values(P).every(v => typeof v === 'number' && Number.isInteger(v)); };
+const fmtFp = n => fmt(n, wholePoints() ? 0 : 1);
 function statVal(p, k) {
   if (k === 'fgm' && !isFootball()) return p.fgPct * p.fga; // (football's fgm: field goals made)
   if (k === 'ftm') return p.ftPct * p.fta;
