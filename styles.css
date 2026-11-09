@@ -363,7 +363,7 @@ a { color: var(--accent); }
 .pf-more { position: sticky; left: 0; display: inline-block; padding: 10px 8px; }
 .perf-owner.mine { color: var(--accent); font-weight: 600; } /* your team's name: orange */
 .perf-owner.opp { color: var(--text); font-weight: 700; } /* this matchup's opponent: bold */
-@media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 160px; } .perf-table .pf-name .pmeta { white-space: normal; } } /* phones: badges wrap instead of hiding */
+@media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 156px; } .perf-table .pf-name .pmeta { white-space: normal; } .perf-table .pf-name .hs { display: none; } } /* phones: no photo, so the stats get the room; badges wrap instead of hiding */
 
 .btn {
   font: inherit; font-weight: 500; font-size: .875rem;
