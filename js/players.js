@@ -96,7 +96,8 @@ function perfFilters(owner, opp, rows) {
   const n = perfFilterCount(), open = ui.perfFiltOpen;
   const find = `<input id="perfQ" class="perf-q" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(ui.perfQ)}" data-input="perf-q" autocomplete="off">`;
   const btn = `<button type="button" class="pill perf-filt-btn${n ? ' on' : ''}" data-action="perf-filt" aria-expanded="${!!open}" aria-controls="perfPanel"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 4h12M4.5 8h7M7 12h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Filters${n ? ` <b>${n}</b>` : ''}</button>`;
-  if (!open) return find + btn;
+  const info = infoBtn('perf');
+  if (!open) return find + btn + info;
   const toggle = (k, l, title) => `<button type="button" class="pill${ui.perfWhose[k] ? ' on' : ''}" data-action="perf-whose" data-key="${k}" aria-pressed="${!!ui.perfWhose[k]}"${title ? ` title="${esc(title)}"` : ''}>${l}</button>`;
   const rostered = ['me', 'opp', 'other'].some(k => ui.perfWhose[k]);
   const spots = [['all', 'All', ''], ['active', 'Active', "In their team's starting lineup"], ['bench', 'Bench', "On their team's bench or IR"]];
@@ -110,7 +111,7 @@ function perfFilters(owner, opp, rows) {
     ${row('Player', `${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', `${SPORT.name} team`, ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}`)}
     <div class="pp-foot">${n ? '<button type="button" class="link-btn pp-clear" data-action="perf-clear">Clear filters</button>' : ''}<button type="button" class="btn sm" data-action="perf-filt">Done</button></div>
   </div>`;
-  return find + btn + panel;
+  return find + btn + info + panel;
 }
 
 function topPerformancesCard() {

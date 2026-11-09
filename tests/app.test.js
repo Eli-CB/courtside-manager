@@ -268,10 +268,8 @@ test('the tabs: Matchup is this week, Plan Ahead opens on next week until a week
   app.planAheadWeek();
   assert.equal(ui.weekShift, 0, 'a week picked stays');
   Object.assign(ui, { tab: 'dashboard', weekShift: 0, weekChosen: false });
-  // a tab's (i) sits on the tab bar, so its card doesn't repeat the tab's name
-  assert.match(app.tabInfo('dashboard', 'Matchup'), /data-key="dashmatch".*aria-label="About Matchup"/);
-  assert.match(app.tabInfo('players', 'Players'), /data-key="perf"/);
-  assert.equal(app.tabInfo('week', 'Plan Ahead'), '');
+  // Matchup's and Players' (i) sit in the page, not on the tab bar
+  assert.ok(!app.tabList().some(([, l]) => /info/.test(l)));
 });
 
 test('a player out or day-to-day says so in a few letters on the Players table', () => {

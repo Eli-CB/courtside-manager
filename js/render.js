@@ -85,9 +85,6 @@ function leagueMenu() {
 const TABS_NOW = [['dashboard', 'Matchup'], ['week', 'Plan Ahead'], ['recap', 'Recap'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const TABS_BROWSE = [['players', 'Players']]; // browsing without a league
-// A tab's own (i), on the tab bar next to its name (phones: next to the menu button) rather than over its first card
-const TAB_INFO = { dashboard: 'dashmatch', players: 'perf' };
-const tabInfo = (tab, label) => (TAB_INFO[tab] ? `<button type="button" class="info-btn tab-info" data-action="info" data-key="${TAB_INFO[tab]}" aria-label="About ${label}" title="About ${label}">i</button>` : '');
 const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
@@ -268,20 +265,18 @@ function render() {
   leagueMenu();
   gearMenu();
   ctxBar();
-  const cur = !landing && tabList().find(([k]) => k === ui.tab);
-  const info = cur && !ui.season ? tabInfo(ui.tab, cur[1]) : '';
-  $('#tabInfo').innerHTML = info;
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
   if (ui.pendingSeason) { $('#view').innerHTML = loadingCard('Loading that season…'); return; }
   const nav = $('#tabs');
-  const mode = `${ui.season ? 'past:' + ui.season : state.browse ? 'browse' : `now:${SPORT.key}`}|${info && ui.tab}`;
+  const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : `now:${SPORT.key}`;
   if (nav.dataset.mode !== mode) {
     const x = nav.scrollLeft || 0;
-    nav.innerHTML = tabList().map(([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${l}</a>${k === ui.tab ? info : ''}`).join('');
+    nav.innerHTML = tabList().map(([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${l}</a>`).join('');
     nav.dataset.mode = mode;
     nav.scrollLeft = x;
   }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
+  const cur = tabList().find(([k]) => k === ui.tab);
   $('#navCurrent').textContent = cur ? cur[1] : 'Menu';
   if (ui.season) {
     const past = { standings: viewStandings, awards: viewAwards, draft: viewDraft, rosters: viewPastRosters };
