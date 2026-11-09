@@ -258,6 +258,10 @@ function planAheadWeek() {
 
 function render() {
   if (ui.hold) return; // changing sports: the league isn't in place yet
+  // a live update waits while a menu or a text box on the page is in use: redrawing would close the menu (a phone's
+  // picker shuts and the choice is lost) or drop the typing; the next update, or the choice itself, redraws
+  const busy = document.activeElement;
+  if (live.hold && busy && busy.closest && busy.closest('#view') && /^(SELECT|INPUT|TEXTAREA)$/.test(busy.tagName)) return;
   planAheadWeek();
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
