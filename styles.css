@@ -278,7 +278,12 @@ a { color: var(--accent); }
 }
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
-.perf-when { margin: -6px 0 10px; }
+.perf-when { margin: 0 0 0 auto; text-align: right; }
+/* the controls in one bar: groups sit side by side and wrap as a whole */
+.perf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 10px; }
+.perf-bar .perf-filters { margin: 0; }
+.perf-bar .perf-q { flex: 1 1 200px; max-width: none; margin: 0; }
+@media (max-width: 640px) { .perf-when { margin: 0; text-align: left; } }
 /* when: the menu, and Totals / Per game beside it (one row, phones too) */
 .perf-when-pick { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .perf-when-pick .ctx-team { width: auto; min-width: 0; flex: 0 1 auto; }

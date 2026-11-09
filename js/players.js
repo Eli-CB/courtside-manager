@@ -86,7 +86,6 @@ function perfBadges(rows, { range, day, avg, perWeek }) {
   return badges;
 }
 
-// My team and Opponent show their row tint, so they double as the legend
 function perfFilters(owner, opp, rows) {
   const pill = ([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${l}</button>`;
   const teams = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['other', 'Other teams']];
@@ -223,7 +222,8 @@ function topPerformancesCard() {
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
     </table></div>${legend}`;
-  return card(toggle, `<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p>${filters}${table}`);
+  // one bar: when, search, the menus and filters, then what's shown (at the end of the last line), wrapping as the screen narrows
+  return card('', `<div class="perf-bar">${toggle}${filters}<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p></div>${table}`);
 }
 
 /* ---------- NBA players ---------- */
