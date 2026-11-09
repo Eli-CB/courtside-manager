@@ -86,22 +86,31 @@ function perfBadges(rows, { range, day, avg, perWeek }) {
   return badges;
 }
 
-// Whose players the list shows (one choice), and for rostered ones where they are in the lineup: All, Active, Bench
-const PERF_WHO = [['all', 'All players'], ['me', 'My team'], ['opp', 'Opponent'], ['matchup', 'My matchup'], ['other', 'Other teams'], ['fa', 'Waivers']];
-const perfWho = opp => (!opp && ['opp', 'matchup'].includes(ui.perfWho) ? 'all' : ui.perfWho);
+// The filters, behind one button: whose players (yours, the opponent's, the other teams', waivers: any of them), where
+// rostered ones are in the lineup (All, Active, Bench; waivers have no lineup, so it never hides them), then position, NBA
+// team, only rookies, only injured. The button counts the filters that are on.
+const PERF_WHOSE = { me: true, opp: true, other: true, fa: true };
+const perfFilterCount = () => (Object.values(ui.perfWhose).some(v => !v) ? 1 : 0) + (ui.perfSpot !== 'all') + !!ui.perfPos + !!ui.perfTeam + !!ui.perfOnly.rookie + !!ui.perfOnly.inj;
 
 function perfFilters(owner, opp, rows) {
-  // search; whose players (a menu) and, unless it's waivers, All / Active / Bench; then position and NBA team (menus
-  // dressed as pills), only rookies, only injured
-  const who = perfWho(opp);
+  const n = perfFilterCount(), open = ui.perfFiltOpen;
+  const find = `<input id="perfQ" class="perf-q" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(ui.perfQ)}" data-input="perf-q" autocomplete="off">`;
+  const btn = `<button type="button" class="pill perf-filt-btn${n ? ' on' : ''}" data-action="perf-filt" aria-expanded="${!!open}" aria-controls="perfPanel"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 4h12M4.5 8h7M7 12h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Filters${n ? ` <b>${n}</b>` : ''}</button>`;
+  if (!open) return find + btn;
+  const toggle = (k, l, title) => `<button type="button" class="pill${ui.perfWhose[k] ? ' on' : ''}" data-action="perf-whose" data-key="${k}" aria-pressed="${!!ui.perfWhose[k]}"${title ? ` title="${esc(title)}"` : ''}>${l}</button>`;
+  const rostered = ['me', 'opp', 'other'].some(k => ui.perfWhose[k]);
   const spots = [['all', 'All', ''], ['active', 'Active', "In their team's starting lineup"], ['bench', 'Bench', "On their team's bench or IR"]];
-  const whose = !owner.size || !rows.length ? '' : `<div class="perf-filters" role="group" aria-label="Show players"><select class="pill pill-menu${who !== 'all' ? ' on' : ''}" data-change="perf-who" aria-label="Whose players">${PERF_WHO.filter(([k]) => opp || !['opp', 'matchup'].includes(k)).map(([k, l]) => `<option value="${k}"${k === who ? ' selected' : ''}${k === 'opp' ? ` title="${esc(opp.name)}"` : ''}>${l}</option>`).join('')}</select>${who === 'fa' ? ''
-    : `<div class="seg seg-sm" role="group" aria-label="Where in the lineup">${spots.map(([k, l, t]) => `<button type="button" class="${ui.perfSpot === k ? 'on' : ''}" data-action="perf-spot" data-spot="${k}" aria-pressed="${ui.perfSpot === k}"${t ? ` title="${t}"` : ''}>${l}</button>`).join('')}</div>`}</div>`;
   const menu = (action, label, val, opts) => `<select class="pill pill-menu${val ? ' on' : ''}" data-change="${action}" aria-label="${label}"><option value="">${label === 'Position' ? 'All positions' : 'All teams'}</option>${opts.map(x => `<option ${val === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
   const only = (k, l, title) => `<button type="button" class="pill${ui.perfOnly[k] ? ' on' : ''}" data-action="perf-only" data-key="${k}" aria-pressed="${!!ui.perfOnly[k]}" title="${title}">${l}</button>`;
-  const find = `<input id="perfQ" class="perf-q" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(ui.perfQ)}" data-input="perf-q" autocomplete="off">${whose}
-    <div class="perf-filters perf-narrow" role="group" aria-label="Narrow the list">${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', `${SPORT.name} team`, ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}</div>`;
-  return find;
+  const row = (label, body) => `<div class="pp-row"><span class="pp-label">${label}</span><div class="perf-filters">${body}</div></div>`;
+  const league = owner.size && rows.length;
+  const panel = `<div class="perf-panel" id="perfPanel" role="group" aria-label="Filters">
+    ${league ? row('Show', `${toggle('me', 'My team')}${opp ? toggle('opp', 'Opponent', opp.name) : ''}${toggle('other', 'Other teams')}${toggle('fa', 'Waivers', 'Not on a roster in your league')}`) : ''}
+    ${league ? row('Lineup', `<div class="seg seg-sm" role="group" aria-label="Where in the lineup">${spots.map(([k, l, t]) => `<button type="button" class="${ui.perfSpot === k ? 'on' : ''}" data-action="perf-spot" data-spot="${k}" aria-pressed="${ui.perfSpot === k}"${t ? ` title="${t}"` : ''}${rostered ? '' : ' disabled'}>${l}</button>`).join('')}</div>`) : ''}
+    ${row('Player', `${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', `${SPORT.name} team`, ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}`)}
+    <div class="pp-foot">${n ? '<button type="button" class="link-btn pp-clear" data-action="perf-clear">Clear filters</button>' : ''}<button type="button" class="btn sm" data-action="perf-filt">Done</button></div>
+  </div>`;
+  return find + btn + panel;
 }
 
 function topPerformancesCard() {
@@ -190,16 +199,14 @@ function topPerformancesCard() {
   const badges = perfBadges(rows, { range, day, avg, perWeek });
   const legend = badges.size ? '<p class="muted small pf-legend">🚀 best · 🔥 2nd best in a category · 🧊 worst shooting · 🧈 most turnovers</p>' : '';
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
-  // whose players (all, yours, the opponent's, both of this matchup's, the other teams', or on no team: waivers) and, for
-  // rostered players, where they are: active or bench (IR counts as bench); Active or Bench leaves out waivers
+  // whose players (yours, the opponent's, the other teams', waivers: any of them) and, for rostered players, where they
+  // are: active or bench (IR counts as bench); waivers have no lineup, so Active or Bench leaves them be
   const teamOf = r => { const tid = owner.get(r.raw.id); return !tid ? null : tid === mine ? 'me' : opp && tid === opp.id ? 'opp' : 'other'; };
   const filters = perfFilters(owner, opp, rows);
   const q = normName(ui.perfQ);
-  const whose = perfWho(opp);
-  const whoseOk = t => (whose === 'all' ? true : whose === 'fa' ? !t : whose === 'matchup' ? t === 'me' || t === 'opp' : t === whose);
   const picked = rows.filter(r => {
     const t = teamOf(r);
-    return (!owner.size || (whoseOk(t) && (ui.perfSpot === 'all' || whose === 'fa' || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q))
+    return (!owner.size || (ui.perfWhose[t || 'fa'] && (!t || ui.perfSpot === 'all' || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q))
       && (!ui.perfPos || (r.raw.pos || []).includes(ui.perfPos)) && (!ui.perfTeam || r.raw.team === ui.perfTeam)
       && (!ui.perfOnly.rookie || isRookie(r.raw)) && (!ui.perfOnly.inj || !!r.raw.inj);
   });
@@ -208,7 +215,7 @@ function topPerformancesCard() {
   const sorted = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
   // a live update keeps the rows where they were (numbers and ranks change in place; anyone new goes below) so the
   // table doesn't jump while it's read; anything you do sorts it again
-  const sig = [range, perWeek, dates.join(), so.key, so.dir, whose, ui.perfSpot, mine, ui.perfQ, ui.perfPos, ui.perfTeam, JSON.stringify(ui.perfOnly)].join('|');
+  const sig = [range, perWeek, dates.join(), so.key, so.dir, JSON.stringify(ui.perfWhose), ui.perfSpot, mine, ui.perfQ, ui.perfPos, ui.perfTeam, JSON.stringify(ui.perfOnly)].join('|');
   // rows shown: the top 300 over the season, 100 for a day or week, and 100 more each time Show more is tapped (for this
   // list: any other sort, filter or range starts over)
   if (ui.perfMore.sig !== sig) ui.perfMore = { sig, n: 0 };

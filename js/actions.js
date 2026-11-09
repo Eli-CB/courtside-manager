@@ -361,6 +361,19 @@ const actions = {
     render();
   },
   'perf-more'() { ui.perfMore.n += 100; render(); },
+  'perf-filt'() { ui.perfFiltOpen = !ui.perfFiltOpen; render(); },
+  // whose players: any of them, but never none
+  'perf-whose'(el) {
+    const k = el.dataset.key, next = { ...ui.perfWhose, [k]: !ui.perfWhose[k] };
+    if (!Object.values(next).some(Boolean)) return;
+    ui.perfWhose = next;
+    render();
+  },
+  'perf-clear'() {
+    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: '', perfTeam: '' });
+    Object.assign(ui.perfOnly, { rookie: false, inj: false });
+    render();
+  },
   'perf-spot'(el) {
     ui.perfSpot = el.dataset.spot;
     render();
@@ -509,9 +522,6 @@ document.addEventListener('change', e => {
     adoptTeam(el.value);
     state.demo = false;
     commit(`Welcome, ${state.teamName}`);
-  } else if (el.dataset.change === 'perf-who') {
-    ui.perfWho = el.value;
-    render();
   } else if (el.dataset.change === 'perf-pos') {
     ui.perfPos = el.value;
     render();

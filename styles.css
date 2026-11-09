@@ -283,7 +283,18 @@ a { color: var(--accent); }
 .perf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 10px; }
 .perf-bar .perf-filters { margin: 0; }
 .perf-bar .perf-q { flex: 0 1 220px; margin: 0; }
-@media (min-width: 900px) { .perf-bar .perf-narrow { margin-left: auto; } } /* wide: position, team and the rest to the right */
+/* Filters: a button (with how many are on) that opens a panel under the bar */
+.perf-filt-btn { display: inline-flex; align-items: center; gap: 6px; }
+.perf-filt-btn b { font-weight: 700; }
+.perf-panel { order: 10; flex: 1 0 100%; display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.pp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pp-label { width: 52px; flex: none; font-size: .78rem; font-weight: 600; color: var(--muted); }
+.pp-row .perf-filters { flex: 1; min-width: 0; }
+.pp-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+.link-btn.pp-clear { color: var(--muted); font-size: .85rem; } /* not orange: that's for your team */
+.link-btn.pp-clear:hover { color: var(--text); text-decoration: underline; }
+.seg button:disabled { opacity: .45; cursor: default; }
+@media (max-width: 640px) { .pp-row { gap: 6px; } .pp-label { width: 100%; } }
 @media (max-width: 640px) { .perf-when { margin: 0; text-align: left; } }
 /* when: the menu, and Totals / Per game beside it (one row, phones too) */
 .perf-when-pick { display: flex; align-items: center; gap: 8px; min-width: 0; }
