@@ -444,9 +444,9 @@ td.player { min-width: 170px; }
 
 /* ---------- Lineup ---------- */
 .slot-label {
-  display: inline-grid; place-items: center; min-width: 46px; padding: 3px 6px;
-  border-radius: 6px; background: var(--surface-2); color: var(--muted);
-  font-weight: 800; font-size: .78rem; text-transform: none; letter-spacing: 0;
+  display: inline-grid; place-items: center; min-width: 30px; padding: 2px 4px;
+  border-radius: 5px; background: var(--surface-2); color: var(--muted);
+  font-weight: 700; font-size: .68rem; line-height: 1.3; text-transform: none; letter-spacing: 0;
 }
 /* color is kept for what it means (good, bad, a warning, you): positions are plain */
 .pt { font-weight: 700; color: var(--muted); }
