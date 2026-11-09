@@ -109,7 +109,8 @@ function strengthsCard() {
 }
 
 function slotBadge(slot) {
-  const cls = slot === 'IL' ? 'il' : `slot-${slot}`;
+  const pc = slot !== 'IL' && SPORT.slotColors && SPORT.slotColors[slot];
+  const cls = slot === 'IL' ? 'il' : `slot-${slot}${pc ? ` pc pc-${pc}` : ''}`;
   return `<span class="slot-label ${cls}">${slot === 'FLX' ? 'Flx' : slot === 'BN' ? 'Res' : slot}</span>`;
 }
 

@@ -448,7 +448,20 @@ td.player { min-width: 170px; }
   border-radius: 5px; background: var(--surface-2); color: var(--muted);
   font-weight: 700; font-size: .68rem; line-height: 1.3; text-transform: none; letter-spacing: 0;
 }
-/* color is kept for what it means (good, bad, a warning, you): positions are plain */
+/* lineup spots in Fantrax's colors (basketball: SPORT.slotColors), its own shades; lighter ones on dark */
+.slot-label.pc { color: var(--pc); }
+.pc-orange-1 { --pc: #e65e0f; --pc-dark: #fb923c; }
+.pc-orange-2 { --pc: #c04b0c; --pc-dark: #fdba74; }
+.pc-rose-2 { --pc: #bd133d; --pc-dark: #fb7185; }
+.pc-blue { --pc: #0866c4; --pc-dark: #60a5fa; }
+.pc-blue-2 { --pc: #064a98; --pc-dark: #93c5fd; }
+.pc-purple-1 { --pc: #913ae3; --pc-dark: #c084fc; }
+.pc-purple-2 { --pc: #7d2ac6; --pc-dark: #d8b4fe; }
+.pc-emerald-1 { --pc: #059467; --pc-dark: #34d399; }
+.pc-teal-2 { --pc: #0f7b72; --pc-dark: #5eead4; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .slot-label.pc { color: var(--pc-dark); } }
+:root[data-theme="dark"] .slot-label.pc { color: var(--pc-dark); }
+/* color is kept for what it means (good, bad, a warning, you): positions under names are plain */
 .pt { font-weight: 700; color: var(--muted); }
 .slot-label.il { background: var(--bad-soft); color: var(--bad); }
 select, input, textarea {

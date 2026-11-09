@@ -11,6 +11,8 @@ const SPORTS = {
     slotTypes: ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'],
     elig: { PG: ['PG'], SG: ['SG'], SF: ['SF'], PF: ['PF'], C: ['C'], G: ['PG', 'SG'], F: ['SF', 'PF'], FLX: ['PG', 'SG', 'SF', 'PF', 'C'] },
     defaultSlots: ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'],
+    // each lineup spot's color, as Fantrax shows them (its own shades: pc-* in styles.css; Res is its plain blue)
+    slotColors: { PG: 'orange-2', SG: 'rose-2', G: 'orange-1', SF: 'blue-2', PF: 'purple-2', F: 'purple-1', C: 'emerald-1', FLX: 'teal-2', BN: 'blue' },
     broadPos: { G: ['PG', 'SG'], F: ['SF', 'PF'] }, // leagues with broad positions list G / F instead of PG,SG / SF,PF
     // The standard 9 categories, in the order most leagues display them (used when a league's own list is unknown).
     // Percentage categories name the makes and attempts they're built from.
