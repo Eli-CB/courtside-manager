@@ -1951,6 +1951,17 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     if (X.missed.length) assert.ok(html.includes('started without playing a game'));
     // a points week's best is the top score, already in the finals; the share text and the image come from the same list
     assert.ok(X.allPlay && !app.recapItems(X).some(x => x.label === 'Best week') && !html.includes('Best week') && !app.recapText(L, X).includes('Best week'));
+    // a points week's luck: the best score that lost and the worst that won (each only on the wrong side of the middle),
+    // the closest final, and the starter with the biggest share of his team's points
+    const decided = X.games.filter(g => g.margin > 0);
+    const tight = decided.reduce((a, b) => (b.margin < a.margin ? b : a));
+    if (tight.margin >= 0.05 * tight.sc.me) assert.equal(X.close, null, 'no Nail-biter: the closest final is 5% of the winner or more');
+    else if (X.close) assert.equal(X.close.margin, tight.margin, 'Nail-biter: the closest final');
+    if (X.unlucky) assert.ok(X.unlucky.place <= 6 && X.unlucky.sc.opp === Math.max(...decided.map(g => g.sc.opp)), 'Tough luck: the best losing score');
+    if (X.lucky) assert.ok(X.lucky.place > 6 && X.lucky.sc.me === Math.min(...decided.map(g => g.sc.me)), 'Lucky win: the worst winning score');
+    assert.ok(X.carry && X.carry.share >= 0.2 && X.carry.pts < X.carry.of, "Carried: a fifth or more of his team's points");
+    assert.ok(app.recapItems(X).some(x => x.label === 'Carried'));
+    assert.ok(!X.goalie && !X.hats.length && !X.defense, 'no hockey or football items in basketball');
   } finally { ui.tab = 'dashboard'; }
   // Awards so far run on the same weeks
   ui.tab = 'awards';
@@ -2413,6 +2424,10 @@ test('hockey history: weeks, recaps and awards run on its box scores, and a heal
     assert.ok(!/undefined|NaN|\[object/.test(again.replace(/<[^>]*>/g, ' ')), `${tab} has only real numbers`);
     assert.ok(html.length && again.length > 100, tab);
   }
+  // the recap's hockey items: a goalie of the week (a goalie's line), and three-goal games
+  const X = [...a.get('recaps').values()].find(Boolean);
+  assert.ok(!X.goalie || (X.goalie.line.sa || X.goalie.line.gs) && X.goalie !== X.mvp, 'Goalie of the week: a goalie, not the Player of the week');
+  assert.ok(X.hats.every(x => a.lineStat(x.line, 'g') >= 3));
   ui.tab = 'standings';
 });
 
@@ -2644,8 +2659,13 @@ test('football on the page: lines in words, finished weeks, this week, byes and 
   }
   ui.tab = 'standings';
   quiet(a);
+  // the recap's football item: the best team defense started (when the Player of the week isn't one)
+  const X = [...a.get('recaps').values()].find(Boolean);
+  assert.ok(X, 'a football recap');
+  assert.ok(!X.defense || (X.defense.p.pos[0] === 'DEF' && X.defense !== X.mvp));
+  assert.ok(!X.goalie && !X.hats.length, 'no hockey items');
   // the player card
-  const qb = a.get('NBA').players.find(p => p.pos[0] === 'QB' && p.cur), def = a.get('NBA').players.find(p => p.pos[0] === 'DEF');
+  const qb =a.get('NBA').players.find(p => p.pos[0] === 'QB' && p.cur), def = a.get('NBA').players.find(p => p.pos[0] === 'DEF');
   assert.equal(a.cardStats(qb)[0][0], 'Pass yd');
   assert.equal(a.cardStats(def)[0][0], 'Sacks');
   assert.deepEqual([...a.gameStats(qb, { pass_yd: 300 })[0]], ['300 pass yd']);

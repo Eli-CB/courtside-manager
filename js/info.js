@@ -43,7 +43,9 @@ const INFO = {
     <li><b>Worst game:</b> the worst single game by a starter.</li>
     <li><b>Street clothes:</b> the starter who missed the most of his NBA team's games while in a starting lineup that week (injury, rest or coach's decision; the box scores can't tell which).</li>
     <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Plan Ahead, for a finished week).</li>
-    <li><b>Best week</b> (category leagues): the team whose week would have beaten the most others. In a points league that's simply the top score in the finals.</li></ul>
+    <li><b>Best week</b> (category leagues): the team whose week would have beaten the most others. In a points league that's simply the top score in the finals.</li>
+    <li><b>Points leagues:</b> <b>Carried</b>, the starter with the biggest share of his team's points (a fifth or more); <b>Tough luck</b>, the best score that lost, when it was in the league's top half; <b>Lucky win</b>, the worst score that won, when it was in the bottom half; <b>Nail-biter</b>, the closest final.</li>
+    <li><b>Hockey:</b> <b>Goalie of the week</b> (when the Player of the week isn't a goalie) and every starter's <b>Hat trick</b>. <b>Football:</b> <b>Defense of the week</b>, the best team defense started.</li></ul>
     <p><b>Sleeper leagues</b> count one game a week for each starter, so a starter's week is the game that counted (the one whose fantasy points match Sleeper's for him that week, bonuses included). Player of the week is the best of those games and Worst game the worst; there's no separate Game of the week or Worst week. Street clothes is a starter who didn't play a game all week while his NBA team did, and a bench regret puts in the bench player's best game.</p>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
   moves: ['Waiver wire', `

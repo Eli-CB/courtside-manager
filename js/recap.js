@@ -78,9 +78,39 @@ function buildRecap(L, P, period) {
   // the starters who missed the most of their NBA team's games while in a starting lineup that week
   const missedBy = Object.entries(startersMissed({ ...L, weeks: rps, fidNba: currentFidNba() }, P.G) || {}).flatMap(([tid, ps]) => ps.filter(x => x.games).map(x => ({ ...x, tid })));
   const most = Math.max(0, ...missedBy.map(x => x.games));
+  // Points leagues: every team's score, ranked, for the luck of the draw: the best score that lost, the worst that won
+  // (each only when it was on the wrong side of the league's middle), the closest final (under 5% of the winner's score,
+  // as Heartbreak Hotel counts a close loss; not a game already told as luck), and the starter who carried his team (the
+  // biggest share of its points)
+  let pointsBits = {};
+  if (isPoints() && R.length > 2) {
+    const score = new Map(R.map(S => [S.tid, lineFp(S.tot)]));
+    const sorted = [...score.values()].sort((a, b) => b - a), place = v => sorted.findIndex(x => x <= v + 1e-9) + 1;
+    const mid = R.length / 2, decided = games.filter(g => g.margin > 0);
+    const lost = best(decided, g => g.sc.opp), won = best(decided, g => -g.sc.me);
+    const tight = best(decided, g => -g.margin);
+    const carry = best(weeks.map(x => ({ ...x, share: lineFp(x.line) / score.get(x.tid) })).filter(x => score.get(x.tid) > 0), x => x.share);
+    const unlucky = lost && place(lost.sc.opp) <= mid ? { ...lost, place: place(lost.sc.opp) } : null;
+    const lucky = won && place(won.sc.me) > mid ? { ...won, place: place(won.sc.me) } : null;
+    pointsBits = {
+      unlucky, lucky,
+      close: tight && tight.margin < 0.05 * tight.sc.me && ![unlucky, lucky].some(x => x && x.a === tight.a) ? tight : null,
+      carry: carry && carry.share >= 0.2 ? { ...carry, pts: lineFp(carry.line), of: score.get(carry.tid) } : null,
+    };
+  }
+  // Hockey: the best goalie's week (when Player of the week isn't one), and every starter's three-goal game
+  const isGoalie = line => !!(line.sa || line.gs);
+  const goalie = isHockey() ? best(weeks.filter(x => isGoalie(x.line)), x => x.v) : null;
+  const mvp = best(weeks, x => x.v);
+  // Football: the best team defense started
+  const defense = isFootball() ? best(weeks.filter(x => x.p.pos[0] === 'DEF'), x => x.v) : null;
   return {
+    ...pointsBits,
+    goalie: goalie && goalie !== mvp ? goalie : null,
+    hats: isHockey() ? single.filter(x => !isGoalie(x.line) && lineStat(x.line, 'g') >= 3) : [],
+    defense: defense && defense !== mvp ? defense : null,
     period, games: order,
-    mvp: best(weeks, x => x.v),
+    mvp,
     game: L.oneGame ? null : best(single, x => x.v), // one-game weeks: the player of the week's game
     // the least a starter did a game over the week, among those with 2 or more games (one short night isn't a week)
     brick: L.oneGame ? null : best(weeks.filter(x => x.line.gp1 >= 2), x => -x.v / x.line.gp1),
@@ -109,6 +139,8 @@ function recapItems(X) {
       `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}` });
   };
   if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
+  if (X.goalie) stand('🥅', 'Goalie of the week', X.goalie, true);
+  if (X.defense) stand('🛡️', 'Defense of the week', X.defense, false);
   if (X.game) stand('🚀', 'Game of the week', X.game, false);
   if (X.brick) stand('🧱', 'Worst week', X.brick, true, X.brick.v < 0 ? 'pos-bad' : '');
   if (X.dud) stand('🗑️', 'Worst game', X.dud, false, X.dud.v < 0 ? 'pos-bad' : '');
@@ -125,6 +157,29 @@ function recapItems(X) {
     const r = X.regret, o = Math.sign(Math.round((r.sc.me - r.sc.opp) * 10)), res = o > 0 ? 'won' : 'tied';
     add('🪑', 'Bench regret', `<b>${teamLink(r.tid)}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
       `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`);
+  }
+  if (X.hats && X.hats.length) {
+    const who = html => X.hats.map(x => (html ? `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span>` : `${x.p.name} (${team(x.tid)})`)).join(', ');
+    const tail = X.hats.length > 1 ? 'each scored three goals in a game' : `scored ${fmt(lineStat(X.hats[0].line, 'g'), 0)} goals in a game`;
+    add('🎩', 'Hat trick', `${who(true)} ${tail}`, `${who(false)} ${tail}`);
+  }
+  if (X.carry) {
+    const c = X.carry, pct = Math.round(c.share * 100);
+    add('🎒', 'Carried', `${name(c.p, true)} scored ${fmt(c.pts, 1)} of <b>${teamLink(c.tid)}</b>'s ${fmt(c.of, 1)} (${pct}%)`,
+      `${c.p.name} scored ${fmt(c.pts, 1)} of ${team(c.tid)}'s ${fmt(c.of, 1)} (${pct}%)`);
+  }
+  const final = g => `${fmt(g.sc.me, 1)}–${fmt(g.sc.opp, 1)}`;
+  if (X.unlucky) {
+    const g = X.unlucky, said = `scored ${fmt(g.sc.opp, 1)}, the ${g.place === 1 ? 'most' : ordinal(g.place) + ' most'} in the league, and still lost`;
+    add('😩', 'Tough luck', `<b>${teamLink(g.b)}</b> ${said} to ${teamLink(g.a)} ${final(g)}`, `${team(g.b)} ${said} to ${team(g.a)} ${final(g)}`);
+  }
+  if (X.lucky) {
+    const g = X.lucky, said = `won with ${fmt(g.sc.me, 1)}, the ${g.place === X.teams ? 'fewest' : ordinal(g.place) + ' most'} in the league`;
+    add('🍀', 'Lucky win', `<b>${teamLink(g.a)}</b> ${said}, over ${teamLink(g.b)} ${final(g)}`, `${team(g.a)} ${said}, over ${team(g.b)} ${final(g)}`);
+  }
+  if (X.close) {
+    const g = X.close, by = `by ${fmt(g.margin, g.margin < 1 ? 2 : 1)}`;
+    add('😬', 'Nail-biter', `<b>${teamLink(g.a)}</b> beat ${teamLink(g.b)} ${final(g)}, ${by}`, `${team(g.a)} beat ${team(g.b)} ${final(g)}, ${by}`);
   }
   // Best week: a category week is hard to read from the finals; a points week is just the top score, there for all to see
   if (X.allPlay && X.teams > 2 && !isPoints()) {
