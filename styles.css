@@ -304,6 +304,7 @@ a { color: var(--accent); }
 .pill.pill-menu.on { background-color: var(--text); border-color: var(--text); color: var(--surface); }
 .perf-table .pf-emo { margin-right: 2px; font-size: .9em; }
 .pf-legend { margin: 8px 0 0; }
+@media (max-width: 640px) { .pf-legend { display: none; } } /* phones: the emoji keep their tooltips; no room for the key */
 /* weekly recap */
 .rc-when { margin: -6px 0 10px; }
 .rc-img { display: block; width: 100%; max-height: 60vh; object-fit: contain; border-radius: 10px; margin: 0 0 12px; background: #15171b; }
