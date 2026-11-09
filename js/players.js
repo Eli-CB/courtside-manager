@@ -88,7 +88,7 @@ function perfBadges(rows, { range, day, avg, perWeek }) {
 
 // My team and Opponent show their row tint, so they double as the legend
 function perfFilters(owner, opp, rows) {
-  const pill = ([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${k === 'me' || k === 'opp' ? `<span class="pf-swatch pf-${k}"></span>` : ''}${l}</button>`;
+  const pill = ([k, l, title]) => `<button type="button" class="pill${ui.perfShow[k] ? ' on' : ''}" data-action="perf-show" data-group="${k}" aria-pressed="${!!ui.perfShow[k]}"${title ? ` title="${esc(title)}"` : ''}>${l}</button>`;
   const teams = [['me', 'My team'], ...(opp ? [['opp', 'Opponent', opp.name]] : []), ['other', 'Other teams']];
   const where = [['active', 'Active', 'In their team\'s starting lineup'], ['bench', 'Bench', 'On their team\'s bench or IR'], ['fa', 'Waivers', 'Not on a roster in your league']];
   // search, then pill buttons: position and NBA team (menus dressed as pills), only rookies, only injured; then
@@ -144,8 +144,8 @@ function topPerformancesCard() {
   // except on IR (out of the lineup, so whose he is helps)
   const who = id => {
     const tid = owner.get(id);
-    if (tid && (tid === mine || (opp && tid === opp.id)) && spot.get(id).st !== 'INJURED_RESERVE') return lineupBadge(id);
-    if (tid) return `<span class="perf-owner">${teamLink(tid)}</span> ${lineupBadge(id)}`;
+    // every rostered player names his team: yours in orange, this matchup's opponent in bold
+    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : opp && tid === opp.id ? ' opp' : ''}">${teamLink(tid)}</span> ${lineupBadge(id)}`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge good">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };

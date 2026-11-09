@@ -1052,7 +1052,7 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
     html = app.topPerformancesCard();
     assert.equal(count(html), per[me]);
     assert.ok(ids(html).every(id => owned.get(id) === me), 'only my players');
-    assert.equal((html.match(/<tr class="pf-me">/g) || []).length, ids(html).length, 'my rows are tinted');
+    assert.equal((html.match(/<tr class="pf-me">/g) || []).length, ids(html).length, 'my rows are marked');
     assert.ok(!html.includes('>Your team<'), 'no Your team badge');
     app.ui.perfShow.me = false; app.ui.perfShow.fa = true;
     html = app.topPerformancesCard();
@@ -1064,7 +1064,7 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
       app.ui.perfShow.opp = true;
       html = app.topPerformancesCard();
       assert.ok(ids(html).length && ids(html).every(id => owned.get(id) === opp.id), "only the opponent's players");
-      assert.ok(html.includes('<tr class="pf-opp">') && html.includes(`title="Opponent: ${opp.name.replace(/'/g, '&#39;')}"`), "the opponent's rows are tinted");
+      assert.ok(html.includes('<tr class="pf-opp">') && html.includes(`title="Opponent: ${opp.name.replace(/'/g, '&#39;')}"`), "the opponent's rows are marked");
     }
   } finally {
     app.state.fxTeam = was;
@@ -1213,7 +1213,12 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
     const stOf = tr => spot.get(+tr.match(/data-nba="(\d+)"/)[1]);
     assert.ok(rowsOf(html).every(tr => tr.includes('badge active') === (stOf(tr) === 'ACTIVE')), 'Active badge on exactly the active players');
     assert.ok(rowsOf(html).every(tr => tr.includes('badge bench') === (!!stOf(tr) && stOf(tr) !== 'ACTIVE' && stOf(tr) !== 'INJURED_RESERVE')), 'Bench badge on the rest of the rostered players');
-    // IR: a red badge and always the fantasy team's name, even on your team or the opponent's
+    // every rostered player names his fantasy team: yours in orange (mine), the opponent's in bold (opp)
+    const me = app.get('state').fxTeam;
+    assert.ok(rowsOf(html).filter(tr => tr.startsWith('<tr class="pf-me"') || tr.includes('<tr class="pf-me">')).every(tr => tr.includes('class="perf-owner mine"')), 'your team in orange');
+    assert.ok(rowsOf(html).filter(tr => tr.includes('class="pf-opp"')).every(tr => tr.includes('class="perf-owner opp"')), 'the opponent in bold');
+    assert.ok(me && html.includes('class="perf-owner mine"'));
+    // IR: a red badge and the fantasy team's name
     const owners = new Map(Object.entries(L.rosters).flatMap(([tid, r]) => r.filter(x => x.nba).map(x => [x.nba, tid])));
     app.ui.perfRange = 'avg';
     const avg = rowsOf(app.topPerformancesCard()).filter(tr => stOf(tr) === 'INJURED_RESERVE');
@@ -1222,7 +1227,7 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
     for (const tr of avg) {
       const tid = owners.get(+tr.match(/data-nba="(\d+)"/)[1]);
       assert.ok(tr.includes('<span class="badge bad" title="On injured reserve">IR</span>'), 'red IR badge');
-      assert.ok(tr.includes(`<span class="perf-owner">${app.teamLink(tid)}</span>`) && tr.includes(`data-action="team-card" data-team="${tid}"`), `${app.fxTeamName(tid)}'s IR player shows the team, a link to its card`);
+      assert.ok(/<span class="perf-owner( mine| opp)?">/.test(tr) && tr.includes(`${app.teamLink(tid)}</span>`) && tr.includes(`data-action="team-card" data-team="${tid}"`), `${app.fxTeamName(tid)}'s IR player shows the team, a link to its card`);
     }
     assert.ok(html.indexOf('data-group="other"') < html.indexOf('pf-sep') && html.indexOf('pf-sep') < html.indexOf('data-group="fa"'), 'Waivers sits with Active and Bench');
     app.ui.perfShow.bench = false;
