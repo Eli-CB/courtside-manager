@@ -220,6 +220,8 @@ function topPerformancesCard() {
   perfOrder = { sig, ids: shown.map(r => r.raw.id) };
   const count = `${picked.length > shown.length ? `${shown.length} of ` : ''}${picked.length} player${picked.length === 1 ? '' : 's'}`;
   // today before tip-off: when the first game starts
+  // a game on today: its clock (a finished one says nothing: its line is there, nothing's moving)
+  const clock = r => { const st = liveStatus(r.raw, day); return st && st !== 'Final' ? `${st} · ` : ''; };
   const first = live.games.filter(g => g.d === day && g.state === 'pre').sort((a, b) => a.start - b.start)[0];
   const waiting = range === 'today' && !rows.length ? `<p class="muted small" style="margin:0">${live.at || live.error ? `No games have started yet.${first ? ` First tip-off ${fmtTime(first.start)}.` : ''}` : "Loading today's games…"}</p>` : '';
   const table = !rows.length ? waiting : !shown.length ? '<p class="muted small" style="margin:0">No players match these filters.</p>' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
@@ -227,7 +229,7 @@ function topPerformancesCard() {
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 28)}<div class="bmain">
           <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button>${rookieBadge(r.raw, 'by-name')}${injBadge(r.raw.inj, 'by-name')}</div>
-          <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${proj ? `${esc(r.game)} · ` : avg || perWeek ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today && liveStatus(r.raw, day) ? `${liveStatus(r.raw, day)} · ` : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
+          <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${proj ? `${esc(r.game)} · ` : avg || perWeek ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today ? clock(r) : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
