@@ -456,6 +456,11 @@ function showPlayerDetail(nbaId) {
       ${isGoalie(raw) ? `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? `about ${fmt(raw.inj && raw.inj.status === 'Out' ? 0 : expectedGames({ ...raw, nbaId: raw.id }, matchDates(weekStartAt(0)).filter(d => d >= todayIso() && !gameFinal(raw, d))), 1)}` : '—'}</div><div class="pc-rank">${t ? `of ${t.left} games` : ''}</div></div>`
     : isFootball() ? (() => { const week = matchDates(weekStartAt(0)), p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, week) ? fmt(footballPts(p, week), 1) : 'Bye'}</div></div>`; })()
     : `<div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>`}
+      ${isFootball() ? '' : (() => {
+        // the next matchup period's games (its team's schedule), for planning next week's lineup
+        const next = weekShifts().filter(x => x > 0)[0], dates = next ? matchDates(weekStartAt(next)) : [];
+        return `<div class="proj"><div class="k">Games next period</div><div class="v">${dates.length ? gamesIn(playerFromRaw(raw), dates) : '—'}</div></div>`;
+      })()}
       ${(() => {
         // his value, and under it his rank among every NBA player this season (per game: regulars only)
         const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
