@@ -327,6 +327,12 @@ a { color: var(--accent); }
 .pill:hover { background: var(--surface-2); }
 .pill.on { background: var(--text); border-color: var(--text); color: var(--surface); }
 .badge.active { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--muted); }
+/* Players: where a rostered player is, as a mark: filled = starting lineup, hollow = bench */
+.lu-ico { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 2px; vertical-align: 0; box-sizing: border-box; }
+.lu-ico.active { background: var(--text); }
+.lu-ico.bench { border: 1.5px solid var(--muted); }
+/* not on a roster: grey, so it doesn't read as a good number */
+.badge.fa { background: var(--surface-2); color: var(--muted); }
 .badge.bench { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
 .perf-wrap { overflow: auto; margin: 0 0 14px; } /* no padding: pinned columns stick to its edges */
 .perf-table { width: 100%; border-collapse: separate; border-spacing: 0; }

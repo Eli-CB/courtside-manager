@@ -941,7 +941,7 @@ test('player card: a fantasy team with its lineup spot', async () => {
   const html = app.cardOwner(app.nbaById.get(x.nba));
   assert.ok(html.includes(app.esc(app.fxTeamName(tid))) && html.includes('badge bad">IR'), 'team and a red IR badge');
   const fa = app.NBA.players.find(r => r.fx && r.fx.st !== 'T' && !Object.values(L.rosters).flat().some(y => y.nba === r.id));
-  if (fa) assert.match(app.cardOwner(fa), /badge good">(Waivers|Free agent|Available)</);
+  if (fa) assert.match(app.cardOwner(fa), /badge fa">(Waivers|Free agent|Available)</);
 });
 
 test('performances: every range marks each category leader with an emoji', async () => {
@@ -1227,8 +1227,8 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
     assert.ok(html.includes('data-spot="all" aria-pressed="true"') && html.includes('data-spot="active" aria-pressed="false"'), 'All by default');
     const rowsOf = h => h.split('<tbody>')[1].split('</tr>').slice(0, -1);
     const stOf = tr => spot.get(+tr.match(/data-nba="(\d+)"/)[1]);
-    assert.ok(rowsOf(html).every(tr => tr.includes('badge active') === (stOf(tr) === 'ACTIVE')), 'Active badge on exactly the active players');
-    assert.ok(rowsOf(html).every(tr => tr.includes('badge bench') === (!!stOf(tr) && stOf(tr) !== 'ACTIVE' && stOf(tr) !== 'INJURED_RESERVE')), 'Bench badge on the rest of the rostered players');
+    assert.ok(rowsOf(html).every(tr => tr.includes('lu-ico active') === (stOf(tr) === 'ACTIVE')), 'Active mark on exactly the active players');
+    assert.ok(rowsOf(html).every(tr => tr.includes('lu-ico bench') === (!!stOf(tr) && stOf(tr) !== 'ACTIVE' && stOf(tr) !== 'INJURED_RESERVE')), 'Bench mark on the rest of the rostered players');
     // every rostered player names his fantasy team: yours in orange (mine), the opponent's in bold (opp)
     const me = app.get('state').fxTeam;
     assert.ok(rowsOf(html).filter(tr => tr.startsWith('<tr class="pf-me"') || tr.includes('<tr class="pf-me">')).every(tr => tr.includes('class="perf-owner mine"')), 'your team in orange');
