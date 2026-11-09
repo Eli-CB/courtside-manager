@@ -1,39 +1,15 @@
-// League Layer: Alerts, page rendering, the league and season bar, past seasons.
+// League Layer: page rendering, the league and season bar, past seasons.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
 // Whether a menu's fold was open, so drawing it again keeps it that way
 const isOpen = (el, sel = 'details') => !!(el.querySelector(sel) && el.querySelector(sel).open);
 
-/* =========================================================
-   Alerts
-   ========================================================= */
-function buildAlerts() {
-  const a = [];
-  state.lineup.forEach((id, i) => {
-    const p = byId(id);
-    if (!p) a.push({ lvl: 'warn', msg: `Empty <b>${state.slots[i]}</b> slot in your starting lineup.` });
-    else if (p.status === 'Out') a.push({ lvl: 'bad', msg: `<b>${esc(p.name)}</b> is Out but starting at ${state.slots[i]}.` });
-    else if (p.status === 'DTD') a.push({ lvl: 'warn', msg: `<b>${esc(p.name)}</b> is day-to-day — confirm before lock.` });
-  });
-  for (const p of ilPlayers()) {
-    if (p.status === 'Healthy') a.push({ lvl: 'warn', msg: `<b>${esc(p.name)}</b> is healthy but sitting on IL.` });
-  }
-  if (state.il.length > state.ilSize) a.push({ lvl: 'bad', msg: `IL has ${state.il.length} players but only ${state.ilSize} spots.` });
-  const over = activeCount() - rosterLimit();
-  if (over > 0) a.push({ lvl: 'bad', msg: `Roster is ${over} over the ${rosterLimit()}-player limit. Drop or IL someone.` });
-  // lineup advice lives on Matchups, where it plays to the actual matchup
-  if (NBA && state.opp.players.length && (state.lineupMode === 'weekly' || isFootball())) {
-    const ctx = weekContext();
-    const better = ctx.bestIds && [...ctx.bestIds].some(id => !ctx.setIds.has(id));
-    if (better) a.push({ lvl: 'warn', msg: `A better lineup for this week takes you from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> to win.`, action: 'go-week', label: 'See it' });
-  }
-  if (!a.length) a.push({ lvl: 'good', msg: 'Lineup is set and everyone starting is healthy.' });
-  // the waiver order, where the league's site shares it (ESPN, Sleeper; Fantrax doesn't): this season only
+// Where you are in the waiver order, where the league's site shares it (ESPN, Sleeper; Fantrax doesn't): this season
+// only. On Standings, with the full order a tap away.
+function waiverLine() {
   const W = !ui.season && !seasonCtx && fxLeague() && fxLeague().waivers, mine = W && W.find(w => w.id === state.fxTeam);
-  if (mine) a.push({ lvl: '', msg: `You're <b>#${mine.rank}</b> of ${W.length} on waivers${mine.left != null ? `, with $${mine.left} of budget left` : ''}.`, action: 'waiver-order', label: 'See waiver order' });
-  // a fresh recap has its own line under the matchup (recapFold)
-  return a;
+  return mine ? `<p class="muted small waiver-line">You're <b>#${mine.rank}</b> of ${W.length} on waivers${mine.left != null ? `, with $${mine.left} of budget left` : ''} · <button type="button" class="link-btn quiet" data-action="waiver-order">See waiver order</button></p>` : '';
 }
 
 /* =========================================================

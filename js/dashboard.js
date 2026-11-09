@@ -1,4 +1,4 @@
-// League Layer: Dashboard: the matchup, its folds and action items.
+// League Layer: the Matchup tab: the matchup and the folds under it.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
@@ -10,17 +10,11 @@ function viewDashboard() {
   return `
   <div class="dash-grid">
     ${NBA ? dashMatchupCard() : ''}
-    <div class="dash-folds">${recapFold()}${NBA ? movesCard() : ''}${newsCard()}</div>
-    <div class="card">
-      <div class="card-head"><h2>Action items</h2></div>
-      <ul class="alerts">
-        ${buildAlerts().map(x => `<li class="alert ${x.lvl}"><span class="dot"></span><span class="grow">${x.msg}</span>${x.action ? `<button class="btn sm" data-action="${x.action}">${x.label}</button>` : ''}</li>`).join('')}
-      </ul>
-    </div>
+    <div class="dash-folds">${recapFold()}${NBA ? movesCard() : ''}</div>
   </div>`;
 }
 
-// Under the matchup, one line each (the recap, the waiver wire, injury news): the line says what's inside, a tap opens
+// Under the matchup, one line each (the recap, the waiver wire): the line says what's inside, a tap opens
 // the rest. Open ones stay open when the page is drawn again (live updates) and on coming back to the tab, this visit.
 // dot: 'bad' / 'warn' / 'good' for a colored dot before the title
 function dashFold(key, title, sub, body, dot = '') {
@@ -273,16 +267,6 @@ function dashMatchupCard() {
   }
   chipWas = new Map();
   return card(toggle, `${head}${catTable}${dashWeekRows(C, A, B)}`);
-}
-
-function newsCard() {
-  const mine = state.players.filter(p => p.inj);
-  mine.sort((a, b) => (b.inj.date || '').localeCompare(a.inj.date || ''));
-  const out = mine.filter(p => p.inj.status === 'Out').length;
-  const body = mine.length ? `<ul class="alerts">${mine.slice(0, 6).map(p => `<li class="alert ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${headshot(p, 32)}<span class="grow"><b>${esc(p.name)}</b> <span class="badge ${p.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(p.inj.label)}</span><br><span class="small">${esc(p.inj.note)}</span> <span class="muted small">${p.inj.date ? fmtDay(p.inj.date) : ''}</span></span></li>`).join('')}</ul>`
-    : `<p class="muted small" style="margin:0">${NBA ? 'None of your players are on the injury report.' : `Injury news appears here when live ${SPORT.name} data is available.`}</p>`;
-  const sub = !NBA ? `when ${SPORT.name} data is available` : !mine.length ? 'none of your players' : `${mine.length} of your players${out ? ` · ${out} out` : ''}`;
-  return dashFold('news', 'Injury news', sub, `${body}<p class="muted small df-src">Your players · from ESPN</p>`, mine.length ? (out ? 'bad' : 'warn') : '');
 }
 
 // ----- This week's waiver moves: who joined and left each team since last week's rosters -----

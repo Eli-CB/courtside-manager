@@ -1571,7 +1571,6 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     // the Dashboard points to it for three days
     assert.equal(app.freshRecap().n, 1);
     assert.ok(app.recapFold().includes('data-action="go-recap"') && app.recapFold().includes('Week 1 recap'), 'a line under the matchup');
-    assert.ok(!app.buildAlerts().some(a => a.action === 'go-recap'), 'not also an action item');
   } finally { ui.tab = 'dashboard'; }
   // leagues that don't share past lineups say so
   await app.useLeague(ESPN);
@@ -2091,7 +2090,7 @@ test("Fantrax's 'too many requests' in a normal answer waits as long as it says,
   } finally { app.fetch = realFetch; }
 });
 
-test('the waiver order: from ESPN and Sleeper, in the action items and a popup; Fantrax shares none', async () => {
+test('the waiver order: from ESPN and Sleeper, a line under the standings and a popup; Fantrax shares none', async () => {
   const E = await app.useLeague(ESPN);
   assert.deepEqual(E.waivers.map(w => w.rank), E.waivers.map((w, i) => i + 1), 'first claim first');
   assert.ok(E.waivers.every(w => w.left === null), 'no budget in this league');
@@ -2101,19 +2100,21 @@ test('the waiver order: from ESPN and Sleeper, in the action items and a popup; 
   const st = app.get('state'), was = st.fxTeam;
   try {
     useTeam(S.waivers[2].id);
-    const item = app.buildAlerts().find(a => a.action === 'waiver-order');
-    assert.ok(item && item.msg.includes('<b>#3</b> of 12'), item && item.msg);
+    const line = app.waiverLine();
+    assert.ok(line.includes('<b>#3</b> of 12') && line.includes('data-action="waiver-order"'), line);
+    assert.ok(app.viewStandings().includes(line), 'under the standings');
+    assert.ok(!app.viewDashboard().includes('Action items') && !app.viewDashboard().includes('Injury news'), 'not on Matchup');
     const pop = app.waiverPopup();
     assert.equal((pop.match(/<li/g) || []).length, 12);
     assert.ok(pop.includes('class="me"') && pop.includes(app.fxTeamName(S.waivers[2].id)));
     const ui = app.get('ui');
     ui.season = 'past';
-    try { assert.ok(!app.buildAlerts().some(a => a.action === 'waiver-order'), 'not while a past season is on screen'); } finally { ui.season = null; }
+    try { assert.equal(app.waiverLine(), '', 'not while a past season is on screen'); } finally { ui.season = null; }
     // Fantrax doesn't share it: no item
     const F = await app.useLeague(CATS9);
     assert.equal(F.waivers, undefined);
     useTeam(F.teams[0].id);
-    assert.ok(!app.buildAlerts().some(a => a.action === 'waiver-order'));
+    assert.equal(app.waiverLine(), '');
   } finally { st.fxTeam = was; }
 });
 
