@@ -237,7 +237,7 @@ a { color: var(--accent); }
 .mu-p.right { align-items: flex-end; text-align: right; }
 .mu-p.right .bplayer { flex-direction: row-reverse; }
 .mu-p .bname .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.mu-p.live { background: color-mix(in srgb, var(--good) 7%, var(--surface)); }
+.mu-p.live { --live-bg: color-mix(in srgb, var(--good) 7%, var(--surface)); background: var(--live-bg); }
 .mu-row.bench .mu-p, .mu-p.bench, .mu-p.out { opacity: .62; }
 .mu-game { font-size: .78rem; color: var(--muted); }
 .mu-game b { color: var(--bad); }
@@ -273,6 +273,9 @@ a { color: var(--accent); }
   .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
   .mu-slot .slot-label { font-size: .62rem; padding: 2px 2px; }
   .mu-p { padding: 7px 2px; }
+  /* phones: the card runs edge to edge, so a game on's green runs to the screen's edge too, not 16px short of it */
+  .mu-p.live:not(.right) { box-shadow: -16px 0 0 var(--live-bg); }
+  .mu-p.live.right { box-shadow: 16px 0 0 var(--live-bg); }
   .mu-cats { font-size: .74rem; }
   .mu-cats thead th { font-size: .64rem; }
 }
