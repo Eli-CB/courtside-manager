@@ -222,7 +222,7 @@ function gearMenu() {
   const advOpen = isOpen(el, '.gear-adv');
   // the phone's status bar follows the site's theme, as chosen here, not only the device's
   const colorNow = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = colorNow === 'dark' ? '#09090b' : '#ffffff'; });
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = colorNow === 'dark' ? '#141416' : '#ffffff'; });
   const dark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
   const league = fxLeague() && !needsLanding() && !state.demo;
   el.innerHTML = `<details class="gear"${wasOpen ? ' open' : ''}>

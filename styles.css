@@ -25,9 +25,9 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #09090b;
-    --surface: #09090b;
-    --surface-2: #18181b;
-    --border: #27272a;
+    --surface: #141416; /* a step off the page, as white is off light grey */
+    --surface-2: #202024;
+    --border: #2c2c31;
     --text: #fafafa;
     --muted: #a1a1aa;
     --accent: #f97316;
@@ -51,9 +51,9 @@
   --b2b: #facc15;
   --b2b-ring: #15803d;
   --bg: #09090b;
-  --surface: #09090b;
-  --surface-2: #18181b;
-  --border: #27272a;
+  --surface: #141416; /* a step off the page, as white is off light grey */
+  --surface-2: #202024;
+  --border: #2c2c31;
   --text: #fafafa;
   --muted: #a1a1aa;
   --accent: #f97316;
@@ -996,7 +996,7 @@ a.lm-item { text-decoration: none; }
 /* ---------- Phones: sections run edge to edge with a line between, no rounded boxes or gaps; those after a tab's
    first one with a heading roll up to it (rollCards) ---------- */
 @media (max-width: 640px) {
-  :root { --bg: var(--surface); }
+  body { background: var(--surface); } /* one color behind the edge-to-edge sections, in light and dark */
   .container { padding-top: 0; }
   #view > :first-child:not(.card):not(.dash-grid):not(.week-stack) { margin-top: 14px; }
   #view .card { margin-inline: -16px; border-radius: 0; border-width: 0 0 1px; box-shadow: none; padding: 14px 16px; }
