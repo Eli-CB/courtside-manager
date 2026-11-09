@@ -361,8 +361,8 @@ const actions = {
     render();
   },
   'perf-more'() { ui.perfMore.n += 100; render(); },
-  'perf-show'(el) {
-    ui.perfShow[el.dataset.group] = !ui.perfShow[el.dataset.group];
+  'perf-spot'(el) {
+    ui.perfSpot = el.dataset.spot;
     render();
   },
   'perf-sort'(el) {
@@ -509,6 +509,9 @@ document.addEventListener('change', e => {
     adoptTeam(el.value);
     state.demo = false;
     commit(`Welcome, ${state.teamName}`);
+  } else if (el.dataset.change === 'perf-who') {
+    ui.perfWho = el.value;
+    render();
   } else if (el.dataset.change === 'perf-pos') {
     ui.perfPos = el.value;
     render();

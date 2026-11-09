@@ -952,8 +952,7 @@ test('performances: every range marks each category leader with an emoji', async
   const cats = app.scoreCats().filter(c => !c.fp);
   const cellsOf = html => Object.fromEntries(html.split('<tbody>')[1].split('</tr>').slice(0, -1).map(tr => [tr.match(/data-nba="(\d+)"/)[1], [...tr.matchAll(/<td class="sc"[^>]*>(.*?)<\/td>/g)].map(m => m[1])]));
   app.ui.perfRange = 'day';
-  const show = app.ui.perfShow;
-  app.ui.perfShow = { me: true, opp: true, other: true, active: true, bench: true, fa: true };
+  Object.assign(app.ui, { perfWho: 'all', perfSpot: 'all' });
   try {
     const html = app.topPerformancesCard();
     assert.match(html, /pf-legend/, 'a legend');
@@ -990,7 +989,7 @@ test('performances: every range marks each category leader with an emoji', async
     yc = cellsOf(app.topPerformancesCard());
     assert.equal((((yc[aLead.raw.id] || [])[pts] || '').match(/pf-emo[^>]*>([^<]+)</) || [])[1], '\u{1F680}', `per game: ${aLead.raw.name} leads in points among regulars`);
     assert.match(app.topPerformancesCard(), /title="Most PTS per game"/);
-  } finally { app.ui.perfRange = null; app.ui.perfShow = show; app.ui.perfSort = { key: 'v', dir: -1 }; }
+  } finally { app.ui.perfRange = null; Object.assign(app.ui, { perfWho: 'all', perfSpot: 'all' }); app.ui.perfSort = { key: 'v', dir: -1 }; }
 });
 
 test('performances: everyone who played in one table, top 100 by the sorted column, ranked by value', async () => {
@@ -1046,29 +1045,37 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
   const count = html => +html.match(/· (?:\d+ of )?(\d+) players?</)[1];
   try {
     let html = app.topPerformancesCard();
-    assert.ok(['me', 'fa', 'other'].every(k => html.includes(`data-group="${k}" aria-pressed="true"`)), 'all on by default');
+    assert.ok(html.includes('<option value="all" selected>All players</option>') && html.includes('data-spot="all" aria-pressed="true"'), 'everyone by default');
     assert.equal(count(html), played.length);
-    for (const k of ['opp', 'fa', 'other']) app.ui.perfShow[k] = false;
+    app.ui.perfWho = 'me';
     html = app.topPerformancesCard();
     assert.equal(count(html), per[me]);
     assert.ok(ids(html).every(id => owned.get(id) === me), 'only my players');
     assert.equal((html.match(/<tr class="pf-me">/g) || []).length, ids(html).length, 'my rows are marked');
     assert.ok(!html.includes('>Your team<'), 'no Your team badge');
-    app.ui.perfShow.me = false; app.ui.perfShow.fa = true;
+    app.ui.perfWho = 'fa';
     html = app.topPerformancesCard();
     assert.ok(ids(html).length && ids(html).every(id => !owned.has(id)), 'only players not on a roster');
-    app.ui.perfShow.fa = false;
-    assert.match(app.topPerformancesCard(), /No players match/);
+    assert.ok(!html.includes('data-action="perf-spot"'), 'waivers: no Active / Bench');
+    app.ui.perfSpot = 'active';
+    assert.ok(ids(app.topPerformancesCard()).length, "waivers: a lineup choice left from before doesn't empty the list");
+    app.ui.perfSpot = 'all';
+    app.ui.perfWho = 'other';
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).length && ids(html).every(id => owned.has(id) && owned.get(id) !== me), "other teams' players");
     const opp = app.fxOpponentFor(day, me);
     if (opp && played.some(r => owned.get(r.raw.id) === opp.id)) {
-      app.ui.perfShow.opp = true;
+      app.ui.perfWho = 'opp';
       html = app.topPerformancesCard();
       assert.ok(ids(html).length && ids(html).every(id => owned.get(id) === opp.id), "only the opponent's players");
+      app.ui.perfWho = 'matchup';
+      assert.ok(ids(app.topPerformancesCard()).every(id => [me, opp.id].includes(owned.get(id))), 'both sides of my matchup');
+      app.ui.perfWho = 'opp';
       assert.ok(html.includes('<tr class="pf-opp">') && html.includes(`title="Opponent: ${opp.name.replace(/'/g, '&#39;')}"`), "the opponent's rows are marked");
     }
   } finally {
     app.state.fxTeam = was;
-    Object.assign(app.ui.perfShow, { me: true, opp: true, fa: true, other: true, active: true, bench: true });
+    Object.assign(app.ui, { perfWho: 'all', perfSpot: 'all' });
   }
 });
 
@@ -1089,7 +1096,7 @@ test("Players: the Opponent filter is this matchup's opponent for every range, n
       for (const r of ['year', 'avg', 'day']) {
         ui.perfRange = r;
         const html = app.topPerformancesCard();
-        assert.ok(html.includes(`data-group="opp" aria-pressed="true" title="${now.name.replace(/'/g, '&#39;')}"`), `${r}: ${now.name}`);
+        assert.ok(html.includes(`<option value="opp" title="${now.name.replace(/'/g, '&#39;')}">Opponent</option>`), `${r}: ${now.name}`);
       }
     });
   } finally {
@@ -1150,7 +1157,7 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     assert.equal(count(html), rows.length, 'every NBA player with stats');
     assert.ok(rows.length > 300 && rows.every(r => r.per));
     assert.ok(/\d+ GP · \d+ min\/g/.test(html), 'games played and minutes a game');
-    if (app.state.fxTeam && app.fxOpponentFor(app.todayIso(), app.state.fxTeam)) assert.ok(html.includes('data-group="opp"'), "this week's opponent filter too");
+    if (app.state.fxTeam && app.fxOpponentFor(app.todayIso(), app.state.fxTeam)) assert.ok(html.includes('<option value="opp"'), "this week's opponent filter too");
     assert.ok(/<td class="sc" title="FG%: [\d.]+-[\d.]+ a game">\.\d{3}<\/td>/.test(html), 'percentages per game');
     // the top row is the best average game
     const best = rows.reduce((x, y) => (y.v > x.v ? y : x));
@@ -1217,7 +1224,7 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
   const ids = html => [...(html.split('<tbody>')[1] || '').matchAll(/data-nba="(\d+)"/g)].map(m => +m[1]);
   try {
     let html = app.topPerformancesCard();
-    assert.ok(html.includes('data-group="active" aria-pressed="true"') && html.includes('data-group="bench" aria-pressed="true"'));
+    assert.ok(html.includes('data-spot="all" aria-pressed="true"') && html.includes('data-spot="active" aria-pressed="false"'), 'All by default');
     const rowsOf = h => h.split('<tbody>')[1].split('</tr>').slice(0, -1);
     const stOf = tr => spot.get(+tr.match(/data-nba="(\d+)"/)[1]);
     assert.ok(rowsOf(html).every(tr => tr.includes('badge active') === (stOf(tr) === 'ACTIVE')), 'Active badge on exactly the active players');
@@ -1238,15 +1245,14 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
       assert.ok(tr.includes('<span class="badge bad" title="On injured reserve">IR</span>'), 'red IR badge');
       assert.ok(/<span class="perf-owner( mine| opp)?">/.test(tr) && tr.includes(`${app.teamLink(tid)}</span>`) && tr.includes(`data-action="team-card" data-team="${tid}"`), `${app.fxTeamName(tid)}'s IR player shows the team, a link to its card`);
     }
-    assert.ok(html.indexOf('data-group="other"') < html.indexOf('pf-sep') && html.indexOf('pf-sep') < html.indexOf('data-group="fa"'), 'Waivers sits with Active and Bench');
-    app.ui.perfShow.bench = false;
+    app.ui.perfSpot = 'active';
     html = app.topPerformancesCard();
-    assert.ok(ids(html).every(id => !spot.has(id) || spot.get(id) === 'ACTIVE'), 'bench hidden, waivers still shown');
-    app.ui.perfShow.bench = true; app.ui.perfShow.active = false; app.ui.perfShow.fa = false;
+    assert.ok(ids(html).length && ids(html).every(id => spot.has(id) && spot.get(id) === 'ACTIVE'), 'Active: starters only, no waivers');
+    app.ui.perfSpot = 'bench';
     html = app.topPerformancesCard();
-    assert.ok(ids(html).length && ids(html).every(id => spot.has(id) && spot.get(id) !== 'ACTIVE'), 'only bench players');
+    assert.ok(ids(html).length && ids(html).every(id => spot.has(id) && spot.get(id) !== 'ACTIVE'), 'Bench: bench and IR players only');
   } finally {
-    Object.assign(app.ui.perfShow, { me: true, opp: true, fa: true, other: true, active: true, bench: true });
+    Object.assign(app.ui, { perfWho: 'all', perfSpot: 'all' });
   }
 });
 
