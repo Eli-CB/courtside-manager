@@ -515,7 +515,7 @@ function pickupsCard() {
   pickMemo = { key, ideas };
   return `
     <div class="card">
-      <div class="card-head"><h2>Pickup ideas for ${ui.weekShift === 1 ? 'next week' : ui.weekShift ? 'that week' : 'this week'}</h2><span class="muted small">vs ${esc(state.opp.name || 'your opponent')} · ${fxLeague() ? 'free agents and waivers in your league' : 'if available in your league'}</span></div>
+      <div class="card-head"><h2>Pickup ideas</h2><span class="muted small">vs ${esc(state.opp.name || 'your opponent')} · ${fxLeague() ? 'free agents and waivers in your league' : 'if available in your league'}</span></div>
       ${ideas.length ? `<ul class="alerts">${ideas.map(x => {
         const better = isFootball() ? [] : x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
         return `<li class="alert">${headshot(x.p, 32)}<span class="grow"><button class="link-btn pname" data-action="player-detail" data-nba="${x.p.nbaId}">${esc(x.p.name)}</button> <span class="muted small">${esc(x.p.team)} · ${posTags(x.p.pos)} · ${isFootball() ? `${fmt(footballPts(x.p, ctx.dates), 1)} proj` : `${x.games} games`}</span><br>
