@@ -1173,6 +1173,15 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     ui.perfTeam = '';
     // the top 300 over a season
     assert.equal((app.topPerformancesCard().split('<tbody>')[1].match(/<\/tr>/g) || []).length, Math.min(300, rows.length), 'Per game: the top 300');
+    // Show more: 100 more rows each time, until another sort or filter starts the list over
+    const shownRows = () => (app.topPerformancesCard().split('<tbody>')[1].match(/<\/tr>/g) || []).length;
+    if (rows.length > 300) {
+      assert.match(app.topPerformancesCard(), new RegExp(`data-action="perf-more">Show ${Math.min(100, rows.length - 300)} more<`));
+      ui.perfMore.n += 100;
+      assert.equal(shownRows(), Math.min(400, rows.length));
+      ui.perfOnly.rookie = true; app.topPerformancesCard(); ui.perfOnly.rookie = false;
+      assert.equal(shownRows(), 300, 'a new filter starts over at 300');
+    }
     // position and team are pill-style menus, then Rookies and Injured
     html = app.topPerformancesCard();
     assert.ok(/<select class="pill pill-menu" data-change="perf-pos"/.test(html) && /<select class="pill pill-menu" data-change="perf-team"/.test(html));

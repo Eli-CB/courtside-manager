@@ -201,7 +201,10 @@ function topPerformancesCard() {
   // a live update keeps the rows where they were (numbers and ranks change in place; anyone new goes below) so the
   // table doesn't jump while it's read; anything you do sorts it again
   const sig = [range, perWeek, dates.join(), so.key, so.dir, JSON.stringify(ui.perfShow), mine, ui.perfQ, ui.perfPos, ui.perfTeam, JSON.stringify(ui.perfOnly)].join('|');
-  const cap = avg || range === 'year' ? 300 : 100; // rows shown: the top 300 over the season, 100 for a day or week
+  // rows shown: the top 300 over the season, 100 for a day or week, and 100 more each time Show more is tapped (for this
+  // list: any other sort, filter or range starts over)
+  if (ui.perfMore.sig !== sig) ui.perfMore = { sig, n: 0 };
+  const cap = (avg || range === 'year' ? 300 : 100) + ui.perfMore.n;
   let shown = sorted.slice(0, cap);
   if (live.hold && perfOrder.sig === sig) {
     const byId = new Map(picked.map(r => [r.raw.id, r])), was = new Set(perfOrder.ids);
@@ -221,7 +224,7 @@ function topPerformancesCard() {
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? fmt(r.v, 1) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
-    </table></div>${legend}`;
+    </table>${picked.length > shown.length ? `<div class="pf-more"><button type="button" class="btn sm" data-action="perf-more">Show ${Math.min(100, picked.length - shown.length)} more</button></div>` : ''}</div>${legend}`;
   // one bar: when, search, the menus and filters, then what's shown (at the end of the last line), wrapping as the screen narrows
   return card('', `<div class="perf-bar">${toggle}${filters}<p class="muted small perf-when">${when}${rows.length ? ` · ${count}` : ''}</p></div>${table}`);
 }

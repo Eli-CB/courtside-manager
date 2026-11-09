@@ -360,6 +360,7 @@ const actions = {
     ui.perfOnly[el.dataset.key] = !ui.perfOnly[el.dataset.key];
     render();
   },
+  'perf-more'() { ui.perfMore.n += 100; render(); },
   'perf-show'(el) {
     ui.perfShow[el.dataset.group] = !ui.perfShow[el.dataset.group];
     render();

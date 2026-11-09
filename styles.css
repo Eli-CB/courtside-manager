@@ -353,6 +353,8 @@ a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
 .perf-rank { flex: none; min-width: 1.5em; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .perf-owner { color: var(--muted); }
+/* past the rows shown, at the bottom of the list: Show more, kept at the left while the stats scroll sideways */
+.pf-more { position: sticky; left: 0; display: inline-block; padding: 10px 8px; }
 .perf-owner.mine { color: var(--accent); font-weight: 600; } /* your team's name: orange */
 .perf-owner.opp { color: var(--text); font-weight: 700; } /* this matchup's opponent: bold */
 @media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 160px; } .perf-table .pf-name .pmeta { white-space: normal; } } /* phones: badges wrap instead of hiding */
