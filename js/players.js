@@ -365,7 +365,14 @@ function cardGames(raw) {
     const matchup = s ? (s.home === team ? `vs ${s.away}` : `@ ${s.home}`) : '';
     return { ...st, date: d, matchup, wl: margin > 0 ? 'W' : margin < 0 ? 'L' : '' };
   });
-  for (const [d, lines] of live.lines) if (lines.has(raw.id) && !box.some(g => g[0] === d)) out.push({ ...lines.get(raw.id), date: d, matchup: 'live', wl: '' });
+  // today's (and any day the saved box scores don't have yet), from ESPN's feed: the matchup from its scoreboard, the
+  // result once it's over, and "live" only while it's on
+  for (const [d, lines] of live.lines) {
+    if (!lines.has(raw.id) || box.some(g => g[0] === d)) continue;
+    const g = liveGame(raw, d), home = g && g.home === raw.team;
+    const vs = g ? (home ? `vs ${g.away}` : `@ ${g.home}`) : '', diff = g ? (home ? g.hs - g.as : g.as - g.hs) : 0;
+    out.push({ ...lines.get(raw.id), date: d, matchup: g && g.state === 'in' ? `${vs} · live` : vs, wl: g && g.state === 'post' && diff ? (diff > 0 ? 'W' : 'L') : '' });
+  }
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 

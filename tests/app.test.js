@@ -1016,6 +1016,24 @@ test("a league scored in whole points shows its scores without a .0; projections
   assert.ok(!app.wholePoints(), 'a category league has no points');
 });
 
+test("the player card's games from ESPN's feed: the matchup, the result once it's over, live only while it's on", async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const live = app.get('live'), raw = [...app.nbaById.values()].find(p => p.team), d = '2026-10-26';
+  const was = { games: live.games, lines: live.lines };
+  try {
+    live.lines = new Map([[d, new Map([[raw.id, { pts: 20, min: 30, gp1: 1 }]])]]);
+    live.games = [{ id: 'x', d, home: raw.team, away: 'ZZZ', hs: 101, as: 99, state: 'post' }];
+    let g = app.cardGames(raw).find(o => o.date === d);
+    assert.equal(g.matchup, 'vs ZZZ');
+    assert.equal(g.wl, 'W');
+    live.games = [{ id: 'x', d, home: 'ZZZ', away: raw.team, hs: 50, as: 40, state: 'in' }];
+    g = app.cardGames(raw).find(o => o.date === d);
+    assert.equal(g.matchup, '@ ZZZ · live');
+    assert.equal(g.wl, '');
+  } finally { Object.assign(live, was); }
+});
+
 test('performances: everyone who played in one table, top 100 by the sorted column, ranked by value', async () => {
   await app.loadBoxes();
   const cell = (tr, i) => [...tr.matchAll(/<td class="sc"[^>]*>(?:<span[^>]*>[^<]*<\/span>)?([^<]*)</g)][i][1];
