@@ -1004,7 +1004,7 @@ a.lm-item { text-decoration: none; }
   #view .table-wrap { margin: 0 -16px; padding: 0 16px; }
   #view .awards > .card { margin-inline: -16px; }
   /* a section after the first: its heading, a chevron, and nothing else until tapped */
-  .card.rollable > .card-head > h2 { cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+  .card.rollable > .card-head > h2 { cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1 1 100%; min-width: 0; } /* its own line: what's beside it wraps under, never squeezed */
   .card.rollable > .card-head > h2::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: .85rem; transition: transform .15s; }
   .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(90deg); }
   .card.rolled > :not(.card-head), .card.rolled > .card-head > :not(h2) { display: none; }
