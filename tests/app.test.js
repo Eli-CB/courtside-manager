@@ -1819,10 +1819,62 @@ test("a week is over once its last game day's box scores are in, before Fantrax 
   await app.loadBoxes();
   const L = await app.useLeague(CATS9);
   const wk1 = L.periods[0]; // Oct 20-25, ends on Fantrax Monday Oct 26 at 6:59 PM
-  assert.equal(await onDay('2026-10-25', () => app.periodOver(wk1)), false, 'Sunday: its last games still to come');
+  // Sunday night: over once every one of its games is final (ESPN's finals are put in with the saved ones that night)
+  const sunday = [...app.get('BOX').finals].filter(x => x.startsWith('2026-10-25 '));
+  assert.ok(sunday.length);
+  app.get('BOX').finals.delete(sunday[0]);
+  assert.equal(await onDay('2026-10-25', () => app.periodOver(wk1)), false, 'Sunday: a game still to finish');
+  app.get('BOX').finals.add(sunday[0]);
+  assert.equal(await onDay('2026-10-25', () => app.periodOver(wk1)), true, 'Sunday night: every game final');
   assert.equal(await onDay('2026-10-26', () => app.periodOver(wk1)), true, "Monday noon: Sunday's games are in");
   assert.ok(await onDay('2026-10-26', () => app.finishedPeriods(L).some(p => p.n === 1)), 'its recap is ready');
   assert.equal(await onDay('2026-10-26', () => app.periodOver(L.periods[1])), false, 'week 2 just starting');
+});
+
+test("the night a week ends: its last games from ESPN, before the daily job saves them", async () => {
+  await app.loadBoxes();
+  const L = await app.useLeague(CATS9);
+  const BOX = app.get('BOX'), wk1 = L.periods[0], d = '2026-10-25';
+  // Sunday's DET at PHI isn't saved yet
+  const keep = { finals: [...BOX.finals], scores: new Map(BOX.scores), byPlayer: new Map([...BOX.byPlayer].map(([id, g]) => [id, [...g]])) };
+  BOX.finals.delete(`${d} PHI`); BOX.finals.delete(`${d} DET`);
+  for (const [id, games] of BOX.byPlayer) BOX.byPlayer.set(id, games.filter(g => !(g[0] === d && ['PHI', 'DET'].includes(g[3]))));
+  // ESPN has it final: its scoreboard that day, made from a saved one (PHI's box score; IND's players aren't in this game)
+  const sb = JSON.parse(readFixture('espn/live/scoreboard.json'));
+  const ev = sb.events.find(e => e.id === '401909884'), det = sb.events.find(e => e.id === '401909883').competitions[0].competitors.find(c => c.team.abbreviation === 'DET');
+  const comps = ev.competitions[0].competitors;
+  comps[comps.findIndex(c => c.team.abbreviation === 'IND')] = { ...det, homeAway: comps.find(c => c.team.abbreviation === 'IND').homeAway };
+  Object.assign(ev, { date: `${d}T23:00Z` });
+  ev.status.type.state = 'post';
+  const day = { ...sb, day: { date: d }, events: [ev] };
+  const urls = [], realFetch = app.fetch;
+  app.fetch = url => { urls.push(String(url)); return String(url).endsWith('scoreboard?dates=20261025') ? Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(day) }) : realFetch(url); };
+  try {
+    app.get('boxFill').at = 0;
+    await onDay(d, async () => {
+      assert.deepEqual(JSON.parse(JSON.stringify(app.weekDaysToFill(L))), [d], 'the week ends today, and a game of it is missing');
+      assert.equal(app.periodOver(wk1), false);
+      assert.equal(await app.fillWeekFromEspn(L), 1, 'one game read');
+      assert.ok(urls.some(u => u.endsWith('summary?event=401909884')));
+      assert.equal(app.periodOver(wk1), true, 'the week is over: its recap can show');
+      assert.ok(app.finishedPeriods(L).some(p => p.n === 1));
+      const phi = [...BOX.byPlayer].filter(([, g]) => g.some(x => x[0] === d && x[3] === 'PHI'));
+      assert.ok(phi.length >= 5, "PHI's players have the game");
+      const ind = m => [...m].filter(([, g]) => g.some(x => x[0] === d && x[3] === 'IND')).length;
+      assert.equal(ind(BOX.byPlayer), ind(keep.byPlayer), "no one from a team that wasn't in it (IND's own game that day stays as saved)");
+      assert.ok(!('cur' in app.get('gameLogs')), 'the game log is built again');
+      urls.length = 0;
+      assert.equal(await app.fillWeekFromEspn(L), 0, 'nothing left to fill');
+      assert.equal(urls.length, 0, 'and nothing asked');
+    });
+  } finally {
+    app.fetch = realFetch;
+    BOX.finals.clear(); keep.finals.forEach(x => BOX.finals.add(x));
+    BOX.scores.clear(); keep.scores.forEach((v, k) => BOX.scores.set(k, v));
+    BOX.byPlayer.clear(); keep.byPlayer.forEach((v, k) => BOX.byPlayer.set(k, v));
+    BOX.day.clear(); for (const [id, games] of BOX.byPlayer) BOX.day.set(id, new Map(games.map(([dd, st, margin]) => [dd, { ...st, margin }])));
+    delete app.get('gameLogs').cur;
+  }
 });
 
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {

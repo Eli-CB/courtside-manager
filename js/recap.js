@@ -206,6 +206,7 @@ function viewRecap() {
   if (!hasLineupHistory(L)) return empty(`No recaps for ${esc(sourceName(L))} leagues yet`, "Recaps come from each week's real lineups, which the site reads from Fantrax and Sleeper only for now.");
   // the last game day's box scores tell whether a week is over before Fantrax says so
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'recap') render(); }).catch(() => {});
+  else fillWeekFromEspn(L); // (the night a week ends, its last games from ESPN before the daily job saves them)
   const done = finishedPeriods(L);
   if (!done.length) return empty('No finished weeks yet', 'The first recap appears once week 1 is over.');
   const period = done.find(p => p.n === ui.recapWeek) || done[done.length - 1];
@@ -370,6 +371,7 @@ function recapSharePopup(L, X, url) {
 // A week that ended in the last three days: offered on the Dashboard
 function freshRecap(L = fxLeague()) {
   if (!L || !hasLineupHistory(L)) return null;
+  if (BOX) fillWeekFromEspn(L);
   const p = finishedPeriods(L).pop();
   return p && Date.now() - fxTime(p.endAt) < 3 * 864e5 ? p : null;
 }

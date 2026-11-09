@@ -77,7 +77,8 @@ function espnHockeyLines(sm) {
 }
 
 // One ESPN box score as the lines the saved box scores give: NBA id -> stats (players who've been on the floor)
-function espnLines(sm) {
+// (teamOf, when given, gets each player's team in that game)
+function espnLines(sm, teamOf) {
   if (isHockey()) return espnHockeyLines(sm);
   const out = new Map();
   for (const team of (sm.boxscore && sm.boxscore.players) || []) {
@@ -90,6 +91,7 @@ function espnLines(sm) {
       const num = k => (k in i ? +v[i[k]] || 0 : 0);
       const raw = !a.didNotPlay && v.length && num('minutes') > 0 ? espnPlayer(a.athlete, tri) : null;
       if (!raw) continue;
+      if (teamOf) teamOf.set(raw.id, tri);
       const [fgm, fga] = madeAtt(v[i['fieldGoalsMade-fieldGoalsAttempted']]);
       const [tpm, tpa] = madeAtt(v[i['threePointFieldGoalsMade-threePointFieldGoalsAttempted']]);
       const [ftm, fta] = madeAtt(v[i['freeThrowsMade-freeThrowsAttempted']]);
@@ -121,6 +123,62 @@ async function readBoxes(games) {
   const failed = res.filter(r => r.status === 'rejected');
   if (failed.length && failed.length === res.length) throw failed[0].reason;
   return failed.length;
+}
+
+// ----- A week's last games, before the daily job saves them -----
+// The Recap (and the Dashboard's offer of it) waits for a week's games to be in the saved box scores, which the daily job
+// writes at 3-4 a.m. ET. So that it's there the night the week ends, ESPN's finished games of the latest week's days the
+// saved ones lack are put in with them, as the job keeps ESPN copies until NBA.com's come. Basketball only (ESPN's
+// hockey lines lack stats leagues count); once a minute at most, and only from the week's last game day on.
+const boxFill = { at: 0, busy: false };
+function weekDaysToFill(L) {
+  if (!L || !BOX || isFootball() || isHockey() || !hasLineupHistory(L)) return [];
+  const today = todayIso();
+  // the week not over yet whose last game day has come (on a Monday morning, the next one has started already)
+  const days = (L.periods || []).filter(x => String(x.start).slice(0, 10) <= today && !periodOver(x))
+    .map(x => matchDates(String(x.start).slice(0, 10))).find(ds => ds.length && ds[ds.length - 1] <= today) || [];
+  return days.filter(d => [...teamDates].some(([t, ds]) => ds.has(d) && !BOX.finals.has(`${d} ${t}`)));
+}
+// One finished ESPN game into the saved box scores, as loadBoxes reads the job's
+function addBoxGame(g, lines, teamOf) {
+  const s = { home: g.home, away: g.away, hs: g.hs, as: g.as };
+  BOX.finals.add(`${g.d} ${g.home}`).add(`${g.d} ${g.away}`);
+  BOX.scores.set(`${g.d} ${g.home}`, s).set(`${g.d} ${g.away}`, s);
+  for (const [id, st] of lines) {
+    const team = teamOf.get(id);
+    if (team !== g.home && team !== g.away) continue;
+    const margin = team === g.home ? g.hs - g.as : g.as - g.hs;
+    if (!BOX.byPlayer.has(id)) BOX.byPlayer.set(id, []);
+    BOX.byPlayer.get(id).push([g.d, st, margin, team]);
+    if (!BOX.day.has(id)) BOX.day.set(id, new Map());
+    BOX.day.get(id).set(g.d, { ...st, margin });
+  }
+}
+async function fillWeekFromEspn(L) {
+  const days = weekDaysToFill(L);
+  if (!days.length || boxFill.busy || Date.now() - boxFill.at < 60e3) return 0;
+  boxFill.busy = true;
+  boxFill.at = Date.now();
+  let added = 0;
+  try {
+    for (const d of days) {
+      const games = espnGames(await getJson(`${SPORT.espn}scoreboard?dates=${espnDate(d)}`, 'ESPN', undefined, 1)).filter(g => g.state === 'post' && !savedFinal(g));
+      await Promise.all(games.map(async g => {
+        const teamOf = new Map(), lines = espnLines(await getJson(`${SPORT.espn}summary?event=${g.id}`, 'ESPN', undefined, 1), teamOf);
+        if (!lines.size || savedFinal(g)) return;
+        addBoxGame(g, lines, teamOf);
+        added++;
+      }));
+    }
+  } catch (e) { /* ESPN didn't answer: the saved box scores will have them by morning */ } finally { boxFill.busy = false; }
+  if (added) {
+    // what was built on the saved box scores alone is built again (Sleeper's points for the week too, which tell which game counted)
+    delete gameLogs.cur;
+    delete pastWeeks[L.id];
+    if (L.source === 'sleeper') delete rosterWeeksLoad[L.id];
+    if (ui.tab === 'recap' || ui.tab === 'dashboard') render();
+  }
+  return added;
 }
 
 // ESPN's feed is unofficial: it can block the site or change shape, and a visitor only sees a note. Failing LIVE_FAILS
