@@ -399,7 +399,7 @@ function matchupBoard(ctx) {
   const sched = ui.boardMode === 'sched' || isFootball(); // (football: its one number)
   const legend = isFootball() ? ((NBA.projWeeks || []).includes(footballWeek(ctx.dates[0])) ? '' : 'No projections for this week yet: season averages')
     : sched ? ''
-    : `<span class="sw zp2"></span> helps <span class="sw zn2"></span> hurts · click a column to sort${ui.statSort.key !== 'slot' ? ' · <button class="link-btn" data-action="stat-sort" data-key="slot">back to lineup order</button>' : ''}`;
+    : ui.statSort.key !== 'slot' ? '<button class="link-btn quiet" data-action="stat-sort" data-key="slot">Back to lineup order</button>' : ''; // (green helps, red hurts: plain to see)
 
   let body;
   if (sched) {
