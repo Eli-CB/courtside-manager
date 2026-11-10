@@ -162,7 +162,10 @@ saved leagues are lost). Owner's league:
   shows them on next week (`withViewedTeam(viewWeek, true)`, `nextRosterPeriod()`, `fxTeamSide(tid, period)`). Every
   other tab and the saved lineup stay on this week's.
 - Fantrax: minimize requests. League data cached on the device; manual ↻ Reload (gear menu) instead of
-  loading fresh each visit. Weekly rosters fetched once per finished period. Shared player list/ADP once a day.
+  loading fresh each visit; the one automatic reload is 15 minutes before a matchup period's first game and 2 minutes after
+  (`checkAutoReload`, actions.js: Fantrax starts a period at its first tip-off, else ESPN's scoreboard, else 7 PM ET; only when the
+  league was read before that moment; checked once a minute and on coming back to the page), so the lock's lineups and the new
+  period show without a manual Reload. Weekly rosters fetched once per finished period. Shared player list/ADP once a day.
 - Keepers exist only if draft rounds < roster spots (starters + bench); keepers = opening-week roster minus
   that team's picks. Keepers are graded as the #5 and #15 picks: this season the better one by ADP, a past season by
   the season before's value per game (`L.priorSeason` archive); never compare today's ADP to a past draft.

@@ -279,15 +279,7 @@ const actions = {
     const label = el.textContent;
     el.textContent = 'Reloading…';
     try {
-      await refreshLeague();
-      if (state.fxTeam && fxRoster(state.fxTeam).length) {
-        const side = fxTeamSide(state.fxTeam);
-        Object.assign(state, { players: side.players, il: side.il, lineup: side.lineup, teamName: side.name || state.teamName });
-      }
-      syncLinked();
-      delete seasonTot[fxLeague().id];
-      delete curAwards[fxLeague().id];
-      if (gameLogs.cur) delete gameLogs.cur;
+      await reloadLeague();
       commit(`Reloaded ${fxLeague().name} from ${sourceName()}`);
     } catch (e) {
       toast(`Couldn't reload from ${sourceName()} (${e.message})`);
@@ -460,7 +452,75 @@ window.addEventListener('appinstalled', () => { ui.installPrompt = null; if (sta
 // for the day's stats and any new version. A browser tab is left alone.
 const OPENED_AT = Date.now(), APP_STALE = 3 * 36e5;
 const appStale = () => isInstalled() && Date.now() - OPENED_AT > APP_STALE;
-document.addEventListener('visibilitychange', () => { if (!document.hidden && appStale()) location.reload(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && appStale()) location.reload(); else if (!document.hidden) checkAutoReload(); });
+
+// ----- The league read again as a matchup period starts -----
+// The league is kept on the device (6 hours, or until ↻ Reload) and a page can sit open for days, so across a lock last
+// week's period and lineups would stay on screen. It's read again from its site 15 minutes before a period's first game
+// (the lineups as finally set, next week's too on Plan Ahead) and 2 minutes after it (the new period and its locked
+// lineups), when what's here was read before that moment: twice a period at most on a device, quietly, on a visit or
+// while the page is open. Not in a past season, the demo, browsing, or before a team is picked.
+const AUTO_BEFORE = 15 * 60e3, AUTO_AFTER = 2 * 60e3;
+const autoReload = { timer: null, busy: false, done: new Set() };
+
+// Reload the league from its site and everything read from it (↻ Reload, and the automatic one)
+async function reloadLeague() {
+  await refreshLeague();
+  if (state.fxTeam && fxRoster(state.fxTeam).length) {
+    const side = fxTeamSide(state.fxTeam);
+    Object.assign(state, { players: side.players, il: side.il, lineup: side.lineup, teamName: side.name || state.teamName });
+  }
+  syncLinked();
+  delete seasonTot[fxLeague().id];
+  delete curAwards[fxLeague().id];
+  if (gameLogs.cur) delete gameLogs.cur;
+}
+
+// 7 PM in New York that day (the data file has no tip-off times)
+function etEvening(d) {
+  const hour = t => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(t);
+  return ['-05:00', '-04:00'].map(o => Date.parse(`${d}T19:00:00${o}`)).find(t => hour(t) === '19') || Date.parse(`${d}T19:00:00-05:00`);
+}
+// When a period's first game starts: Fantrax starts a period at its first tip-off (its lock); ESPN's scoreboard says
+// once that day's is here; else 7 PM ET on the period's first game day
+function periodFirstGame(p) {
+  const day = matchDates(String(p.start).slice(0, 10)).find(d => [...teamDates.values()].some(ds => ds.has(d)));
+  if (!day) return null;
+  const lock = /T\d/.test(String(p.lock || '')) && fxTime(p.lock);
+  const times = [...live.games.filter(g => g.d === day).map(g => +g.start), ...(lock ? [+lock] : [])].filter(Number.isFinite);
+  return times.length ? Math.min(...times) : etEvening(day);
+}
+// The moments to read the league again, for the periods starting from two days ago to a week ahead
+function autoReloadMarks(L = fxLeague()) {
+  if (!L || !L.periods) return [];
+  const today = todayIso(), from = addDays(today, -2), to = addDays(today, 8);
+  return L.periods.filter(p => { const s = String(p.start).slice(0, 10); return s >= from && s <= to; })
+    .flatMap(p => { const t = periodFirstGame(p); return t == null ? [] : [t - AUTO_BEFORE, t + AUTO_AFTER]; }).sort((a, b) => a - b);
+}
+// When the league here was read from its site (the site's own league: this morning's file, or a reload since)
+function leagueReadAt(id) {
+  const c = readLeagueCache()[id], site = NBA && NBA.siteLeague && NBA.siteLeague.id === id;
+  return Math.max(c ? c.at : 0, site ? Date.parse(NBA.updated || 0) || 0 : 0);
+}
+// The moment passed since the league was read, if any
+function autoReloadDue(now = Date.now()) {
+  const L = fxLeague();
+  if (!L || !state.fxTeam || state.demo || state.browse || ui.season) return null;
+  const at = leagueReadAt(L.id);
+  return autoReloadMarks(L).filter(m => m <= now && at < m && !autoReload.done.has(m)).pop() ?? null;
+}
+async function checkAutoReload() {
+  if (!state || !NBA || document.hidden || autoReload.busy || autoReloadDue() == null) return;
+  autoReload.busy = true;
+  autoReloadMarks().filter(x => x <= Date.now()).forEach(x => autoReload.done.add(x)); // once each, even if it fails
+  try { await reloadLeague(); commit(); } catch (e) { /* quietly: ↻ Reload is still in the menu */ } finally { autoReload.busy = false; }
+}
+// looked at once a minute while the page is open (a cheap sum), and on coming back to it
+(function autoReloadTick() {
+  checkAutoReload();
+  autoReload.timer = setTimeout(autoReloadTick, 60e3);
+  if (autoReload.timer.unref) autoReload.timer.unref(); // (tests: don't keep Node waiting)
+})();
 
 // Phones: a rolled-up section's heading opens or closes it (its own buttons and menus still work as they are)
 document.addEventListener('click', e => {
