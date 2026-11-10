@@ -17,7 +17,8 @@ saved leagues are lost). Owner's league:
     "NBA", `nbaId`, `nbaPlayers` and the like mean "the sport's data" (as "fx" names mean "the league's site")
   - core: constants, `state` (localStorage `courtside-manager-v1`), `ui`, helpers (every time of day through `fmtTime`:
     the gear menu's 24-hour toggle, `courtside-clock`, else the device's own clock), headshots (ring + background in team colors,
-    `TEAM_COLORS`; logos only where there is no photo)
+    `TEAM_COLORS`; logos only where there is no photo; the 80 px sheet stays sharp up to 40 px, `hsPx(desktop, phone)` sizes them up on desktop). The player card's
+    picture (`playerPhoto`): the full cutout (NBA.com's 260/1040 px for basketball, ESPN's by `espn` id otherwise) in front of the team logo, ESPN-style; the round photo if it won't load
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
     model (`scoreCats`, `catZ`, `BASE`: each stat's mean/spread from the data via `baseNow`, the league's teams × roster
     spots by minutes, smart blend, or a past season's archive inside `withSeason`), lineup optimizer. Player value
