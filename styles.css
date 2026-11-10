@@ -720,7 +720,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .pbar-k { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .pbar.thin { height: 6px; }
 .pbar .asset { background: var(--muted); opacity: .55; }
-.cat-table tr.moved td:first-child b { color: var(--accent); }
+.cat-lock { font-size: .72rem; margin-left: 2px; }
 @media (max-width: 640px) {
     .board { min-width: 0; }
   .board col.c-slot { width: 46px; }

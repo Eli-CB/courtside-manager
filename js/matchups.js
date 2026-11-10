@@ -442,7 +442,9 @@ function catCompareTable(ctx, changed) {
         ? `<span class="pbars"><span class="pbar-row"><span class="pbar-k">Now</span><span class="pbar thin"><span class="asset" style="width:${Math.round(s.p * 100)}%"></span></span><span class="num small">${pctTxt(s.p)}</span></span>
            <span class="pbar-row"><span class="pbar-k">New</span><span class="pbar thin"><span class="${cls || 'mid'}" style="width:${pct}%"></span></span><span class="num small"><b>${pct}%</b></span></span></span>`
         : `<span class="pbar"><span class="${sCls || 'mid'}" style="width:${pct}%"></span></span><span class="num small"><b>${pct}%</b></span>`;
-      return `<tr class="${moved ? 'moved' : ''}"><td><b>${c.label}</b></td><td class="num">${fmtCat(c, c.b)}</td><td class="num">${fmtCat(c, s.a)}</td>${changed ? `<td class="num">${fmtCat(c, c.a)}</td>` : ''}
+      // 🔒 a category that's all but won (90%+, "Locked")
+      const lock = lbl === 'Locked' ? ' <span class="cat-lock" role="img" aria-label="Locked" title="Locked: 90% or better to win">🔒</span>' : '';
+      return `<tr class="${moved ? 'moved' : ''}"><td><b>${c.label}</b>${lock}</td><td class="num">${fmtCat(c, c.b)}</td><td class="num">${fmtCat(c, s.a)}</td>${changed ? `<td class="num">${fmtCat(c, c.a)}</td>` : ''}
         <td class="pbar-cell">${bars}<span class="badge ${cls}">${lbl}</span></td></tr>`;
     }).join('')}</tbody>
   </table></div>`;
