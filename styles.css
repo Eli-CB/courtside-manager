@@ -298,10 +298,19 @@ a { color: var(--accent); }
 /* a photo that opens the player's card (not one inside a trade list's checkbox row) */
 [data-photo] { cursor: pointer; }
 label [data-photo], #detailBody [data-photo] { cursor: inherit; }
-/* a player's name, shortened on a phone if it must, and his injury tag always beside it */
-.detail-title:has(> .dt-name) { display: flex; align-items: center; gap: 6px; }
-.detail-title .dt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.detail-title .badge { flex: none; font-size: .7rem; }
+/* a player's card title: his name, then who he is (team, number, positions, age, country, years), on the same line
+   when it fits, else under it */
+.detail-title:has(> .dt-name) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 1px; white-space: normal; }
+.detail-title .dt-name { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-title .dt-bio { font-size: .82rem; font-weight: 400; color: var(--muted); }
+.detail-title .dt-bio .pt { color: var(--text); }
+/* the card's top: the photo, his fantasy team beside it, the tiles beside that (on a phone the tiles go under) */
+.pc-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-start; gap: 12px; }
+.pc-top > .pc-photo, .pc-top > .hs { flex: none; }
+.pc-who { flex: 0 1 190px; min-width: 120px; }
+.pc-who .pc-owner:first-child { margin-top: 0; }
+.proj-grid.pc-tiles { flex: 1 1 300px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .pc-who { flex: 1 1 0; } .proj-grid.pc-tiles { flex-basis: 100%; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); } }
 .link-btn.pp-clear:hover, .link-btn.quiet:hover { color: var(--text); text-decoration: underline; }
 .seg button:disabled { opacity: .45; cursor: default; }
 @media (max-width: 640px) { .pp-row { gap: 6px; } .pp-label { width: 100%; } }

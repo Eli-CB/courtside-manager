@@ -921,10 +921,14 @@ test("player profile: value per game (each game, each season's averages) and thi
     assert.ok(html.includes(`>#${better + 1} of ${R.totN}</div>`), 'under Value this season');
     if (Math.round(cur.gp) >= R.minGp) assert.ok(html.includes(`>#${R.per.get(raw.id)} of ${R.perN}</div>`), 'under Value per game');
     assert.ok(!html.includes('Rank per game'), 'no separate tiles');
-    // the header: age, flag, and whose he is in the league
-    if (raw.born) assert.match(html, / · age \d\d/);
-    if (raw.nat) assert.ok(html.includes(`flagcdn.com/w20/${raw.nat.toLowerCase()}.png`));
-    assert.ok(html.includes('class="pc-owner"'), 'his fantasy team, or free agent');
+    // the title: his name, then his age and flag; beside the photo, whose he is in the league
+    const title = els['#detailTitle'].innerHTML;
+    assert.match(title, /^<span class="dt-name">[^<]+<\/span><span class="dt-bio">/);
+    if (raw.born) assert.match(title, / · age \d\d/);
+    if (raw.nat) assert.ok(title.includes(`flagcdn.com/w20/${raw.nat.toLowerCase()}.png`));
+    assert.ok(!/ · age /.test(html), 'not again in the card');
+    assert.ok(html.includes('<div class="pc-who"><p class="pc-owner">'), 'his fantasy team, or free agent, beside the photo');
+    assert.ok(html.indexOf('pc-who') < html.indexOf('pc-tiles'), 'and the tiles after it');
     // Games: the whole season from the box scores, newest first, scrolling past five
     await app.loadBoxes();
     app.showPlayerDetail(raw.id);

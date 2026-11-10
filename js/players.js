@@ -462,34 +462,36 @@ function showPlayerDetail(nbaId) {
   };
   const footballTile = () => { const p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, thisWeek) ? fmt(footballPts(p, thisWeek), 1) : 'Bye'}</div></div>`; };
   $('#detailBody').innerHTML = `
-    <div class="detail-head">
-      <div class="detail-id">${playerPhoto(raw)}<div><p class="muted" style="margin:0">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</p>${cardOwner(raw)}</div></div>
+    <div class="detail-head pc-top">
+      ${playerPhoto(raw)}
+      ${(() => { const who = cardOwner(raw); return who ? `<div class="pc-who">${who}</div>` : ''; })()}
+      <div class="proj-grid pc-tiles">
+        <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? linkTeams(nextGame(t.next)) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
+        ${isGoalie(raw) ? goalieTile() : isFootball() ? footballTile()
+      : `<div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>`}
+        ${isFootball() ? '' : (() => {
+          // the next matchup period's games (its team's schedule), for planning next week's lineup
+          const next = weekShifts().filter(x => x > 0)[0], dates = next ? matchDates(weekStartAt(next)) : [];
+          return `<div class="proj"><div class="k">Games next period</div><div class="v">${dates.length ? gamesIn(playerFromRaw(raw), dates) : '—'}</div></div>`;
+        })()}
+        ${(() => {
+          // his value, and under it his rank among every NBA player this season (per game: regulars only)
+          const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
+          const rank = (n, of, tip) => `<div class="pc-rank" data-tip="${esc(tip)}">${n ? `#${n} of ${of}` : season ? `ranked with ${R.minGp}+ G` : ''}</div>`;
+          return `<div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div>${rank(per, R.perN, `Among the ${R.perN} ${SPORT.name} players with ${R.minGp}+ games this season, keepers and free agents included (the Draft tab ranks only the league's draft picks)`)}</div>
+        <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div>${tot ? rank(tot, R.totN, `Among the ${R.totN} ${SPORT.name} players who've played this season, by ${VAL.toLowerCase()} added up`) : ''}</div>`;
+        })()}
+      </div>
     </div>
-    ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small">${esc(raw.inj.note)} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
-    <div class="proj-grid" style="margin-top:12px">
-      <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? linkTeams(nextGame(t.next)) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
-      ${isGoalie(raw) ? goalieTile() : isFootball() ? footballTile()
-    : `<div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>`}
-      ${isFootball() ? '' : (() => {
-        // the next matchup period's games (its team's schedule), for planning next week's lineup
-        const next = weekShifts().filter(x => x > 0)[0], dates = next ? matchDates(weekStartAt(next)) : [];
-        return `<div class="proj"><div class="k">Games next period</div><div class="v">${dates.length ? gamesIn(playerFromRaw(raw), dates) : '—'}</div></div>`;
-      })()}
-      ${(() => {
-        // his value, and under it his rank among every NBA player this season (per game: regulars only)
-        const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
-        const rank = (n, of, tip) => `<div class="pc-rank" data-tip="${esc(tip)}">${n ? `#${n} of ${of}` : season ? `ranked with ${R.minGp}+ G` : ''}</div>`;
-        return `<div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div>${rank(per, R.perN, `Among the ${R.perN} ${SPORT.name} players with ${R.minGp}+ games this season, keepers and free agents included (the Draft tab ranks only the league's draft picks)`)}</div>
-      <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div>${tot ? rank(tot, R.totN, `Among the ${R.totN} ${SPORT.name} players who've played this season, by ${VAL.toLowerCase()} added up`) : ''}</div>`;
-      })()}
-    </div>
+    ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small"><b>${esc(raw.inj.label)}</b>${raw.inj.note ? `: ${esc(raw.inj.note)}` : ''} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
     ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th>${AVG.map(([h]) => `<th class="num">${h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted small">No ${SPORT.name} regular-season stats yet.</p>`}
     <h3 class="sub" style="margin-top:16px">Games${games.length ? ` <span class="muted small">${games.length}</span>` : ''}</h3>
     ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th>${CS.map(([h, , , gh]) => `<th class="num">${gh || h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   const d = $('#detailDialog');
   cardOpen = nbaId;
-  // his name, and the injury report's word beside it (no word: healthy)
-  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span>${raw.inj ? ` <span class="badge ${raw.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(raw.inj.label)}</span>` : ''}`;
+  // his name, and who he is: team, number, positions, age, country, years in the league (his injury, if any, is the note
+  // under the photo, its word first)
+  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</span>`;
   if (!d.open) d.showModal();
 }
