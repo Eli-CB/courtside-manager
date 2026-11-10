@@ -390,12 +390,12 @@ function matchupBoard(ctx) {
   // weekly lineups: the starters the projection uses; daily: their lineup as set now (like yours), while
   // each day's best lineup is what's projected
   const oppOn = ctx.oppIds || new Set(Array.isArray(state.opp.starters) ? state.opp.starters : []);
-  const oppStarters = ctx.opp.filter(p => oppOn.has(p.id)).sort((a, b) => value(b) - value(a));
+  const oppStarters = sortDesc(ctx.opp.filter(p => oppOn.has(p.id)), value);
   const oppSlotIds = fillSlots(oppStarters, state.slots);
   const oppById = new Map(ctx.opp.map(p => [p.id, p]));
   const prio = p => weeklyPriority(p, ctx.dates);
-  const myBench = benchPlayers().sort((a, b) => prio(b) - prio(a));
-  const oppBench = ctx.opp.filter(p => !oppOn.has(p.id)).sort((a, b) => prio(b) - prio(a));
+  const myBench = sortDesc(benchPlayers(), prio);
+  const oppBench = sortDesc(ctx.opp.filter(p => !oppOn.has(p.id)), prio);
   const sched = ui.boardMode === 'sched' || !!SPORT.oneNumber; // (football: its one number)
   const legend = isFootball() ? ((NBA.projWeeks || []).includes(footballWeek(ctx.dates[0])) ? '' : 'No projections for this week yet: season averages')
     : sched ? ''
@@ -510,9 +510,9 @@ function pickupIdeas(ctx) {
 // Trying a free agent means setting a whole lineup with him, and football's Matchups redraws every 30 s during games:
 // a live redraw keeps the list it has, as the same players are still out there
 let pickMemo = { key: '', ideas: [] };
-function pickupsCard() {
+function pickupsCard(ctx) { // (ctx: the week as the page has just worked it out, so it isn't worked out twice a draw)
   if (!NBA) return '';
-  const ctx = weekContext();
+  ctx = ctx || weekContext();
   if (!ctx.hasOpp) return '';
   const key = [ctx.dates[0], state.opp.fxId, ...ctx.mine.map(p => p.id)].join();
   const ideas = live.hold && pickMemo.key === key ? pickMemo.ideas : pickupIdeas(ctx).filter(x => x.score > 0.001);
@@ -704,6 +704,6 @@ function viewWeek() {
     ${past || `${scoreboard}
     ${matchupBoard(ctx)}
     ${over ? '' : weekly ? lineupSection(ctx) : dailyCards}
-    ${over || (ctx.locked && weekly) ? '' : pickupsCard()}`}
+    ${over || (ctx.locked && weekly) ? '' : pickupsCard(ctx)}`}
   </div>`;
 }

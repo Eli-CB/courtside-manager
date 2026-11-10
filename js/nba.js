@@ -504,7 +504,8 @@ function projectSide(players, dates, fixedIds) {
   const tot = Object.fromEntries(COUNT_KEYS.map(k => [k, 0]));
   const vr = Object.fromEntries(COUNT_KEYS.map(k => [k, 0]));
   const left = Object.fromEntries(COUNT_KEYS.map(k => [k, 0])); // the part still to be played
-  const ranked = [...players].sort((a, b) => value(b) - value(a));
+  const ranked = sortDesc(players, value);
+  const pg = new Map(), perG = p => pg.get(p) || pg.set(p, perGame(p)).get(p); // (his average game: once, not for each of his days)
   const days = [];
   let games = 0;
   for (const d of dates) {
@@ -521,7 +522,7 @@ function projectSide(players, dates, fixedIds) {
     for (const p of SPORT.oneNumber ? [] : active) { // (football: oneGameSide)
       const line = gameFinal(p, d) ? actualLine(p, d) : null;
       if (line) { for (const k of COUNT_KEYS) tot[k] += line[k] || 0; games++; continue; }
-      const g = perGame(p), c = startChance(p, d); // (a goalie counts by his chance of starting, which also widens his spread)
+      const g = perG(p), c = startChance(p, d); // (a goalie counts by his chance of starting, which also widens his spread)
       for (const k of COUNT_KEYS) { tot[k] += c * g.m[k]; vr[k] += c * (g.sd[k] ** 2 + g.m[k] ** 2) - (c * g.m[k]) ** 2; left[k] += c * g.m[k]; }
       games += c;
     }
@@ -664,7 +665,7 @@ function fitsSlots(ids, players) {
 // starter/bench swaps that raise the expected category score.
 function bestWeeklyIds(players, dates, them) {
   if (isFootball()) return bestFootballIds(players, dates);
-  const cands = players.filter(p => p.status !== 'Out').sort((a, b) => weeklyPriority(b, dates) - weeklyPriority(a, dates));
+  const cands = sortDesc(players.filter(p => p.status !== 'Out'), p => weeklyPriority(p, dates));
   let cur = new Set(fillSlots(cands, state.slots).filter(Boolean));
   if (!them) return cur;
   const score = ids => objective(matchOdds(compareCats(projectSide(players, dates, ids), them)));

@@ -178,7 +178,7 @@ function teamCardHtml(tid) {
   const row = (p, slot) => `<tr${slot === 'IL' ? ' class="muted-row"' : ''}><td>${slotBadge(slot)}</td><td>${playerCell(p)}</td><td>${p.status !== 'Healthy' ? statusBadge(p) : ''}</td><td class="num"><b>${worth(p)}</b></td></tr>`;
   const starters = side.lineup.map((id, i) => (id && byId.get(id) ? row(byId.get(id), state.slots[i]) : '')).join('');
   const on = new Set([...side.lineup, ...side.il]);
-  const bench = side.players.filter(p => !on.has(p.id)).sort((a, b) => value(b) - value(a)).map(p => row(p, 'BN')).join('');
+  const bench = sortDesc(side.players.filter(p => !on.has(p.id)), value).map(p => row(p, 'BN')).join('');
   const ir = side.il.map(id => byId.get(id)).filter(Boolean).map(p => row(p, 'IL')).join('');
   // its starters' totals in each category against every team's, ranked (as Category strengths ranks them)
   let cats = '';
@@ -363,7 +363,7 @@ function viewTrade() {
   for (const id of ui.tradeGive) if (!state.players.some(p => p.id === id)) ui.tradeGive.delete(id);
   for (const id of ui.tradeGet) if (!theirs.some(p => String(p.nbaId) === id)) ui.tradeGet.delete(id);
 
-  const pick = (list, set, side, key) => list.length ? `<ul class="pick-list">${[...list].sort((a, b) => value(b) - value(a)).map(p => `
+  const pick = (list, set, side, key) => list.length ? `<ul class="pick-list">${sortDesc(list, value).map(p => `
     <li><label><input type="checkbox" data-change="trade" data-side="${side}" value="${key(p)}" ${set.has(key(p)) ? 'checked' : ''}>
       <span class="grow">${playerCell(p)}</span>${p.status !== 'Healthy' ? statusBadge(p) : ''}<span class="val">${fmtValue(value(p))}</span></label></li>`).join('')}</ul>`
     : `<p class="muted small">${side === 'get' ? (others.length ? 'This team has no players yet.' : 'Connect a league to trade with its teams.') : 'Your roster is empty.'}</p>`;

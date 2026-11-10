@@ -104,7 +104,7 @@ function dashSide(tid, dates, range, D) {
   };
   return {
     tid, name: S.name, starters, tot: total(dates, range === 'week'), week: total(D.week, true),
-    bench: S.players.filter(p => !on.has(p.id) && !il.has(p.id)).sort((a, b) => value(b) - value(a)),
+    bench: sortDesc(S.players.filter(p => !on.has(p.id) && !il.has(p.id)), value),
     ir: S.players.filter(p => il.has(p.id)),
   };
 }

@@ -300,6 +300,9 @@ function scoreCats() {
 function value(p) {
   return isPoints() ? fantasyPoints(p) : sum(Object.values(catWins(p)));
 }
+// Highest first by what fn says of each: worked out once per item, not at every comparison (a sort by value(p) asked
+// for it some 37,000 times in one draw of Plan Ahead). A new list; ties keep their order.
+const sortDesc = (list, fn) => list.map(x => [fn(x), x]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
 const valueLabel = () => (isPoints() ? 'FP/G' : 'Value');
 const fmtValue = (v, d = 2) => (isPoints() ? fmt(v, 1) : signed(v, d));
 const statOf = (p, c) => (c.fp ? fantasyPoints(p) : c.pct ? pctOf(p, c) : statVal(p, c.key));
