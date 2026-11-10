@@ -21,7 +21,7 @@ import sys
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from update_data import fetch_json, log, name_key, norm_name, per_game, schedule, season_str, write_season_index  # noqa: E402
+from update_data import box_months, fetch_json, log, name_key, norm_name, per_game, schedule, season_str, write_season_index  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data', 'nhl')
@@ -491,6 +491,7 @@ def main():
         'season': season, 'prevSeason': prev_season, 'sources': ['NHL.com stats & schedule', 'ESPN injury report'],
         'statKeys': STAT_KEYS, 'logKeys': LOG_KEYS, 'sdKeys': SD_KEYS,
         'week': week, 'teams': team_sched, 'players': players, 'league': None,
+        'box': box_months(BOX_CACHE),
     }
     tmp = OUT + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:

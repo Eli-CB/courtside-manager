@@ -1972,6 +1972,36 @@ test('a stand-in draw (another team on the page): your own state is back afterwa
   } finally { if (was == null) ls.removeItem(key); else ls.setItem(key, was); }
 });
 
+test('box scores by month: the same season as the one file, each month at its own address', async () => {
+  const one = await app.loadBoxes();
+  const want = { finals: [...one.finals].sort(), players: one.byPlayer.size, lines: [...one.byPlayer.values()].reduce((n, g) => n + g.length, 0) };
+  const all = JSON.parse(readFixture('boxscores.json'));
+  const months = [...new Set(Object.values(all.games).map(g => g.d.slice(0, 7)))].sort();
+  assert.ok(months.length >= 1);
+  const NBA = app.get('NBA'), urls = [], realFetch = app.fetch;
+  app.fetch = url => { urls.push(String(url)); return realFetch(url); };
+  try {
+    NBA.box = Object.fromEntries(months.map((m, i) => [m, `v${i}`])); // as the daily job writes it: month -> version
+    app.changed('sport'); // (drops the box scores it has)
+    const got = await app.loadBoxes();
+    assert.deepEqual(urls.filter(u => u.includes('box')).sort(), months.map((m, i) => `data/box/${m}.json?v=v${i}`), 'one request a month, its version in the address; not the one file');
+    assert.deepEqual([...got.finals].sort(), want.finals, 'every game of the season');
+    assert.equal(got.byPlayer.size, want.players);
+    assert.equal([...got.byPlayer.values()].reduce((n, g) => n + g.length, 0), want.lines, "and every player's lines, once");
+    // a month that fails to load fails the lot (no season with a hole in it), and the next ask tries again
+    app.changed('sport');
+    NBA.box = { ...NBA.box, '2031-01': 'x' };
+    await assert.rejects(app.loadBoxes(), /box scores 404/);
+    assert.equal(app.get('BOX'), null);
+  } finally {
+    app.fetch = realFetch;
+    delete NBA.box;
+    app.changed('sport');
+    await app.ready();
+    await app.loadBoxes();
+  }
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;

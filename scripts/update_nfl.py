@@ -23,7 +23,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from update_data import fetch_json, log, norm_name, per_game, schedule  # noqa: E402
+from update_data import box_months, fetch_json, log, norm_name, per_game, schedule  # noqa: E402
 
 DATA = os.path.join(ROOT, 'data', 'nfl')
 OUT = os.path.join(DATA, 'players.json')
@@ -341,6 +341,7 @@ def main():
         'season': season, 'prevSeason': str(int(season) - 1), 'sources': ['Sleeper stats and projections', 'ESPN schedule'],
         'statKeys': ['gp'] + keys, 'projKeys': proj['projKeys'], 'projWeeks': proj['projWeeks'], 'logKeys': [], 'sdKeys': [],
         'week': week, 'weeks': {str(k): v for k, v in sorted(week_of(games).items())}, 'teams': teams, 'players': players, 'league': None,
+        'box': box_months(BOX_CACHE),
     }
     tmp = OUT + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:

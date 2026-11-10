@@ -218,6 +218,9 @@ saved leagues are lost). Owner's league:
   IP address.' } }` (getDraftResults: 5 s): `getJson` waits what it says and asks again; a draft that still doesn't come
   marks the league `draftFailed` (not kept on the device; Draft tab offers Try again), never "no draft".
 - Box score cache holds NBA.com and ESPN copies of games: always dedupe by date+teams (`loadBoxes` does).
+- Box scores reach the site by month: each job keeps `boxscores.json` as its own working copy and also writes `box/<YYYY-MM>.json` beside it
+  (`box_months`, update_data.py), with `box: {month: version}` in the players file; the site asks for `box/<month>.json?v=<version>` (`boxFiles`, views.js), so a
+  finished month is downloaded once and only the month underway each day. A players file without `box` falls back to the one file. Nothing on the site reads `boxscores.json` otherwise.
 - ESPN's injury report: the morning job's, then the page reads ESPN's feed itself (`refreshInjuries`/`applyInjuries`, live.js; from `render` and on coming back
   on screen, at most every 15 min, no timer; ~50 KB; same Out/DTD rules as the jobs; one it can't place keeps the morning's entry; under 5 matched = not believed).
   A player listed questionable who then plays loses the tag once he's played on or after his entry's date (`playedSince`/`dropPlayedInjuries`, nba.js:

@@ -231,11 +231,19 @@ function boxCounts(st) {
   return Object.assign(st, { dd: +(tens >= 2), td: +(tens >= 3), gp1: 1 });
 }
 
+// The season's box scores as the daily job publishes them: one file per month (NBA.box: month -> its version, which is in
+// the file's address), so the browser keeps a finished month and downloads only the month underway each day. A data file
+// from before months had the whole season in boxscores.json, new every day.
+async function boxFiles() {
+  const dir = SPORT.data, months = Object.entries(NBA.box || {});
+  const get = async url => { const r = await fetch(url); if (!r.ok) throw new Error(`box scores ${r.status}`); return r.json(); };
+  if (!months.length) return get(`${dir}boxscores.json?v=${encodeURIComponent(NBA.updated || '')}`);
+  const parts = await Promise.all(months.map(([month, v]) => get(`${dir}box/${month}.json?v=${v}`)));
+  return { ...parts[0], games: Object.assign({}, ...parts.map(p => p.games)) };
+}
+
 function loadBoxes() {
-  boxLoad = boxLoad || fetch(`${SPORT.data}boxscores.json?v=${encodeURIComponent(NBA.updated || '')}`).then(r => {
-    if (!r.ok) throw new Error(`box scores ${r.status}`);
-    return r.json();
-  }).then(data => {
+  boxLoad = boxLoad || boxFiles().then(data => {
     const unique = new Map(), cols = data.keys || SPORT.boxCols; // (a box row's columns, as boxGameLog reads them too)
     for (const [gid, g] of Object.entries(data.games || {})) {
       const key = `${g.d} ${g.home} ${g.away}`;

@@ -28,7 +28,12 @@ function readFixture(rel) {
 function fakeFetch(url) {
   const u = new URL(String(url), 'http://localhost/');
   let body = null;
-  if (u.pathname.includes('/data/nhl/')) body = readFixture('nhl/' + u.pathname.split('/').pop());
+  const month = u.pathname.match(/\/data\/(nhl\/|nfl\/)?box\/(\d{4}-\d\d)\.json$/);
+  if (month) { // a month of box scores: cut from the saved season, as the daily job does (box_months)
+    const all = JSON.parse(readFixture(`${month[1] || ''}boxscores.json`));
+    const games = Object.fromEntries(Object.entries(all.games).filter(([, g]) => g.d.startsWith(month[2])));
+    body = Object.keys(games).length ? JSON.stringify({ season: all.season, v: all.v, ...(all.keys ? { keys: all.keys } : {}), games }) : null;
+  } else if (u.pathname.includes('/data/nhl/')) body = readFixture('nhl/' + u.pathname.split('/').pop());
   else if (u.pathname.includes('/data/nfl/')) body = readFixture('nfl/' + u.pathname.split('/').pop());
   else if (u.pathname.endsWith('/data/players.json')) body = readFixture('players.json');
   else if (u.pathname.endsWith('/data/boxscores.json')) body = readFixture('boxscores.json');

@@ -14,6 +14,7 @@ Sources (all public, no API key):
 Run:  python scripts/update_data.py
 """
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -486,6 +487,41 @@ def box_scores(season, finals, name_to_id):
     return cache['games']
 
 
+def box_months(path):
+    """The site's copy of the box scores: one file per month, box/2026-11.json beside boxscores.json (which stays the
+    job's own working copy). A visitor then downloads a finished month once, and each day only the month underway,
+    instead of the whole season again. Returns {month: version} for the players file's 'box': the version is a hash
+    of the month's file and goes in its address, so the address changes only when that month's games do (a stat
+    correction in its last days). Months of another season are removed."""
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding='utf-8') as f:
+        cache = json.load(f)
+    meta = {k: cache[k] for k in ('season', 'v', 'keys') if k in cache}  # (not the job's own notes, like hockey's 'who')
+    months = {}
+    for gid in sorted(cache.get('games', {})):  # in a set order, so the same games always make the same file
+        game = cache['games'][gid]
+        months.setdefault(game['d'][:7], {})[gid] = game
+    folder = os.path.join(os.path.dirname(path), 'box')
+    os.makedirs(folder, exist_ok=True)
+    index = {}
+    for month, games in sorted(months.items()):
+        body = json.dumps({**meta, 'games': games}, separators=(',', ':'))
+        index[month] = hashlib.sha1(body.encode('utf-8')).hexdigest()[:10]
+        file = os.path.join(folder, month + '.json')
+        old = None
+        if os.path.exists(file):
+            with open(file, encoding='utf-8') as f:
+                old = f.read()
+        if old != body:
+            with open(file, 'w', encoding='utf-8', newline='') as f:
+                f.write(body)
+    for name in os.listdir(folder):
+        if name.endswith('.json') and name[:-5] not in index:
+            os.remove(os.path.join(folder, name))
+    return index
+
+
 def season_from_boxes(games):
     """Per-game averages (season and last 10) and newest-first game logs from box scores."""
     unique = {}
@@ -838,6 +874,7 @@ def main():
         'sources': [f'{sched_src} box scores & schedule', 'NBA.com stats' if stats_ok else 'NBA.com stats (saved copy)', 'ESPN injury report'],
         'statKeys': STAT_KEYS, 'logKeys': LOG_KEYS, 'sdKeys': SD_KEYS,
         'week': week, 'teams': teams, 'players': players, 'league': league,
+        'box': box_months(BOX_CACHE),
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     tmp = OUT + '.tmp'
