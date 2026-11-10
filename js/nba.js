@@ -518,7 +518,7 @@ function projectSide(players, dates, fixedIds) {
       const ids = new Set(fillSlots(avail, state.slots).filter(Boolean));
       active = avail.filter(p => ids.has(p.id));
     }
-    for (const p of isFootball() ? [] : active) { // (football: oneGameSide)
+    for (const p of SPORT.oneNumber ? [] : active) { // (football: oneGameSide)
       const line = gameFinal(p, d) ? actualLine(p, d) : null;
       if (line) { for (const k of COUNT_KEYS) tot[k] += line[k] || 0; games++; continue; }
       const g = perGame(p), c = startChance(p, d); // (a goalie counts by his chance of starting, which also widens his spread)
@@ -578,7 +578,7 @@ const FP_RHO = 0.35;
 function fpTotals(S) {
   const sc = foldPoints(leaguePoints());
   const a = sum(Object.entries(sc).map(([k, v]) => (S.tot[k] || 0) * v)) + (S.tot.bonus || 0);
-  if (isFootball()) return { a, vr: S.vr.fpsd || 0 }; // players' weeks, not stat by stat: there are dozens
+  if (SPORT.oneNumber) return { a, vr: S.vr.fpsd || 0 }; // players' weeks, not stat by stat: there are dozens
   const parts = Object.entries(sc).map(([k, v]) => v * Math.sqrt(S.vr[k] || 0));
   const vr = (1 - FP_RHO) * sum(parts.map(x => x * x)) + FP_RHO * sum(parts) ** 2;
   return { a, vr };

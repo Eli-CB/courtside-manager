@@ -35,6 +35,9 @@ function footballNow(p, dates) {
   return g && g.state === 'in' ? { d, state: 'in', line, left: gameMinLeft(g) / SPORT.game.minutes } : { d, state: 'pre', line: null };
 }
 
+// A lineup spot that can't change any more this week: where spots lock game by game (SPORT.gameLocks), a player whose game has started
+const spotLocked = (p, dates) => !!SPORT.gameLocks && ['in', 'post'].includes(footballNow(p, dates).state);
+
 // One side's entry for the week: what he's scored, and what share of his projection is still to come
 function footballEntry(p, dates) {
   const g = footballProj(p, dates), now = footballNow(p, dates), line = now.line || {};

@@ -12,7 +12,7 @@ function fmtCat(c, v) { return c.pct ? fmtPct(v) : fmt(v, 0); }
 // Everything the week page (and pickup ideas) needs, computed once per render
 function weekContext(start = weekStart()) {
   const dates = matchDates(start);
-  const weekly = state.lineupMode === 'weekly' || isFootball(); // (football: one lineup for the week, locking player by player)
+  const weekly = state.lineupMode === 'weekly' || !!SPORT.weekLineup; // (football: one lineup for the week, locking player by player)
   const mine = state.players.filter(p => !state.il.includes(p.id));
   const opp = oppActive(); // (their injured reserve apart, as yours)
   const hasOpp = state.opp.players.length > 0;
@@ -20,7 +20,7 @@ function weekContext(start = weekStart()) {
   const oppIds = weekly ? oppStarterIds(dates) : null;
   const them = projectSide(opp, dates, oppIds);
   const asSet = projectSide(mine, dates, setIds);
-  const locked = weekly && !isFootball() && new Date() >= lockTime(start);
+  const locked = weekly && !SPORT.gameLocks && new Date() >= lockTime(start);
   const bestIds = weekly && !locked ? bestWeeklyIds(mine, dates, hasOpp ? them : null) : null;
   const best = weekly && !bestIds ? asSet : projectSide(mine, dates, bestIds);
   const catsSet = compareCats(asSet, them), catsBest = compareCats(best, them);
@@ -94,10 +94,10 @@ function pairSwaps(ctx) {
 function nearMisses(ctx, base) {
   const out = [];
   for (const b of ctx.mine) {
-    if (base.has(b.id) || b.status === 'Out' || !gamesIn(b, ctx.dates) || (isFootball() && footballNow(b, ctx.dates).state !== 'pre')) continue;
+    if (base.has(b.id) || b.status === 'Out' || !gamesIn(b, ctx.dates) || spotLocked(b, ctx.dates)) continue;
     let bestFor = null;
     for (const sId of base) {
-      if (isFootball() && ['in', 'post'].includes(footballNow(byId(sId), ctx.dates).state)) continue; // locked
+      if (spotLocked(byId(sId), ctx.dates)) continue;
       const trial = new Set(base); trial.delete(sId); trial.add(b.id);
       if (!fitsSlots(trial, ctx.mine)) continue;
       const ex = explainChange(ctx, base, trial, byId(sId), b);
@@ -112,17 +112,17 @@ function whySentence(ex, ctx) {
   const parts = [];
   const gi = ex.inP ? weekGames(ex.inP, ctx.dates) : 0, go = ex.outP ? weekGames(ex.outP, ctx.dates) : 0;
   const inN = ex.inP ? esc(lastName(ex.inP.name)) : '', outN = ex.outP ? esc(lastName(ex.outP.name)) : '';
-  if (isFootball()) {
+  if (SPORT.oneNumber) {
     const pts = p => fmt(footballPts(p, ctx.dates), 1);
     if (ex.inP && ex.outP) parts.push(`${inN} projects ${pts(ex.inP)} to ${outN}'s ${pts(ex.outP)}.`);
     else if (ex.inP) parts.push(`Fills an open slot with ${pts(ex.inP)} projected points.`);
   } else if (ex.inP && ex.outP) {
     parts.push(gi > go ? `${inN} plays ${gi} games to ${outN}'s ${go}.` : gi === go ? `Both play ${gi} games, so it comes down to fit.` : `${inN} plays fewer games (${gi} vs ${go}) but helps where this matchup is close.`);
   } else if (ex.inP) parts.push(`Fills an open slot with ${gi} more games.`);
-  if (ctx.hasOpp && isPoints() && !isFootball()) {
+  if (ctx.hasOpp && isPoints() && !SPORT.oneNumber) {
     const fp = ex.rows.find(r => r.c.fp);
     if (fp) parts.push(`${signed(fp.d, 1)} projected points, ${pctTxt(fp.pA)}→${pctTxt(fp.pB)} to win.`);
-  } else if (ctx.hasOpp && !isFootball()) {
+  } else if (ctx.hasOpp && !SPORT.oneNumber) {
     const lifts = ex.rows.filter(r => r.pB - r.pA > 0.015).sort((x, y) => (y.pB - y.pA) - (x.pB - x.pA)).slice(0, 3);
     const costs = ex.rows.filter(r => r.pA - r.pB > 0.015).sort((x, y) => (y.pA - y.pB) - (x.pA - x.pB)).slice(0, 2);
     if (lifts.length) parts.push(`Biggest lift: ${lifts.map(r => `${r.c.label} ${pctTxt(r.pA)}→${pctTxt(r.pB)}`).join(', ')}.`);
@@ -133,7 +133,7 @@ function whySentence(ex, ctx) {
 }
 
 function catChips(ex) {
-  if (isFootball()) return ''; // points are all that counts, and the swap's line says so
+  if (SPORT.oneNumber) return ''; // points are all that counts, and the swap's line says so
   return `<div class="cat-chips">${ex.rows.map(r => {
     // in points leagues only total points decide the week, so only FP shows a win chance
     const moved = Math.abs(r.pB - r.pA) >= 0.01 && (!isPoints() || r.c.fp);
@@ -143,10 +143,10 @@ function catChips(ex) {
 }
 
 function swapBlock(ex, ctx, kind) {
-  const g = p => `<span class="muted small">${posTags(p.pos)} · ${isFootball() ? `${fmt(footballPts(p, ctx.dates), 1)} proj` : `${weekGames(p, ctx.dates)} G`}</span>`;
+  const g = p => `<span class="muted small">${posTags(p.pos)} · ${SPORT.oneNumber ? `${fmt(footballPts(p, ctx.dates), 1)} proj` : `${weekGames(p, ctx.dates)} G`}</span>`;
   const net = ctx.hasOpp
     ? `<span class="swap-net ${ex.score >= 0 ? 'pos-good' : 'pos-bad'}">${isPoints() || matchupScoring() === 'most' ? `${signed(ex.dWin * 100, 1)}% win · ${goalDelta(ex.dExp)}` : `${signed(ex.dExp, 2)} cats · ${signed(ex.dWin * 100, 1)}% win`}</span>`
-    : `<span class="swap-net ${ex.dGames >= 0 ? 'pos-good' : 'pos-bad'}">${isFootball() ? goalDelta(ex.dExp) : `${signed(ex.dGames, 0)} games`}</span>`;
+    : `<span class="swap-net ${ex.dGames >= 0 ? 'pos-good' : 'pos-bad'}">${SPORT.oneNumber ? goalDelta(ex.dExp) : `${signed(ex.dGames, 0)} games`}</span>`;
   const head = ex.inP
     ? `<span class="swap-in">↑ Start <b>${esc(ex.inP.name)}</b> ${g(ex.inP)}</span>${ex.outP ? `<span class="swap-out">↓ Bench <b>${esc(ex.outP.name)}</b> ${g(ex.outP)}</span>` : ''}`
     : '<span class="swap-in">Other moves needed to fit everyone into slots</span>';
@@ -159,7 +159,7 @@ const isB2B = (p, d) => playsOn(p, d) && (playsOn(p, addDays(d, -1)) || playsOn(
 // A played game well under his usual minutes, and the likely reason: an injury (he's been on the injury
 // report since that game), a blowout, foul trouble, or unknown. Null for a normal game.
 function shortMinutes(p, line, d) {
-  if (isHockey()) return null; // ice time doesn't swing with blowouts and fouls (or a goalie's by much)
+  if (SPORT.steadyMinutes) return null; // ice time doesn't swing with blowouts and fouls (or a goalie's by much)
   const usual = p.min || 0;
   if (usual < 20 || line.min > usual * 0.7 || usual - line.min < 8) return null;
   const why = [];
@@ -296,7 +296,7 @@ function rowTags(p, ctx, side, starter) {
 function boardCell(p, ctx, side, starter) {
   if (!p) return `<td class="bcell"><span class="muted small">${side === 'them' && !ctx.hasOpp ? '' : 'Empty'}</span></td>`;
   const tags = rowTags(p, ctx, side, starter);
-  if (isFootball()) return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, hsPx(36, 22))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>${footballMeta(p, ctx)}</div></div></td>`;
+  if (SPORT.oneNumber) return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, hsPx(36, 22))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>${footballMeta(p, ctx)}</div></div></td>`;
   return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, hsPx(36, 22))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>
     <div class="bmeta"><span class="bmeta-info">${posTags(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g" data-tip="${esc(gamesLeftTip(p, ctx.dates))}">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
 }
@@ -396,7 +396,7 @@ function matchupBoard(ctx) {
   const prio = p => weeklyPriority(p, ctx.dates);
   const myBench = benchPlayers().sort((a, b) => prio(b) - prio(a));
   const oppBench = ctx.opp.filter(p => !oppOn.has(p.id)).sort((a, b) => prio(b) - prio(a));
-  const sched = ui.boardMode === 'sched' || isFootball(); // (football: its one number)
+  const sched = ui.boardMode === 'sched' || !!SPORT.oneNumber; // (football: its one number)
   const legend = isFootball() ? ((NBA.projWeeks || []).includes(footballWeek(ctx.dates[0])) ? '' : 'No projections for this week yet: season averages')
     : sched ? ''
     : ui.statSort.key !== 'slot' ? '<button class="link-btn quiet" data-action="stat-sort" data-key="slot">Back to lineup order</button>' : ''; // (green helps, red hurts: plain to see)
@@ -413,7 +413,7 @@ function matchupBoard(ctx) {
         <colgroup><col class="c-slot"><col><col></colgroup>
         <thead><tr><th></th><th>${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</th><th>${state.opp.fxId ? teamLink(state.opp.fxId, esc(state.opp.name)) : esc(state.opp.name || 'Opponent')}</th></tr></thead>
         <tbody>${rows}
-          ${isFootball() ? `<tr class="board-tot"><th scope="row"></th><td><b>${fmt(fpTotals(ctx.asSet).a, 1)}</b> projected</td><td>${ctx.hasOpp ? `<b>${fmt(fpTotals(ctx.them).a, 1)}</b> projected` : ''}</td></tr>`
+          ${SPORT.oneNumber ? `<tr class="board-tot"><th scope="row"></th><td><b>${fmt(fpTotals(ctx.asSet).a, 1)}</b> projected</td><td>${ctx.hasOpp ? `<b>${fmt(fpTotals(ctx.them).a, 1)}</b> projected` : ''}</td></tr>`
     : `<tr class="board-tot"><th scope="row"></th><td><b>${ctx.asSet.games}</b> starter games${ctx.bestIds && ctx.best.games !== ctx.asSet.games ? ` <span class="muted">(${ctx.best.games} suggested)</span>` : ''}</td><td>${ctx.hasOpp ? `<b>${ctx.them.games}</b> starter games` : ''}</td></tr>`}
           <tr class="board-sep"><td colspan="3">Bench</td></tr>${bench}${irRows}
         </tbody>
@@ -423,7 +423,7 @@ function matchupBoard(ctx) {
   }
   return `
     <div class="card board-card">
-      <div class="card-head"><h2>Lineups ${infoBtn(sched ? 'dots' : 'shading')}</h2>${isFootball() ? '' : boardModes()}</div>
+      <div class="card-head"><h2>Lineups ${infoBtn(sched ? 'dots' : 'shading')}</h2>${SPORT.oneNumber ? '' : boardModes()}</div>
       ${legend ? `<p class="muted small board-legend">${legend}</p>` : ''}
       ${body}
     </div>`;
@@ -457,7 +457,7 @@ function lineupSection(ctx) {
   const base = ctx.bestIds;
   const misses = nearMisses(ctx, base);
   const intro = !ctx.mine.length ? 'Add players to your roster first.'
-    : !ctx.hasOpp ? (isFootball() ? 'Add your opponent to see your win chance. Until then, suggestions just favor the most projected points.' : 'Add your opponent to optimize for this matchup. Until then, suggestions just favor more games from better players.')
+    : !ctx.hasOpp ? (SPORT.oneNumber ? 'Add your opponent to see your win chance. Until then, suggestions just favor the most projected points.' : 'Add your opponent to optimize for this matchup. Until then, suggestions just favor more games from better players.')
     : changed ? `Making ${steps.length === 1 ? 'this change' : 'these changes'} moves your win chance from <b>${pctTxt(ctx.oSet.win)}</b> to <b>${pctTxt(ctx.oBest.win)}</b> and your projected score from <b>${fmt(ctx.oSet.expected, isPoints() ? 0 : 1)}</b> to <b>${fmt(ctx.oBest.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'fantasy points' : 'categories'}.`
     : `Your lineup as set is the best one we found for this matchup (${pctTxt(ctx.oSet.win)} to win, ${fmt(ctx.oSet.expected, isPoints() ? 0 : 1)} projected ${isPoints() ? 'fantasy points' : 'categories'}).`;
   const swing = ctx.catsSet.filter(c => c.p > 0.1 && c.p < 0.9).map(c => c.label);
@@ -489,14 +489,14 @@ function pickupIdeas(ctx) {
   const anyDrop = lowest(mine);
   const taken = new Set([...state.players, ...state.opp.players].map(p => p.nbaId).filter(Boolean));
   const cands = nbaPlayers()
-    .filter(x => !taken.has(x.nbaId) && (x.gp || isFootball()) && x.status !== 'Out' && gamesIn(x, dates) && (!fxLeague() || fxAvailable(nbaById.get(x.nbaId))))
-    .filter(x => !isFootball() || footballNow(x, dates).state === 'pre')
-    .sort((a, b) => (isFootball() ? footballPts(b, dates) - footballPts(a, dates) : b.val - a.val))
+    .filter(x => !taken.has(x.nbaId) && (x.gp || SPORT.oneNumber) && x.status !== 'Out' && gamesIn(x, dates) && (!fxLeague() || fxAvailable(nbaById.get(x.nbaId))))
+    .filter(x => !spotLocked(x, dates))
+    .sort((a, b) => (SPORT.oneNumber ? footballPts(b, dates) - footballPts(a, dates) : b.val - a.val))
     .slice(0, 70);
   const out = [];
   for (const x of cands) {
     const p = playerFromRaw(nbaById.get(x.nbaId));
-    const drop = isFootball() ? weakest(p) : anyDrop;
+    const drop = SPORT.samePosDrops ? weakest(p) : anyDrop;
     if (!drop) continue;
     const team = [...mine.filter(m => m !== drop), p];
     const proj = projectSide(team, dates, weekly ? bestWeeklyIds(team, dates, null) : null);
@@ -521,7 +521,7 @@ function pickupsCard() {
     <div class="card">
       <div class="card-head"><h2>Pickup ideas</h2><span class="muted small">vs ${esc(state.opp.name || 'your opponent')} · ${fxLeague() ? 'free agents and waivers in your league' : 'if available in your league'}</span></div>
       ${ideas.length ? `<ul class="alerts">${ideas.map(x => {
-        const better = isFootball() ? [] : x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
+        const better = SPORT.oneNumber ? [] : x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
         return `<li class="alert">${headshot(x.p, 32)}<span class="grow"><button class="link-btn pname" data-action="player-detail" data-nba="${x.p.nbaId}">${esc(x.p.name)}</button> <span class="muted small">${esc(x.p.team)} · ${posTags(x.p.pos)} · ${isFootball() ? `${fmt(footballPts(x.p, ctx.dates), 1)} proj` : `${x.games} games`}</span><br>
           <span class="small">For ${esc(x.drop.name)}: <b class="pos-good">${goalDelta(x.gain)}</b>, ${Math.round(x.win * 100)}% to win${better.length ? ` · helps ${better.join(', ')}` : ''}</span></span></li>`;
       }).join('')}</ul>` : '<p class="muted small" style="margin:0">No free agent clearly improves this matchup.</p>'}

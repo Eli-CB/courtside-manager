@@ -73,6 +73,7 @@ const SPORTS = {
   // keys (gg, ag, gpim), so a league can score them apart from a skater's and no total mixes them; gt is his hours played.
   nhl: {
     key: 'nhl', name: 'NHL', emoji: '🏒', data: 'data/nhl/', fantrax: 'NHL',
+    steadyMinutes: true, // ice time doesn't swing with blowouts and fouls: no "short minutes" notes
     positions: ['C', 'LW', 'RW', 'D', 'G'],
     slotTypes: ['C', 'LW', 'RW', 'W', 'F', 'D', 'G', 'FLX'],
     elig: { C: ['C'], LW: ['LW'], RW: ['RW'], W: ['LW', 'RW'], F: ['C', 'LW', 'RW'], D: ['D'], G: ['G'], FLX: ['C', 'LW', 'RW', 'D'] },
@@ -150,6 +151,11 @@ const SPORTS = {
   // the league does. No past seasons or Fantrax yet; a team defense is a player, with a number made from its team code.
   nfl: {
     key: 'nfl', name: 'NFL', emoji: '🏈', data: 'data/nfl/', fantrax: 'NFL',
+    // What a football week is like, for the pages that aren't football's own (football.js does the football):
+    weekLineup: true,   // one lineup for the week, whatever the league's site calls it
+    gameLocks: true,    // a lineup spot locks when its player's game starts (spotLocked), not all at once
+    oneNumber: true,    // a player's week is one projected number: no games count, schedule dots, per-game tables, categories or minutes
+    samePosDrops: true, // an add takes the place of the weakest at its position
     positions: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'],
     slotTypes: ['QB', 'RB', 'WR', 'TE', 'WRRB', 'WRTE', 'FLX', 'SFLX', 'K', 'DEF'],
     elig: { QB: ['QB'], RB: ['RB'], WR: ['WR'], TE: ['TE'], K: ['K'], DEF: ['DEF'], WRRB: ['WR', 'RB'], WRTE: ['WR', 'TE'], FLX: ['RB', 'WR', 'TE'], SFLX: ['QB', 'RB', 'WR', 'TE'] },
