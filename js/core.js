@@ -458,13 +458,16 @@ function teamLink(tid, label) {
 }
 
 function playerCell(p, link = true, photo = true) {
-  const name = link && p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`;
+  const name = link && p.nbaId ? `${playerBtn(p.nbaId, p.name)}` : `<span class="pname">${esc(p.name)}</span>`;
   const next = p.next ? ` · ${nextGame(p.next)}` : '';
   const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note.length > 60 ? p.inj.note.slice(0, 60) + '…' : p.inj.note) : ''}</div>` : '';
   // the photo's ring shows the team; without a photo the logo does
   const body = `<div>${name}</div><div class="pmeta">${photo ? '' : teamLogo(p.team, 14) + ' '}${posTags(p.pos)}${next}</div>${inj}`;
   return photo ? `<div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain">${body}</div></div>` : body;
 }
+
+// A player's name as the button that opens his card (label: HTML in place of his plain name)
+const playerBtn = (id, name, label = esc(name)) => `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${id}">${label}</button>`;
 
 // a small photo and name for use inside a line of text
 const inlinePlayer = (p, text, px = 20) => `<span class="inl-p">${headshot(p, px)}${text}</span>`;

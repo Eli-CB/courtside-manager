@@ -283,7 +283,7 @@ function topPerformancesCard() {
       <thead><tr>${th('name', 'Player', 'pf-name')}${cats.map(c => th(c.key, c.label, 'sc')).join('')}${th('v', proj ? 'Proj' : pts ? 'FP' : 'Value', 'num pf-v')}</tr></thead>
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 34)}<div class="bmain">
-          <div class="bname"><button class="link-btn pname" data-action="player-detail" data-nba="${r.raw.id}">${esc(r.raw.name)}</button>${rookieBadge(r.raw, 'by-name')}${injBadge(r.raw.inj, 'by-name')}</div>
+          <div class="bname">${playerBtn(r.raw.id, r.raw.name)}${rookieBadge(r.raw, 'by-name')}${injBadge(r.raw.inj, 'by-name')}</div>
           <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${proj ? `${esc(r.game)} · ` : avg || perWeek ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today ? clock(r) : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? (avg || perWeek ? fmt(r.v, 1) : fmtFp(r.v)) : signed(r.v, 2)}</td>
@@ -445,11 +445,21 @@ function showPlayerDetail(nbaId) {
     .map(([l, s]) => `<tr><td><b>${l}</b></td>${AVG.map(([, f]) => `<td class="num">${f(s)}</td>`).join('')}${valCell(perGameVal(s))}</tr>`).join('');
   const games = cardGames(raw);
   // phones: each game as a short block
+  const preBadge = o => (o.type === 'PRE' ? ' <span class="badge">Pre</span>' : '');
+  const wlBadge = o => (o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : '');
+  const gameWorthTxt = v => `<span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtValue(v)} ${isPoints() ? 'FP' : 'value'}</span>`;
   const gamesNarrow = games.length ? `<ul class="pc-games show-sm pc-games-wrap">${games.map(o => { const v = lineValue(o); return `<li>
-      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ` <span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}<span class="pc-g-min">${Math.round(o.min)} min · <span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtValue(v)} ${isPoints() ? 'FP' : 'value'}</span></span></div>
+      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${preBadge(o)} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ' ' + wlBadge(o) : ''}<span class="pc-g-min">${Math.round(o.min)} min · ${gameWorthTxt(v)}</span></div>
       <div>${gameStats(raw, o)[0].map(x => `<span>${x}</span>`).join(' · ')}</div>
       <div class="muted">${gameStats(raw, o)[1].join(' · ')}</div></li>`; }).join('')}</ul>` : '';
   const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td>${CS.map(([, , g]) => `<td class="num">${g(o)}</td>`).join('')}${valCell(lineValue(o))}</tr>`).join('');
+  // the tile after Next game: a goalie's starts still to come, football's projected week (the rest: games left, below)
+  const thisWeek = matchDates(weekStartAt(0));
+  const goalieTile = () => {
+    const left = raw.inj && raw.inj.status === 'Out' ? 0 : expectedGames({ ...raw, nbaId: raw.id }, thisWeek.filter(d => d >= todayIso() && !gameFinal(raw, d)));
+    return `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? `about ${fmt(left, 1)}` : '—'}</div><div class="pc-rank">${t ? `of ${t.left} games` : ''}</div></div>`;
+  };
+  const footballTile = () => { const p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, thisWeek) ? fmt(footballPts(p, thisWeek), 1) : 'Bye'}</div></div>`; };
   $('#detailBody').innerHTML = `
     <div class="detail-head">
       <div class="detail-id">${playerPhoto(raw)}<div><p class="muted" style="margin:0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</p>${cardOwner(raw)}</div></div>
@@ -458,8 +468,7 @@ function showPlayerDetail(nbaId) {
     ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small">${esc(raw.inj.note)} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
     <div class="proj-grid" style="margin-top:12px">
       <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
-      ${isGoalie(raw) ? `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? `about ${fmt(raw.inj && raw.inj.status === 'Out' ? 0 : expectedGames({ ...raw, nbaId: raw.id }, matchDates(weekStartAt(0)).filter(d => d >= todayIso() && !gameFinal(raw, d))), 1)}` : '—'}</div><div class="pc-rank">${t ? `of ${t.left} games` : ''}</div></div>`
-    : isFootball() ? (() => { const week = matchDates(weekStartAt(0)), p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, week) ? fmt(footballPts(p, week), 1) : 'Bye'}</div></div>`; })()
+      ${isGoalie(raw) ? goalieTile() : isFootball() ? footballTile()
     : `<div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>`}
       ${isFootball() ? '' : (() => {
         // the next matchup period's games (its team's schedule), for planning next week's lineup

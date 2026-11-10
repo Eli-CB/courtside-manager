@@ -39,7 +39,12 @@ function leagueMenu() {
     <summary aria-label="League menu"><span class="lm-name">${esc(L.name)}${P ? ` · ${esc(P.label)}` : ''}</span><span class="lm-caret" aria-hidden="true">▾</span></summary>
     <div class="lm-pop">
       <div class="lm-sec">Leagues</div>
-      ${saved.map(l => `<div class="lm-row"><button type="button" class="lm-item${l.id === cur ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${l.id === cur ? '✓ ' : ''}${esc(l.name)}</button>${l.id !== cur ? `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>` : ''}</div>${l.id === cur ? seasons : ''}`).join('')}
+      ${saved.map(l => {
+        const on = l.id === cur; // (the one on the page: ticked, its seasons under it, and no Remove)
+        const pick = `<button type="button" class="lm-item${on ? ' on' : ''}" data-action="league-switch" data-id="${esc(l.id)}">${on ? '✓ ' : ''}${esc(l.name)}</button>`;
+        const remove = on ? '' : `<button type="button" class="icon-btn xs" data-action="league-remove" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}" title="Remove">✕</button>`;
+        return `<div class="lm-row">${pick}${remove}</div>${on ? seasons : ''}`;
+      }).join('')}
       ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)}</span></div>` : ''}
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}

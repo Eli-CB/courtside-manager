@@ -113,7 +113,7 @@ function draftData() {
 function draftRow(p, mine) {
   const gainCls = p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted';
   return `<tr class="${p.teamId === mine ? 'dr-mine' : ''}">
-    <td class="st-name"><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain"><div class="bname">${p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : esc(p.name)}</div>
+    <td class="st-name"><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain"><div class="bname">${p.nbaId ? `${playerBtn(p.nbaId, p.name)}` : esc(p.name)}</div>
       <div class="pmeta">${esc(p.team)}${p.teamId === mine ? ' <span class="badge accent">you</span>' : ''}</div></div></div></td>
     <td class="num">R${p.round} · <b>#${p.pick}</b></td>
     <td class="num">${p.gp ? `#${p.rank}` : '<span class="muted">—</span>'}</td>
@@ -131,7 +131,7 @@ function draftTeamCard(d, tid, ps) {
   const L = fxLeague();
   const year = seasonCtx ? seasonCtx.label : L && L.year ? seasonLabel(L.year) : '';
   const gain = (g, gp) => (!d.graded ? '' : gp ? `<b class="aw-break-v ${g > 0 ? 'pos-good' : g < 0 ? 'pos-bad' : 'muted'}">${signed(g, 0)}</b>` : '<b class="aw-break-v muted">DNP</b>');
-  const row = (p, meta, right) => `<li><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain">${p.nbaId ? `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`}<div class="muted small">${meta}</div></div></div>${right}</li>`;
+  const row = (p, meta, right) => `<li><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain">${p.nbaId ? `${playerBtn(p.nbaId, p.name)}` : `<span class="pname">${esc(p.name)}</span>`}<div class="muted small">${meta}</div></div></div>${right}</li>`;
   const ks = d.keepers[tid] || [];
   const keepers = ks.map(k => row(k, k.past ? 'Keeper' : `Keeper · graded as pick #${k.slot}${k.like ? ` · ${seasonCtx ? 'finished as' : 'playing like'} #${k.like}` : ''}`, k.past ? '' : gain(k.gain, k.gp))).join('');
   const picks = [...ps].sort((a, b) => a.pick - b.pick).map(p => row(p, `R${p.round} · pick #${p.pick}${d.graded && p.gp ? ` · ${seasonCtx ? 'finished as' : 'playing like'} #${p.rank}` : ''}`, gain(p.gain, p.gp))).join('');
@@ -220,8 +220,13 @@ function viewDraft() {
   }).join('')}</tr>`).join('');
 
   const modeSeg = !d.graded ? '' : `<div class="seg seg-sm" role="group" aria-label="Rank picks by">${[['game', 'Per game'], ['total', 'Season totals']].map(([k, l]) => `<button type="button" class="${ui.draftMode === k ? 'on' : ''}" data-action="draft-mode" data-mode="${k}" aria-pressed="${ui.draftMode === k}">${l}</button>`).join('')}</div>`;
+  const kind = d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft';
+  const gradedBy = !d.graded ? `not graded: the site has no ${SPORT.name} stats for that season`
+    : d.season ? `graded by the games of the league's season, ${fmtDay(d.season.from)} – ${fmtDay(d.season.to)}`
+    : seasonCtx ? `graded by ${seasonCtx.label} full-season stats`
+    : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`;
   return `
-  <div class="page-sub-row">${modeSeg}<p class="page-sub">${d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft'}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${!d.graded ? `not graded: the site has no ${SPORT.name} stats for that season` : d.season ? `graded by the games of the league's season, ${fmtDay(d.season.from)} – ${fmtDay(d.season.to)}` : seasonCtx ? `graded by ${seasonCtx.label} full-season stats` : `compared with this season so far (up to ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} played)`} ${infoBtn('draft')}</p></div>
+  <div class="page-sub-row">${modeSeg}<p class="page-sub">${kind}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${gradedBy} ${infoBtn('draft')}</p></div>
   ${!seasonCtx && d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
   ${d.graded ? `<div class="trade-grid">
     ${draftList(seasonCtx ? 'Best picks' : 'Best picks so far', best, mine, true)}

@@ -522,7 +522,7 @@ function pickupsCard(ctx) { // (ctx: the week as the page has just worked it out
       <div class="card-head"><h2>Pickup ideas</h2><span class="muted small">vs ${esc(state.opp.name || 'your opponent')} · ${fxLeague() ? 'free agents and waivers in your league' : 'if available in your league'}</span></div>
       ${ideas.length ? `<ul class="alerts">${ideas.map(x => {
         const better = SPORT.oneNumber ? [] : x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
-        return `<li class="alert">${headshot(x.p, 32)}<span class="grow"><button class="link-btn pname" data-action="player-detail" data-nba="${x.p.nbaId}">${esc(x.p.name)}</button> <span class="muted small">${esc(x.p.team)} · ${posTags(x.p.pos)} · ${isFootball() ? `${fmt(footballPts(x.p, ctx.dates), 1)} proj` : `${x.games} games`}</span><br>
+        return `<li class="alert">${headshot(x.p, 32)}<span class="grow">${playerBtn(x.p.nbaId, x.p.name)} <span class="muted small">${esc(x.p.team)} · ${posTags(x.p.pos)} · ${isFootball() ? `${fmt(footballPts(x.p, ctx.dates), 1)} proj` : `${x.games} games`}</span><br>
           <span class="small">For ${esc(x.drop.name)}: <b class="pos-good">${goalDelta(x.gain)}</b>, ${Math.round(x.win * 100)}% to win${better.length ? ` · helps ${better.join(', ')}` : ''}</span></span></li>`;
       }).join('')}</ul>` : '<p class="muted small" style="margin:0">No free agent clearly improves this matchup.</p>'}
     </div>`;
@@ -661,17 +661,24 @@ function viewWeek() {
 
   const over = dates[dates.length - 1] < today; // a finished week: nothing left to project
   const past = over ? pastWeekCard(start) : ''; // its real result and lineups, where the league shares them
+  const unit = isPoints() ? 'points' : 'cats';
+  const when = ui.weekShift === 1 ? 'next week' : ui.weekShift ? 'that week' : 'this week';
+  const real = hasOpp ? null : fxOpponentFor(start); // (no opponent loaded: who the league says you play)
+  const noOpp = () => `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${real
+    ? `${when[0].toUpperCase() + when.slice(1)} you play <b>${esc(real.name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(real.name)} from ${sourceName()}</button>`
+    : `${sourceName()} has no matchup for you ${when}.`}${fxLeague() && state.fxTeam ? `<div class="sb-pick">Or compare against ${fxOppPicker(ctx)}</div>` : ''}</div></div>`;
+  const asSetLine = () => `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${unit} · ${pctTxt(oSet.win)} to win${isFootball() ? '' : ` · ${asSet.games} starter games`}</div></div>`;
   const scoreboard = hasOpp ? `
     <div class="card scoreboard">
       <div class="sb-main">
         <div class="sb-side"><div class="sb-label">${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</div><div class="sb-score">${fmt(oBest.expected, isPoints() ? 0 : 1)}</div></div>
-        <div class="sb-vs">${over ? `${isPoints() ? 'points' : 'cats'}<br>with today's<br>lineups` : `projected<br>${isPoints() ? 'points' : 'cats'}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}`}</div>
+        <div class="sb-vs">${over ? `${unit}<br>with today's<br>lineups` : `projected<br>${unit}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}`}</div>
         <div class="sb-side right"><div class="sb-label">${fxLeague() && state.fxTeam ? fxOppPicker(ctx) : esc(state.opp.name || 'Opponent')}</div>${fxLeague() && state.fxTeam ? fxOppNote(ctx) : ''}<div class="sb-score">${isPoints() ? fmt(oBest.opp, 0) : fmt(oBest.n - oBest.expected, 1)}</div></div>
       </div>
       ${over ? '' : `<div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
       <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>`}
-      ${changed && !over ? `<div class="sb-foot one"><div><span class="muted small">Lineup as set</span><br><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${isPoints() ? 'points' : 'cats'} · ${pctTxt(oSet.win)} to win${isFootball() ? '' : ` · ${asSet.games} starter games`}</div></div>` : ''}
-    </div>` : `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${fxOpponentFor(start) ? `${ui.weekShift === 1 ? 'Next week' : ui.weekShift ? 'That week' : 'This week'} you play <b>${esc(fxOpponentFor(start).name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(fxOpponentFor(start).name)} from ${sourceName()}</button>` : `${sourceName()} has no matchup for you ${ui.weekShift === 1 ? 'next week' : ui.weekShift ? 'that week' : 'this week'}.`}${fxLeague() && state.fxTeam ? `<div class="sb-pick">Or compare against ${fxOppPicker(ctx)}</div>` : ''}</div></div>`;
+      ${changed && !over ? asSetLine() : ''}
+    </div>` : noOpp();
 
   // Daily-lineup leagues keep the day-by-day swap list (not one-game leagues: more games don't count there)
   let dailyCards = '';

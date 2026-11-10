@@ -308,7 +308,10 @@ function movesCard() {
   const order = { add: 0, trade: 1, away: 2, drop: 3 };
   const tids = Object.keys(moves).sort((a, b) => (b === me) - (a === me) || moves[b].length - moves[a].length);
   const at = (readLeagueCache()[L.id] || {}).at;
-  const move = m => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${m.kind === 'add' ? '+' : m.kind === 'drop' ? '−' : '⇄'}</span>${m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${m.nba}">${esc(m.name)}</button>`) : esc(m.name)}${m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>` : ''}<span class="sr-only">${m.kind === 'add' ? 'added' : m.kind === 'drop' ? 'dropped' : m.kind === 'trade' ? 'traded for' : 'traded away'}</span></li>`;
+  const SIGN = { add: '+', drop: '−' }, SAID = { add: 'added', drop: 'dropped', trade: 'traded for' }; // (a trade either way: ⇄)
+  const who = m => (m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, playerBtn(m.nba, m.name)) : esc(m.name));
+  const other = m => (m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>` : '');
+  const move = m => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${SIGN[m.kind] || '⇄'}</span>${who(m)}${other(m)}<span class="sr-only">${SAID[m.kind] || 'traded away'}</span></li>`;
   const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${teamLink(tid)}</div>
       <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
     : '<p class="muted small" style="margin:0">No adds or drops since last week.</p>';
