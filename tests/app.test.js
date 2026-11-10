@@ -2819,6 +2819,96 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   assert.ok(a.needsLanding());
 });
 
+test('a failing feed is asked less and less often: 30 s, then 1, 2, 4 minutes, 5 at most, and back at once when it answers', () => {
+  const app2 = loadApp();
+  const fails = app2.get('feedFails');
+  const wait = n => { fails.x = n; return app2.feedWait('x', 30e3) / 1e3; };
+  assert.deepEqual([0, 1, 2, 3, 4, 9].map(wait), [30, 60, 120, 240, 300, 300]);
+  fails.y = 3;
+  assert.equal(app2.feedWait('y', 120e3), 300e3, 'Sleeper basketball: 2 minutes, at most 5 too');
+  app2.noteLiveOk('x');
+  assert.equal(app2.feedWait('x', 30e3), 30e3);
+});
+
+test("ESPN not answering the site: after two misses in a row (the site itself answering) its feeds come through the Worker, for a while", async () => {
+  const a = loadApp();
+  await a.ready();
+  a.location.hostname = 'leaguelayer.com';
+  const real = a.fetch, asked = [], sent = [], net = { espn: false, site: true };
+  a.fetch = (u, o) => {
+    const s = String(u);
+    asked.push(s);
+    if (s.includes('/errors')) { sent.push(JSON.parse(o.body)); return Promise.resolve({}); }
+    if (s === 'index.html') return net.site ? Promise.resolve({ ok: true }) : Promise.reject(new Error('offline'));
+    if (s.includes('site.api.espn.com') && !net.espn) return Promise.resolve({ ok: false, status: 403 });
+    return real(u, o);
+  };
+  const ls = a.localStorage, key = 'courtside-espn-route';
+  ls.removeItem(key);
+  try {
+    await assert.rejects(a.espnSite('scoreboard'), /403/, 'one miss: an error, as before');
+    assert.ok(!asked.some(u => u.includes('api.leaguelayer.com/espn/')));
+    // the visitor offline: not ESPN's fault, no switch
+    net.site = false;
+    await assert.rejects(a.espnSite('scoreboard'), /403/);
+    assert.ok(!asked.some(u => u.includes('api.leaguelayer.com/espn/')), 'no switch while the site itself is unreachable');
+    net.site = true;
+    const sb = await a.espnSite('scoreboard');
+    assert.ok(sb.events && sb.events.length, 'the second miss in a row: the same scoreboard, through the Worker');
+    assert.ok(asked.includes('https://api.leaguelayer.com/espn/basketball/nba/scoreboard'));
+    assert.ok(+ls.getItem(key) > a.Date.now() + 5 * 36e5, "remembered for six hours (by the page's clock)");
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].msg, /^ESPN not answering the site directly \(ESPN answered 403\): its feeds come through the Worker/);
+    // from now on, straight to the Worker
+    asked.length = 0;
+    await a.espnSite('summary?event=401909881');
+    assert.deepEqual(asked, ['https://api.leaguelayer.com/espn/basketball/nba/summary?event=401909881']);
+    // six hours on, ESPN is tried directly again
+    ls.setItem(key, String(a.Date.now() - 1));
+    net.espn = true;
+    asked.length = 0;
+    await a.espnSite('scoreboard');
+    assert.deepEqual(asked, ['https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard']);
+  } finally { ls.removeItem(key); a.fetch = real; }
+});
+
+test("the Worker's ESPN route: only the site's feeds, only for its pages, kept for seconds", async () => {
+  const worker = (await import('../worker/yahoo.js')).default;
+  const store = new Map(), upstream = [];
+  const realFetch = globalThis.fetch, realCaches = globalThis.caches;
+  globalThis.caches = { default: { match: async r => (store.has(r.url) ? store.get(r.url).clone() : undefined), put: async (r, res) => { store.set(r.url, res); } } };
+  globalThis.fetch = async u => { upstream.push(String(u)); return new Response('{"events":[]}', { status: String(u).includes('event=9') ? 404 : 200, headers: { 'Content-Type': 'application/json' } }); };
+  const env = { SITE_ORIGINS: 'https://leaguelayer.com,http://localhost:5173' };
+  const ask = async (path, origin = 'https://leaguelayer.com') => {
+    const waits = [];
+    const res = await worker.fetch(new Request(`https://api.leaguelayer.com${path}`, { headers: origin ? { Origin: origin } : {} }), env, { waitUntil: p => waits.push(p) });
+    await Promise.all(waits);
+    return res;
+  };
+  try {
+    let r = await ask('/espn/basketball/nba/scoreboard');
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://leaguelayer.com');
+    assert.equal(r.headers.get('Cache-Control'), 'no-store', "the browser doesn't keep it");
+    assert.deepEqual(upstream, ['https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard']);
+    await ask('/espn/basketball/nba/scoreboard');
+    assert.equal(upstream.length, 1, 'a second visitor: from the cache, ESPN not asked again');
+    await ask('/espn/hockey/nhl/scoreboard?dates=20261108&x=1');
+    assert.equal(upstream[1], 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=20261108', 'only the parameters a feed takes');
+    await ask('/espn/football/nfl/injuries');
+    await ask('/espn/basketball/nba/summary?event=9');
+    await ask('/espn/basketball/nba/summary?event=9');
+    assert.equal(upstream.filter(u => u.endsWith('event=9')).length, 2, "an ESPN error isn't kept");
+    const n = upstream.length;
+    for (const bad of ['/espn/basketball/nba/teams', '/espn/baseball/mlb/scoreboard', '/espn/basketball/nba/summary', '/espn/basketball/nba/scoreboard?dates=tomorrow', '/espn/../../x']) {
+      assert.equal((await ask(bad)).status, 404, bad);
+    }
+    assert.equal((await ask('/espn/basketball/nba/scoreboard', 'https://elsewhere.example')).status, 404, "another site's page");
+    assert.equal((await ask('/espn/basketball/nba/scoreboard', null)).status, 404, 'no page at all (a script)');
+    assert.equal(upstream.length, n, 'none of those reached ESPN');
+  } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; }
+});
+
 test("ESPN failing again and again reaches the error log, a visitor's own connection doesn't", async () => {
   const setup = async ({ own = true, online = true } = {}) => {
     const a = loadApp();
@@ -2830,7 +2920,8 @@ test("ESPN failing again and again reaches the error log, a visitor's own connec
       const s = String(u);
       if (s.includes('/errors')) { sent.push(JSON.parse(o.body)); return Promise.resolve({}); }
       if (s === 'index.html') return own ? Promise.resolve({ ok: true }) : Promise.reject(new Error('offline'));
-      if (s.includes('site.api.espn.com') && !net.espn) return Promise.resolve({ ok: false, status: 403 });
+      // ESPN down for everyone: the Worker's way to it too
+      if ((s.includes('site.api.espn.com') || s.includes('api.leaguelayer.com/espn/')) && !net.espn) return Promise.resolve({ ok: false, status: 403 });
       return real(u, o);
     };
     a.get('ui').tab = 'dashboard';

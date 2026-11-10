@@ -12,11 +12,46 @@
 //   POST /errors                      the site sends one error: message, where it came from, page, league, version, browser
 //   GET  /errors?key=<ERRORS_KEY>     the last 30 days' errors, newest first, the same ones grouped (for the owner)
 // Kept in the KV namespace bound as ERRORS for 30 days; ERRORS_KEY is a secret. Without them errors are dropped.
+//
+// And ESPN's site feed, should ESPN stop answering the site's pages directly (the page switches here by itself: espnSite
+// in js/live.js):
+//   GET  /espn/<sport>/<league>/<scoreboard | summary | injuries>?<dates | event>
+// Only those three feeds of the three sports, only for the site's own pages, each answer kept at Cloudflare's edge for
+// seconds (ESPN_TTL), so ESPN is asked about once per feed per half minute however many people are watching.
 
 const AUTH = 'https://api.login.yahoo.com/oauth2/';
 const API = 'https://fantasysports.yahooapis.com/fantasy/v2/';
 const ERROR_DAYS = 30;
 const ERROR_FIELDS = { msg: 300, at: 300, stack: 1500, page: 120, source: 20, league: 60, build: 20, ua: 200 };
+// ESPN's feeds the site reads, and how long one answer is kept (seconds): a game day's scoreboard and a box score while
+// games are on, an earlier day's scoreboard (its games are over), the injury report
+const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
+const ESPN_LEAGUES = new Set(['basketball/nba', 'hockey/nhl', 'football/nfl']);
+const ESPN_TTL = { scoreboard: 20, pastScoreboard: 600, summary: 20, injuries: 300 };
+
+// The ESPN address for /espn/<sport>/<league>/<feed>?<query>, and how long to keep its answer; null for anything else
+function espnFeed(url) {
+  const m = url.pathname.match(/^\/espn\/([a-z]+\/[a-z]+)\/(scoreboard|summary|injuries)$/);
+  if (!m || !ESPN_LEAGUES.has(m[1])) return null;
+  const [, league, feed] = m, q = new URLSearchParams();
+  const dates = url.searchParams.get('dates'), event = url.searchParams.get('event');
+  if (feed === 'scoreboard' && dates) { if (!/^\d{8}$/.test(dates)) return null; q.set('dates', dates); }
+  if (feed === 'summary') { if (!/^\d{1,12}$/.test(event || '')) return null; q.set('event', event); }
+  const ttl = feed === 'scoreboard' && dates ? ESPN_TTL.pastScoreboard : ESPN_TTL[feed];
+  return { upstream: `${ESPN_SITE}${league}/${feed}${q.toString() ? '?' + q : ''}`, ttl };
+}
+
+// One ESPN feed, from Cloudflare's cache if it's fresh, else asked of ESPN (and kept, if ESPN answered)
+async function espnCached(target, ctx) {
+  const cache = caches.default, key = new Request(target.upstream);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const r = await fetch(target.upstream, { headers: { Accept: 'application/json' } });
+  const res = new Response(r.body, { status: r.status, headers: { 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': `public, max-age=${target.ttl}` } });
+  if (r.ok) ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 // One error from the site, cut to size; the newest sort first in KV's listing (keys count down)
@@ -69,7 +104,7 @@ ${list ? `<ol>${list}</ol>` : '<p>No errors.</p>'}`;
 }
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
     const origins = String(env.SITE_ORIGINS || 'https://leaguelayer.com').split(',').map(s => s.trim());
     const origin = req.headers.get('Origin') || '';
@@ -90,6 +125,17 @@ export default {
       if (!env.ERRORS || !env.ERRORS_KEY || url.searchParams.get('key') !== env.ERRORS_KEY) return new Response('Not found', { status: 404 });
       return new Response(await errorPage(env), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
     }
+    if (url.pathname.startsWith('/espn/') && req.method === 'GET') {
+      // only for the site's own pages (a browser always says where a page is from); not an open proxy
+      if (!origins.includes(origin)) return new Response('Not found', { status: 404 });
+      const target = espnFeed(url);
+      if (!target) return new Response(JSON.stringify({ error: 'not an ESPN feed the site reads' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
+      let r;
+      try { r = await espnCached(target, ctx); } catch (e) { r = new Response(JSON.stringify({ error: "couldn't reach ESPN" }), { status: 502 }); }
+      // to the page: never kept in the browser (its own updates decide when to ask again)
+      return new Response(r.body, { status: r.status, headers: { ...cors, 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': 'no-store' } });
+    }
+
     const callback = `${url.origin}/yahoo/callback`;
     const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     // the page to send someone back to: only the site's own pages

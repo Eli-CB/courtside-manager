@@ -50,6 +50,23 @@ npx wrangler deploy
 The log: `https://api.leaguelayer.com/errors?key=<that password>` (each error once, with how many times, when, and on
 which pages and leagues). Until this is set up the site's reports are dropped.
 
+## ESPN fallback
+
+The site's live scores, late box scores and injury report come from ESPN's site feed, asked by each visitor's
+browser. Should ESPN stop answering the site directly, the page switches by itself (after two misses in a row while
+leaguelayer.com still answers) to `GET /espn/<sport>/<league>/<scoreboard|summary|injuries>` here, which asks ESPN once
+for everyone and keeps each answer at Cloudflare's edge for 20 seconds (an earlier day's scoreboard 10 minutes, the
+injury report 5). Only those feeds, only for the site's own pages (`SITE_ORIGINS`). Nothing to set up beyond deploying:
+
+```
+npx wrangler deploy
+```
+
+Check: `https://api.leaguelayer.com/espn/basketball/nba/scoreboard` answers 404 in a browser tab (no page origin) and
+the scoreboard from the site. If it's ever used, the error log says so once per visitor: "ESPN not answering the site
+directly ... its feeds come through the Worker". The free plan counts each page's request (100,000 a day); a watching
+visitor makes about 2,000 an evening, so a busy night on the fallback may need the $5 plan.
+
 ## Checking it
 
 `https://api.leaguelayer.com/yahoo/login?return=https://leaguelayer.com/` should open Yahoo's sign-in. After

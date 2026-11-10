@@ -392,7 +392,7 @@ async function fetchEspnFootball(id) {
 // This week's points again, at most every 30 s while football's Dashboard or Matchups is open (as Sleeper's are)
 let espnWeekLoad = null;
 function espnWeekFresh(L) {
-  if (!L || L.source !== 'espn' || !isFootball() || espnWeekLoad || (L.slpWeek && Date.now() - L.slpWeek.at < 30000)) return;
+  if (!L || L.source !== 'espn' || !isFootball() || espnWeekLoad || (L.slpWeek && Date.now() - L.slpWeek.at < feedWait('ESPN live points', 30000))) return;
   const n = sleeperWeekNow(L.periods);
   espnWeekLoad = espnGet(`${L.espnSeason}/segments/0/leagues/${encodeURIComponent(L.id)}?view=mRoster&scoringPeriodId=${n}`, null, 'ffl').then(j => {
     L.slpWeek = { n, pts: espnWeekPoints(j, n), at: Date.now() };

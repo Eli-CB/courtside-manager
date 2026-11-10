@@ -16,7 +16,7 @@ const liveEvery = () => (navigator.connection && navigator.connection.saveData ?
 // read: game id -> { sc: its score when its box score was read, at }; hold: a live update is drawing (rows keep their order)
 const live = { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, busy: false, error: '', timer: null, hold: false };
 // (another sport: its games and lines, from nothing)
-keep('sport', () => { clearTimeout(live.timer); Object.assign(live, { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, error: '', fails: 0, timer: null }); });
+keep('sport', () => { clearTimeout(live.timer); Object.assign(live, { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, tried: 0, error: '', fails: 0, timer: null }); });
 
 // ESPN lists tip-offs in UTC; 5 hours back always lands on the US game date (as the daily data job does)
 const usDay = t => new Date(t - 5 * 36e5).toISOString().slice(0, 10);
@@ -117,7 +117,7 @@ const liveWanted = () => !document.hidden && (footballWeekTab() || (ui.tab === '
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {
   const res = await Promise.allSettled(games.map(async g => {
-    const lines = espnLines(await getJson(`${SPORT.espn}summary?event=${g.id}`, 'ESPN'));
+    const lines = espnLines(await espnSite(`summary?event=${g.id}`));
     if (!live.lines.has(g.d)) live.lines.set(g.d, new Map());
     for (const [id, line] of lines) live.lines.get(g.d).set(id, line);
     live.read.set(g.id, { sc: liveScore(g), at: Date.now() });
@@ -135,6 +135,7 @@ async function readBoxes(games) {
 // saved ones lack are put in with them, as the job keeps ESPN copies until NBA.com's come. Basketball only (ESPN's
 // hockey lines lack stats leagues count); once a minute at most, and only from the week's last game day on.
 const boxFill = { at: 0, busy: false };
+const FINALS = 'ESPN finals'; // (its misses, for feedWait)
 function weekDaysToFill(L) {
   if (!L || !BOX || isFootball() || isHockey() || !hasLineupHistory(L)) return [];
   const today = todayIso();
@@ -160,21 +161,22 @@ function addBoxGame(g, lines, teamOf) {
 }
 async function fillWeekFromEspn(L) {
   const days = weekDaysToFill(L);
-  if (!days.length || boxFill.busy || Date.now() - boxFill.at < 60e3) return 0;
+  if (!days.length || boxFill.busy || Date.now() - boxFill.at < feedWait(FINALS, 60e3)) return 0;
   boxFill.busy = true;
   boxFill.at = Date.now();
   let added = 0;
   try {
     for (const d of days) {
-      const games = espnGames(await getJson(`${SPORT.espn}scoreboard?dates=${espnDate(d)}`, 'ESPN', undefined, 1)).filter(g => g.state === 'post' && !savedFinal(g));
+      const games = espnGames(await espnSite(`scoreboard?dates=${espnDate(d)}`, 1)).filter(g => g.state === 'post' && !savedFinal(g));
       await Promise.all(games.map(async g => {
-        const teamOf = new Map(), lines = espnLines(await getJson(`${SPORT.espn}summary?event=${g.id}`, 'ESPN', undefined, 1), teamOf);
+        const teamOf = new Map(), lines = espnLines(await espnSite(`summary?event=${g.id}`, 1), teamOf);
         if (!lines.size || savedFinal(g)) return;
         addBoxGame(g, lines, teamOf);
         added++;
       }));
     }
-  } catch (e) { /* ESPN didn't answer: the saved box scores will have them by morning */ } finally { boxFill.busy = false; }
+    noteLiveOk(FINALS);
+  } catch (e) { feedFails[FINALS] = (feedFails[FINALS] || 0) + 1; /* ESPN didn't answer: the saved box scores will have them by morning */ } finally { boxFill.busy = false; }
   if (added) {
     // what was built on the saved box scores alone is built again (Sleeper's points for the week too, which tell which game counted)
     changed('box', L.id);
@@ -219,7 +221,7 @@ async function refreshInjuries() {
   if (!NBA || isFootball() || injFeed.busy || document.hidden || (injFeed.nba === NBA && Date.now() - injFeed.at < INJ_EVERY)) return 0;
   Object.assign(injFeed, { busy: true, at: Date.now(), nba: NBA }); // (a miss waits its 15 minutes too)
   try {
-    const feed = await getJson(`${SPORT.espn}injuries`, 'ESPN', undefined, 1);
+    const feed = await espnSite('injuries', 1);
     const n = applyInjuries(feed);
     if (n) render();
     return n;
@@ -232,6 +234,40 @@ async function refreshInjuries() {
 const LIVE_FAILS = 3;
 const feedFails = {};
 const noteLiveOk = (feed = 'ESPN live scores') => { feedFails[feed] = 0; };
+// How long to wait before asking a feed again: its usual wait, doubled after each failure in a row (1, 2, 4, 8 times), and
+// 5 minutes at most. A feed that's failing isn't asked every 30 seconds by every visitor: that's how a site gets blocked.
+const FEED_MAX_WAIT = 5 * 60e3;
+const feedWait = (feed, base) => Math.min(base * 2 ** Math.min(feedFails[feed] || 0, 4), Math.max(base, FEED_MAX_WAIT));
+
+// ESPN's site feed (scoreboards, box scores, the injury report), asked of ESPN by each visitor's browser. Should ESPN stop
+// answering the site (ESPN_SWITCH failures in a row while leaguelayer.com itself answers, so not the visitor's own
+// connection), the same feed comes through League Layer's Worker instead (worker/yahoo.js, /espn/), which asks ESPN once
+// for everyone and keeps the answer for seconds. The switch lasts ESPN_ROUTE_HOURS on this device, then direct is tried
+// again; it's logged once, so the owner knows.
+const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
+const ESPN_SWITCH = 2, ESPN_ROUTE_HOURS = 6, ESPN_ROUTE_KEY = 'courtside-espn-route';
+const espnRoute = { misses: 0 };
+const espnViaWorker = () => { try { return +localStorage.getItem(ESPN_ROUTE_KEY) > Date.now(); } catch (e) { return false; } };
+async function espnSite(path, tries = 3) {
+  const direct = SPORT.espn + path;
+  const viaWorker = () => getJson(`${WORKER}/espn/${direct.slice(ESPN_SITE.length)}`, 'ESPN', undefined, tries);
+  if (espnViaWorker()) return viaWorker();
+  try {
+    const j = await getJson(direct, 'ESPN', undefined, tries);
+    espnRoute.misses = 0;
+    return j;
+  } catch (e) {
+    if (++espnRoute.misses < ESPN_SWITCH || navigator.onLine === false) throw e;
+    const here = await fetch('index.html', { method: 'HEAD', cache: 'no-store' }).catch(() => null);
+    if (!here || !here.ok) throw e; // the visitor's own connection
+    let j;
+    try { j = await viaWorker(); } catch (e2) { throw e; } // the Worker can't either: ESPN itself is down, say so as before
+    try { localStorage.setItem(ESPN_ROUTE_KEY, String(Date.now() + ESPN_ROUTE_HOURS * 36e5)); } catch (x) { /* storage blocked: this visit only */ }
+    espnRoute.misses = 0;
+    reportError(`ESPN not answering the site directly (${e.message}): its feeds come through the Worker for ${ESPN_ROUTE_HOURS} hours`, 'js/live.js');
+    return j;
+  }
+}
 async function noteLiveFailure(msg, feed = 'ESPN live scores') {
   feedFails[feed] = (feedFails[feed] || 0) + 1;
   if (feedFails[feed] !== LIVE_FAILS || navigator.onLine === false) return;
@@ -239,14 +275,17 @@ async function noteLiveFailure(msg, feed = 'ESPN live scores') {
   if (here && here.ok) reportError(`${feed} failing (${SPORT.name}): ${msg}`, 'js/live.js');
 }
 
+// the wait between updates: 30 seconds (a minute with data saver on), longer while ESPN keeps failing
+const liveDelay = () => feedWait('ESPN live scores', liveEvery());
 async function pollLive() {
   clearTimeout(live.timer);
   live.timer = null;
   if (live.busy || !liveWanted()) return;
   live.busy = true;
+  live.tried = Date.now();
   try {
     await loadBoxes().catch(() => null); // to know which finished games are saved already
-    const sb = await getJson(SPORT.espn + 'scoreboard', 'ESPN');
+    const sb = await espnSite('scoreboard');
     live.games = espnGames(sb);
     live.day = (sb.day && sb.day.date) || (live.games[0] && live.games[0].d) || live.day;
     // (football: only the scoreboard. Its live points come from Sleeper, in the league's scoring: footballLines)
@@ -260,7 +299,7 @@ async function pollLive() {
     for (const d of [...days].filter(d => d !== live.day && !live.done.has(d))) {
       if (![...teamDates].some(([t, ds]) => ds.has(d) && !(BOX && BOX.finals.has(`${d} ${t}`)))) { live.done.add(d); continue; }
       try {
-        const past = espnGames(await getJson(`${SPORT.espn}scoreboard?dates=${espnDate(d)}`, 'ESPN', undefined, 1));
+        const past = espnGames(await espnSite(`scoreboard?dates=${espnDate(d)}`, 1));
         if (!(await readBoxes(past.filter(g => g.state === 'post' && !live.done.has(g.id) && !savedFinal(g))))) live.done.add(d);
       } catch (e) { /* try again on the next update */ }
     }
@@ -292,13 +331,14 @@ function scheduleLive() {
   if (!liveWanted()) return;
   const soon = live.games.filter(g => g.state === 'pre').map(g => g.start - Date.now());
   const on = live.error || live.games.some(g => g.state === 'in' || (g.state === 'post' && !live.done.has(g.id) && !savedFinal(g))) || soon.some(ms => ms <= 0);
-  live.timer = setTimeout(pollLive, on ? liveEvery() : Math.max(Math.min(LIVE_IDLE, ...soon), liveEvery()));
+  live.timer = setTimeout(pollLive, on ? liveDelay() : Math.max(Math.min(LIVE_IDLE, ...soon), liveEvery()));
 }
 
 // Showing today's games: update now if the last update is due, else carry on with the schedule
 function startLive() {
   if (live.busy || !liveWanted()) return;
-  if (Date.now() - live.at >= liveEvery()) pollLive();
+  // (from the last try, not the last success: a page drawn again while ESPN fails doesn't ask again at once)
+  if (Date.now() - Math.max(live.at, live.tried || 0) >= liveDelay()) pollLive();
   else if (!live.timer) scheduleLive();
 }
 document.addEventListener('visibilitychange', () => {

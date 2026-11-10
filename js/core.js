@@ -17,7 +17,10 @@ const BUILD = '__BUILD__';
 // Errors in someone's browser go to the error log on the helper server (worker/yahoo.js: POST /errors), so a page
 // that breaks for a visitor is known without waiting for them to say so: the message, where in the code, the page,
 // the league's site and ID, this version and the browser. Only on the live site; each error once a visit, 5 at most.
-const ERROR_LOG = 'https://api.leaguelayer.com/errors';
+// League Layer's Cloudflare Worker (worker/): the error log, Yahoo's sign-in, and ESPN's feeds should ESPN stop answering
+// the site directly (espnSite, live.js)
+const WORKER = 'https://api.leaguelayer.com';
+const ERROR_LOG = `${WORKER}/errors`;
 const errorsSent = new Set();
 function reportError(msg, at, stack) {
   if (location.hostname !== 'leaguelayer.com' || errorsSent.size >= 5 || errorsSent.has(msg + at)) return;

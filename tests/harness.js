@@ -27,6 +27,8 @@ function readFixture(rel) {
 // Serve data files and Fantrax and ESPN API calls from tests/fixtures
 function fakeFetch(url) {
   const u = new URL(String(url), 'http://localhost/');
+  // League Layer's Worker passes ESPN's feeds through (worker/yahoo.js, /espn/): the same saved answers
+  if (u.hostname === 'api.leaguelayer.com' && u.pathname.startsWith('/espn/')) return fakeFetch(`https://site.api.espn.com/apis/site/v2/sports/${u.pathname.slice(6)}${u.search}`);
   let body = null;
   const month = u.pathname.match(/\/data\/(nhl\/|nfl\/)?box\/(\d{4}-\d\d)\.json$/);
   if (month) { // a month of box scores: cut from the saved season, as the daily job does (box_months)

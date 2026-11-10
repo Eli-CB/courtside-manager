@@ -217,7 +217,7 @@ function sleeperWeekRosters(ms) {
 let slpWeekLoad = null;
 function sleeperWeekFresh(L) {
   // (football: as often as the rest of its live scores, these being them)
-  if (!L || L.source !== 'sleeper' || slpWeekLoad || (L.slpWeek && Date.now() - L.slpWeek.at < (isFootball() ? 30000 : 120000))) return;
+  if (!L || L.source !== 'sleeper' || slpWeekLoad || (L.slpWeek && Date.now() - L.slpWeek.at < feedWait('Sleeper live points', isFootball() ? 30000 : 120000))) return;
   const n = sleeperWeekNow(L.periods);
   slpWeekLoad = slpGet(`league/${L.id}/matchups/${n}`).then(ms => {
     const pts = {};
