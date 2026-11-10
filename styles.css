@@ -292,6 +292,16 @@ a { color: var(--accent); }
 .pp-row .perf-filters { flex: 1; min-width: 0; }
 .pp-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
 .link-btn.pp-clear, .link-btn.quiet { color: var(--muted); font-size: .85rem; } /* not orange: that's for your team */
+/* a team's code (UTA, CLE) that opens its players: looks like the text around it until pointed at */
+.link-btn.tm-link { color: inherit; font-weight: inherit; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; }
+.link-btn.tm-link:hover { text-decoration: underline; }
+/* a photo that opens the player's card (not one inside a trade list's checkbox row) */
+[data-photo] { cursor: pointer; }
+label [data-photo], #detailBody [data-photo] { cursor: inherit; }
+/* a player's name, shortened on a phone if it must, and his injury tag always beside it */
+.detail-title:has(> .dt-name) { display: flex; align-items: center; gap: 6px; }
+.detail-title .dt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-title .badge { flex: none; font-size: .7rem; }
 .link-btn.pp-clear:hover, .link-btn.quiet:hover { color: var(--text); text-decoration: underline; }
 .seg button:disabled { opacity: .45; cursor: default; }
 @media (max-width: 640px) { .pp-row { gap: 6px; } .pp-label { width: 100%; } }

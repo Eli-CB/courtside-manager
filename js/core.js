@@ -416,9 +416,11 @@ function headshot(p, px = 28) {
   const tc = TEAM_COLORS[(raw && raw.team) || (p && p.team)];
   const box = `width:${px}px;height:${px}px${tc ? `;--t1:${tc[0]};--t2:${tc[1]};--rw:${Math.max(1.25, +(px / 24).toFixed(2))}px` : ''}`;
   const tm = tc ? ' tm' : '';
-  if (i === undefined) return `<span class="hs hs-none${tm}" style="${box}" aria-hidden="true">${esc(initials(p && p.name))}</span>`;
+  // data-photo: a tap on the photo opens his card, as his name does (actions.js; the name stays the button for keyboards)
+  const who = p && p.nbaId != null ? ` data-photo="${p.nbaId}"` : '';
+  if (i === undefined) return `<span class="hs hs-none${tm}" style="${box}"${who} aria-hidden="true">${esc(initials(p && p.name))}</span>`;
   const col = i % IMG.cols, row = Math.floor(i / IMG.cols);
-  return `<span class="hs${tm}" style="${box};background-size:${IMG.cols * px}px auto;background-position:-${col * px}px -${row * px}px" aria-hidden="true"></span>`;
+  return `<span class="hs${tm}" style="${box};background-size:${IMG.cols * px}px auto;background-position:-${col * px}px -${row * px}px"${who} aria-hidden="true"></span>`;
 }
 
 // a photo's size: bigger where there's room (desktop), the phone's otherwise (the sheet's 80 px stay sharp up to 40)
@@ -459,11 +461,20 @@ function teamLink(tid, label) {
 
 function playerCell(p, link = true, photo = true) {
   const name = link && p.nbaId ? `${playerBtn(p.nbaId, p.name)}` : `<span class="pname">${esc(p.name)}</span>`;
-  const next = p.next ? ` · ${nextGame(p.next)}` : '';
+  const next = p.next ? ` · ${linkTeams(nextGame(p.next))}` : '';
   const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note.length > 60 ? p.inj.note.slice(0, 60) + '…' : p.inj.note) : ''}</div>` : '';
   // the photo's ring shows the team; without a photo the logo does
   const body = `<div>${name}</div><div class="pmeta">${photo ? '' : teamLogo(p.team, 14) + ' '}${posTags(p.pos)}${next}</div>${inj}`;
   return photo ? `<div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain">${body}</div></div>` : body;
+}
+
+// A team's code (UTA, CLE) as a link to the Players tab showing that team's players ('team-players', actions.js)
+const teamBtn = (tri, label = esc(tri)) => `<button type="button" class="link-btn tm-link" data-action="team-players" data-team="${esc(tri)}" title="${esc(tri)} players">${label}</button>`;
+// Every team code in a line's text (not inside its tags) as that link: "Tue @ POR", "OKC vs. WAS", "W 112-100 @MEM"
+function linkTeams(html) {
+  const teams = NBA && NBA.teams;
+  if (!teams || !html) return html;
+  return String(html).replace(/(^|>)([^<]+)/g, (m, open, text) => open + text.replace(/\b[A-Z]{2,4}\b/g, t => (teams[t] ? teamBtn(t) : t)));
 }
 
 // A player's name as the button that opens his card (label: HTML in place of his plain name)

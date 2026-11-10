@@ -449,10 +449,10 @@ function showPlayerDetail(nbaId) {
   const wlBadge = o => (o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : '');
   const gameWorthTxt = v => `<span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtValue(v)} ${isPoints() ? 'FP' : 'value'}</span>`;
   const gamesNarrow = games.length ? `<ul class="pc-games show-sm pc-games-wrap">${games.map(o => { const v = lineValue(o); return `<li>
-      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${preBadge(o)} <span class="muted">${esc(o.matchup)}</span>${o.wl ? ' ' + wlBadge(o) : ''}<span class="pc-g-min">${Math.round(o.min)} min · ${gameWorthTxt(v)}</span></div>
+      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${preBadge(o)} <span class="muted">${linkTeams(esc(o.matchup))}</span>${o.wl ? ' ' + wlBadge(o) : ''}<span class="pc-g-min">${Math.round(o.min)} min · ${gameWorthTxt(v)}</span></div>
       <div>${gameStats(raw, o)[0].map(x => `<span>${x}</span>`).join(' · ')}</div>
       <div class="muted">${gameStats(raw, o)[1].join(' · ')}</div></li>`; }).join('')}</ul>` : '';
-  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${esc(o.matchup)}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td>${CS.map(([, , g]) => `<td class="num">${g(o)}</td>`).join('')}${valCell(lineValue(o))}</tr>`).join('');
+  const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${linkTeams(esc(o.matchup))}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td>${CS.map(([, , g]) => `<td class="num">${g(o)}</td>`).join('')}${valCell(lineValue(o))}</tr>`).join('');
   // the tile after Next game: a goalie's starts still to come, football's projected week (the rest: games left, below)
   const thisWeek = matchDates(weekStartAt(0));
   const goalieTile = () => {
@@ -462,12 +462,11 @@ function showPlayerDetail(nbaId) {
   const footballTile = () => { const p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, thisWeek) ? fmt(footballPts(p, thisWeek), 1) : 'Bye'}</div></div>`; };
   $('#detailBody').innerHTML = `
     <div class="detail-head">
-      <div class="detail-id">${playerPhoto(raw)}<div><p class="muted" style="margin:0">${esc(raw.team)}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</p>${cardOwner(raw)}</div></div>
-      <div>${raw.inj ? `<span class="badge ${raw.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(raw.inj.label)}</span>` : '<span class="badge good">Healthy</span>'}</div>
+      <div class="detail-id">${playerPhoto(raw)}<div><p class="muted" style="margin:0">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</p>${cardOwner(raw)}</div></div>
     </div>
     ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small">${esc(raw.inj.note)} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
     <div class="proj-grid" style="margin-top:12px">
-      <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? nextGame(t.next) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
+      <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? linkTeams(nextGame(t.next)) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
       ${isGoalie(raw) ? goalieTile() : isFootball() ? footballTile()
     : `<div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>`}
       ${isFootball() ? '' : (() => {
@@ -489,6 +488,7 @@ function showPlayerDetail(nbaId) {
     ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th>${CS.map(([h, , , gh]) => `<th class="num">${gh || h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   const d = $('#detailDialog');
   cardOpen = nbaId;
-  $('#detailTitle').textContent = raw.name;
+  // his name, and the injury report's word beside it (no word: healthy)
+  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span>${raw.inj ? ` <span class="badge ${raw.inj.status === 'Out' ? 'bad' : 'warn'}">${esc(raw.inj.label)}</span>` : ''}`;
   if (!d.open) d.showModal();
 }

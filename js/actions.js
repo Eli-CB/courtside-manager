@@ -361,6 +361,17 @@ const actions = {
     ui.perfWhose = next;
     render();
   },
+  // a team's code anywhere: the Players tab showing that team's players over the season (a day could have no game of
+  // theirs; football keeps its projections), every other filter off and the panel open to say so
+  'team-players'(el) {
+    const d = $('#detailDialog');
+    if (d && d.open) d.close();
+    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: '', perfTeam: el.dataset.team, perfQ: '', perfFiltOpen: true });
+    if (!isFootball()) Object.assign(ui, { perfRange: 'year', perfMore: { sig: '', n: 0 } });
+    Object.assign(ui.perfOnly, { rookie: false, inj: false });
+    if (location.hash === '#players') render(); else location.hash = '#players';
+    window.scrollTo(0, 0);
+  },
   'perf-clear'() {
     Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: '', perfTeam: '' });
     Object.assign(ui.perfOnly, { rookie: false, inj: false });
@@ -540,6 +551,9 @@ document.addEventListener('click', e => {
   const gear = $('#gearMenu details');
   if (gear && gear.open && !e.target.closest('#gearMenu') && !e.target.closest('#infoDialog')) gear.removeAttribute('open');
   const el = e.target.closest('[data-action]');
+  // a player's photo opens his card, as his name does (not in a trade list, where the row is a checkbox, or on the card itself)
+  const photo = !el && e.target.closest('[data-photo]');
+  if (photo && !photo.closest('label, #detailBody')) { e.preventDefault(); showPlayerDetail(+photo.dataset.photo); return; }
   if (!el || !actions[el.dataset.action]) return;
   e.preventDefault();
   actions[el.dataset.action](el, e);

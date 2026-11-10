@@ -174,6 +174,7 @@ function dashCell(C, p, right, counts, tag = '', cls = '') {
     // football: his one game, or his bye
     if (isFootball()) game = fbDay ? `${fmtDay(fbDay).split(',')[0]} ${dashGame(p, fbDay)}` : 'Bye';
   } else game = dashGame(p, dates[0]);
+  game = linkTeams(game); // (its opponent's code opens that team's players)
   const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
   return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
     <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>

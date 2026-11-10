@@ -1494,11 +1494,12 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         // Hide game scores: the clock and the opponent, no score
         const g0 = app.espnGames(sb).find(g => g.state === 'in');
         const scoreTxt = `${g0.away} ${g0.as} @ ${g0.home} ${g0.hs}`;
-        assert.ok(m.includes(scoreTxt), 'scores by default');
+        const asText = h => h.replace(/<[^>]*>/g, ''); // (the team codes are links: the text as it reads)
+        assert.ok(asText(m).includes(scoreTxt), 'scores by default');
         app.ui.hideScores = true;
         try {
           const hidden = app.dashMatchupCard();
-          assert.ok(!hidden.includes(scoreTxt) && !/[A-Z]{3} \d+ @ [A-Z]{3} \d+/.test(hidden), 'no score anywhere');
+          assert.ok(!asText(hidden).includes(scoreTxt) && !/[A-Z]{3} \d+ @ [A-Z]{3} \d+/.test(asText(hidden)), 'no score anywhere');
           assert.ok(hidden.includes('lv-dot'), 'still the clock');
         } finally { app.ui.hideScores = false; }
         app.ui.dashRange = 'week';
@@ -2000,6 +2001,27 @@ test('box scores by month: the same season as the one file, each month at its ow
     await app.ready();
     await app.loadBoxes();
   }
+});
+
+test("team codes link to the Players tab filtered by that team; a player's photo knows whose it is", async () => {
+  await app.useLeague(CATS9);
+  const teams = Object.keys(app.NBA.teams), [a, b] = teams;
+  const html = app.linkTeams(`Tue @ ${a} <span class="x">${b} 112</span> ${a}X ZZZ`);
+  const links = [...html.matchAll(/data-team="([A-Z]+)"/g)].map(m => m[1]);
+  assert.deepEqual(links, [a, b], 'each known code in the text, nothing else');
+  assert.ok(html.includes(`${a}X`) && html.includes('ZZZ') && html.includes('class="x"'), 'longer words, unknown codes and tags left as they are');
+  const ui = app.get('ui');
+  Object.assign(ui, { perfPos: 'C', perfQ: 'smith', perfTeam: '' });
+  app.actions['team-players']({ dataset: { team: a } });
+  assert.equal(ui.perfTeam, a);
+  assert.equal(ui.perfPos, '', 'other filters off, so the whole team shows');
+  assert.equal(ui.perfQ, '');
+  assert.equal(ui.perfFiltOpen, true, 'and the panel open to say why the list is short');
+  assert.equal(ui.perfRange, 'year', "over the season: a day could have no game of theirs");
+  const raw = app.NBA.players.find(r => r.team === a);
+  assert.match(app.headshot({ nbaId: raw.id, name: raw.name }, 28), new RegExp(`data-photo="${raw.id}"`));
+  assert.doesNotMatch(app.headshot({ name: 'No One' }, 28), /data-photo/, 'no player id: nothing to open');
+  Object.assign(ui, { perfTeam: '', perfFiltOpen: false });
 });
 
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {

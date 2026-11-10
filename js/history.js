@@ -726,7 +726,7 @@ function fanDetail(T) {
   if (!F) return '<p class="muted">No starts yet.</p>';
   const top = F.teams[0];
   return `<p class="aw-break-total"><b>${Math.round(top.share * 100)}%</b> of ${F.n} starts were ${esc(top.team)} players</p>
-    <ul class="aw-break">${F.teams.slice(0, 5).map(x => `<li><div class="bplayer">${teamLogo(x.team, 24)}<div class="bmain"><b>${esc(x.team)}</b><div class="muted small">${x.players.slice(0, 3).map(p => esc(p.name)).join(', ')}${x.players.length > 3 ? ` +${x.players.length - 3}` : ''}</div></div></div><b class="aw-break-v">${Math.round(x.share * 100)}%</b></li>`).join('')}</ul>
+    <ul class="aw-break">${F.teams.slice(0, 5).map(x => `<li><div class="bplayer">${teamLogo(x.team, 24)}<div class="bmain"><b>${teamBtn(x.team)}</b><div class="muted small">${x.players.slice(0, 3).map(p => esc(p.name)).join(', ')}${x.players.length > 3 ? ` +${x.players.length - 3}` : ''}</div></div></div><b class="aw-break-v">${Math.round(x.share * 100)}%</b></li>`).join('')}</ul>
     <p class="muted small">A start is a player in the starting lineup for a week, counted for the ${SPORT.name} team he played for that week.</p>`;
 }
 const pickRows = list => awardRows(list, p => signed(p.gain, 0), p => `Rd ${p.round}, pick ${p.pick} · ranked ${ordinal(p.rank)}`);
