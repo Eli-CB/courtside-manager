@@ -10,6 +10,7 @@ let nbaLoading = Promise.resolve(false);
 const nbaById = new Map();
 const nbaByName = new Map();
 let nbaCache = null; // player-like objects for the Players tab
+keep('players sport', () => { nbaCache = null; });
 const BASIS_LABELS = { blend: 'Smart blend', cur: 'This season', prev: 'Last season', l10: 'Last 10 games' };
 
 const normName = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -86,7 +87,7 @@ function syncLinked() {
     }
     if (raw) applyNba(p, raw);
   }
-  nbaCache = null;
+  changed('players');
   return before !== JSON.stringify([state.players, state.opp.players]);
 }
 
@@ -130,13 +131,7 @@ async function useSport(key) {
   const data = await fetchSport(key); // first: if it can't load, nothing has changed
   setSport(key);
   state.sport = key;
-  BOX = null; boxLoad = null; espnIndex = null; nbaCache = null; winsMemo = null; fpBaseCache = null; rankMemo = { key: null };
-  for (const memo of [archives, gameLogs]) for (const k of Object.keys(memo)) delete memo[k]; // (the same season names)
-  catsMemo = { L: undefined, cats: CATS };
-  clearTimeout(live.timer);
-  Object.assign(live, { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, error: '', fails: 0, timer: null });
-  document.documentElement.style.removeProperty('--hs-sheet');
-  IMG = null; IMG_INDEX.clear();
+  changed('sport'); // box scores, photos, live scores, every memo of the other sport's numbers
   useData(data);
   loadImages();
 }
@@ -446,6 +441,7 @@ function computeBase(stats, n) {
 // win chance moves. The unit is categories won in an even matchup. Counting stats only add; turnovers and
 // shooting below the league's average take away.
 let winsMemo = null;
+keep('sport', () => { winsMemo = null; });
 function winWeights() {
   const cats = scoreCats(); // the league's categories, and their baselines
   if (winsMemo && winsMemo.cats === cats && winsMemo.BASE === BASE && winsMemo.n === state.slots.length) return winsMemo.w;

@@ -383,6 +383,7 @@ function cardGames(raw) {
 // Where each player's season ranks among everyone's, by value per game and by this season's value added up. Per game
 // counts regulars only: half the games of whoever has played the most. Kept until the stats or the scoring change.
 let rankMemo = { key: null };
+keep('sport', () => { rankMemo = { key: null }; });
 function valueRanks() {
   const key = `${NBA.updated}|${JSON.stringify(leaguePoints() || scoreCats().map(c => c.key))}`;
   if (rankMemo.key === key) return rankMemo;

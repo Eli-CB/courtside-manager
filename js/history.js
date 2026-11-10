@@ -28,6 +28,7 @@ function readRosterWeeks() {
 try { localStorage.removeItem('courtside-roster-history-v1'); } catch (e) { /* older format, no statuses */ }
 // one load per league at a time, shared by Season totals and Awards
 const rosterWeeksLoad = {};
+keep('league', id => dropKept(rosterWeeksLoad, id));
 function loadRosterWeeks(L) {
   if (!rosterWeeksLoad[L.id]) {
     const P = rosterWeeksLoad[L.id] = fetchRosterWeeks(L).catch(e => { delete rosterWeeksLoad[L.id]; throw e; });
@@ -116,6 +117,8 @@ function boxGameLog(B) {
 // A past season's game lines (data/seasons/<season>-games.json), kept as the plain number arrays they
 // arrive in ([day, team, ...stats], oldest first). A team's schedule is every day any of its players played.
 const gameLogs = {};
+keep('sport', () => dropKept(gameLogs)); // (the same season names in another sport)
+keep('box league', () => { delete gameLogs.cur; }); // (a league reload also tries again a log that failed to load)
 async function loadGameLog(season) {
   if (season in gameLogs) return gameLogs[season];
   if (season === 'cur') { // this season: the daily box scores
@@ -487,6 +490,7 @@ function weekScore(a, b) {
 
 // ----- Archived seasons: seasons/<season>.json in the sport's data folder, saved once (scripts/archive_season.py; update_nhl.py) -----
 const archives = {}; // season -> { keys, players: Map(id -> { n, s }) }, or null when not saved
+keep('sport', () => dropKept(archives));
 const seasonOf = year => `${year}-${String(year + 1).slice(2)}`;
 async function loadArchive(season) {
   if (season in archives) return archives[season];
@@ -881,6 +885,7 @@ function seasonAwards() {
 
 // The season underway: the same awards, from this season's weekly lineups and box scores so far
 const curAwards = {}; // league id -> { weeks, fidNba } once loaded
+keep('box league', id => dropKept(curAwards, id));
 function viewAwardsSoFar() {
   const L = fxLeague();
   if (!L || !NBA) return '';

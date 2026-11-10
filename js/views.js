@@ -211,7 +211,9 @@ function teamCardHtml(tid) {
 // was ACTIVE there, using this season's box scores (data/boxscores.json, loaded when Standings opens).
 let boxLoad = null;
 let BOX = null; // { byPlayer, finals } once data/boxscores.json has loaded
+keep('sport', () => { BOX = null; boxLoad = null; });
 const seasonTot = {}; // league id -> { state: 'loading' | 'ready' | 'error', teams, msg }
+keep('box league', id => dropKept(seasonTot, id));
 
 function rosterPeriodsOf(L) {
   if (L.rosterPeriods && L.rosterPeriods.length) return L.rosterPeriods.map(([n, start, end]) => ({ n, start, end }));

@@ -61,6 +61,28 @@ function emptyState() {
 }
 
 /* =========================================================
+   What's kept, and when it's thrown away
+   ========================================================= */
+// Anything worked out and kept (a cache, a memo) signs up here, where it's declared, with what it was worked out from:
+//   'sport'    the sport on the page (its data file, box scores, photos)
+//   'box'      the box scores (games added to the saved ones)
+//   'league'   a league as read from its site: rosters, lineups, matchups
+//   'players'  the players' own details: injuries, the league's positions and rosters, its categories
+// changed('box', leagueId) then empties everything that used the box scores (for that league, where a thing is kept by
+// league; all of them without an id). Nothing clears another file's cache by hand.
+const kept = [];
+const keep = (from, reset) => { kept.push({ from: from.split(' '), reset }); };
+function changed(what, id) { for (const k of kept) if (k.from.includes(what)) k.reset(id); }
+// one league's entries out of a thing kept by league id (or by "league id|..."); all of them without an id
+function dropKept(memo, id) {
+  const isMap = memo instanceof Map;
+  for (const k of isMap ? [...memo.keys()] : Object.keys(memo)) {
+    if (id != null && k !== id && !String(k).startsWith(`${id}|`)) continue;
+    if (isMap) memo.delete(k); else delete memo[k];
+  }
+}
+
+/* =========================================================
    State + persistence
    ========================================================= */
 let state = null;
@@ -243,6 +265,7 @@ function catDef(key) {
   return { key, label: STAT_LABEL[key] || key.toUpperCase(), neg: NEG_CATS.has(key), dec: key === 'dd' || key === 'td' ? 2 : null };
 }
 let catsMemo = { L: undefined, cats: CATS };
+keep('sport', () => { catsMemo = { L: undefined, cats: CATS }; });
 function scoreCats() {
   const L = fxLeague();
   if (catsMemo.L !== L) {
@@ -251,7 +274,7 @@ function scoreCats() {
       ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0, dec: k === 'dd' || k === 'td' ? 2 : null })), { key: 'fp', label: 'FP', fp: true }]
       : L && L.cats && L.cats.length ? L.cats.map(catDef) : CATS };
     BASE = baseNow(); // and on the league's size (and, for a past season, that season's stats)
-    nbaCache = null; // player values depend on the categories
+    changed('players'); // player values depend on the categories
   }
   return catsMemo.cats;
 }
@@ -267,6 +290,7 @@ const statOf = (p, c) => (c.fp ? fantasyPoints(p) : c.pct ? pctOf(p, c) : statVa
 
 // Typical fantasy points per game for a rostered player, for shading the FP column
 let fpBaseCache = null;
+keep('sport', () => { fpBaseCache = null; });
 function fpBase() {
   const sc = leaguePoints();
   if (fpBaseCache && fpBaseCache.sc === sc) return fpBaseCache.v;
@@ -320,6 +344,7 @@ function stepper(action, what, select, ends = {}) {
 // ----- Headshots and team logos (headshots.webp + images.json in the sport's data folder, built by scripts/build_images.py) -----
 let IMG = null;
 const IMG_INDEX = new Map();
+keep('sport', () => { IMG = null; IMG_INDEX.clear(); document.documentElement.style.removeProperty('--hs-sheet'); });
 
 async function loadImages() {
   const sport = SPORT;

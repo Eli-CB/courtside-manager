@@ -26,7 +26,7 @@ const actions = {
   'clear-saved'() {
     for (const k of SAVED_LEAGUE_DATA) { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } }
     fxShared = null; espnShared = null;
-    for (const id of Object.keys(rosterWeeksLoad)) delete rosterWeeksLoad[id];
+    changed('league'); // every league's weekly rosters are asked for again
     gearMenu();
     toast('Cleared saved league data');
   },
@@ -473,9 +473,7 @@ async function reloadLeague() {
     Object.assign(state, { players: side.players, il: side.il, lineup: side.lineup, teamName: side.name || state.teamName });
   }
   syncLinked();
-  delete seasonTot[fxLeague().id];
-  delete curAwards[fxLeague().id];
-  if (gameLogs.cur) delete gameLogs.cur;
+  changed('league', fxLeague().id);
 }
 
 // 7 PM in New York that day (the data file has no tip-off times)

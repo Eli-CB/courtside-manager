@@ -532,14 +532,16 @@ function pickupsCard() {
 // The weekly rosters and box scores load once (shared with Season totals and Awards); each matchup's replay is kept
 const pastWeeks = {}; // league id -> { state, weeks, G } ; replays: "league|period|team" -> result
 const pastReplays = new Map();
+keep('box league', id => { dropKept(pastWeeks, id); dropKept(pastReplays, id); });
 // The league's weekly rosters and this season's box scores, loading the first time (Matchups and Recap redraw when in)
 function pastWeeksOf(L) {
   let P = pastWeeks[L.id];
   if (!P) {
-    P = pastWeeks[L.id] = { state: 'loading' };
+    const mine = P = pastWeeks[L.id] = { state: 'loading' };
+    const still = () => pastWeeks[L.id] === mine; // (dropped while loading, by changed('box' or 'league'): the next ask loads again)
     Promise.all([loadRosterWeeks(L), loadGameLog('cur')])
-      .then(([weeks, G]) => { pastWeeks[L.id] = { state: 'ready', weeks, G }; })
-      .catch(e => { pastWeeks[L.id] = { state: 'error', msg: e.message }; })
+      .then(([weeks, G]) => { if (still()) pastWeeks[L.id] = { state: 'ready', weeks, G }; })
+      .catch(e => { if (still()) pastWeeks[L.id] = { state: 'error', msg: e.message }; })
       .finally(() => { if (ui.tab === 'week' || ui.tab === 'recap') render(); });
   }
   return P;

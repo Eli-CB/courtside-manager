@@ -15,6 +15,8 @@ const liveEvery = () => (navigator.connection && navigator.connection.saveData ?
 // games: the scoreboard's; lines: date -> NBA id -> stat line; done: finished games (and days) already read;
 // read: game id -> { sc: its score when its box score was read, at }; hold: a live update is drawing (rows keep their order)
 const live = { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, busy: false, error: '', timer: null, hold: false };
+// (another sport: its games and lines, from nothing)
+keep('sport', () => { clearTimeout(live.timer); Object.assign(live, { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, error: '', fails: 0, timer: null }); });
 
 // ESPN lists tip-offs in UTC; 5 hours back always lands on the US game date (as the daily data job does)
 const usDay = t => new Date(t - 5 * 36e5).toISOString().slice(0, 10);
@@ -36,6 +38,7 @@ function espnGames(sb) {
 
 // ESPN's players as NBA.com's: by ESPN id (the daily data file has them), else first initial, last name and team
 let espnIndex = null;
+keep('sport', () => { espnIndex = null; });
 function espnPlayer(a, team, role = '') {
   if (!espnIndex || espnIndex.nba !== NBA) {
     espnIndex = { nba: NBA, ids: new Map(), names: new Map() };
@@ -174,9 +177,8 @@ async function fillWeekFromEspn(L) {
   } catch (e) { /* ESPN didn't answer: the saved box scores will have them by morning */ } finally { boxFill.busy = false; }
   if (added) {
     // what was built on the saved box scores alone is built again (Sleeper's points for the week too, which tell which game counted)
-    delete gameLogs.cur;
-    delete pastWeeks[L.id];
-    if (L.source === 'sleeper') delete rosterWeeksLoad[L.id];
+    changed('box', L.id);
+    if (L.source === 'sleeper') changed('league', L.id);
     if (ui.tab === 'recap' || ui.tab === 'dashboard') render();
   }
   return added;

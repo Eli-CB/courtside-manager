@@ -346,7 +346,7 @@ function applyFantraxLeague({ league, fxPlayers }) {
     else delete raw.fx;
   }
   NBA.league = league;
-  nbaCache = null;
+  changed('players');
 }
 
 // Roster slots from the league's settings (8 starters, bench and IR sizes)
@@ -393,7 +393,7 @@ const fxLeague = () => viewLeague || (!state.browse && NBA && NBA.league) || nul
 function clearLeaguePlayers() {
   if (!NBA) return;
   for (const raw of NBA.players) { delete raw.fx; raw.pos = raw.basePos; }
-  nbaCache = null;
+  changed('players');
 }
 const myTeamId = () => (viewLeague ? viewTeam : state.fxTeam);
 function viewingLeague(L, me, fn) {
@@ -509,7 +509,7 @@ async function getLeague(id, force) {
   const src = leagueSourceOf(id);
   const res = await (src === 'espn' ? fetchEspnLeague(id) : src === 'sleeper' ? fetchSleeperLeague(id) : src === 'yahoo' ? fetchYahooLeague(id) : fetchFantraxLeague(id));
   if (!res.league.draftFailed) saveLeague(id, res); // a league missing its draft is asked for again next time
-  delete rosterWeeksLoad[id]; // the current period's lineups may have changed
+  changed('league', id); // its lineups, matchups and rosters may have changed: whatever was worked out from them goes
   return res;
 }
 

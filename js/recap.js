@@ -7,6 +7,7 @@
 // counts one matchup: every final, then the standouts. Fantrax and Sleeper leagues (the others don't share past lineups);
 // in Sleeper's one-game weeks a starter's week is the game that counted, so Player of the week is the best such game.
 const recaps = new Map(); // "league|period" -> recap, or null when the week's lineups aren't there
+keep('box league', id => dropKept(recaps, id));
 
 // weeks whose games are all played (a Fantrax week ends officially when the next locks, a day after its last games)
 const finishedPeriods = L => (L.periods || []).filter(p => periodOver(p) && ((L.matchups || {})[String(p.n)] || []).length);

@@ -1940,6 +1940,23 @@ test("ESPN's injury report read again through the day: new entries in, healed pl
   } finally { players.forEach((r, i) => { r.inj = saved[i]; }); g.inj = prevG; }
 });
 
+test("what's kept goes when what it was worked out from changes: one league's, or everyone's", () => {
+  const recaps = app.get('recaps'), seasonTot = app.get('seasonTot'), pastWeeks = app.get('pastWeeks'), gameLogs = app.get('gameLogs'), weeksLoad = app.get('rosterWeeksLoad');
+  const fill = () => { for (const id of ['aaa', 'bbb']) { recaps.set(`${id}|3`, {}); seasonTot[id] = {}; pastWeeks[id] = {}; weeksLoad[id] = Promise.resolve(null); } gameLogs.cur = {}; gameLogs['2024-25'] = {}; };
+  try {
+    fill();
+    app.changed('box', 'aaa');
+    assert.ok(!recaps.has('aaa|3') && !seasonTot.aaa && !pastWeeks.aaa && !('cur' in gameLogs), "new box scores: that league's recaps, totals and past weeks, and this season's game log");
+    assert.ok(recaps.has('bbb|3') && seasonTot.bbb && pastWeeks.bbb, "another league's stay");
+    assert.ok(weeksLoad.aaa && gameLogs['2024-25'], "its weekly rosters and a past season's log don't depend on box scores");
+    fill();
+    app.changed('league', 'aaa');
+    assert.ok(!weeksLoad.aaa && !recaps.has('aaa|3') && weeksLoad.bbb, 'the league read again: its rosters too');
+    app.changed('league');
+    assert.ok(!weeksLoad.bbb && !recaps.has('bbb|3') && !seasonTot.bbb, 'no id: every league');
+  } finally { for (const id of ['aaa', 'bbb']) { recaps.delete(`${id}|3`); delete seasonTot[id]; delete pastWeeks[id]; delete weeksLoad[id]; } delete gameLogs.cur; delete gameLogs['2024-25']; }
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;
