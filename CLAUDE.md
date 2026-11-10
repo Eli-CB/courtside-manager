@@ -199,7 +199,8 @@ saved leagues are lost). Owner's league:
 - stats.nba.com blocks GitHub runners. Past seasons live in `data/seasons/<season>.json` + `-games.json`
   (2016-17..2025-26), made on the owner's PC. Each fall archive the season just ended:
   `python scripts/archive_season.py 2026-27`.
-- Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data. Each sport's refresh
+- Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data. It publishes only what the page reads
+  (`index.html`, `styles.css`, `manifest.webmanifest`, `js/`, `data/`, `fonts/`, `icons/`: the deploy job's "Gather" step): a new top-level file or folder the page needs must be added there. Each sport's refresh
   runs apart; one that fails (or NFL projections failing) fails the run at the end, so GitHub says so, and the rest still publishes.
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
