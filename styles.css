@@ -657,7 +657,6 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .board thead th { font-size: .8rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
 .board th[scope="row"] { padding-right: 4px; }
 .bcell { vertical-align: top; }
-.bcell.bench, .board tbody tr:has(> .bcell.bench) > th { background: color-mix(in srgb, var(--surface-2) 55%, transparent); } /* a bench row's slot too, so the row is one shade */
 .bname { font-weight: 600; line-height: 1.3; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .bname .pname { font-size: .9rem; }
 .n-short { display: none; }
@@ -763,7 +762,6 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .stat-boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; min-width: 920px; }
 .stab { table-layout: fixed; width: 100%; }
 .bench-boards { margin-top: 20px; }
-.bench-boards .stab tbody td.st-name, .bench-boards .stab tbody td.st-g { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
 .stab th, .stab td { padding: 6px 3px; }
 .stab th.st-name, .stab td.st-name { width: 31%; padding-left: 6px; }
 .stab .st-g { width: 6%; }
@@ -771,7 +769,6 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .stab thead th { font-size: .7rem; }
 .stab thead th.st-name { font-size: .82rem; color: var(--text); text-transform: none; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
 .stab td.sc { text-align: center; font-size: .82rem; font-variant-numeric: tabular-nums; color: var(--text); border-bottom: 2px solid var(--surface); }
-.stab tbody tr.bench td.st-name, .stab tbody tr.bench td.st-g { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
 .stab .bname { flex-wrap: nowrap; }
 .stab .bname .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
