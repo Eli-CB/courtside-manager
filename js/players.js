@@ -22,12 +22,13 @@ function perfDays() {
   for (const [d, lines] of live.lines) if (lines.size) played.add(d);
   const day = [...played].filter(x => x < today).sort().pop() || null;
   const games = played.has(today) || [...teamDates.values()].some(ds => ds.has(today)) || live.games.some(g => g.d === today);
-  // This period: the matchup's game days so far, once there's more than one (one is just Today); until the new period's
-  // first game starts, the whole period before it (Last period), so the morning after still shows how it went
+  // This period: the matchup's game days so far, from its first (a one-day period is the same as Today or Yesterday, but
+  // the menu keeps its place); until the new period's first game starts, the whole period before it (Last period), so the
+  // morning after still shows how it went
   const cur = matchDates(mondayOf(today)), now = cur.filter(x => x <= today && played.has(x));
   const last = now.length ? [] : matchDates(mondayOf(addDays(cur[0], -1))).filter(x => x < cur[0] && played.has(x));
   const year = [...played].filter(x => x <= today).sort(); // every game day of the season so far
-  return { today: games ? today : null, started: played.has(today) || live.games.some(g => g.d === today && g.state !== 'pre'), day, week: now.length > 1 ? now : last.length ? last : null, weekPast: !now.length && !!last.length, year };
+  return { today: games ? today : null, started: played.has(today) || live.games.some(g => g.d === today && g.state !== 'pre'), day, week: now.length ? now : last.length ? last : null, weekPast: !now.length && !!last.length, year };
 }
 
 // Each player's lines over those days (the saved box scores, else ESPN's), added up, with what they added: fantasy
@@ -183,7 +184,7 @@ function topPerformancesCard() {
   const day = dates[0];
   const updated = range === 'day' || avg ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
     : live.at ? ` · updated ${fmtTime(live.at)}` : '';
-  const when = proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly || perWeek ? `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
+  const when = proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly || perWeek ? `${fmtDay(dates[0])}${dates.length > 1 ? ` – ${fmtDay(dates[dates.length - 1])}` : ''}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
   const toggle = `<div class="perf-when-pick"><select class="ctx-team perf-range" data-change="perf-range" aria-label="Show games from">${opts.map(([k, l]) => `<option value="${k}" ${k === chosen ? 'selected' : ''}>${l}</option>`).join('')}</select>${many
     ? `<div class="seg seg-sm" role="group" aria-label="Totals or per game">${[['0', 'Totals'], ['1', 'Per game']].map(([v, l]) => `<button type="button" class="${String(+per) === v ? 'on' : ''}" data-action="perf-per" data-per="${v}" aria-pressed="${String(+per) === v}">${l}</button>`).join('')}</div>` : ''}</div>`;
 

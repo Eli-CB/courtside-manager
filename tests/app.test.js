@@ -757,11 +757,14 @@ async function onDay(iso, fn) {
   try { return await fn(); } finally { app.Date = RealDate; }
 }
 
-test('performances: today, the last game day before it, and this week once it has more than one day', async () => {
+test('performances: today, the last game day before it, and this period from its first game day', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
   const days = async iso => JSON.parse(JSON.stringify(await onDay(iso, () => app.perfDays())));
   assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'], weekPast: false, year: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
+  // the period's first game day (here opening night): This period already, though it's just today so far
+  assert.deepEqual((await days('2026-10-20')).week, ['2026-10-20'], 'one game day in: the period is there');
+  await onDay('2026-10-20', () => assert.ok(app.topPerformancesCard().includes('<option value="week" >This period</option>')));
   // Monday at noon (the same date in any US time zone and UTC)
   // ...and until the new period's first game, the period before it whole (Last period), to see how it all went
   const first = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'];
