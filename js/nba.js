@@ -164,7 +164,7 @@ async function loadNba(fresh = false) {
     const folded = foldPastSeasons();
     if (state.browse) clearLeaguePlayers(); // browsing without a league: none of the site league's on the players
     if (syncLinked() || migrate || folded) commit(); else render();
-    if (!isFootball()) loadBoxes().then(() => { if (dropPlayedInjuries()) render(); }).catch(() => {}); // (who's played since his injury entry)
+    if (!isFootball()) loadBoxes().then(() => { if (dropPlayedInjuries()) render(); }).catch(() => {}).then(refreshInjuries); // (who's played since his injury entry; then ESPN's report as it is now)
     if (ui.pendingSeason) route(); // a refresh on a past season waited for this data
     return true;
   } catch (e) {

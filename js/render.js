@@ -242,6 +242,7 @@ function render() {
   gearMenu();
   ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
+  refreshInjuries(); // (ESPN's injury report as it is now: at most every 15 minutes)
   if (ui.pendingSeason) { $('#view').innerHTML = loadingCard('Loading that season…'); return; }
   const nav = $('#tabs');
   const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : `now:${SPORT.key}`;

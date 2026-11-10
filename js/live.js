@@ -182,6 +182,48 @@ async function fillWeekFromEspn(L) {
   return added;
 }
 
+// ----- The injury report, through the day -----
+// The morning's data has ESPN's injury report as it was then; the page reads the report again (ESPN's own feed, about 50 KB)
+// when it's drawn or comes back on screen, at most every 15 minutes (no timer of its own), the same way the job does: Out (suspended too) or Day-To-Day, hockey's
+// questionable and probable as DTD. A player the feed has but the page can't place keeps the morning's entry.
+const INJ_EVERY = 15 * 60e3;
+const injFeed = { at: 0, nba: null, busy: false };
+function injuryFrom(i) {
+  const s = String(i.status || '').trim(), l = s.toLowerCase();
+  const status = isHockey() ? (['day-to-day', 'questionable', 'probable'].includes(l) ? 'DTD' : 'Out') : (['out', 'suspension', 'suspended'].includes(l) ? 'Out' : 'DTD');
+  return { status, label: s || status, note: i.shortComment || '', date: String(i.date || '').slice(0, 10), back: String((i.details || {}).returnDate || '').slice(0, 10) };
+}
+// feed: ESPN's injuries answer -> how many players' entries changed
+function applyInjuries(feed) {
+  const found = new Map(), unplaced = new Set();
+  for (const team of feed.injuries || []) for (const i of team.injuries || []) {
+    const a = i.athlete || {};
+    if (!a.displayName) continue;
+    const id = (String(((a.links || [])[0] || {}).href || '').match(/\/id\/(\d+)/) || [])[1];
+    const raw = espnPlayer({ id, displayName: a.displayName }, a.team ? espnTri(a.team) : '', isHockey() ? hockeyRole((a.position || {}).abbreviation) : '');
+    if (raw) found.set(raw, injuryFrom(i)); else unplaced.add(nameKey(a.displayName));
+  }
+  if (found.size < 5) return 0; // (an answer that comes back nearly empty isn't believed over the morning's)
+  let n = 0;
+  for (const raw of NBA.players) {
+    let inj = found.get(raw) || (raw.inj && unplaced.has(nameKey(raw.name)) ? raw.inj : null);
+    if (inj && inj.date && playedSince(raw.id, inj.date)) inj = null; // listed for a game he's since played
+    if (JSON.stringify(inj) !== JSON.stringify(raw.inj || null)) { raw.inj = inj; n++; }
+  }
+  if (n) syncLinked();
+  return n;
+}
+async function refreshInjuries() {
+  if (!NBA || isFootball() || injFeed.busy || document.hidden || (injFeed.nba === NBA && Date.now() - injFeed.at < INJ_EVERY)) return 0;
+  Object.assign(injFeed, { busy: true, at: Date.now(), nba: NBA }); // (a miss waits its 15 minutes too)
+  try {
+    const feed = await getJson(`${SPORT.espn}injuries`, 'ESPN', undefined, 1);
+    const n = applyInjuries(feed);
+    if (n) render();
+    return n;
+  } catch (e) { return 0; /* the morning's report stays */ } finally { injFeed.busy = false; }
+}
+
 // ESPN's feed is unofficial: it can block the site or change shape, and a visitor only sees a note. Failing LIVE_FAILS
 // updates in a row (blocked, or its answers no longer read) goes to the error log, once a visit, unless it's this
 // visitor's own connection: offline, or this site doesn't answer either.
@@ -258,7 +300,7 @@ function startLive() {
   else if (!live.timer) scheduleLive();
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { clearTimeout(live.timer); live.timer = null; } else startLive();
+  if (document.hidden) { clearTimeout(live.timer); live.timer = null; } else { startLive(); refreshInjuries(); }
 });
 
 // minutes of a game still to be played: all of them before the start, less the game clock's progress (none left in overtime)

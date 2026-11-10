@@ -1915,6 +1915,31 @@ test("the opponent's injured reserve: in the IR row, not on their bench or in th
   assert.match(app.slotBadge('IL'), />IR</, 'called IR');
 });
 
+test("ESPN's injury report read again through the day: new entries in, healed players out, ones it can't place kept", async () => {
+  await app.loadBoxes();
+  const players = app.NBA.players.filter(r => r.team && !r.inj).slice(0, 7);
+  const [a, b, c, d, e, f, g] = players;
+  const saved = players.map(r => r.inj);
+  const entry = (r, status, date = '2026-10-26') => ({ status, date: `${date}T18:00Z`, shortComment: `${r.name} news`, athlete: { displayName: r.name, team: { abbreviation: r.team, id: '0' }, links: [] } });
+  const prevG = g.inj;
+  try {
+    g.inj = { status: 'Out', label: 'Out', note: 'old', date: '2026-10-20' }; // was on the morning's report, not on ESPN's now
+    f.inj = { status: 'DTD', label: 'Day-To-Day', note: 'kept', date: '2026-10-26' }; // ESPN lists him under a name the page can't place
+    const feed = { injuries: [{ id: '1', injuries: [entry(a, 'Out'), entry(b, 'Day-To-Day'), entry(c, 'Suspension'), entry(d, 'Out'), entry(e, 'Day-To-Day'),
+      { ...entry(f, 'Day-To-Day'), athlete: { displayName: f.name, team: { abbreviation: 'ZZZ', id: '0' }, links: [] } }] }] }; // (on a team the page doesn't know)
+    assert.ok(app.applyInjuries(feed) >= 6);
+    assert.equal(a.inj.status, 'Out');
+    assert.equal(b.inj.status, 'DTD');
+    assert.equal(c.inj.status, 'Out', 'suspended counts as Out');
+    assert.equal(b.inj.date, '2026-10-26');
+    assert.equal(g.inj, null, 'off the report now');
+    assert.equal(f.inj.note, 'kept', "one it can't place keeps the morning's entry");
+    // empty or nearly empty: not believed
+    assert.equal(app.applyInjuries({ injuries: [] }), 0);
+    assert.equal(a.inj.status, 'Out');
+  } finally { players.forEach((r, i) => { r.inj = saved[i]; }); g.inj = prevG; }
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;
