@@ -2449,6 +2449,17 @@ test('hockey: every tab shows real numbers, the player card speaks hockey', asyn
   const raw = a.get('NBA').players;
   const goalie = raw.find(p => p.pos.includes('G') && p.cur), skater = raw.find(p => p.pos.includes('C') && p.cur);
   assert.equal(a.cardStats(goalie).map(c => c[0]).join(), 'GS,MIN,W,L,OTL,SO,GA,SV%,GAA');
+  // his card's second tile: the starts he's likely to get, not his team's games (the test page keeps what's drawn into the card)
+  const doc = a.document, realQuery = doc.querySelector, card = realQuery();
+  doc.querySelector = sel => (sel === '#detailBody' ? card : realQuery(sel));
+  try {
+    a.showPlayerDetail(goalie.id);
+    const tile = String(card.innerHTML).match(/Starts left this week<\/div><div class="v">([^<]*)</);
+    assert.ok(tile && /^(about [\d.]+|—)$/.test(tile[1]), `a goalie's tile: ${tile && tile[1]}`);
+    a.showPlayerDetail(skater.id);
+    assert.match(String(card.innerHTML), /Games left this week/, "a skater's: games left");
+    assert.doesNotMatch(String(card.innerHTML), /Starts left this week/);
+  } finally { doc.querySelector = realQuery; }
   assert.equal(a.cardStats(skater).map(c => c[0]).slice(0, 4).join(), 'MIN,G,A,PTS');
   assert.match(a.gameStats(goalie, { sv: 30, sa: 32, ga: 2, w: 1 })[0][0], /30 saves on 32/);
   assert.equal(a.gameStats(goalie, { sv: 30, sa: 32, ga: 2, w: 1 })[1][0], 'Win');
