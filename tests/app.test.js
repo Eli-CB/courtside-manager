@@ -1877,6 +1877,29 @@ test("the night a week ends: its last games from ESPN, before the daily job save
   }
 });
 
+test("an injury entry goes once he's played since it was written: questionable, then played", async () => {
+  await app.loadBoxes();
+  const BOX = app.get('BOX');
+  const [id, days] = [...BOX.day].find(([, m]) => m.size >= 2);
+  const last = [...days.keys()].sort().pop();
+  const raw = app.NBA.players.find(r => r.id === id), saved = raw.inj;
+  try {
+    raw.inj = { status: 'DTD', label: 'Day-To-Day', note: 'questionable for tonight', date: last };
+    assert.equal(app.dropPlayedInjuries(), true);
+    assert.equal(raw.inj, null, 'played that night: no longer listed');
+    raw.inj = { status: 'Out', label: 'Out', note: 'ankle', date: app.addDays(last, 1) };
+    assert.equal(app.dropPlayedInjuries(), false);
+    assert.equal(raw.inj.status, 'Out', "hurt after his last game: still listed");
+    // a game tonight, from ESPN's live lines
+    app.get('live').lines.set(app.addDays(last, 2), new Map([[id, { min: 30, pts: 20 }]]));
+    assert.equal(app.dropPlayedInjuries(), true);
+    assert.equal(raw.inj, null, 'and played tonight');
+  } finally {
+    raw.inj = saved;
+    app.get('live').lines.clear();
+  }
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;
@@ -3160,4 +3183,49 @@ test('every site loads into the same league', async () => {
   app.localStorage.removeItem('courtside-yahoo');
   checkLeague((await hockeyApp()).fxLeague(), 'hockey');
   checkLeague((await footballApp()).fxLeague(), 'football');
+});
+
+test("the league is read again from its site 15 minutes before a period's first game and 2 minutes after", async () => {
+  const L = await app.useLeague(CATS9);
+  const S = app.get('state'), ui = app.get('ui'), KEY = 'courtside-fantrax-v2';
+  const keep = { fxTeam: S.fxTeam, fxLeagueId: S.fxLeagueId, demo: S.demo, browse: S.browse }, kept = app.localStorage.getItem(KEY);
+  const tip = Date.parse('2026-11-02T19:00:00-05:00'); // week 3 starts on Fantrax at its first tip-off
+  const readAt = t => { const all = JSON.parse(app.localStorage.getItem(KEY) || '{}'); all[CATS9] = { at: t, res: null }; app.localStorage.setItem(KEY, JSON.stringify(all)); };
+  const asked = [], realFetch = app.fetch;
+  app.fetch = url => { if (String(url).includes('getLeagueInfo')) asked.push(String(url)); return realFetch(url); };
+  try {
+    Object.assign(S, { fxTeam: L.teams[0].id, fxLeagueId: CATS9 });
+    app.setClock('2026-11-02T12:00:00-05:00');
+    const marks = app.autoReloadMarks(L);
+    assert.ok(marks.includes(tip - 15 * 60e3) && marks.includes(tip + 2 * 60e3), 'week 3: 6:45 and 7:02 PM');
+    readAt(Date.parse('2026-11-02T09:00:00-05:00'));
+    assert.equal(app.autoReloadDue(), null, 'noon: nothing yet');
+    app.setClock('2026-11-02T18:50:00-05:00');
+    assert.equal(app.autoReloadDue(), tip - 15 * 60e3, 'ten minutes before, read this morning: read it again');
+    for (const k of ['demo', 'browse']) { S[k] = true; assert.equal(app.autoReloadDue(), null, `not in ${k}`); S[k] = keep[k]; }
+    ui.season = 'czqgnyozmf2tbr93';
+    assert.equal(app.autoReloadDue(), null, 'not in a past season');
+    ui.season = null;
+    await app.checkAutoReload();
+    assert.equal(asked.length, 1, 'read once');
+    assert.equal(app.autoReloadDue(), null, 'and not again before the game');
+    app.setClock('2026-11-02T19:05:00-05:00');
+    assert.equal(app.autoReloadDue(), tip + 2 * 60e3, 'after tip-off: the new period and its locked lineups');
+    await app.checkAutoReload();
+    assert.equal(asked.length, 2);
+    app.setClock('2026-11-02T23:00:00-05:00');
+    await app.checkAutoReload();
+    assert.equal(asked.length, 2, 'twice a period at most');
+    // read since (↻ Reload): nothing due
+    app.get('autoReload').done.clear();
+    readAt(Date.parse('2026-11-02T19:10:00-05:00'));
+    assert.equal(app.autoReloadDue(), null);
+  } finally {
+    app.fetch = realFetch;
+    app.setClock();
+    clearTimeout(app.get('autoReload').timer);
+    app.get('autoReload').done.clear();
+    Object.assign(S, keep);
+    if (kept == null) app.localStorage.removeItem(KEY); else app.localStorage.setItem(KEY, kept);
+  }
 });

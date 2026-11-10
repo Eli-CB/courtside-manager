@@ -120,6 +120,7 @@ async function readBoxes(games) {
     live.read.set(g.id, { sc: liveScore(g), at: Date.now() });
     if (g.state === 'post') live.done.add(g.id);
   }));
+  dropPlayedInjuries(); // someone listed questionable who's played tonight
   const failed = res.filter(r => r.status === 'rejected');
   if (failed.length && failed.length === res.length) throw failed[0].reason;
   return failed.length;

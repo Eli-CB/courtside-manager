@@ -58,6 +58,23 @@ function applyNba(p, raw) {
   p.next = t ? t.next : null;
 }
 
+// ESPN's injury report comes with the morning's data, so someone listed questionable who then plays would stay tagged all
+// day. Once he's played a game on or after the day his entry was written (the saved box scores, or ESPN's lines of a game
+// tonight), he isn't listed any more; the next morning's report says again if he still is.
+function playedSince(id, from) {
+  const days = BOX && BOX.day.get(id);
+  if (days) for (const d of days.keys()) if (d >= from) return true;
+  for (const [d, lines] of live.lines) if (d >= from && lines.has(id)) return true; // (only players who've been on the floor)
+  return false;
+}
+function dropPlayedInjuries() {
+  if (!NBA || isFootball()) return false;
+  let n = 0;
+  for (const raw of NBA.players) if (raw.inj && raw.inj.date && playedSince(raw.id, raw.inj.date)) { raw.inj = null; n++; }
+  if (n) syncLinked(); // (and the players list is drawn again)
+  return n > 0;
+}
+
 function syncLinked() {
   if (!NBA) return false;
   const before = JSON.stringify([state.players, state.opp.players]);
@@ -147,6 +164,7 @@ async function loadNba(fresh = false) {
     const folded = foldPastSeasons();
     if (state.browse) clearLeaguePlayers(); // browsing without a league: none of the site league's on the players
     if (syncLinked() || migrate || folded) commit(); else render();
+    if (!isFootball()) loadBoxes().then(() => { if (dropPlayedInjuries()) render(); }).catch(() => {}); // (who's played since his injury entry)
     if (ui.pendingSeason) route(); // a refresh on a past season waited for this data
     return true;
   } catch (e) {

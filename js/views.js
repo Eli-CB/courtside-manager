@@ -251,6 +251,7 @@ function loadBoxes() {
       }
     }
     BOX = { cols, byPlayer, finals, scores, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };
+    dropPlayedInjuries();
     return BOX;
   }).catch(e => { boxLoad = null; throw e; });
   return boxLoad;
