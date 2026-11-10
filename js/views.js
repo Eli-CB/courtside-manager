@@ -111,7 +111,7 @@ function strengthsCard() {
 function slotBadge(slot) {
   const pc = slot !== 'IL' && SPORT.slotColors && SPORT.slotColors[slot];
   const cls = slot === 'IL' ? 'il' : `slot-${slot}${pc ? ` pc pc-${pc}` : ''}`;
-  return `<span class="slot-label ${cls}">${slot === 'FLX' ? 'Flx' : slot === 'BN' ? 'Res' : slot}</span>`;
+  return `<span class="slot-label ${cls}">${slot === 'FLX' ? 'Flx' : slot === 'BN' ? 'Res' : slot === 'IL' ? 'IR' : slot}</span>`;
 }
 
 // A sortable column header. down: whether this column is currently sorted biggest-first

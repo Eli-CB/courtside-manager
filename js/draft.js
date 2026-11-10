@@ -458,7 +458,7 @@ function adoptTeam(teamId) {
   const opp = fxOpponentFor(weekStart());
   if (opp) {
     const o = fxTeamSide(opp.id);
-    state.opp = { name: o.name, week: weekStart(), fxId: opp.id, players: o.players, starters: o.starters };
+    state.opp = { name: o.name, week: weekStart(), fxId: opp.id, players: o.players, starters: o.starters, il: o.il };
   } else {
     state.opp = { name: '', week: null, players: [], starters: null, fxId: null };
   }

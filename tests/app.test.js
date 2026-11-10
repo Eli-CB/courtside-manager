@@ -1900,6 +1900,21 @@ test("an injury entry goes once he's played since it was written: questionable, 
   }
 });
 
+test("the opponent's injured reserve: in the IR row, not on their bench or in their projection", async () => {
+  const L = await app.useLeague(CATS9);
+  const S = app.get('state'), saved = S.opp;
+  try {
+    const side = app.fxTeamSide(L.teams[1].id);
+    const [a, b] = side.players;
+    S.opp = { name: side.name, fxId: L.teams[1].id, players: side.players, starters: side.starters, il: [b.id] };
+    const act = app.oppActive().map(p => p.id);
+    assert.ok(act.includes(a.id) && !act.includes(b.id), 'their IR player is apart');
+    S.opp = { ...S.opp, il: undefined };
+    assert.deepEqual([...app.oppIlIds()], side.il, "a side saved before: their league's IR");
+  } finally { S.opp = saved; }
+  assert.match(app.slotBadge('IL'), />IR</, 'called IR');
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;

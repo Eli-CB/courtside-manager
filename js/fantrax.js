@@ -527,7 +527,7 @@ async function refreshLeague(force = true) {
   const cur = state.opp.fxId;
   if (after && (!cur || cur === after.id || (before && cur === before.id))) {
     const o = fxTeamSide(after.id);
-    state.opp = { name: o.name, week: weekStart(), fxId: after.id, players: o.players, starters: o.starters };
+    state.opp = { name: o.name, week: weekStart(), fxId: after.id, players: o.players, starters: o.starters, il: o.il };
   }
   return true;
 }
@@ -535,7 +535,7 @@ async function refreshLeague(force = true) {
 function loadFxTeam(teamId, week = weekStart()) {
   const side = fxTeamSide(teamId);
   const name = side.name;
-  state.opp = { name, week, fxId: teamId, players: side.players, starters: side.starters };
+  state.opp = { name, week, fxId: teamId, players: side.players, starters: side.starters, il: side.il };
   const opp = fxOpponentFor(week);
   commit(opp && opp.id === teamId ? `Loaded ${name}, your week ${opp.period} opponent` : `Scouting ${name}`);
 }
@@ -559,7 +559,7 @@ function withViewedTeam(fn, week = false) {
     if (!n || !state.fxTeam) return fn();
     const me = fxTeamSide(state.fxTeam, n), o = state.opp.fxId ? fxTeamSide(state.opp.fxId, n) : null;
     const saved = state;
-    state = { ...saved, players: me.players, lineup: me.lineup, il: me.il, opp: o ? { ...saved.opp, players: o.players, starters: o.starters } : saved.opp };
+    state = { ...saved, players: me.players, lineup: me.lineup, il: me.il, opp: o ? { ...saved.opp, players: o.players, starters: o.starters, il: o.il } : saved.opp };
     try { return fn(); } finally { state = saved; }
   }
   const a = fxTeamSide(ui.viewA, n);
@@ -569,7 +569,7 @@ function withViewedTeam(fn, week = false) {
   const saved = state;
   state = {
     ...saved, teamName: a.name, players: a.players, lineup: a.lineup, il: a.il, sample: false,
-    opp: b ? { name: b.name, week: weekStart(), fxId: bId, players: b.players, starters: b.starters } : { name: '', week: null, fxId: null, players: [], starters: null },
+    opp: b ? { name: b.name, week: weekStart(), fxId: bId, players: b.players, starters: b.starters, il: b.il } : { name: '', week: null, fxId: null, players: [], starters: null, il: [] },
   };
   ui.viewing = true;
   try { return fn(); } finally { state = saved; ui.viewing = false; }

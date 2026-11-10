@@ -216,6 +216,14 @@ function nextGame(next) {
    ========================================================= */
 function starters() { return state.lineup.map(byId).filter(Boolean); }
 function ilPlayers() { return state.il.map(byId).filter(Boolean); }
+// The opponent's injured reserve (ids): as their league has it (a side saved before this was kept: from the league)
+function oppIlIds() {
+  if (Array.isArray(state.opp.il)) return new Set(state.opp.il);
+  const L = fxLeague();
+  return new Set(L && state.opp.fxId && L.teams.some(t => t.id === state.opp.fxId) ? fxTeamSide(state.opp.fxId).il : []);
+}
+// The opponent's players who can play: everyone but their injured reserve
+function oppActive() { const il = oppIlIds(); return state.opp.players.filter(p => !il.has(p.id)); }
 function benchPlayers() {
   const used = new Set([...state.lineup.filter(Boolean), ...state.il]);
   return state.players.filter(p => !used.has(p.id));
@@ -690,7 +698,7 @@ function bestWeeklyIds(players, dates, them) {
 
 // The opponent's starters: the ones you marked, or our best guess
 function oppStarterIds(dates) {
-  const opp = state.opp.players;
+  const opp = oppActive();
   if (Array.isArray(state.opp.starters)) {
     const ids = new Set(state.opp.starters.filter(id => opp.some(p => p.id === id)));
     if (ids.size) return ids;
