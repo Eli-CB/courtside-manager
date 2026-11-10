@@ -752,6 +752,16 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .inl-p { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
 .alert > .hs { margin-top: 1px; }
 .detail-id { display: flex; align-items: center; gap: 12px; }
+/* the player card's picture, as ESPN shows one: the player in front of his team's logo on a tint of its color */
+.pc-photo { position: relative; flex: none; width: 128px; aspect-ratio: 260 / 190; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(115deg, color-mix(in srgb, var(--t1, var(--muted)) 16%, var(--surface-2)) 0%, var(--surface-2) 75%);
+  box-shadow: inset 0 0 0 1px var(--border); }
+.pc-logo { position: absolute; left: -16%; top: 50%; width: 82%; transform: translateY(-50%); opacity: .3; pointer-events: none; }
+.pc-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
+.pc-photo > .hs { display: none; }
+.pc-photo.no-shot .pc-shot { display: none; }
+.pc-photo.no-shot > .hs { display: inline-grid; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+@media (min-width: 641px) { .pc-photo { width: 184px; } }
 .seg-sm { display: inline-flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--surface-2); }
 .seg-sm button { font: inherit; font-size: .8rem; font-weight: 500; padding: 4px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .seg-sm button:hover { color: var(--text); }

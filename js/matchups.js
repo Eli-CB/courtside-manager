@@ -296,8 +296,8 @@ function rowTags(p, ctx, side, starter) {
 function boardCell(p, ctx, side, starter) {
   if (!p) return `<td class="bcell"><span class="muted small">${side === 'them' && !ctx.hasOpp ? '' : 'Empty'}</span></td>`;
   const tags = rowTags(p, ctx, side, starter);
-  if (isFootball()) return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, matchMedia('(max-width: 640px)').matches ? 22 : 28)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>${footballMeta(p, ctx)}</div></div></td>`;
-  return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, matchMedia('(max-width: 640px)').matches ? 22 : 28)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>
+  if (isFootball()) return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, hsPx(36, 22))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>${footballMeta(p, ctx)}</div></div></td>`;
+  return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, hsPx(36, 22))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>
     <div class="bmeta"><span class="bmeta-info">${posTags(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g" data-tip="${esc(gamesLeftTip(p, ctx.dates))}">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
 }
 
@@ -356,7 +356,7 @@ function stabCells(p, ctx) {
 function statRow(p, ctx, side, starter) {
   // opponent start/bench/remove buttons stay on the Schedule view to keep these tables clean
   const tags = side === 'me' ? rowTags(p, ctx, side, starter) : '';
-  return `<tr class="${starter ? '' : 'bench'}"><td class="st-name"><div class="bplayer">${headshot(p, 24)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div></div></div></td>
+  return `<tr class="${starter ? '' : 'bench'}"><td class="st-name"><div class="bplayer">${headshot(p, hsPx(30, 24))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div></div></div></td>
     <td class="num st-g">${weekGames(p, ctx.dates)}</td>${stabCells(p, ctx)}</tr>`;
 }
 
@@ -597,7 +597,7 @@ function pastWeekCard(start) {
     if (c.pct) return `<td class="sc${cls}" title="${s[c.att] ? `${s[c.made] || 0}-${s[c.att]}` : 'no attempts'}">${s[c.att] ? fmtPct(s[c.made] / s[c.att]) : '—'}</td>`;
     return `<td class="sc${cls}">${fmt(lineStat(s, c.key), 0)}</td>`;
   };
-  const row = (x, bench) => `<tr class="${bench ? 'bench' : ''}"><td class="st-name"><div class="bplayer">${headshot(x.p, 24)}<div class="bmain"><div class="bname">${playerName(x.p)}</div></div></div></td>
+  const row = (x, bench) => `<tr class="${bench ? 'bench' : ''}"><td class="st-name"><div class="bplayer">${headshot(x.p, hsPx(30, 24))}<div class="bmain"><div class="bname">${playerName(x.p)}</div></div></div></td>
     <td class="num st-g">${x.line.gp1 || 0}</td>${cols.map(c => cell(x.line, c)).join('')}${pts ? `<td class="sc">${fmtFp(lineFp(x.line))}</td>` : ''}</tr>`;
   const table = (S, O) => {
     const sc = weekScore(S.tot, O.tot);

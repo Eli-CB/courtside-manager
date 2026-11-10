@@ -113,7 +113,7 @@ function draftData() {
 function draftRow(p, mine) {
   const gainCls = p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted';
   return `<tr class="${p.teamId === mine ? 'dr-mine' : ''}">
-    <td class="st-name"><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, 28)}<div class="bmain"><div class="bname">${p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : esc(p.name)}</div>
+    <td class="st-name"><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain"><div class="bname">${p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : esc(p.name)}</div>
       <div class="pmeta">${esc(p.team)}${p.teamId === mine ? ' <span class="badge accent">you</span>' : ''}</div></div></div></td>
     <td class="num">R${p.round} · <b>#${p.pick}</b></td>
     <td class="num">${p.gp ? `#${p.rank}` : '<span class="muted">—</span>'}</td>
@@ -131,7 +131,7 @@ function draftTeamCard(d, tid, ps) {
   const L = fxLeague();
   const year = seasonCtx ? seasonCtx.label : L && L.year ? seasonLabel(L.year) : '';
   const gain = (g, gp) => (!d.graded ? '' : gp ? `<b class="aw-break-v ${g > 0 ? 'pos-good' : g < 0 ? 'pos-bad' : 'muted'}">${signed(g, 0)}</b>` : '<b class="aw-break-v muted">DNP</b>');
-  const row = (p, meta, right) => `<li><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, 28)}<div class="bmain">${p.nbaId ? `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`}<div class="muted small">${meta}</div></div></div>${right}</li>`;
+  const row = (p, meta, right) => `<li><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain">${p.nbaId ? `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${esc(p.name)}</button>` : `<span class="pname">${esc(p.name)}</span>`}<div class="muted small">${meta}</div></div></div>${right}</li>`;
   const ks = d.keepers[tid] || [];
   const keepers = ks.map(k => row(k, k.past ? 'Keeper' : `Keeper · graded as pick #${k.slot}${k.like ? ` · ${seasonCtx ? 'finished as' : 'playing like'} #${k.like}` : ''}`, k.past ? '' : gain(k.gain, k.gp))).join('');
   const picks = [...ps].sort((a, b) => a.pick - b.pick).map(p => row(p, `R${p.round} · pick #${p.pick}${d.graded && p.gp ? ` · ${seasonCtx ? 'finished as' : 'playing like'} #${p.rank}` : ''}`, gain(p.gain, p.gp))).join('');

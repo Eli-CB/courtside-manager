@@ -377,6 +377,26 @@ function headshot(p, px = 28) {
   return `<span class="hs${tm}" style="${box};background-size:${IMG.cols * px}px auto;background-position:-${col * px}px -${row * px}px" aria-hidden="true"></span>`;
 }
 
+// a photo's size: bigger where there's room (desktop), the phone's otherwise (the sheet's 80 px stay sharp up to 40)
+const hsPx = (desk, phone = desk) => (matchMedia('(max-width: 640px)').matches ? phone : desk);
+
+// A player's full photo (a cutout), for the player card: NBA.com's for basketball, ESPN's (by ESPN id) for the others.
+// [1x, 2x] or null (a team defense; no ESPN id)
+function photoSrcs(raw) {
+  if (!raw || (raw.pos && raw.pos[0] === 'DEF')) return null;
+  if (SPORT.key === 'nba') return [260, 1040].map(w => `https://cdn.nba.com/headshots/nba/latest/${w}x${w === 260 ? 190 : 760}/${raw.id}.png`);
+  if (!raw.espn) return null;
+  return [260, 520].map(w => `https://a.espncdn.com/combiner/i?img=/i/headshots/${SPORT.key}/players/full/${raw.espn}.png&w=${w}&h=${Math.round(w * 190 / 260)}`);
+}
+// The player card's picture, as ESPN shows one: the player in front of his team's logo on a tint of its color; the
+// small round photo if the big one won't load (marked by the page's error listener, actions.js)
+function playerPhoto(raw) {
+  const small = headshot({ nbaId: raw.id, name: raw.name }, 64), src = photoSrcs(raw);
+  if (!src) return small;
+  const tc = TEAM_COLORS[raw.team], logo = IMG && IMG.logos[raw.team];
+  return `<div class="pc-photo"${tc ? ` style="--t1:${tc[0]};--t2:${tc[1]}"` : ''}>${logo ? `<img class="pc-logo" src="${logo}" alt="" aria-hidden="true">` : ''}<img class="pc-shot" src="${src[0]}" srcset="${src[0]} 1x, ${src[1]} 2x" alt="${esc(raw.name)}" decoding="async">${small}</div>`;
+}
+
 function teamLogo(team, px = 16) {
   const src = IMG && team && IMG.logos[team];
   return src ? `<img class="tlogo" src="${src}" alt="${esc(team)}" title="${esc(team)}" width="${px}" height="${px}">` : esc(team || 'FA');
@@ -399,7 +419,7 @@ function playerCell(p, link = true, photo = true) {
   const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note.length > 60 ? p.inj.note.slice(0, 60) + '…' : p.inj.note) : ''}</div>` : '';
   // the photo's ring shows the team; without a photo the logo does
   const body = `<div>${name}</div><div class="pmeta">${photo ? '' : teamLogo(p.team, 14) + ' '}${posTags(p.pos)}${next}</div>${inj}`;
-  return photo ? `<div class="bplayer">${headshot(p, 32)}<div class="bmain">${body}</div></div>` : body;
+  return photo ? `<div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain">${body}</div></div>` : body;
 }
 
 // a small photo and name for use inside a line of text

@@ -453,6 +453,8 @@ window.addEventListener('appinstalled', () => { ui.installPrompt = null; if (sta
 const OPENED_AT = Date.now(), APP_STALE = 3 * 36e5;
 const appStale = () => isInstalled() && Date.now() - OPENED_AT > APP_STALE;
 document.addEventListener('visibilitychange', () => { if (!document.hidden && appStale()) location.reload(); else if (!document.hidden) checkAutoReload(); });
+// a player card's big photo that won't load: its small round one instead (errors don't bubble, so this listens on the way down)
+document.addEventListener('error', e => { const t = e.target; if (t && t.classList && t.classList.contains('pc-shot')) t.parentNode.classList.add('no-shot'); }, true);
 
 // ----- The league read again as a matchup period starts -----
 // The league is kept on the device (6 hours, or until ↻ Reload) and a page can sit open for days, so across a lock last

@@ -623,7 +623,7 @@ function viewPastRosters() {
     ${rows.length ? `<div class="table-wrap"><table>
       <thead><tr><th>Player</th><th>Slot</th>${graded ? `<th class="num">GP</th>${[...SPORT.tableStats, ...SPORT.tablePct].map(x => `<th class="num">${x[1]}</th>`).join('')}<th class="num">Value</th>` : ''}</tr></thead>
       <tbody>${rows.map(x => `<tr>
-        <td class="player"><div class="bplayer">${headshot({ nbaId: x.raw ? x.raw.id : null, name: x.name }, 28)}<div class="bmain"><div class="bname">${x.raw ? `<button class="link-btn pname" data-action="player-detail" data-nba="${x.raw.id}">${esc(x.name)}</button>` : esc(x.name)}</div></div></div></td>
+        <td class="player"><div class="bplayer">${headshot({ nbaId: x.raw ? x.raw.id : null, name: x.name }, hsPx(32, 28))}<div class="bmain"><div class="bname">${x.raw ? `<button class="link-btn pname" data-action="player-detail" data-nba="${x.raw.id}">${esc(x.name)}</button>` : esc(x.name)}</div></div></div></td>
         <td>${slotBadge(slotOfItem(x.it))}</td>
         ${graded ? `<td class="num">${x.gp || '—'}</td>${x.s ? statCells(x.s) : `<td class="num muted" colspan="${SPORT.tableStats.length + SPORT.tablePct.length + 1}">No ${SPORT.name} stats that season</td>`}` : ''}
       </tr>`).join('')}</tbody>
@@ -659,7 +659,7 @@ function pastStarters(L, G, tid, r, teams) {
         const raw = nbaById.get(P.nba);
         const [label, cls] = how[P.how];
         return `<tr>
-        <td class="player"><div class="bplayer">${headshot({ nbaId: P.nba, name: P.name }, 28)}<div class="bmain"><div class="bname">${raw && !raw.inactive ? `<button class="link-btn pname" data-action="player-detail" data-nba="${P.nba}">${esc(P.name)}</button>` : esc(P.name)}</div></div></div></td>
+        <td class="player"><div class="bplayer">${headshot({ nbaId: P.nba, name: P.name }, hsPx(32, 28))}<div class="bmain"><div class="bname">${raw && !raw.inactive ? `<button class="link-btn pname" data-action="player-detail" data-nba="${P.nba}">${esc(P.name)}</button>` : esc(P.name)}</div></div></div></td>
         <td><span class="badge ${cls}">${label}</span></td>
         <td class="num">${P.weeks}</td><td class="num"><b>${P.gp}</b></td><td class="num ${P.missed ? 'pos-bad' : 'muted'}">${P.missed}</td>
         ${STATS.map(([k]) => `<td class="num">${num(P, k)}</td>`).join('')}
@@ -676,7 +676,7 @@ function pastStarters(L, G, tid, r, teams) {
 // ----- What made a team's award number (Waiver Wire Wizard, Unc Status), opened from its name -----
 const awardDetails = new Map(); // "award|team" -> { title, html }, written as the awards draw
 function awardRows(list, val, meta) {
-  return `<ul class="aw-break">${list.map(p => `<li><div class="bplayer">${headshot({ nbaId: p.nba, name: p.name }, 28)}<div class="bmain"><button type="button" class="link-btn pname" data-action="player-detail" data-nba="${p.nba}">${esc(p.name)}</button><div class="muted small">${meta(p)}</div></div></div><b class="aw-break-v">${val(p)}</b></li>`).join('')}</ul>`;
+  return `<ul class="aw-break">${list.map(p => `<li><div class="bplayer">${headshot({ nbaId: p.nba, name: p.name }, hsPx(32, 28))}<div class="bmain"><button type="button" class="link-btn pname" data-action="player-detail" data-nba="${p.nba}">${esc(p.name)}</button><div class="muted small">${meta(p)}</div></div></div><b class="aw-break-v">${val(p)}</b></li>`).join('')}</ul>`;
 }
 function waiverDetail(T, txt) {
   const ps = [...(T.waiverList || [])].sort((a, b) => b.v - a.v);

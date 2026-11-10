@@ -176,7 +176,7 @@ function dashCell(C, p, right, counts, tag = '', cls = '') {
   } else game = dashGame(p, dates[0]);
   const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
   return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
-    <div class="bplayer">${headshot(p, 32)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
+    <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
     <div class="mu-game">${game}</div>
     ${lines.length ? `<div class="mu-chips">${lineChips(tot, C.flash && C.flash(p, tot))}</div>` : ''}
   </div>`;
