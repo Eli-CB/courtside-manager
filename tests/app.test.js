@@ -757,21 +757,37 @@ async function onDay(iso, fn) {
   try { return await fn(); } finally { app.Date = RealDate; }
 }
 
-test('performances: today, the last game day before it, and this period from its first game day', async () => {
+test('performances: today, the last game day before it, this period once it has two game days, and the last period all week', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
   const days = async iso => JSON.parse(JSON.stringify(await onDay(iso, () => app.perfDays())));
-  assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'], weekPast: false, year: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far');
-  // the period's first game day (here opening night): This period already, though it's just today so far
-  assert.deepEqual((await days('2026-10-20')).week, ['2026-10-20'], 'one game day in: the period is there');
-  await onDay('2026-10-20', () => assert.ok(app.topPerformancesCard().includes('<option value="week" >This period</option>')));
-  // Monday at noon (the same date in any US time zone and UTC)
-  // ...and until the new period's first game, the period before it whole (Last period), to see how it all went
+  assert.deepEqual(await days('2026-10-21'), { today: '2026-10-21', started: true, day: '2026-10-20', week: ['2026-10-20', '2026-10-21'], last: null, year: ['2026-10-20', '2026-10-21'] }, 'Wednesday: today, last night, the days played so far (no period before opening night)');
+  // the period's first game day (here opening night): no This period yet, it would only repeat Today
+  assert.equal((await days('2026-10-20')).week, null, 'one game day in: Today says it');
+  await onDay('2026-10-20', () => assert.ok(!app.topPerformancesCard().includes('value="week"')));
+  // Monday at noon (the same date in any US time zone and UTC): the period before, whole (Last period), to see how it all went
   const first = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'];
-  assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: first, weekPast: true, year: first }, "Monday before tip-off: last night was last week's");
+  assert.deepEqual(await days('2026-10-26'), { today: '2026-10-26', started: false, day: '2026-10-25', week: null, last: first, year: first }, "Monday before tip-off: last night was last week's");
+  // mid-week: both, This period from two game days on and Last period still there
+  const finals = app.get('BOX').finals;
+  try {
+    finals.add('2026-10-26 ZZZ').add('2026-10-27 ZZZ');
+    const wed = await days('2026-10-28');
+    assert.deepEqual([wed.week, wed.last], [['2026-10-26', '2026-10-27'], first]);
+    await onDay('2026-10-28', () => {
+      const html = app.topPerformancesCard();
+      assert.ok(/value="week" >This period<\/option><option value="last" >Last period<\/option><option value="year"/.test(html), 'This period, then Last period, then This season');
+      app.ui.perfRange = 'last';
+      try {
+        const last = app.topPerformancesCard();
+        assert.ok(last.includes('<option value="last" selected>') && last.includes('Tue, Oct 20 – Sun, Oct 25'), 'the whole week before');
+        assert.ok(last.includes('data-action="perf-per"'), 'with Totals / Per game, as any period');
+      } finally { app.ui.perfRange = null; }
+    });
+  } finally { finals.delete('2026-10-26 ZZZ'); finals.delete('2026-10-27 ZZZ'); }
   await onDay('2026-10-26', () => {
     const html = app.topPerformancesCard();
-    assert.ok(html.includes('value="today"') && html.includes('>Yesterday<') && html.includes('<option value="week" >Last period</option>'), 'Today, Yesterday and Last period');
+    assert.ok(html.includes('value="today"') && html.includes('>Yesterday<') && html.includes('<option value="last" >Last period</option>') && !html.includes('value="week"'), 'Today, Yesterday and Last period');
     assert.ok(html.includes('<option value="day" selected>') && html.includes('Last night'), "before tip-off it opens on last night's games");
     app.ui.perfRange = 'today';
     try {
