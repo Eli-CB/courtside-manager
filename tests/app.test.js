@@ -1957,6 +1957,21 @@ test("what's kept goes when what it was worked out from changes: one league's, o
   } finally { for (const id of ['aaa', 'bbb']) { recaps.delete(`${id}|3`); delete seasonTot[id]; delete pastWeeks[id]; delete weeksLoad[id]; } delete gameLogs.cur; delete gameLogs['2024-25']; }
 });
 
+test('a stand-in draw (another team on the page): your own state is back afterwards, and nothing saves meanwhile', () => {
+  const key = app.get('STORAGE_KEY'), ls = app.localStorage, name = app.get('state').teamName, was = ls.getItem(key);
+  try {
+    ls.setItem(key, 'untouched');
+    const out = app.withState({ teamName: 'Someone else' }, () => { app.save(); return app.get('state').teamName; });
+    assert.equal(out, 'Someone else', 'the stand-in is what the draw reads');
+    assert.equal(app.get('state').teamName, name, 'and your own is back');
+    assert.equal(ls.getItem(key), 'untouched', "a save while standing in doesn't keep the other team as yours");
+    assert.throws(() => app.withState({ teamName: 'x' }, () => { throw new Error('boom'); }), /boom/);
+    assert.equal(app.get('state').teamName, name, 'back after a draw that fails too');
+    app.save();
+    assert.notEqual(ls.getItem(key), 'untouched', 'saving works again');
+  } finally { if (was == null) ls.removeItem(key); else ls.setItem(key, was); }
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;

@@ -558,21 +558,18 @@ function withViewedTeam(fn, week = false) {
   if (!viewingOther()) {
     if (!n || !state.fxTeam) return fn();
     const me = fxTeamSide(state.fxTeam, n), o = state.opp.fxId ? fxTeamSide(state.opp.fxId, n) : null;
-    const saved = state;
-    state = { ...saved, players: me.players, lineup: me.lineup, il: me.il, opp: o ? { ...saved.opp, players: o.players, starters: o.starters, il: o.il } : saved.opp };
-    try { return fn(); } finally { state = saved; }
+    return withState(saved => ({ ...saved, players: me.players, lineup: me.lineup, il: me.il, opp: o ? { ...saved.opp, players: o.players, starters: o.starters, il: o.il } : saved.opp }), fn);
   }
   const a = fxTeamSide(ui.viewA, n);
   const real = fxOpponentFor(weekStart(), ui.viewA);
   const bId = ui.viewB || (real && real.id);
   const b = bId ? fxTeamSide(bId, n) : null;
-  const saved = state;
-  state = {
-    ...saved, teamName: a.name, players: a.players, lineup: a.lineup, il: a.il, sample: false,
+  const side = {
+    teamName: a.name, players: a.players, lineup: a.lineup, il: a.il, sample: false,
     opp: b ? { name: b.name, week: weekStart(), fxId: bId, players: b.players, starters: b.starters, il: b.il } : { name: '', week: null, fxId: null, players: [], starters: null, il: [] },
   };
   ui.viewing = true;
-  try { return fn(); } finally { state = saved; ui.viewing = false; }
+  try { return withState(side, fn); } finally { ui.viewing = false; }
 }
 
 // Plan Ahead's opponent, picked where their name is on the scoreboard: the week's real one (marked) or any other team, to

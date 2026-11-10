@@ -16,7 +16,8 @@ saved leagues are lost). Owner's league:
     points the plain names the site reads (`POSITIONS`, `ELIG`, `STAT_LABEL`, `COUNT_KEYS`, `TEAM_COLORS`...) at a sport's tables.
     "NBA", `nbaId`, `nbaPlayers` and the like mean "the sport's data" (as "fx" names mean "the league's site")
   - core: constants, the cache registry (`keep(from, reset)` beside each cache's declaration, `changed('sport' | 'box' | 'league' | 'players', leagueId)` wherever one of
-    those changes: never clear another file's cache by hand; a new cache signs up with `keep`), `state` (localStorage `courtside-manager-v1`), `ui`, helpers (every time of day through `fmtTime`:
+    those changes: never clear another file's cache by hand; a new cache signs up with `keep`), `withState(over, fn)` (the one place the page's state is swapped: a draw as
+    another team or with next week's lineups, `withViewedTeam`; fn mustn't wait, and `save` refuses meanwhile), `state` (localStorage `courtside-manager-v1`), `ui`, helpers (every time of day through `fmtTime`:
     the gear menu's 24-hour toggle, `courtside-clock`, else the device's own clock), headshots (ring + background in team colors,
     `TEAM_COLORS`; logos only where there is no photo; the 80 px sheet stays sharp up to 40 px, `hsPx(desktop, phone)` sizes them up on desktop). The player card's
     picture (`playerPhoto`): the full cutout (NBA.com's 260/1040 px for basketball, ESPN's by `espn` id otherwise) in front of the team logo, ESPN-style; the round photo if it won't load

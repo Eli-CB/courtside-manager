@@ -145,7 +145,23 @@ function normalizePlayer(p) {
 }
 
 function save() {
+  if (standIn) { reportError('a save during a stand-in draw (withState)', 'js/core.js'); return; } // it would keep the stand-in as your own team
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+}
+
+// A draw as another team, or with another week's lineups: the page's state stands in for it while fn runs and is back
+// when it returns (the one place state is swapped). over: the fields that differ, or saved state -> the whole stand-in.
+// fn must finish in one go: whatever it leaves waiting would read your own team again; and nothing saves meanwhile.
+let standIn = 0;
+function withState(over, fn) {
+  const saved = state;
+  state = typeof over === 'function' ? over(saved) : { ...saved, ...over };
+  standIn++;
+  try {
+    const out = fn();
+    if (out && typeof out.then === 'function') reportError('a stand-in draw that waits (withState)', 'js/core.js');
+    return out;
+  } finally { state = saved; standIn--; }
 }
 
 function restoreFrom(data) {

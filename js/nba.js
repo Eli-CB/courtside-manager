@@ -232,20 +232,15 @@ function slotOf(p) {
 // Max-value lineup. Eligible players form a transversal matroid, so taking players
 // greedily by value and keeping each one an augmenting path can fit is optimal.
 function autoLineupIds(s = state) {
-  const prevState = state;
-  state = s;
-  try {
-    const slots = s.slots;
+  return withState(() => s, () => { // (values and eligibility read the page's state: s stands in)
     const ilSet = new Set(s.il);
     const cand = s.players
       .filter(p => !ilSet.has(p.id) && p.status !== 'Out')
       .map(p => ({ p, v: gameWorth(p) * (p.status === 'DTD' ? 0.85 : 1) }))
       .sort((a, b) => b.v - a.v)
       .map(x => x.p);
-    return fillSlots(cand, slots);
-  } finally {
-    state = prevState;
-  }
+    return fillSlots(cand, s.slots);
+  });
 }
 
 // Assign candidates (in priority order) to slots; returns player id per slot (null = empty)
