@@ -2047,6 +2047,40 @@ test("team codes link to the Players tab filtered by that team; a player's photo
   Object.assign(ui, { perfTeam: '', perfFiltOpen: false });
 });
 
+test("the Recap's Trends: last 5 games against the usual one, per category, with the reason when the box scores tell it", async () => {
+  const L = await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const saved = app.get('BOX'), ui = app.get('ui');
+  const [hot, cold, star] = app.NBA.players.filter(r => r.team && !r.pos.includes('G')).slice(0, 3);
+  const line = (min, pts) => ({ min, pts, reb: 4, ast: 2, stl: 1, blk: 0, tpm: 1, to: 1, fgm: 5, fga: 10, ftm: 2, fta: 3 });
+  const days = Array.from({ length: 15 }, (_, i) => app.addDays('2026-10-11', i)); // Oct 11 - 25: 10 earlier games, then 5
+  const games = (f, team = 'AAA') => days.map((d, i) => [d, f(i), 0, team]).filter(g => g[1]);
+  const byPlayer = new Map([
+    [hot.id, games(i => (i < 10 ? line(20, 6) : line(28, 12)))], // more minutes, double the points
+    [cold.id, games(i => (i < 10 ? line(30, 20) : line(30, 8)), 'BBB')],
+    [star.id, games(i => (i < 10 ? line(34, 25) : null))], // a regular who's missed the last five
+  ]);
+  app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer });
+  try {
+    const period = L.periods[0]; // Oct 20 - 25
+    const html = await onDay('2026-10-26', () => app.trendsCard(L, period));
+    const section = (h, label) => h.split('<section class="tr-cat').find(x => x.includes(`<h3 class="sub">${label}</h3>`)) || '';
+    const pts = section(html, 'Points');
+    assert.ok(pts.includes(`data-nba="${hot.id}"`) && pts.includes('<b>12.0</b> <span class="muted">vs 6.0</span>') && pts.includes('+100%'), 'heating up in points: 12.0 vs 6.0, +100%');
+    assert.match(pts, new RegExp(`with ${app.lastName(star.name, true)} out`), 'a regular teammate out');
+    assert.match(pts, /minutes 20 → 28/);
+    assert.ok(!pts.includes(`data-nba="${cold.id}"`), 'not the one cooling off');
+    assert.ok(section(html, 'Minutes').includes('<b>28.0</b> <span class="muted">vs 20.0</span>'), 'the role list');
+    assert.match(html, /Last 5 games through Sun, Oct 25/);
+    ui.trendDir = 'down';
+    const down = section(await onDay('2026-10-26', () => app.trendsCard(L, period)), 'Points');
+    assert.ok(down.includes(`data-nba="${cold.id}"`) && down.includes('<b>8.0</b> <span class="muted">vs 20.0</span>') && down.includes('−60%'), 'cooling off: 8.0 vs 20.0, -60%');
+    // too few games: nothing to say yet
+    app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer: new Map([[hot.id, games(i => (i > 8 ? line(20, 6) : null))]]) });
+    assert.match(await onDay('2026-10-26', () => app.trendsCard(L, period)), /Not enough games yet/);
+  } finally { app.set('BOX', saved); ui.trendDir = 'up'; }
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;

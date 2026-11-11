@@ -86,7 +86,11 @@ saved leagues are lost). Owner's league:
     bench regret, best all-play week (categories only); points leagues add Carried (biggest share of a team's points, 20%+), Tough luck / Lucky win (best losing / worst winning score, on the wrong side of the middle) and Nail-biter (closest final under 5% of the winner, not a game already told as luck); hockey Goalie of the week and Hat trick, football Defense of the week; then every final) from `benchSwaps` on the shared `pastWeeksOf` data; Share opens a popup with the
     recap as a picture (`recapCanvas`: 1080 px PNG on a canvas, headshots from the sheet `IMG.sheet`; Share image / Copy image / Save
     image) or the text: the standouts + a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
-    Fantrax and Sleeper. The Dashboard offers it for 3 days after a week ends (`freshRecap`)
+    Fantrax and Sleeper. The Dashboard offers it for 3 days after a week ends (`freshRecap`). Under it, Trends (`trendsCard`, recap.js; not football): Heating up / Cooling off (`ui.trendDir`), each player's last 5 games
+    through the week's last game day against his median game before them (5+ earlier games; a regular: 15+ minutes, hockey 10), one top-5 list per
+    counting category (points leagues: fantasy points), shooting % with volume, then Minutes and Shot attempts; ranked by the change per game, the % shown;
+    Rising on waivers (unowned, by lineValue gained); notes from the box scores only (`teammateOut`: a 24+ minute teammate missing most of those games;
+    minutes moved 4+). Owners are today's rosters. Info text `trends`
   - live: live box scores for the Dashboard matchup's and Performances' Today (and This week). Every ESPN site-feed request goes through `espnSite(path)`:
     direct from the browser; after `ESPN_SWITCH` (2) misses in a row while leaguelayer.com answers, through the Worker's cached `/espn/` route (worker/yahoo.js)
     for 6 hours on that device (`courtside-espn-route`), logged once. Failing feeds back off (`feedWait`: ×2 per miss, 5 min at most) for live scores,

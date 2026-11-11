@@ -232,8 +232,164 @@ function viewRecap() {
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>
     <ul class="rc-finals">${finals}</ul>
+  </div>
+  ${trendsCard(L, period)}`;
+}
+
+// ----- Trends: who's playing above or below his usual line -----
+// For the week shown: each player's last TREND_GAMES games through its last game day, against his median game before
+// them (at least TREND_BEFORE of those). One list per counting category the league has (fantasy points in a points
+// league), its shooting percentages with real volume, then minutes and shot attempts, the role changes that come first.
+// A list ranks by the change per game, not the percentage (1 to 2.6 threes is +160% but a small change); the
+// percentage is shown. Owners are today's rosters: who has him now. Football: a week is one game, too few to trend.
+const TREND_GAMES = 5, TREND_BEFORE = 5, TREND_TOP = 5, TREND_WAIVERS = 5;
+const TREND_NAMES = { pts: 'Points', reb: 'Rebounds', ast: 'Assists', stl: 'Steals', blk: 'Blocks', tpm: 'Threes', oreb: 'Offensive rebounds',
+  dreb: 'Defensive rebounds', g: 'Goals', a: 'Assists', sog: 'Shots on goal', hit: 'Hits', pim: 'Penalty minutes', ppp: 'Power-play points',
+  ppg: 'Power-play goals', ppa: 'Power-play assists', pm: 'Plus/minus', fow: 'Faceoffs won', shp: 'Short-handed points' };
+const median = xs => { const s = [...xs].sort((a, b) => a - b), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+const mean = xs => (xs.length ? sum(xs) / xs.length : 0);
+const trendMinutes = () => (isHockey() ? 10 : 15); // a regular's minutes (hockey: ice time) a game
+
+// The lists: [{ key, label, get(line) }] (pct: a shooting category, with the attempts it needs a game; role: minutes, shots)
+function trendStats() {
+  const cols = new Set(BOX.cols || []), has = k => cols.has(k) || !!DERIVED[k];
+  const out = [], shooting = [];
+  if (isPoints()) out.push({ key: 'fp', label: 'Fantasy points', get: s => lineFp(s) });
+  else for (const c of scoreCats()) {
+    if (c.fp || c.neg || ['dd', 'td', 'gp1'].includes(c.key)) continue; // (turnovers: more isn't heating up; a double-double is yes or no)
+    if (c.pct && !c.rate) { if (!isHockey() && has(c.made) && has(c.att)) shooting.push({ key: c.key, label: c.label, pct: c, minAtt: c.att === 'fta' ? 3 : 8 }); continue; }
+    if (c.rate || !has(c.key)) continue;
+    out.push({ key: c.key, label: TREND_NAMES[c.key] || c.label, get: s => lineStat(s, c.key) });
+  }
+  out.push(...shooting); // (the counting categories first, in the league's order; then shooting; then the role lists)
+  if (has('min')) out.push({ key: 'min', label: isHockey() ? 'Ice time' : 'Minutes', get: s => s.min || 0, role: true });
+  if (has('fga') && !isHockey()) out.push({ key: 'fga', label: 'Shot attempts', get: s => s.fga || 0, role: true });
+  return out;
+}
+
+// Every player with enough games: his recent games and the ones before, each stat's now and before (and how far it moved)
+function trendPlayers(end) {
+  const stats = trendStats(), keys = BOX.cols || [], out = [];
+  for (const [id, games] of BOX.byPlayer) {
+    const raw = nbaById.get(id);
+    if (!raw || isGoalie(raw)) continue;
+    const played = games.filter(g => g[0] <= end && (g[1].min || 0) > 0).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    if (played.length < TREND_GAMES + TREND_BEFORE) continue;
+    const recent = played.slice(-TREND_GAMES), before = played.slice(0, -TREND_GAMES);
+    if (Date.parse(end) - Date.parse(recent[recent.length - 1][0]) > 7 * 864e5) continue; // hasn't played lately: not a trend
+    const R = recent.map(g => g[1]), B = before.map(g => g[1]);
+    const row = { raw, id, recent, minNow: mean(R.map(s => s.min || 0)), minBefore: median(B.map(s => s.min || 0)), stats: {} };
+    for (const st of stats) {
+      if (st.pct) {
+        const att = xs => sum(xs.map(s => lineStat(s, st.pct.att))), made = xs => sum(xs.map(s => lineStat(s, st.pct.made)));
+        const aN = att(R), aB = att(B);
+        if (aN / R.length < st.minAtt || aB / B.length < st.minAtt / 2) continue;
+        const now = made(R) / aN, was = made(B) / aB;
+        row.stats[st.key] = { now, was, move: (now - was) * aN / R.length }; // the makes a game above (or below) his usual rate
+      } else {
+        const now = mean(R.map(st.get)), was = median(B.map(st.get));
+        row.stats[st.key] = { now, was, move: now - was };
+      }
+    }
+    // his whole line now and before, for what it's worth (the waiver list)
+    const line = xs => Object.fromEntries(keys.map(k => [k, mean(xs.map(s => s[k] || 0))]));
+    row.gain = lineValue(line(R)) - lineValue(Object.fromEntries(keys.map(k => [k, median(B.map(s => s[k] || 0))])));
+    out.push(row);
+  }
+  return { stats, players: out };
+}
+
+// A regular teammate (24+ minutes a game) who missed most of these games: "with Edwards out"
+function teammateOut(row, regulars) {
+  const team = row.recent[row.recent.length - 1][3], dates = row.recent.filter(g => g[3] === team).map(g => g[0]);
+  if (dates.length < 3) return '';
+  const gone = (regulars.get(team) || []).filter(m => m.id !== row.id && dates.filter(d => !m.days.has(d)).length >= Math.ceil(dates.length * 0.6));
+  if (!gone.length) return '';
+  const m = gone.sort((a, b) => b.min - a.min)[0];
+  return `with ${esc(lastName(m.name, true))} out`;
+}
+function teamRegulars(end) {
+  const out = new Map();
+  for (const [id, games] of BOX.byPlayer) {
+    const g = games.filter(x => x[0] <= end && (x[1].min || 0) > 0);
+    if (g.length < TREND_BEFORE) continue;
+    const min = median(g.map(x => x[1].min || 0));
+    if (min < (isHockey() ? 18 : 24)) continue;
+    const team = g.reduce((a, b) => (a[0] > b[0] ? a : b))[3], raw = nbaById.get(id);
+    if (!raw) continue;
+    if (!out.has(team)) out.set(team, []);
+    out.get(team).push({ id, name: raw.name, min, days: new Set(games.map(x => x[0])) }); // (a game anywhere: traded isn't "out")
+  }
+  return out;
+}
+
+function trendsCard(L, period) {
+  if (!BOX || isFootball()) return '';
+  const up = ui.trendDir !== 'down';
+  const days = matchDates(String(period.start).slice(0, 10)).filter(d => d <= todayIso());
+  const end = days[days.length - 1] || String(period.end).slice(0, 10);
+  const { stats, players } = trendPlayers(end);
+  const owner = new Map();
+  for (const [tid, r] of Object.entries(L.rosters || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
+  const mine = myTeamId(), regulars = up ? teamRegulars(end) : null;
+  const whose = raw => {
+    const tid = owner.get(raw.id);
+    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : ''}">${teamLink(tid)}</span>`;
+    return raw.fx ? `<span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
+  };
+  const minutesNote = row => (Math.abs(row.minNow - row.minBefore) >= 4 ? `minutes ${Math.round(row.minBefore)} → ${Math.round(row.minNow)}` : '');
+  const fmtOf = st => (st.pct ? v => fmtPct(v) : v => fmt(v, 1));
+  const change = (st, x) => (st.pct ? `${x.move > 0 ? '+' : '−'}${fmt(Math.abs(x.move), 1)} makes`
+    : x.was > 0 ? `${x.move > 0 ? '+' : '−'}${Math.round(Math.abs(x.move) / x.was * 100)}%` : `${x.move > 0 ? '+' : '−'}${fmt(Math.abs(x.move), 1)}`);
+  const rowHtml = (row, i, num, note) => `<li class="tr-row"><span class="tr-rank">${i + 1}</span>${headshot({ nbaId: row.id, name: row.raw.name }, 28)}
+      <div class="tr-main"><div class="tr-name">${playerBtn(row.id, row.raw.name)} <span class="muted small">${teamBtn(row.raw.team)}</span></div>
+      <div class="tr-meta">${[whose(row.raw), note].filter(Boolean).join(' · ')}</div></div>${num}</li>`;
+
+  const lists = stats.map(st => {
+    const fm = fmtOf(st);
+    const ok = row => {
+      const x = row.stats[st.key];
+      if (!x || !(up ? x.move > 0 : x.move < 0)) return false;
+      if (up ? row.minNow < trendMinutes() : row.minBefore < trendMinutes()) return false; // a regular, now (or before a drop)
+      return st.pct || x.was <= 0 || Math.abs(x.move) / x.was >= 0.15; // (a small wobble isn't a trend)
+    };
+    const top = players.filter(ok).sort((a, b) => (up ? b.stats[st.key].move - a.stats[st.key].move : a.stats[st.key].move - b.stats[st.key].move)).slice(0, TREND_TOP);
+    if (!top.length) return '';
+    const rows = top.map((row, i) => {
+      const x = row.stats[st.key];
+      const notes = [up ? teammateOut(row, regulars) : '', st.role ? '' : minutesNote(row)].filter(Boolean).join(' · ');
+      const num = `<div class="tr-num"><b>${fm(x.now)}</b> <span class="muted">vs ${fm(x.was)}</span><div class="small ${up ? 'pos-good' : 'pos-bad'}">${change(st, x)}</div></div>`;
+      return rowHtml(row, i, num, notes);
+    }).join('');
+    return `<section class="tr-cat"><h3 class="sub">${esc(st.label)}</h3><ol class="tr-list">${rows}</ol></section>`;
+  }).filter(Boolean);
+
+  // the ones a league can still have: no fantasy team, playing like it, by what his games are worth now against before
+  const waivers = !up || !fxLeague() ? [] : players
+    .filter(row => !owner.has(row.id) && row.raw.fx && row.raw.fx.st !== 'T' && row.gain > 0 && row.minNow >= trendMinutes())
+    .sort((a, b) => b.gain - a.gain).slice(0, TREND_WAIVERS);
+  const waiverRows = waivers.map((row, i) => {
+    const jumps = stats.filter(st => !st.pct && !st.role && row.stats[st.key] && row.stats[st.key].move > 0 && row.stats[st.key].was > 0)
+      .sort((a, b) => row.stats[b.key].move / row.stats[b.key].was - row.stats[a.key].move / row.stats[a.key].was).slice(0, 2)
+      .map(st => `${esc(STAT_LABEL[st.key] || st.label)} ${fmt(row.stats[st.key].now, 1)} vs ${fmt(row.stats[st.key].was, 1)}`);
+    const note = [teammateOut(row, regulars || teamRegulars(end)), ...jumps].filter(Boolean).join(' · ');
+    const num = `<div class="tr-num"><b class="pos-good">${fmtValue(row.gain)}</b><div class="small muted">${isPoints() ? 'FP a game' : 'value a game'}</div></div>`;
+    return rowHtml(row, i, num, note);
+  }).join('');
+
+  const seg = `<div class="seg seg-sm" role="group" aria-label="Trending">${[['up', 'Heating up'], ['down', 'Cooling off']].map(([k, l]) =>
+    `<button type="button" class="${(k === 'up') === up ? 'on' : ''}" data-action="trend-dir" data-dir="${k}" aria-pressed="${(k === 'up') === up}">${l}</button>`).join('')}</div>`;
+  const body = lists.length || waiverRows
+    ? `${waiverRows ? `<section class="tr-cat tr-waivers"><h3 class="sub">Rising on waivers</h3><ol class="tr-list">${waiverRows}</ol></section>` : ''}
+       <div class="tr-grid">${lists.join('')}</div>`
+    : `<p class="muted small" style="margin:0">Not enough games yet: a trend compares a player's last ${TREND_GAMES} games with at least ${TREND_BEFORE} before them.</p>`;
+  return `<div class="card trends">
+    <div class="card-head"><h2>Trends ${infoBtn('trends')}</h2>${seg}</div>
+    <p class="muted small tr-when">Last ${TREND_GAMES} games through ${fmtDay(end)}, against each player's usual game before them</p>
+    ${body}
   </div>`;
 }
+
 
 // ----- The recap as a picture, for the league chat -----
 // 1080 px wide, as tall as it needs: the league and week, the standouts (photos for the players), every final, the

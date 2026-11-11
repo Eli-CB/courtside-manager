@@ -91,6 +91,8 @@ const actions = {
   },
   'go-week'() { location.hash = '#week'; },
   'go-recap'() { ui.recapWeek = null; location.hash = '#recap'; },
+  // the Recap's Trends: heating up or cooling off
+  'trend-dir'(el) { ui.trendDir = el.dataset.dir; render(); },
   // the previous or next finished week's recap
   'recap-step'(el) {
     const done = finishedPeriods(fxLeague()).map(p => p.n);
