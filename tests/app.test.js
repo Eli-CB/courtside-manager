@@ -2566,6 +2566,11 @@ test('hockey scoring: goals and assists count apart for skaters and goalies, and
 
 test('hockey: every tab shows real numbers, the player card speaks hockey', async () => {
   const a = await hockeyApp();
+  // lineup spots in Fantrax's hockey colors: F green, D purple, G brown (basketball's G stays its own orange)
+  assert.match(a.slotBadge('F'), /pc-emerald-1/);
+  assert.match(a.slotBadge('D'), /pc-purple-2/);
+  assert.match(a.slotBadge('G'), /pc-amber-2/);
+  assert.match(app.slotBadge('G'), /pc-orange-1/);
   await a.loadBoxes();
   const ui = a.get('ui'), L = a.fxLeague();
   assert.equal(a.tabList().length, 8);

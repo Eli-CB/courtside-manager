@@ -83,6 +83,8 @@ const SPORTS = {
     steadyMinutes: true, // ice time doesn't swing with blowouts and fouls: no "short minutes" notes
     positions: ['C', 'LW', 'RW', 'D', 'G'],
     slotTypes: ['C', 'LW', 'RW', 'W', 'F', 'D', 'G', 'FLX'],
+    // each lineup spot's color, as Fantrax shows hockey's (F green, D purple, G brown; Res its plain blue); C, LW, RW and W stay plain until seen
+    slotColors: { F: 'emerald-1', D: 'purple-2', G: 'amber-2', BN: 'blue' },
     elig: { C: ['C'], LW: ['LW'], RW: ['RW'], W: ['LW', 'RW'], F: ['C', 'LW', 'RW'], D: ['D'], G: ['G'], FLX: ['C', 'LW', 'RW', 'D'] },
     defaultSlots: ['C', 'C', 'W', 'W', 'W', 'W', 'D', 'D', 'D', 'D', 'G', 'G'],
     broadPos: { W: ['LW', 'RW'], F: ['C', 'LW', 'RW'] },

@@ -493,6 +493,7 @@ td.player { min-width: 170px; }
 .pc-purple-1 { --pc: #913ae3; --pc-dark: #c084fc; }
 .pc-purple-2 { --pc: #7d2ac6; --pc-dark: #d8b4fe; }
 .pc-emerald-1 { --pc: #059467; --pc-dark: #34d399; }
+.pc-amber-2 { --pc: #735111; --pc-dark: #fcd34d; }
 .pc-teal-2 { --pc: #0f7b72; --pc-dark: #5eead4; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .slot-label.pc { color: var(--pc-dark); } }
 :root[data-theme="dark"] .slot-label.pc { color: var(--pc-dark); }
