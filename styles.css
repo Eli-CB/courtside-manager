@@ -303,7 +303,7 @@ a { color: var(--accent); }
 .pp-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
 .link-btn.pp-clear, .link-btn.quiet { color: var(--muted); font-size: .85rem; } /* not orange: that's for your team */
 /* a team's code (UTA, CLE) that opens its players: looks like the text around it until pointed at */
-.link-btn.tm-link { color: inherit; font-weight: inherit; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; }
+.link-btn.tm-link { color: inherit; font-weight: inherit; text-decoration: none; text-underline-offset: 2px; }
 .link-btn.tm-link:hover { text-decoration: underline; }
 /* a photo that opens the player's card (not one inside a trade list's checkbox row) */
 [data-photo] { cursor: pointer; }
@@ -977,7 +977,8 @@ tr.me-row td { background: var(--accent-soft); }
 .aw-list li { display: list-item; }
 .aw-list li span + span { float: right; font-variant-numeric: tabular-nums; }
 .aw-list li.me, .aw-win.me .aw-name { color: var(--accent); }
-.aw-team { color: inherit; font: inherit; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; }
+.aw-team { color: inherit; font: inherit; text-align: left; text-decoration: none; text-underline-offset: 3px; }
+.aw-team:hover { text-decoration: underline; }
 .prose .aw-break, .aw-break { list-style: none; margin: 0 0 10px; padding: 0; }
 .aw-break li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 0; margin: 0; border-bottom: 1px solid var(--border); }
 .aw-break .bmain { min-width: 0; }
