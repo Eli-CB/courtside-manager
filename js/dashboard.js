@@ -183,12 +183,13 @@ function dashCell(C, p, right, counts, tag = '', cls = '') {
   </div>`;
 }
 
-// one day: just who's playing (or played), each side in one column with no gaps: starters, then the bench (its
-// games didn't count, tagged), then anyone Out or who sat out a finished game
+// one day: just who's playing (or played), each side in one column with no gaps, by game: on now, then finished, then
+// still to come (starters before the bench within each, the bench tagged: its games didn't count), then anyone Out or
+// who sat out a finished game. A bench player in a game now is above a starter whose game hasn't begun.
 function dashDayRows(C, A, B) {
   const d = C.dates[0], { D, today } = C;
   const sits = p => !lineOn(p, d) && (p.status === 'Out' || gameFinal(p, d) || !!(liveGame(p, d) && liveGame(p, d).state === 'post') || startWords(p, d) === 'not starting');
-  // within each group: games on now first, then finished ones, then the rest by tip-off (lineup order otherwise)
+  // games on now first, then finished ones, then the rest by tip-off (lineup order otherwise)
   const stage = p => {
     const g = liveGame(p, d);
     if (g && g.state === 'in') return [0, 0];
@@ -197,15 +198,18 @@ function dashDayRows(C, A, B) {
   };
   const byStage = list => list.map((p, i) => ({ p, i, s: stage(p) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.i - b.i).map(x => x.p);
   const plays = (list, out = false) => byStage(list.filter(p => p && playsOn(p, d) && sits(p) === out));
-  const BENCH_TAG = ' <span class="badge bench">Bench</span>';
+  const BENCH_TAG = ' <span class="badge bench">Bench</span>'; // (not beside Out: that says enough, and both crowd the name out)
   const column = S => {
     if (!S) return [];
     const bench = [...S.bench, ...S.ir];
-    return [...plays(S.starters).map(p => [p, 'start']), ...plays(bench).map(p => [p, 'bench']),
-      ...plays(S.starters, true).map(p => [p, 'out']), ...plays(bench, true).map(p => [p, 'out bench'])];
+    const on = p => p && playsOn(p, d) && !sits(p);
+    const playing = [...S.starters.filter(on).map(p => [p, 'start']), ...bench.filter(on).map(p => [p, 'bench'])]
+      .map((x, i) => ({ x, i, s: stage(x[0]) }))
+      .sort((a, b) => a.s[0] - b.s[0] || (a.x[1] === 'bench') - (b.x[1] === 'bench') || a.s[1] - b.s[1] || a.i - b.i).map(y => y.x);
+    return [...playing, ...plays(S.starters, true).map(p => [p, 'out']), ...plays(bench, true).map(p => [p, 'out bench'])];
   };
   const a = column(A), b = column(B);
-  const person = (x, right) => (x ? dashCell(C, x[0], right, x[1] === 'start', x[1].endsWith('bench') ? BENCH_TAG : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
+  const person = (x, right) => (x ? dashCell(C, x[0], right, x[1] === 'start', x[1].endsWith('bench') && x[0].status !== 'Out' ? BENCH_TAG : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
   const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${person(a[i], false)}${person(b[i], true)}</div>`).join('');
   const none = rows ? '' : d === today && !D.today ? `<p class="muted small mu-none">No ${SPORT.name} games today.</p>`
     : `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>`;

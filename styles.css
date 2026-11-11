@@ -234,6 +234,13 @@ a { color: var(--accent); }
 .mu-p.right { align-items: flex-end; text-align: right; }
 .mu-p.right .bplayer { flex-direction: row-reverse; }
 .mu-p .bname .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* a name and its tags (Bench, Out) on one line, the name shortening first: every row's name sits at the same height */
+.mu-p .bname { flex-wrap: nowrap; min-width: 0; }
+.mu-p .bname .badge { flex: none; }
+/* the right side: the name row as wide as its cell (not its contents), hugging the photo, so a long one shortens instead of
+   spilling into the left side */
+.mu-p.right .bplayer { align-self: stretch; }
+.mu-p.right .bname { justify-content: flex-end; }
 .mu-p.live { --live-bg: color-mix(in srgb, var(--good) 7%, var(--surface)); background: var(--live-bg); }
 .mu-row.bench .mu-p, .mu-p.bench, .mu-p.out { opacity: .62; }
 .mu-game { font-size: .78rem; color: var(--muted); }
@@ -267,7 +274,10 @@ a { color: var(--accent); }
   .mu-pace { flex-direction: column; gap: 3px; align-items: flex-start; } /* phones: stacked beside the score */
   .mu-team.right .mu-pace { flex-direction: column; align-items: flex-end; }
   .mu-row { grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); }
-  .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+  .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; } /* (room either side of the middle) */
+  /* phones: initial and last name (K. Towns), as Plan Ahead's lineups */
+  .mu-p .n-full { display: none; }
+  .mu-p .n-short { display: inline; }
   .mu-slot .slot-label { font-size: .62rem; padding: 2px 2px; }
   .mu-p { padding: 7px 2px; }
   /* phones: the card runs edge to edge, so a game on's green runs to the screen's edge too, not 16px short of it */
