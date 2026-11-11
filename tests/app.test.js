@@ -2071,7 +2071,8 @@ test("the Recap's Trends: last 5 games against the usual one, per category, with
     assert.match(pts, /minutes 20 → 28/);
     assert.ok(!pts.includes(`data-nba="${cold.id}"`), 'not the one cooling off');
     assert.ok(section(html, 'Minutes').includes('<b>28.0</b> <span class="muted">vs 20.0</span>'), 'the role list');
-    assert.match(html, /Last 5 games through Sun, Oct 25/);
+    assert.ok(!/Last 5 games through/.test(html), 'the dates are in the (i), not on the page');
+    assert.ok(html.indexOf('<h3 class="sub">Minutes</h3>') < html.indexOf('<h3 class="sub">Points</h3>'), 'Minutes first');
     ui.trendDir = 'down';
     const down = section(await onDay('2026-10-26', () => app.trendsCard(L, period)), 'Points');
     assert.ok(down.includes(`data-nba="${cold.id}"`) && down.includes('<b>8.0</b> <span class="muted">vs 20.0</span>') && down.includes('−60%'), 'cooling off: 8.0 vs 20.0, -60%');

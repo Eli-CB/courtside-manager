@@ -261,8 +261,8 @@ function trendStats() {
     if (c.rate || !has(c.key)) continue;
     out.push({ key: c.key, label: TREND_NAMES[c.key] || c.label, get: s => lineStat(s, c.key) });
   }
-  out.push(...shooting); // (the counting categories first, in the league's order; then shooting; then the role lists)
-  if (has('min')) out.push({ key: 'min', label: isHockey() ? 'Ice time' : 'Minutes', get: s => s.min || 0, role: true });
+  out.push(...shooting); // (minutes first, then the counting categories in the league's order, shooting, and shot attempts)
+  if (has('min')) out.unshift({ key: 'min', label: isHockey() ? 'Ice time' : 'Minutes', get: s => s.min || 0, role: true });
   if (has('fga') && !isHockey()) out.push({ key: 'fga', label: 'Shot attempts', get: s => s.fga || 0, role: true });
   return out;
 }
@@ -367,23 +367,24 @@ function trendsCard(L, period) {
   }).filter(Boolean);
 
   // By what a player's games are worth (categories won, or fantasy points, a game): the rostered players who moved most
-  // either way, and the risers a league can still have (no fantasy team). Value is the column's label, said once.
+  // either way, and the same for the ones a league can still have (no fantasy team). Value is the column's label, said once.
   const VAL = isPoints() ? 'FP' : 'Value';
   const byValue = (list, n) => list.filter(row => (up ? row.gain > 0 && row.minNow >= trendMinutes() : row.gain < 0 && row.minBefore >= trendMinutes()))
     .sort((a, b) => (up ? b.gain - a.gain : a.gain - b.gain)).slice(0, n);
   const rostered = fxLeague() ? byValue(players.filter(row => owner.has(row.id)), TREND_TOP) : [];
-  const waivers = up && fxLeague() ? byValue(players.filter(row => !owner.has(row.id) && row.raw.fx && row.raw.fx.st !== 'T'), TREND_WAIVERS) : [];
+  const waivers = fxLeague() ? byValue(players.filter(row => !owner.has(row.id) && row.raw.fx && row.raw.fx.st !== 'T'), TREND_WAIVERS) : [];
   const valueRows = list => list.map((row, i) => {
     // why: a teammate out (heating up), and the two stats that moved most his way
     const moved = stats.filter(st => !st.pct && !st.role && row.stats[st.key] && (up ? row.stats[st.key].move > 0 : row.stats[st.key].move < 0) && row.stats[st.key].was > 0)
       .sort((a, b) => Math.abs(row.stats[b.key].move / row.stats[b.key].was) - Math.abs(row.stats[a.key].move / row.stats[a.key].was)).slice(0, 2)
       .map(st => `${esc(STAT_LABEL[st.key] || st.label)} ${fmt(row.stats[st.key].now, 1)} vs ${fmt(row.stats[st.key].was, 1)}`);
     const note = [up ? teammateOut(row, regulars) : '', ...moved].filter(Boolean).join(' · ');
-    const num = `<div class="tr-num"><b>${fmtValue(row.valueNow)}</b> <span class="muted">vs ${fmtValue(row.valueWas)}</span><div class="small ${up ? 'pos-good' : 'pos-bad'}">${fmtValue(row.gain)}</div></div>`;
+    // his value a game now, and the change under it (from his usual game: the (i) and the hover say so)
+    const num = `<div class="tr-num" title="${esc(`${VAL} a game: ${fmtValue(row.valueNow)} in his last ${TREND_GAMES}, ${fmtValue(row.valueWas)} usually`)}"><b>${fmtValue(row.valueNow)}</b><div class="small ${up ? 'pos-good' : 'pos-bad'}">${fmtValue(row.gain)}</div></div>`;
     return rowHtml(row, i, num, note);
   }).join('');
   const valueList = (title, list) => (list.length ? `<section class="tr-cat"><h3 class="sub tr-head"><span>${title}</span><span class="tr-col">${VAL}</span></h3><ol class="tr-list">${valueRows(list)}</ol></section>` : '');
-  const valueLists = [valueList('Rostered players', rostered), valueList('Rising on waivers', waivers)].filter(Boolean);
+  const valueLists = [valueList('Rostered', rostered), valueList('Waivers', waivers)].filter(Boolean);
 
   const seg = `<div class="seg seg-sm" role="group" aria-label="Trending">${[['up', 'Heating up'], ['down', 'Cooling off']].map(([k, l]) =>
     `<button type="button" class="${(k === 'up') === up ? 'on' : ''}" data-action="trend-dir" data-dir="${k}" aria-pressed="${(k === 'up') === up}">${l}</button>`).join('')}</div>`;
@@ -393,7 +394,6 @@ function trendsCard(L, period) {
     : `<p class="muted small" style="margin:0">Not enough games yet: a trend compares a player's last ${TREND_GAMES} games with at least ${TREND_BEFORE} before them.</p>`;
   return `<div class="card trends">
     <div class="card-head"><h2>Trends ${infoBtn('trends')}</h2>${seg}</div>
-    <p class="muted small tr-when">Last ${TREND_GAMES} games through ${fmtDay(end)}, against each player's usual game before them</p>
     ${body}
   </div>`;
 }

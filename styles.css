@@ -773,15 +773,15 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .detail-id { display: flex; align-items: center; gap: 12px; }
 /* the player card's picture, as ESPN shows one: the player in front of his team's logo on a tint of its color */
 /* the Recap's Trends: a list per category, in columns where there's room */
-.tr-when { margin: -4px 0 12px; }
-.tr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 4px 24px; }
+.tr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 20px 28px; }
 .tr-cat { min-width: 0; } /* (a long name shortens instead of widening its column past the page) */
-.tr-cat h3.sub { margin: 8px 0 4px; }
-.tr-value { margin-bottom: 8px; }
+.trends .tr-cat h3.sub { margin: 0 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+/* Rostered and Waivers, then a line, then the lists by stat */
+.tr-value { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
 .tr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .tr-col { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
 .tr-list { list-style: none; margin: 0; padding: 0; }
-.tr-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.tr-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .tr-row:last-child { border-bottom: 0; }
 .tr-rank { width: 14px; flex: none; color: var(--muted); font-size: .78rem; text-align: right; }
 .tr-main { flex: 1 1 auto; min-width: 0; }
