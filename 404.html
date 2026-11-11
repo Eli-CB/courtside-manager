@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found · League Layer</title>
+  <meta name="robots" content="noindex">
+  <!-- GitHub Pages answers any address that doesn't exist with this page (status 404). Everything is inline or
+       addressed from the site's root, since it can show up at any depth (/players, /a/b/c). -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='6 9.5 52 52'><style>.a{fill:%23161a22}@media (prefers-color-scheme:dark){.a{fill:%23ffffff}}</style><polygon class='a' points='36,37 56,27 46,22 36,27 18,18 8,23'/><polygon fill='%237f8a9c' points='8,31 36,45 56,35 56,43 36,53 8,39'/></svg>">
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)">
+  <style>
+    @font-face { font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/inter-latin.woff2) format('woff2'); }
+    :root { --bg: #fafafa; --surface: #ffffff; --surface-2: #f4f4f5; --border: #e4e4e7; --text: #09090b; --muted: #71717a; --accent: #e8620c; --mark: #161a22; color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #09090b; --surface: #141416; --surface-2: #202024; --border: #2c2c31; --text: #fafafa; --muted: #a1a1aa; --accent: #f97316; --mark: #ffffff; color-scheme: dark; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px;
+      background: var(--bg); color: var(--text); font: 16px/1.5 Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+    main { width: 100%; max-width: 440px; text-align: center; }
+    .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; font-weight: 700; margin-bottom: 28px; }
+    .brand svg { width: 26px; height: 26px; }
+    /* his jersey, from the back: OKAFOR over 04 */
+    .jersey { position: relative; width: 168px; margin: 0 auto 18px; }
+    .jersey svg { display: block; width: 100%; height: auto; }
+    .jersey .back { position: absolute; left: 0; right: 0; top: 24%; color: #ffffff; line-height: 1; }
+    .jersey .name { display: block; font-size: 15px; font-weight: 700; letter-spacing: .14em; margin-left: .14em; }
+    .jersey .num { display: block; font-size: 62px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; margin-top: 4px; }
+    .eyebrow { font-size: .78rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 4px; }
+    h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.01em; }
+    p { margin: 0 0 6px; color: var(--muted); }
+    .where { font-size: .85rem; overflow-wrap: anywhere; }
+    .where code { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
+    .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 22px; }
+    .btn { font: inherit; font-weight: 500; font-size: .9rem; text-decoration: none; border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); padding: 8px 16px; border-radius: 6px; }
+    .btn:hover { background: var(--surface-2); }
+    .btn.primary { background: var(--text); border-color: var(--text); color: var(--surface); }
+    .btn.primary:hover { opacity: .9; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="brand" href="/" aria-label="League Layer home">
+      <svg viewBox="6 9.5 52 52" aria-hidden="true"><polygon fill="var(--mark)" points="36,37 56,27 46,22 36,27 18,18 8,23"/><polygon fill="#7f8a9c" points="8,31 36,45 56,35 56,43 36,53 8,39"/></svg>
+      League Layer
+    </a>
+    <div class="jersey" role="img" aria-label="The back of a jersey: OKAFOR, number 04">
+      <svg viewBox="0 0 120 130" aria-hidden="true">
+        <!-- the back of a basketball jersey: a shallow collar, armholes cut in -->
+        <path d="M40 6 C46 10 74 10 80 6 L94 8 C94 22 100 32 108 36 L108 124 L12 124 L12 36 C20 32 26 22 26 8 Z" fill="var(--accent)"/>
+        <path d="M40 6 C46 10 74 10 80 6" fill="none" stroke="var(--bg)" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div class="back" aria-hidden="true"><span class="name">OKAFOR</span><span class="num">04</span></div>
+    </div>
+    <p class="eyebrow">Error 404</p>
+    <h1>Jahlil Okafor-o-four</h1>
+    <p>This page isn't on the roster. It may have been waived, traded away, or never drafted at all.</p>
+    <p class="where" id="where" hidden>Nothing lives at <code id="path"></code></p>
+    <div class="actions">
+      <a class="btn primary" href="/">Back to League Layer</a>
+      <a class="btn" href="/#dashboard">Your matchup</a>
+    </div>
+  </main>
+  <script>
+    // the address that wasn't found, as plain text
+    (function () {
+      var p = location.pathname + location.search;
+      if (p && p !== '/') { document.getElementById('path').textContent = location.host + p; document.getElementById('where').hidden = false; }
+    })();
+  </script>
+</body>
+</html>

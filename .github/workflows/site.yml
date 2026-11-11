@@ -130,7 +130,7 @@ jobs:
       - name: Gather the site's own files
         run: |
           mkdir _site
-          cp -r index.html styles.css manifest.webmanifest js data fonts icons _site/
+          cp -r index.html 404.html styles.css manifest.webmanifest js data fonts icons _site/
           du -sh _site && find _site -type f | wc -l
 
       - uses: actions/configure-pages@v6
