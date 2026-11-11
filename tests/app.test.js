@@ -2086,6 +2086,28 @@ test("the Recap's Trends: last 5 games against the usual one, per category, with
   } finally { app.set('BOX', saved); ui.trendDir = 'up'; }
 });
 
+test("a team's code opens its card in the popup: its schedule, then its players by value, each with whose he is", async () => {
+  await app.useLeague(CATS9);
+  const doc = app.document, realQuery = doc.querySelector, els = {};
+  doc.querySelector = sel => (['#detailBody', '#detailTitle', '#detailDialog'].includes(sel) ? (els[sel] = els[sel] || { innerHTML: '', open: false, showModal() { this.open = true; }, close() { this.open = false; } }) : realQuery(sel));
+  try {
+    const tri = app.NBA.players.find(r => r.team && r.cur).team;
+    assert.match(app.teamBtn(tri), /data-action="sport-team"/, 'the link opens the card, not another tab');
+    app.actions['sport-team']({ dataset: { team: tri } });
+    assert.equal(els['#detailDialog'].open, true);
+    assert.ok(els['#detailTitle'].innerHTML.includes(app.SPORT.teamNames[tri]), `its full name: ${app.SPORT.teamNames[tri]}`);
+    const html = els['#detailBody'].innerHTML;
+    assert.match(html, /Next game/);
+    const ids = [...html.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(m => +m[1]);
+    const team = app.nbaPlayers().filter(p => p.team === tri);
+    assert.equal(new Set(ids).size, team.length, 'every player on the team');
+    const vals = ids.map(id => team.find(p => p.nbaId === id)).filter(p => p.gp).map(p => p.val);
+    assert.deepEqual(vals, [...vals].sort((a, b) => b - a), 'by value a game, best first');
+    assert.match(html, new RegExp(`data-action="team-players" data-team="${tri}"`), 'the whole team on the Players tab, from the foot');
+    assert.equal(Object.keys(app.SPORTS.nba.teamNames).length, 30);
+  } finally { doc.querySelector = realQuery; }
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;

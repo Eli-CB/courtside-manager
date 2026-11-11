@@ -363,7 +363,9 @@ const actions = {
     ui.perfWhose = next;
     render();
   },
-  // a team's code anywhere: the Players tab showing that team's players over the season (a day could have no game of
+  // a team's code anywhere: its card (schedule, players by value), in the popup, without leaving the page
+  'sport-team'(el) { showSportTeamCard(el.dataset.team); },
+  // the foot of that card: the Players tab showing that team's players over the season (a day could have no game of
   // theirs; football keeps its projections), every other filter off and the panel open to say so
   'team-players'(el) {
     const d = $('#detailDialog');

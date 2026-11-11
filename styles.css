@@ -313,6 +313,12 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .detail-title:has(> .dt-name) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 1px; white-space: normal; }
 .detail-title .dt-name { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-title .dt-bio { font-size: .82rem; font-weight: 400; color: var(--muted); }
+.detail-title .dt-name .tlogo { vertical-align: -4px; margin-right: 2px; }
+/* an NBA (NHL, NFL) team's card: its tiles, then its players */
+.proj-grid.tc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tc-table td { vertical-align: middle; }
+.tc-table td:first-child { width: 18px; padding-right: 0; }
+@media (max-width: 640px) { .tc-table .show-sm { display: inline; } } /* (phones: whose he is after his positions) */
 .detail-title .dt-bio .pt { color: var(--text); }
 /* the card's top: the photo, his fantasy team beside it, the tiles beside that (on a phone the tiles go under) */
 .pc-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-start; gap: 12px; }

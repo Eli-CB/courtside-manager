@@ -422,6 +422,51 @@ function gameStats(raw, o) {
 }
 
 let cardOpen = null; // the player whose card is showing
+// ----- A team's card (NBA, NHL or NFL): a team's code anywhere opens it, in the player card's popup -----
+// Its next game and how many it plays this period and next, then its players by value a game (this season's), with
+// whose each is in the league and any injury; a name opens his card. The whole team on the Players tab from its foot.
+function showSportTeamCard(tri) {
+  if (!NBA || !tri) return;
+  const t = teamInfo(tri), L = fxLeague(), mine = myTeamId();
+  const owner = new Map();
+  for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
+  const whose = p => {
+    const tid = owner.get(p.nbaId), raw = nbaById.get(p.nbaId);
+    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : ''}">${teamLink(tid)}</span>`;
+    return raw && raw.fx ? `<span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
+  };
+  const list = sortDesc(nbaPlayers().filter(p => p.team === tri), p => (p.gp ? p.val : -1e9 + (p.inj ? 0 : 1)));
+  const next = weekShifts().filter(x => x > 0)[0], nextDates = next ? matchDates(weekStartAt(next)) : [];
+  const nextN = t && nextDates.length ? nextDates.filter(d => (t.dates || []).includes(d)).length : null;
+  const tiles = `<div class="proj-grid tc-tiles">
+      <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? linkTeams(nextGame(t.next)) : '—'}</div></div>
+      <div class="proj"><div class="k">Games left this week</div><div class="v">${t ? t.left : '—'}</div></div>
+      ${isFootball() ? '' : `<div class="proj"><div class="k">Games next period</div><div class="v">${nextN == null ? '—' : nextN}</div></div>`}
+    </div>`;
+  const VAL = isPoints() ? 'FP' : 'Value';
+  const rows = list.map((p, i) => {
+    const raw = nbaById.get(p.nbaId);
+    return `<tr><td class="num muted">${i + 1}</td>
+      <td><div class="bplayer">${headshot(p, 28)}<div class="bmain"><div class="bname">${playerBtn(p.nbaId, p.name)}${raw ? injBadge(raw.inj) : ''}</div>
+        <div class="pmeta">${posTags(p.pos)}<span class="show-sm"> · ${whose(p) || 'no team'}</span></div></div></div></td>
+      <td class="hide-sm">${whose(p)}</td>
+      <td class="num hide-sm">${p.gp || '—'}</td>
+      <td class="num"><b class="${p.gp && p.val < 0 && !isPoints() ? 'pos-bad' : ''}">${p.gp ? fmtValue(p.val) : '—'}</b></td></tr>`;
+  }).join('');
+  $('#detailBody').innerHTML = `${tiles}
+    <h3 class="sub" style="margin-top:16px">Players <span class="muted small">${list.length}</span></h3>
+    <div class="table-wrap"><table class="tc-table">
+      <thead><tr><th></th><th>Player</th><th class="hide-sm">Fantasy team</th><th class="num hide-sm">GP</th><th class="num" data-tip="${esc(isPoints() ? 'Fantasy points a game in your league, this season' : "Categories won a game, this season: what his average game adds to winning a week's categories")}">${VAL}</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="5" class="muted small">No players on ${esc(tri)} in the data.</td></tr>`}</tbody>
+    </table></div>
+    <p style="margin:14px 0 0"><button type="button" class="link-btn quiet" data-action="team-players" data-team="${esc(tri)}">See ${esc(tri)} on the Players tab</button></p>`;
+  const name = (SPORT.teamNames || {})[tri] || tri;
+  $('#detailTitle').innerHTML = `<span class="dt-name">${teamLogo(tri, 22)} ${esc(name)}</span><span class="dt-bio">${esc(tri)}</span>`;
+  cardOpen = null;
+  const d = $('#detailDialog');
+  if (!d.open) d.showModal();
+}
+
 function showPlayerDetail(nbaId) {
   // the season's box scores, the first time a card needs them
   if (!BOX && NBA) loadBoxes().then(() => { if ($('#detailDialog').open && cardOpen === nbaId) showPlayerDetail(nbaId); }).catch(() => {});

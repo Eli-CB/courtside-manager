@@ -471,8 +471,8 @@ function playerCell(p, link = true, photo = true) {
   return photo ? `<div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain">${body}</div></div>` : body;
 }
 
-// A team's code (UTA, CLE) as a link to the Players tab showing that team's players ('team-players', actions.js)
-const teamBtn = (tri, label = esc(tri)) => `<button type="button" class="link-btn tm-link" data-action="team-players" data-team="${esc(tri)}" title="${esc(tri)} players">${label}</button>`;
+// A team's code (UTA, CLE) as a link to its card: its schedule and players by value, in the player card's popup ('sport-team')
+const teamBtn = (tri, label = esc(tri)) => `<button type="button" class="link-btn tm-link" data-action="sport-team" data-team="${esc(tri)}" title="${esc((SPORT.teamNames || {})[tri] || tri)}">${label}</button>`;
 // Every team code in a line's text (not inside its tags) as that link: "Tue @ POR", "OKC vs. WAS", "W 112-100 @MEM"
 function linkTeams(html) {
   const teams = NBA && NBA.teams;
