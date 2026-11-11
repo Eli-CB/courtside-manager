@@ -28,7 +28,7 @@
     .jersey .back { position: absolute; left: 0; right: 0; top: 24%; color: #ffffff; line-height: 1; }
     .jersey .name { display: block; font-size: 15px; font-weight: 700; letter-spacing: .14em; margin-left: .14em; }
     .jersey .num { display: block; font-size: 62px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; margin-top: 4px; }
-    .eyebrow { font-size: .78rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 4px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* (for screen readers: the jersey says it) */
     h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.01em; }
     p { margin: 0 0 6px; color: var(--muted); }
     .where { font-size: .85rem; overflow-wrap: anywhere; }
@@ -47,6 +47,7 @@
       <svg viewBox="6 9.5 52 52" aria-hidden="true"><polygon fill="var(--mark)" points="36,37 56,27 46,22 36,27 18,18 8,23"/><polygon fill="#7f8a9c" points="8,31 36,45 56,35 56,43 36,53 8,39"/></svg>
       League Layer
     </a>
+    <!-- Jahlil Okafor-o-four: his jersey from the back says it all -->
     <div class="jersey" role="img" aria-label="The back of a jersey: OKAFOR, number 04">
       <svg viewBox="0 0 120 130" aria-hidden="true">
         <!-- the back of a basketball jersey: a shallow collar, armholes cut in -->
@@ -55,8 +56,7 @@
       </svg>
       <div class="back" aria-hidden="true"><span class="name">OKAFOR</span><span class="num">04</span></div>
     </div>
-    <p class="eyebrow">Error 404</p>
-    <h1>Jahlil Okafor-o-four</h1>
+    <h1 class="sr-only">Page not found</h1>
     <p>This page isn't on the roster. It may have been waived, traded away, or never drafted at all.</p>
     <p class="where" id="where" hidden>Nothing lives at <code id="path"></code></p>
     <div class="actions">
