@@ -156,7 +156,7 @@ saved leagues are lost). Owner's league:
   `tests/test_update_nhl.py` (Python), the last tests in `app.test.js`; fixtures from `tests/capture_nhl_fixtures.py` (team names replaced).
 - Logo ("Sheet": two tilted Ls, the second a thin edge under the first; "Ink" colors, chosen for now): `scripts/build_icons.py` draws it and writes `icons/logo.svg`,
   `icons/favicon.svg` (a 16 px cut with a wider gap and no background, the first L dark on a light tab and white on a dark one, also inline in index.html: copy it there if it changes) and the three PNGs. On a home screen the mark stays inside the middle 80% circle.
-- `404.html`: GitHub Pages' page for any address that doesn't exist ("Jahlil Okafor-o-four", said only by the back of his jersey, OKAFOR 04: no heading on the page), self-contained (inline styles, root-relative font and links: it shows at any depth).
+- `404.html`: GitHub Pages' page for any address that doesn't exist ("Jahlil Okafor-o-four", said only by the back of his jersey, OKAFOR 04, drawn in SVG in the colors of the team that drafted him, Philadelphia: colors only, no team logo or wordmark; no heading on the page), self-contained (inline styles, root-relative font and links: it shows at any depth).
 - Home screen: `manifest.webmanifest` + `icons/` + the tags in index.html make the site install full screen (`canInstall`, the settings menu's Install the app:
   the browser's offer, or steps for an iPhone, which keeps the app's storage apart from Safari's, so a league is connected once more there). No service worker on purpose: every
   visit is the live site. An installed app has no refresh button, so returning after 3 hours reloads it (`appStale`).
