@@ -138,7 +138,8 @@ saved leagues are lost). Owner's league:
   (`gameWorth` for a trade or lineup: value × share). Street Clothes and Missed skip goalies: a healthy backup sits most games. Checked on 48
   real team-weeks: goalies scored 4.7 a week, every-game projected 8.1, this 5.2 (average miss 3.8 to 2.0). Category leagues were
   only tested on a made-up scoring setup: no real hockey category league yet. A Fantrax league's sport comes from its scoring groups (`fxSport`:
-  `HOCKEY_SKATING`, Fantrax doesn't name it). `fetchFantraxLeague` reads a league against that sport's data file
+  `HOCKEY_SKATING`, Fantrax doesn't name it; `BASKETBALL_PLAYER` or no groups is basketball, any other sport, e.g. `GOLF_GOLFER`,
+  is refused with a plain message, `FANTRAX_SPORTS`, and logged as tried, never loaded as basketball). `fetchFantraxLeague` reads a league against that sport's data file
   (`fetchSport`) without changing the page; `switchLeague` then swaps sports (`useSport`, with `ui.hold` stopping `render` until the
   league is in place; a league that fails puts the sport back). `state.sport` picks the tables before a saved state is read.
   `scripts/update_nhl.py` (same daily job, its own step, a failure there doesn't stop the NBA data) builds `data/nhl/` laid out

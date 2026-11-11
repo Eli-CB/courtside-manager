@@ -2108,6 +2108,18 @@ test("a team's code opens its card in the popup: its schedule, then its players 
   } finally { doc.querySelector = realQuery; }
 });
 
+test("a Fantrax league of a sport the site doesn't read (golf) says so, instead of loading as basketball", async () => {
+  const group = code => ({ scoringSystem: { scoringCategorySettings: [{ group: { code } }] } });
+  assert.equal(app.fxSport(group('BASKETBALL_PLAYER')), 'nba');
+  assert.equal(app.fxSport(group('HOCKEY_SKATING')), 'nhl');
+  assert.equal(app.fxSport(group('GOLF_GOLFER')), 'golf');
+  assert.equal(app.fxSport(group('FOOTBALL_PLAYER')), 'football', 'football on Fantrax: not read yet (Sleeper only)');
+  assert.equal(app.fxSport({}), 'nba', "groups that don't say: basketball, as before");
+  const err = await app.fetchFantraxLeague('golffixture0001').then(() => null, e => e);
+  assert.ok(err && err.message === 'not supported: golf', err && err.message);
+  assert.equal(app.leagueError('golffixture0001', err).message, "That's a Fantrax golf league. League Layer covers basketball and hockey leagues on Fantrax (and football on Sleeper) for now.");
+});
+
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;

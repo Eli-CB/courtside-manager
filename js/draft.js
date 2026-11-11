@@ -403,6 +403,7 @@ function leagueError(id, e) {
   if (e.message === 'yahoo sign-in') return new Error('Sign in with Yahoo to load Yahoo leagues.');
   if (e.message === 'private league') return new Error("That ESPN league is private, so ESPN won't share it. Only public ESPN leagues can be loaded; the league manager can make it viewable to the public in the league's settings.");
   if (/not basketball/.test(e.message)) return new Error(`That league isn't basketball (${e.message.replace(/^that's /, '')}).`);
+  if (/^not supported: /.test(e.message)) return new Error(`That's a Fantrax ${e.message.replace(/^not supported: /, '')} league. League Layer covers basketball and hockey leagues on Fantrax (and football on Sleeper) for now.`);
   return new Error(`${site} didn't find that league (${e.message}). Check the ID in your league's address.${site === 'ESPN' ? ' Only public ESPN leagues can be loaded.' : ''}`);
 }
 

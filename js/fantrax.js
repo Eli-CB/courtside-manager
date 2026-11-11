@@ -194,8 +194,16 @@ function fxStatKey(cat, group) {
   return null;
 }
 const fxGroup = cat => (cat.group && cat.group.code) || '';
-// A league's sport, from its scoring groups (Fantrax doesn't name it)
-const fxSport = info => (((info.scoringSystem || {}).scoringCategorySettings || []).some(c => /^HOCKEY/.test(fxGroup(c))) ? 'nhl' : 'nba');
+// A league's sport, from its scoring groups (Fantrax doesn't name it): BASKETBALL_PLAYER, HOCKEY_SKATING / HOCKEY_GOALIE,
+// GOLF_GOLFER... 'nba' or 'nhl', the ones read on Fantrax; another sport by its group's first word ('golf', 'football');
+// a league whose groups don't say is taken for basketball, as before
+const FANTRAX_SPORTS = ['nba', 'nhl'];
+function fxSport(info) {
+  const groups = ((info.scoringSystem || {}).scoringCategorySettings || []).map(fxGroup).filter(Boolean);
+  if (groups.some(g => /^HOCKEY/.test(g))) return 'nhl';
+  if (!groups.length || groups.some(g => /^BASKETBALL/.test(g))) return 'nba';
+  return groups[0].split('_')[0].toLowerCase();
+}
 
 function fxPointsScoring(ss) {
   if (!ss || !/POINTS/.test(ss.type || '')) return {};
@@ -273,7 +281,14 @@ async function fetchFantraxLeague(id, opts = {}) {
   // the league says its sport, which says whose players to match it to (nothing changes on the page until it's opened)
   const info = await fxGet(`getLeagueInfo?leagueId=${q}`);
   if (info.error || !info.teamInfo) throw new Error((info.error && info.error.message) || 'League not found');
-  const sport = fxSport(info), T = SPORTS[sport];
+  const sport = fxSport(info);
+  // a sport the site doesn't read on Fantrax (golf, football...): said plainly, not loaded as basketball with no one matched;
+  // which sports people try goes to the error log, to see what's wanted
+  if (!FANTRAX_SPORTS.includes(sport)) {
+    reportError(`Fantrax ${sport} league tried (not supported)`, 'js/fantrax.js');
+    throw new Error(`not supported: ${sport}`);
+  }
+  const T = SPORTS[sport];
   const [D, { ids, adp: adpList }, rosters, draftFirst, standings] = await Promise.all([
     SPORT.key === sport && NBA ? NBA : fetchSport(sport), fxPlayerLists(sport), fxGet(`getTeamRosters?leagueId=${q}`),
     fxGet(`getDraftResults?leagueId=${q}`).catch(() => null), fxGet(`getStandings?leagueId=${q}`).catch(() => []),
