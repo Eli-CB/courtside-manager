@@ -17,7 +17,7 @@
 // in js/live.js):
 //   GET  /espn/<sport>/<league>/<scoreboard | summary | injuries>?<dates | event>
 // Only those three feeds of the three sports, only for the site's own pages, each answer kept at Cloudflare's edge for
-// seconds (ESPN_TTL), so ESPN is asked about once per feed per half minute however many people are watching.
+// seconds (ESPN_TTL), so ESPN is asked about once per feed every 20-30 seconds however many people are watching.
 
 const AUTH = 'https://api.login.yahoo.com/oauth2/';
 const API = 'https://fantasysports.yahooapis.com/fantasy/v2/';
@@ -27,7 +27,8 @@ const ERROR_FIELDS = { msg: 300, at: 300, stack: 1500, page: 120, source: 20, le
 // games are on, an earlier day's scoreboard (its games are over), the injury report
 const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
 const ESPN_LEAGUES = new Set(['basketball/nba', 'hockey/nhl', 'football/nfl']);
-const ESPN_TTL = { scoreboard: 20, pastScoreboard: 600, summary: 20, injuries: 300 };
+// (10 s: ESPN's own servers already hand out copies several seconds old, so 20 s here held a live scoreboard about 40 s)
+const ESPN_TTL = { scoreboard: 10, pastScoreboard: 600, summary: 10, injuries: 300 };
 
 // The ESPN address for /espn/<sport>/<league>/<feed>?<query>, and how long to keep its answer; null for anything else
 function espnFeed(url) {

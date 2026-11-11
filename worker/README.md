@@ -55,8 +55,8 @@ which pages and leagues). Until this is set up the site's reports are dropped.
 The site's live scores, late box scores and injury report come from ESPN's site feed, asked by each visitor's
 browser. Should ESPN stop answering the site directly, the page switches by itself (after two misses in a row while
 leaguelayer.com still answers) to `GET /espn/<sport>/<league>/<scoreboard|summary|injuries>` here, which asks ESPN once
-for everyone and keeps each answer at Cloudflare's edge for 20 seconds (an earlier day's scoreboard 10 minutes, the
-injury report 5). Only those feeds, only for the site's own pages (`SITE_ORIGINS`). Nothing to set up beyond deploying:
+for everyone and keeps each answer at Cloudflare's edge for 10 seconds (an earlier day's scoreboard 10 minutes, the
+injury report 5). With ESPN's own servers' copies already a few seconds old, a live score is at most about 30 s behind. Only those feeds, only for the site's own pages (`SITE_ORIGINS`). Nothing to set up beyond deploying:
 
 ```
 npx wrangler deploy
