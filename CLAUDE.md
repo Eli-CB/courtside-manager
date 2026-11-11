@@ -89,7 +89,7 @@ saved leagues are lost). Owner's league:
     Fantrax and Sleeper. The Dashboard offers it for 3 days after a week ends (`freshRecap`). Under it, Trends (`trendsCard`, recap.js; not football): Heating up / Cooling off (`ui.trendDir`), each player's last 5 games
     through the week's last game day against his median game before them (5+ earlier games; a regular: 15+ minutes, hockey 10), one top-5 list per
     counting category (points leagues: fantasy points), shooting % with volume, then Minutes and Shot attempts; ranked by the change per game, the % shown;
-    Rising on waivers (unowned, by lineValue gained); notes from the box scores only (`teammateOut`: a 24+ minute teammate missing most of those games;
+    by Value first (lineValue now vs before, one Value/FP label per list): Rostered players (both ways) and Rising on waivers (unowned, heating up only); notes from the box scores only (`teammateOut`: a 24+ minute teammate missing most of those games;
     minutes moved 4+). Owners are today's rosters. Info text `trends`
   - live: live box scores for the Dashboard matchup's and Performances' Today (and This week). Every ESPN site-feed request goes through `espnSite(path)`:
     direct from the browser; after `ESPN_SWITCH` (2) misses in a row while leaguelayer.com answers, through the Worker's cached `/espn/` route (worker/yahoo.js)

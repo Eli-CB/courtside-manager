@@ -293,7 +293,9 @@ function trendPlayers(end) {
     }
     // his whole line now and before, for what it's worth (the waiver list)
     const line = xs => Object.fromEntries(keys.map(k => [k, mean(xs.map(s => s[k] || 0))]));
-    row.gain = lineValue(line(R)) - lineValue(Object.fromEntries(keys.map(k => [k, median(B.map(s => s[k] || 0))])));
+    row.valueNow = lineValue(line(R));
+    row.valueWas = lineValue(Object.fromEntries(keys.map(k => [k, median(B.map(s => s[k] || 0))])));
+    row.gain = row.valueNow - row.valueWas;
     out.push(row);
   }
   return { stats, players: out };
@@ -364,23 +366,29 @@ function trendsCard(L, period) {
     return `<section class="tr-cat"><h3 class="sub">${esc(st.label)}</h3><ol class="tr-list">${rows}</ol></section>`;
   }).filter(Boolean);
 
-  // the ones a league can still have: no fantasy team, playing like it, by what his games are worth now against before
-  const waivers = !up || !fxLeague() ? [] : players
-    .filter(row => !owner.has(row.id) && row.raw.fx && row.raw.fx.st !== 'T' && row.gain > 0 && row.minNow >= trendMinutes())
-    .sort((a, b) => b.gain - a.gain).slice(0, TREND_WAIVERS);
-  const waiverRows = waivers.map((row, i) => {
-    const jumps = stats.filter(st => !st.pct && !st.role && row.stats[st.key] && row.stats[st.key].move > 0 && row.stats[st.key].was > 0)
-      .sort((a, b) => row.stats[b.key].move / row.stats[b.key].was - row.stats[a.key].move / row.stats[a.key].was).slice(0, 2)
+  // By what a player's games are worth (categories won, or fantasy points, a game): the rostered players who moved most
+  // either way, and the risers a league can still have (no fantasy team). Value is the column's label, said once.
+  const VAL = isPoints() ? 'FP' : 'Value';
+  const byValue = (list, n) => list.filter(row => (up ? row.gain > 0 && row.minNow >= trendMinutes() : row.gain < 0 && row.minBefore >= trendMinutes()))
+    .sort((a, b) => (up ? b.gain - a.gain : a.gain - b.gain)).slice(0, n);
+  const rostered = fxLeague() ? byValue(players.filter(row => owner.has(row.id)), TREND_TOP) : [];
+  const waivers = up && fxLeague() ? byValue(players.filter(row => !owner.has(row.id) && row.raw.fx && row.raw.fx.st !== 'T'), TREND_WAIVERS) : [];
+  const valueRows = list => list.map((row, i) => {
+    // why: a teammate out (heating up), and the two stats that moved most his way
+    const moved = stats.filter(st => !st.pct && !st.role && row.stats[st.key] && (up ? row.stats[st.key].move > 0 : row.stats[st.key].move < 0) && row.stats[st.key].was > 0)
+      .sort((a, b) => Math.abs(row.stats[b.key].move / row.stats[b.key].was) - Math.abs(row.stats[a.key].move / row.stats[a.key].was)).slice(0, 2)
       .map(st => `${esc(STAT_LABEL[st.key] || st.label)} ${fmt(row.stats[st.key].now, 1)} vs ${fmt(row.stats[st.key].was, 1)}`);
-    const note = [teammateOut(row, regulars || teamRegulars(end)), ...jumps].filter(Boolean).join(' · ');
-    const num = `<div class="tr-num"><b class="pos-good">${fmtValue(row.gain)}</b><div class="small muted">${isPoints() ? 'FP a game' : 'value a game'}</div></div>`;
+    const note = [up ? teammateOut(row, regulars) : '', ...moved].filter(Boolean).join(' · ');
+    const num = `<div class="tr-num"><b>${fmtValue(row.valueNow)}</b> <span class="muted">vs ${fmtValue(row.valueWas)}</span><div class="small ${up ? 'pos-good' : 'pos-bad'}">${fmtValue(row.gain)}</div></div>`;
     return rowHtml(row, i, num, note);
   }).join('');
+  const valueList = (title, list) => (list.length ? `<section class="tr-cat"><h3 class="sub tr-head"><span>${title}</span><span class="tr-col">${VAL}</span></h3><ol class="tr-list">${valueRows(list)}</ol></section>` : '');
+  const valueLists = [valueList('Rostered players', rostered), valueList('Rising on waivers', waivers)].filter(Boolean);
 
   const seg = `<div class="seg seg-sm" role="group" aria-label="Trending">${[['up', 'Heating up'], ['down', 'Cooling off']].map(([k, l]) =>
     `<button type="button" class="${(k === 'up') === up ? 'on' : ''}" data-action="trend-dir" data-dir="${k}" aria-pressed="${(k === 'up') === up}">${l}</button>`).join('')}</div>`;
-  const body = lists.length || waiverRows
-    ? `${waiverRows ? `<section class="tr-cat tr-waivers"><h3 class="sub">Rising on waivers</h3><ol class="tr-list">${waiverRows}</ol></section>` : ''}
+  const body = lists.length || valueLists.length
+    ? `${valueLists.length ? `<div class="tr-grid tr-value">${valueLists.join('')}</div>` : ''}
        <div class="tr-grid">${lists.join('')}</div>`
     : `<p class="muted small" style="margin:0">Not enough games yet: a trend compares a player's last ${TREND_GAMES} games with at least ${TREND_BEFORE} before them.</p>`;
   return `<div class="card trends">
