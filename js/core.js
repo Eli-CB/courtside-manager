@@ -90,7 +90,7 @@ function dropKept(memo, id) {
    ========================================================= */
 let state = null;
 const ui = { weekShift: 0, weekChosen: false, tab: 'dashboard', recapWeek: null, afterPick: null, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
-  dashRange: null, dashBench: false, trendDir: 'up', perfRange: null, perfPer: false, perfMore: { sig: '', n: 0 }, rollOpen: new Set(), perfQ: '', perfPos: '', perfTeam: '', perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
+  dashRange: null, dashBench: false, trendDir: 'up', cardSort: { key: 'date', dir: -1 }, perfRange: null, perfPer: false, perfMore: { sig: '', n: 0 }, rollOpen: new Set(), perfQ: '', perfPos: '', perfTeam: '', perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
   perfWhose: { me: true, opp: true, other: true, fa: true }, perfSpot: 'all', perfFiltOpen: false };
 ui.hideScores = (() => { try { return localStorage.getItem(SCORES_KEY) === '1'; } catch (e) { return false; } })();
 // 24-hour clock: as chosen in the settings menu, else as the device shows times
@@ -453,6 +453,8 @@ function teamLogo(team, px = 16) {
 
 // Position labels in Fantrax's colors
 const posTags = pos => pos.map(x => `<span class="pt pt-${esc(x)}">${esc(x)}</span>`).join(',');
+// The same in their lineup-spot colors, as Fantrax shows them (the player card's title; a position without a color stays plain)
+const posColored = pos => pos.map(x => { const c = (SPORT.slotColors || {})[x]; return `<span class="pt pt-${esc(x)}${c ? ` pc pc-${c}` : ''}">${esc(x)}</span>`; }).join(',');
 
 // a player's name and team line, with their photo unless the list is too long for them (the Players tab)
 // A fantasy team's name that opens its card (this season's teams; names in a past season stay plain)

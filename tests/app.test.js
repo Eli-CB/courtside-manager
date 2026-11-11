@@ -952,8 +952,24 @@ test("player profile: value per game (each game, each season's averages) and thi
     const box = app.get('BOX').byPlayer.get(raw.id) || [];
     assert.ok(full.includes(`Games <span class="muted small">${box.length}</span>`), `all ${box.length} games`);
     assert.ok(full.includes('pc-games-wrap'));
-    const dates = [...full.split('pc-games-wrap"><table>')[1].matchAll(/<tr><td>([^<]+)<\/td>/g)].map(m => m[1]);
+    const gamesTable = full.split('pc-games-wrap pc-log-wrap"><table class="pc-log">')[1];
+    const dates = [...gamesTable.matchAll(/<tr><td>([^<]+)<\/td>/g)].map(m => m[1]);
     assert.equal(dates.length, box.length);
+    // both tables on one column grid: the same stat columns after Season + GP / Date + Matchup + W/L
+    const cols = t => (t.match(/<colgroup>([\s\S]*?)<\/colgroup>/) || [])[1];
+    const [avgCols, gameCols] = [full.split('Per-game averages')[1], gamesTable].map(cols);
+    assert.equal(avgCols.replace('<col class="c-label"><col class="c-gp">', ''), gameCols.replace('<col class="c-date"><col class="c-opp"><col class="c-wl">', ''), 'the same stat columns in both');
+    // sorted by a column: most points first, then the other way
+    const ptsCol = app.cardStats(raw).findIndex(c => c[0] === 'PTS');
+    const order = () => { const t = els['#detailBody'].innerHTML.split('pc-games-wrap pc-log-wrap"><table class="pc-log">')[1]; return [...t.matchAll(/<tr><td>[^<]+<\/td>[\s\S]*?<\/tr>/g)].map(m => +[...m[0].matchAll(/<td class="num">([^<]*)<\/td>/g)][ptsCol][1]); };
+    app.actions['card-sort']({ dataset: { key: String(ptsCol) } });
+    const most = order();
+    assert.deepEqual(most, [...most].sort((x, y) => y - x), 'most points first');
+    app.actions['card-sort']({ dataset: { key: String(ptsCol) } });
+    const least = order();
+    assert.deepEqual(least, [...least].sort((x, y) => x - y), 'then fewest');
+    app.showPlayerDetail(app.NBA.players.find(r => r.id !== raw.id && r.cur).id);
+    assert.equal(app.get('ui').cardSort.key, 'date', "another player's card: newest first again");
   } finally { doc.querySelector = before; }
 });
 

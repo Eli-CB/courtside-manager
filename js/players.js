@@ -472,6 +472,7 @@ function showPlayerDetail(nbaId) {
   if (!BOX && NBA) loadBoxes().then(() => { if ($('#detailDialog').open && cardOpen === nbaId) showPlayerDetail(nbaId); }).catch(() => {});
   const raw = nbaById.get(nbaId);
   if (!raw) return;
+  if (cardOpen !== nbaId) ui.cardSort = { key: 'date', dir: -1 }; // (another player's card: his games newest first)
   const t = teamInfo(raw.team);
   const lines = [[NBA.season, String(NBA.season).slice(2), statObj(raw.cur)], ['Last 10', 'L10', statObj(raw.l10)], [NBA.prevSeason, String(NBA.prevSeason).slice(2), statObj(raw.prev)]]
     .filter(([, , s]) => s && s.gp);
@@ -489,7 +490,10 @@ function showPlayerDetail(nbaId) {
     <tr><td><b>${VAL}</b></td>${lines.map(([, , st]) => valCell(perGameVal(st))).join('')}</tr></tbody></table>` : '';
   const rows = lines.map(([l, , s]) => [l, s])
     .map(([l, s]) => `<tr><td><b>${l}</b></td>${AVG.map(([, f]) => `<td class="num">${f(s)}</td>`).join('')}${valCell(perGameVal(s))}</tr>`).join('');
-  const games = cardGames(raw);
+  // his games, by the column picked (Games' headers; newest first until then). A made-attempted stat sorts by the makes.
+  const so = ui.cardSort, num = v => { const m = String(v).match(/^(-?[\d.]+)-(\d+)$/); return m ? +m[1] + +m[2] / 1e4 : parseFloat(v) || 0; };
+  const sortVal = o => (so.key === 'date' ? o.date : so.key === 'val' ? lineValue(o) : num(CS[+so.key][2](o)));
+  const games = cardGames(raw).sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? -1 : x > y ? 1 : 0) * so.dir || (a.date < b.date ? 1 : -1); });
   // phones: each game as a short block
   const preBadge = o => (o.type === 'PRE' ? ' <span class="badge">Pre</span>' : '');
   const wlBadge = o => (o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : '');
@@ -501,6 +505,7 @@ function showPlayerDetail(nbaId) {
   const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${linkTeams(esc(o.matchup))}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td>${CS.map(([, , g]) => `<td class="num">${g(o)}</td>`).join('')}${valCell(lineValue(o))}</tr>`).join('');
   // the tile after Next game: a goalie's starts still to come, football's projected week (the rest: games left, below)
   const thisWeek = matchDates(weekStartAt(0));
+  const statCols = [...CS, VAL].map(() => '<col>').join(''); // (the same stat columns in both tables, so they line up)
   const goalieTile = () => {
     const left = raw.inj && raw.inj.status === 'Out' ? 0 : expectedGames({ ...raw, nbaId: raw.id }, thisWeek.filter(d => d >= todayIso() && !gameFinal(raw, d)));
     return `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? `about ${fmt(left, 1)}` : '—'}</div><div class="pc-rank">${t ? `of ${t.left} games` : ''}</div></div>`;
@@ -530,13 +535,13 @@ function showPlayerDetail(nbaId) {
     </div>
     ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small"><b>${esc(raw.inj.label)}</b>${raw.inj.note ? `: ${esc(raw.inj.note)}` : ''} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
-    ${avgNarrow}${rows ? `<div class="table-wrap hide-sm"><table><thead><tr><th></th>${AVG.map(([h]) => `<th class="num">${h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted small">No ${SPORT.name} regular-season stats yet.</p>`}
+    ${avgNarrow}${rows ? `<div class="table-wrap hide-sm pc-log-wrap"><table class="pc-log"><colgroup><col class="c-label"><col class="c-gp">${statCols}</colgroup><thead><tr><th></th>${AVG.map(([h]) => `<th class="num">${h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted small">No ${SPORT.name} regular-season stats yet.</p>`}
     <h3 class="sub" style="margin-top:16px">Games${games.length ? ` <span class="muted small">${games.length}</span>` : ''}</h3>
-    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap"><table><thead><tr><th>Date</th><th>Matchup</th><th></th>${CS.map(([h, , , gh]) => `<th class="num">${gh || h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
+    ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap pc-log-wrap"><table class="pc-log"><colgroup><col class="c-date"><col class="c-opp"><col class="c-wl">${statCols}</colgroup><thead><tr>${sortTh('card-sort', 'date', 'Date', so, { cls: '', down: so.dir < 0 })}<th>Matchup</th><th></th>${CS.map(([h, , , gh], i) => sortTh('card-sort', String(i), gh || h, so, { down: so.dir < 0 })).join('')}${sortTh('card-sort', 'val', VAL, so, { down: so.dir < 0 })}</tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   const d = $('#detailDialog');
   cardOpen = nbaId;
   // his name, and who he is: team, number, positions, age, country, years in the league (his injury, if any, is the note
   // under the photo, its word first)
-  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</span>`;
+  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posColored(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</span>`;
   if (!d.open) d.showModal();
 }

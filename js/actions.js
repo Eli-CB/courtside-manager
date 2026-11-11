@@ -385,6 +385,16 @@ const actions = {
     ui.perfSpot = el.dataset.spot;
     render();
   },
+  // the player card's Games: by a column (again: the other way), the popup kept where it was scrolled
+  'card-sort'(el) {
+    if (cardOpen == null) return;
+    const body = $('#detailBody'), wrap = () => (body.querySelector ? body.querySelector('.pc-games-wrap') : null);
+    const top = body.scrollTop, inner = (wrap() || {}).scrollTop || 0;
+    nextSort(ui.cardSort, el.dataset.key, -1);
+    showPlayerDetail(cardOpen);
+    body.scrollTop = top;
+    if (wrap()) wrap().scrollTop = inner;
+  },
   'perf-sort'(el) {
     nextSort(ui.perfSort, el.dataset.key, el.dataset.key === 'name' ? 1 : -1);
     render();
