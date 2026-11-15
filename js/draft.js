@@ -155,18 +155,21 @@ function draftAwards(d) {
   if (auto.length) {
     const and = list => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]);
     const one = auto.length === 1 && auto[0], spots = `${top} spot${top === 1 ? '' : 's'}`;
-    const said = one ? `: ${one.n} pick${one.n === 1 ? '' : 's'} went ${spots} after consensus in all, ${fmt(top / one.n, 1)} a pick` : ` tied: their picks went ${spots} after consensus in all`;
-    // the breakdown: every team, most value first, with its best value pick and its biggest reach
+    const said = one ? `: ${one.n} pick${one.n === 1 ? '' : 's'} went ${spots} late in all, ${fmt(top / one.n, 1)} a pick` : ` tied: their picks went ${spots} late in all`;
+    // the breakdown: every team, most value first, in words rather than signs: "late" after a player's consensus spot (he
+    // fell to them: value), "early" before it (a reach), as The Reacher's "86 picks early"; with the team's steal (the
+    // pick that fell furthest) and its biggest reach, each only when it has one
+    const way = (v, digits = 0) => (Math.round(v * 10 ** digits) === 0 ? 'even' : `${fmt(Math.abs(v), digits)} ${v > 0 ? 'late' : 'early'}`);
     const pickOf = (xs, f) => sortDesc(xs, f)[0];
     const teamRows = sortDesc(teams, t => t.total).map(t => {
-      const best = pickOf(t.xs, x => -x.early), worst = pickOf(t.xs, x => x.early);
-      const note = (x, word) => ` · ${word} ${esc(lastName(x.p.name))} ${signed(-x.early, 0)}`; // (only a real one: a value pick after his spot, a reach before it)
-      return row(`<div class="bmain"><b>${teamLink(t.tid)}</b>`, `${t.n} pick${t.n === 1 ? '' : 's'}, ${signed(t.total / t.n, 1)} a pick${best.early < 0 ? note(best, 'best') : ''}${worst.early > 0 ? note(worst, 'reach') : ''}`,
-        signed(t.total, 0), t.total > 0 ? 'pos-good' : t.total < 0 ? 'pos-bad' : '');
+      const steal = pickOf(t.xs, x => -x.early), reach = pickOf(t.xs, x => x.early);
+      const note = (x, word) => ` · ${word}: ${esc(lastName(x.p.name))}, ${way(-x.early)}`;
+      return row(`<div class="bmain"><b>${teamLink(t.tid)}</b>`, `${t.n} pick${t.n === 1 ? '' : 's'}, ${way(t.total / t.n, 1)} a pick${steal.early < 0 ? note(steal, 'steal') : ''}${reach.early > 0 ? note(reach, 'reach') : ''}`,
+        way(t.total), t.total > 0 ? 'pos-good' : t.total < 0 ? 'pos-bad' : '');
     }).join('');
     out.push({
       e: '🤖', label: 'Autopilot', html: `${and(auto.map(t => `<b>${teamLink(t.tid)}</b>`))}${said}`, text: `${and(auto.map(t => fxTeamName(t.tid)))}${said}`,
-      detail: { title: '🤖 Autopilot', html: `<p class="aw-break-total">Every team's picks against consensus, added up</p><ul class="aw-break">${teamRows}</ul>` },
+      detail: { title: '🤖 Autopilot', html: `<p class="aw-break-total">Every team's picks against consensus, added up. Late: players who fell to them. Early: reaches.</p><ul class="aw-break">${teamRows}</ul>` },
     });
   }
   return out;

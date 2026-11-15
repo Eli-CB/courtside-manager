@@ -2222,7 +2222,7 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     const auto = awards.find(x => x.label === 'Autopilot');
     assert.ok(top > 0 && auto, `a team ahead of consensus: ${top}`);
     for (const t of won) assert.ok(auto.text.includes(app.fxTeamName(t)), `${app.fxTeamName(t)} in ${auto.text}`);
-    assert.ok(auto.text.includes(`${top} spot${top === 1 ? '' : 's'} after consensus in all`), auto.text);
+    assert.ok(auto.text.includes(`${top} spot${top === 1 ? '' : 's'} late in all`), auto.text);
     assert.equal(auto.p, undefined, "a team's award: no player's photo in the picture");
     // on the Draft tab, with Share; shared as a picture or as the text and a link to the league's Draft tab
     const card = app.draftAwardsCard(d);
@@ -2238,9 +2238,11 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     assert.ok((reaches.match(/<li>/g) || []).length <= 10);
     const teamTotals = details.get('Autopilot').html;
     assert.equal((teamTotals.match(/<li>/g) || []).length, Object.keys(totals).length, 'every team');
-    const shown = [...teamTotals.matchAll(/<b class="aw-break-v [^"]*">([^<]+)<\/b>/g)].map(m => +m[1].replace('−', '-'));
+    // in words, not signs: "48 late" (value), "88 early" (reaches), "even"
+    const shown = [...teamTotals.matchAll(/<b class="aw-break-v [^"]*">([^<]+)<\/b>/g)].map(m => (m[1] === 'even' ? 0 : m[1].endsWith(' late') ? 1 : -1) * parseFloat(m[1]) || 0);
     assert.deepEqual(shown, Object.values(totals).sort((a, b) => b - a), 'most value first');
-    assert.ok(!/reach [^·<]*\+\d/.test(teamTotals) && !/best [^·<]*−/.test(teamTotals) && /reach [^·<]*−\d/.test(teamTotals), 'a reach is only ever a reach, a value pick only value');
+    assert.ok(!/reach: [^·<]* late/.test(teamTotals) && !/steal: [^·<]* early/.test(teamTotals) && /reach: [^·<]*, \d+ early/.test(teamTotals), 'a reach is only ever early, a steal late');
+    assert.ok(!/[+−]\d/.test(teamTotals), 'no signs to decode');
     const doc = app.document, realQuery = doc.querySelector, els = {};
     doc.querySelector = sel => (['#infoBody', '#infoTitle', '#infoDialog'].includes(sel) ? (els[sel] = els[sel] || { innerHTML: '', textContent: '', open: false, showModal() { this.open = true; } }) : realQuery(sel));
     try {
@@ -2296,12 +2298,17 @@ test('Draft awards: Autopilot, the team furthest ahead of consensus over its who
     const pick = (n, tid, r) => ({ round: 1, pick: n, teamId: tid, nbaId: r.id, raw: r, name: r.name });
     const d = { picks: [pick(1, A, w), pick(2, B, x), pick(3, C, y), pick(4, D, z)], keepers: {} };
     const auto = app.draftAwards(d).find(a => a.label === 'Autopilot');
-    assert.equal(auto.text, `${app.fxTeamName(B)} and ${app.fxTeamName(D)} tied: their picks went 1 spot after consensus in all`);
+    assert.equal(auto.text, `${app.fxTeamName(B)} and ${app.fxTeamName(D)} tied: their picks went 1 spot late in all`);
     assert.match(auto.html, /<b>.*<\/b> and <b>.*<\/b> tied/);
     // D's player a spot later still: D alone, with its picks and how far a pick
     z.fx.adp = 0.5; // (z first in consensus, so D's pick at #4 is 3 spots late)
     const solo = app.draftAwards(d).find(a => a.label === 'Autopilot');
-    assert.equal(solo.text, `${app.fxTeamName(D)}: 1 pick went 3 spots after consensus in all, 3.0 a pick`);
+    assert.equal(solo.text, `${app.fxTeamName(D)}: 1 pick went 3 spots late in all, 3.0 a pick`);
+    // its breakdown: D 3 late, its pick the steal; A 2 early, its pick the reach
+    const rows = app.draftAwards(d).find(a => a.label === 'Autopilot').detail.html.split('<li>').slice(1);
+    assert.match(rows[0], /1 pick, 3\.0 late a pick · steal: [^,]+, 3 late<\/div>.*>3 late<\/b>/);
+    assert.match(rows[rows.length - 1], /1 pick, 2\.0 early a pick · reach: [^,]+, 2 early<\/div>.*>2 early<\/b>/);
+    assert.ok(rows.some(r => />even<\/b>/.test(r)), "B's pick right on its spot: even");
   } finally {
     for (const [r, fx, adp] of saved) { if (fx) r.fx = fx; else delete r.fx; if (adp != null) r.adp = adp; else delete r.adp; }
   }
