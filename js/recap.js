@@ -533,10 +533,3 @@ function recapSharePopup(L, X, url) {
     </div>`;
 }
 
-// A week that ended in the last three days: offered on the Dashboard
-function freshRecap(L = fxLeague()) {
-  if (!L || !hasLineupHistory(L)) return null;
-  if (BOX) fillWeekFromEspn(L);
-  const p = finishedPeriods(L).pop();
-  return p && Date.now() - fxTime(p.endAt) < 3 * 864e5 ? p : null;
-}

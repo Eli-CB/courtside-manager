@@ -1658,14 +1658,12 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.ok(mvp.p.nbaId === X.mvp.p.nbaId && mvp.tid === X.mvp.tid && mvp.stats.includes(' · ') && mvp.stats.startsWith(`${X.mvp.line.gp1} G, per game: `));
     assert.ok(items.filter(x => !x.p).every(x => x.text && !x.stats), 'the others are a sentence');
     assert.match(app.recapFileName(L, X), /^[a-z0-9-]+-week-1\.png$/);
-    // the Dashboard points to it for three days
-    assert.equal(app.freshRecap().n, 1);
-    assert.ok(app.recapFold().includes('data-action="go-recap"') && app.recapFold().includes('Week 1 recap'), 'a line under the matchup');
+    // the Matchup tab doesn't point to it (the Recap tab is one tap away)
+    assert.ok(!app.viewDashboard().includes('Week 1 recap'));
   } finally { ui.tab = 'dashboard'; }
   // leagues that don't share past lineups say so
   await app.useLeague(ESPN);
   assert.match(app.viewRecap(), /No recaps for ESPN leagues/);
-  assert.equal(app.freshRecap(), null);
   await app.useLeague(CATS9);
 });
 

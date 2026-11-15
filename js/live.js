@@ -132,7 +132,7 @@ async function readBoxes(games) {
 }
 
 // ----- A week's last games, before the daily job saves them -----
-// The Recap (and the Dashboard's offer of it) waits for a week's games to be in the saved box scores, which the daily job
+// The Recap waits for a week's games to be in the saved box scores, which the daily job
 // writes at 3-4 a.m. ET. So that it's there the night the week ends, ESPN's finished games of the latest week's days the
 // saved ones lack are put in with them, as the job keeps ESPN copies until NBA.com's come. Basketball only (ESPN's
 // hockey lines lack stats leagues count); once a minute at most, and only from the week's last game day on.

@@ -10,7 +10,7 @@ function viewDashboard() {
   return `
   <div class="dash-grid">
     ${NBA ? dashMatchupCard() : ''}
-    <div class="dash-folds">${recapFold()}${NBA ? movesCard() : ''}</div>
+    <div class="dash-folds">${NBA ? movesCard() : ''}</div>
   </div>`;
 }
 
@@ -20,13 +20,6 @@ function viewDashboard() {
 function dashFold(key, title, sub, body, dot = '') {
   const open = ui.dashFolds && ui.dashFolds.has(key);
   return `<details class="card dash-fold" data-fold="${key}"${open ? ' open' : ''}><summary>${dot ? `<span class="df-dot ${dot}" aria-hidden="true"></span>` : ''}<span class="df-title">${title}</span><span class="df-sub">${sub}</span></summary><div class="df-body">${body}</div></details>`;
-}
-
-// A week that just ended: its recap, for three days
-function recapFold() {
-  const fresh = freshRecap();
-  return fresh ? dashFold('recap', `Week ${fresh.n} recap`, 'is in, ready to share',
-    `<p class="muted small">${isOneGame() ? 'Player of the week' : 'Player and game of the week'}, bench regret${isPoints() ? '' : ', the best all-play week'} and every final, ready to share with the league.</p><button type="button" class="btn sm primary" data-action="go-recap">See the recap</button>`, 'good') : '';
 }
 
 // ----- The Dashboard's matchup: both lineups slot by slot, for today, the last game day or the week so far -----
