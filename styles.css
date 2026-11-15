@@ -1019,6 +1019,7 @@ tr.me-row td { background: var(--accent-soft); }
 .aw-break li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 0; margin: 0; border-bottom: 1px solid var(--border); }
 .aw-break .bmain { min-width: 0; }
 .aw-break .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: block; text-align: left; }
+.aw-break .muted .pname { display: inline; font-size: inherit; } /* a name inside a row's line (the draft awards' fell and reach) stays in the line */
 .aw-break-v { font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
 .aw-break-total { margin: 0 0 8px; }
 

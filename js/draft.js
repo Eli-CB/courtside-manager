@@ -144,32 +144,33 @@ function draftAwards(d) {
         <ul class="aw-break">${reaches.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${x.early} early`)).join('')}</ul>`,
     };
   }
-  // Autopilot: the most value against consensus over a team's whole draft (each pick's spots after his consensus spot,
-  // added up; a reach counts against): what taking the top of the ADP list every time gives, as the computer does for
-  // whoever isn't there. A tie names every team in it.
+  // Autopilot: the most value against consensus a pick, on average (each pick's spots after his consensus spot; a reach
+  // counts against): what taking the top of the ADP list every time gives, as the computer does for whoever isn't there.
+  // The average, not the total, so a team with more picks (traded for) isn't ahead for that; only teams with at least half
+  // as many picks as the most of any team. A tie (the same to a tenth, as shown) names every team in it.
   const byTeam = new Map();
   for (const x of rated) byTeam.set(x.p.teamId, [...(byTeam.get(x.p.teamId) || []), x]);
-  const teams = [...byTeam].map(([tid, xs]) => ({ tid, xs, n: xs.length, total: -sum(xs.map(x => x.early)) }));
-  const top = Math.max(0, ...teams.map(t => t.total));
-  const auto = top > 0 ? teams.filter(t => t.total === top) : [];
+  const most = Math.max(0, ...[...byTeam.values()].map(xs => xs.length));
+  const teams = [...byTeam].filter(([, xs]) => xs.length >= most / 2).map(([tid, xs]) => ({ tid, xs, n: xs.length, avg: -sum(xs.map(x => x.early)) / xs.length }));
+  const tenth = v => Math.round(v * 10);
+  const top = Math.max(0, ...teams.map(t => tenth(t.avg)));
+  const auto = top > 0 ? teams.filter(t => tenth(t.avg) === top) : [];
   if (auto.length) {
     const and = list => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]);
-    const one = auto.length === 1 && auto[0], spots = `${top} spot${top === 1 ? '' : 's'}`;
-    const said = one ? `: ${one.n} pick${one.n === 1 ? '' : 's'} went ${spots} late in all, ${fmt(top / one.n, 1)} a pick` : ` tied: their picks went ${spots} late in all`;
-    // the breakdown: every team, most value first, in words rather than signs: "late" after a player's consensus spot (he
-    // fell to them: value), "early" before it (a reach), as The Reacher's "86 picks early"; with the team's steal (the
-    // pick that fell furthest) and its biggest reach, each only when it has one
+    const said = `${auto.length > 1 ? ' tied' : ''}: their picks went ${fmt(top / 10, 1)} spots late on average`;
+    // the breakdown: every team, the most late a pick first, its average in words rather than signs: "late" after a
+    // player's consensus spot (he fell to them: value), "early" before it (a reach), as The Reacher's "86 picks early";
+    // under it the pick that fell furthest (how far) and its biggest reach (just who), each only when it has one, by name
     const way = (v, digits = 0) => (Math.round(v * 10 ** digits) === 0 ? 'even' : `${fmt(Math.abs(v), digits)} ${v > 0 ? 'late' : 'early'}`);
     const pickOf = (xs, f) => sortDesc(xs, f)[0];
-    const teamRows = sortDesc(teams, t => t.total).map(t => {
-      const steal = pickOf(t.xs, x => -x.early), reach = pickOf(t.xs, x => x.early);
-      const note = (x, word) => ` · ${word}: ${esc(lastName(x.p.name))}, ${way(-x.early)}`;
-      return row(`<div class="bmain"><b>${teamLink(t.tid)}</b>`, `${t.n} pick${t.n === 1 ? '' : 's'}, ${way(t.total / t.n, 1)} a pick${steal.early < 0 ? note(steal, 'steal') : ''}${reach.early > 0 ? note(reach, 'reach') : ''}`,
-        way(t.total), t.total > 0 ? 'pos-good' : t.total < 0 ? 'pos-bad' : '');
+    const teamRows = sortDesc(teams, t => t.avg).map(t => {
+      const steal = pickOf(t.xs, x => -x.early), reach = pickOf(t.xs, x => x.early), who = x => playerBtn(x.p.nbaId, lastName(x.p.name));
+      const notes = [steal.early < 0 && `fell: ${who(steal)}, ${-steal.early} spot${steal.early === -1 ? '' : 's'}`, reach.early > 0 && `reach: ${who(reach)}`].filter(Boolean);
+      return row(`<div class="bmain"><b>${teamLink(t.tid)}</b>`, notes.join(' · ') || 'every pick on his consensus spot', way(t.avg, 1), tenth(t.avg) > 0 ? 'pos-good' : tenth(t.avg) < 0 ? 'pos-bad' : '');
     }).join('');
     out.push({
       e: '🤖', label: 'Autopilot', html: `${and(auto.map(t => `<b>${teamLink(t.tid)}</b>`))}${said}`, text: `${and(auto.map(t => fxTeamName(t.tid)))}${said}`,
-      detail: { title: '🤖 Autopilot', html: `<p class="aw-break-total">Every team's picks against consensus, added up. Late: players who fell to them. Early: reaches.</p><ul class="aw-break">${teamRows}</ul>` },
+      detail: { title: '🤖 Autopilot', html: `<p class="aw-break-total">Each team's picks against consensus, on average a pick. Late: players who fell to them. Early: reaches.</p><ul class="aw-break">${teamRows}</ul>` },
     });
   }
   return out;
