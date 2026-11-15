@@ -160,6 +160,7 @@ function showTeamCard(tid) {
   $('#detailBody').innerHTML = html;
   $('#detailTitle').innerHTML = teamCardTitle(tid);
   cardOpen = null;
+  sportCardOpen = null;
   const d = $('#detailDialog');
   if (!d.open) d.showModal();
   $('#detailBody').scrollTop = 0;
@@ -251,10 +252,10 @@ function loadBoxes() {
     }
     const byPlayer = new Map(); // NBA id -> [[date, stats]]
     const finals = new Set(); // "date team" for every finished game
-    const scores = new Map(); // "date team" -> { home, away, hs, as }
+    const scores = new Map(); // "date team" -> { home, away, hs, as, last } (last: hockey's REG / OT / SO)
     for (const g of unique.values()) {
       finals.add(`${g.d} ${g.home}`).add(`${g.d} ${g.away}`);
-      const s = { home: g.home, away: g.away, hs: g.hs, as: g.as };
+      const s = { home: g.home, away: g.away, hs: g.hs, as: g.as, last: g.last };
       scores.set(`${g.d} ${g.home}`, s).set(`${g.d} ${g.away}`, s);
       for (const row of g.rows) {
         const st = boxCounts(Object.fromEntries(cols.map((k, i) => [k, +row[i + 2] || 0])));

@@ -2132,6 +2132,41 @@ test("a team's code opens its card in the popup: its schedule, then its players 
   } finally { doc.querySelector = realQuery; }
 });
 
+test("a team's card has its record: its finals, then today's game once it's over (not a preseason one)", async () => {
+  await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const saved = app.get('BOX'), live = app.get('live'), was = live.games;
+  const tri = 'PHI', dates = [...app.get('teamDates').get(tri)].sort();
+  const game = (d, home, away, hs, as, last) => [`${d} ${home}`, `${d} ${away}`].map(k => [k, { home, away, hs, as, last }]);
+  const doc = app.document, realQuery = doc.querySelector, els = {};
+  doc.querySelector = sel => (['#detailBody', '#detailTitle', '#detailDialog'].includes(sel) ? (els[sel] = els[sel] || { innerHTML: '', open: false, showModal() { this.open = true; }, close() { this.open = false; } }) : realQuery(sel));
+  try {
+    // the real season's box scores: a record for every team that has played
+    const real = app.teamRecord(tri);
+    assert.match(real, /^\d+-\d+$/, `W-L: ${real}`);
+    const [w, l] = real.split('-').map(Number);
+    assert.equal(w + l, [...saved.scores.keys()].filter(k => k.endsWith(` ${tri}`)).length, 'one result a game played');
+    // made-up results: won at home, lost away, won by one
+    app.set('BOX', { ...saved, scores: new Map([...game(dates[0], tri, 'BOS', 110, 100), ...game(dates[1], 'NYK', tri, 120, 99), ...game(dates[2], tri, 'MIA', 101, 100)]) });
+    live.games = [];
+    assert.equal(app.teamRecord(tri), '2-1');
+    app.actions['sport-team']({ dataset: { team: tri } });
+    assert.match(els['#detailTitle'].innerHTML, /PHI · <span class="dt-rec"[^>]*>2-1<\/span>/, 'in the title, after its code');
+    // tonight's game counts once it's over; a preseason game (not on its schedule) never does
+    live.games = [{ d: dates[3], home: 'ATL', away: tri, hs: 90, as: 95, state: 'in', period: 4 }, { d: '2026-10-05', home: tri, away: 'ORL', hs: 80, as: 120, state: 'post', period: 4 }];
+    assert.equal(app.teamRecord(tri), '2-1', 'not while it is on');
+    live.games[0].state = 'post';
+    assert.equal(app.teamRecord(tri), '3-1');
+    // a tie (football's) is a third number, only when there is one
+    app.set('BOX', { ...saved, scores: new Map([...game(dates[0], tri, 'BOS', 20, 20)]) });
+    live.games = [];
+    assert.equal(app.teamRecord(tri), '0-0-1');
+    // no games yet: nothing, rather than 0-0
+    app.set('BOX', { ...saved, scores: new Map() });
+    assert.equal(app.teamRecord(tri), '');
+  } finally { app.set('BOX', saved); live.games = was; doc.querySelector = realQuery; }
+});
+
 test("a Fantrax league of a sport the site doesn't read (golf) says so, instead of loading as basketball", async () => {
   const group = code => ({ scoringSystem: { scoringCategorySettings: [{ group: { code } }] } });
   assert.equal(app.fxSport(group('BASKETBALL_PLAYER')), 'nba');
@@ -3597,4 +3632,17 @@ test("the league is read again from its site 15 minutes before a period's first 
     Object.assign(S, keep);
     if (kept == null) app.localStorage.removeItem(KEY); else app.localStorage.setItem(KEY, kept);
   }
+});
+
+test("a hockey team's record keeps its overtime and shootout losses apart (W-L-OT), today's too", async () => {
+  const a = await hockeyApp();
+  await a.loadBoxes();
+  const box = a.get('BOX'), tri = a.NBA.players.find(r => r.team && r.cur).team, dates = [...a.get('teamDates').get(tri)].sort();
+  assert.ok([...box.scores.values()].every(s => ['REG', 'OT', 'SO'].includes(s.last)), "every final says how it ended");
+  const real = a.teamRecord(tri);
+  assert.match(real, /^\d+-\d+-\d+$/, `W-L-OT even with no overtime loss: ${real}`);
+  const game = (d, home, away, hs, as, last) => [`${d} ${home}`, `${d} ${away}`].map(k => [k, { home, away, hs, as, last }]);
+  a.set('BOX', { ...box, scores: new Map([...game(dates[0], tri, 'BOS', 3, 2, 'OT'), ...game(dates[1], tri, 'BOS', 2, 3, 'OT'), ...game(dates[2], 'NYR', tri, 4, 3, 'SO'), ...game(dates[3], 'NYR', tri, 5, 1, 'REG')]) });
+  a.get('live').games = [{ d: dates[4], home: tri, away: 'TOR', hs: 1, as: 2, state: 'post', period: 4 }];
+  assert.equal(a.teamRecord(tri), '1-1-3', 'an overtime win is a win; two late losses, and tonight\'s in overtime');
 });

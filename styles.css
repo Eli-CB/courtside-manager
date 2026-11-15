@@ -314,6 +314,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .detail-title .dt-name { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-title .dt-bio { font-size: .82rem; font-weight: 400; color: var(--muted); }
 .detail-title .dt-name .tlogo { vertical-align: -4px; margin-right: 2px; }
+.detail-title .dt-rec { color: var(--text); font-weight: 600; } /* a team's record, after its code */
 /* an NBA (NHL, NFL) team's card: its tiles, then its players */
 .proj-grid.tc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .tc-table td { vertical-align: middle; }

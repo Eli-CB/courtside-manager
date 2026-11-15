@@ -422,6 +422,25 @@ function gameStats(raw, o) {
 }
 
 let cardOpen = null; // the player whose card is showing
+let sportCardOpen = null; // the NBA (NHL, NFL) team whose card is showing
+// A team's record this regular season: the saved box scores' finals, then today's games on ESPN's scoreboard once
+// they're over (one of its scheduled games, so no preseason). Hockey keeps losses in overtime or a shootout apart
+// (W-L-OT, as the NHL's standings), football its ties when it has one. Empty until the box scores are in.
+function teamRecord(tri) {
+  if (!BOX || !BOX.scores) return '';
+  let w = 0, l = 0, o = 0;
+  const count = (g, late) => {
+    const us = g.home === tri ? +g.hs : +g.as, them = g.home === tri ? +g.as : +g.hs;
+    if (us > them) w++; else if (us === them || late) o++; else l++;
+  };
+  for (const [key, s] of BOX.scores) if (key.endsWith(` ${tri}`) && s.hs != null && s.as != null) count(s, !!s.last && s.last !== 'REG');
+  const dates = teamDates.get(tri) || new Set();
+  for (const g of live.games) {
+    if (g.state === 'post' && (g.home === tri || g.away === tri) && dates.has(g.d) && !BOX.scores.has(`${g.d} ${tri}`)) count(g, isHockey() && g.period > 3);
+  }
+  if (!w && !l && !o) return '';
+  return isHockey() || o ? `${w}-${l}-${o}` : `${w}-${l}`;
+}
 // ----- A team's card (NBA, NHL or NFL): a team's code anywhere opens it, in the player card's popup -----
 // Its next game and how many it plays this period and next, then its players by value a game (this season's), with
 // whose each is in the league and any injury; a name opens his card. The whole team on the Players tab from its foot.
@@ -460,11 +479,19 @@ function showSportTeamCard(tri) {
       <tbody>${rows || `<tr><td colspan="5" class="muted small">No players on ${esc(tri)} in the data.</td></tr>`}</tbody>
     </table></div>
     <p style="margin:14px 0 0"><button type="button" class="link-btn quiet" data-action="team-players" data-team="${esc(tri)}">See ${esc(tri)} on the Players tab</button></p>`;
+  // the title: its name, then its code and record (filled in once the box scores are in, if they weren't yet)
   const name = (SPORT.teamNames || {})[tri] || tri;
-  $('#detailTitle').innerHTML = `<span class="dt-name">${teamLogo(tri, 22)} ${esc(name)}</span><span class="dt-bio">${esc(tri)}</span>`;
+  const recTip = isHockey() ? 'Wins-losses-overtime losses' : isFootball() ? 'Wins-losses(-ties)' : 'Wins-losses';
+  const title = () => {
+    const rec = teamRecord(tri);
+    return `<span class="dt-name">${teamLogo(tri, 22)} ${esc(name)}</span><span class="dt-bio">${esc(tri)}${rec ? ` · <span class="dt-rec" title="${recTip}, this regular season">${rec}</span>` : ''}</span>`;
+  };
+  $('#detailTitle').innerHTML = title();
   cardOpen = null;
+  sportCardOpen = tri;
   const d = $('#detailDialog');
   if (!d.open) d.showModal();
+  if (!BOX) loadBoxes().then(() => { if (d.open && sportCardOpen === tri) $('#detailTitle').innerHTML = title(); }).catch(() => {});
 }
 
 function showPlayerDetail(nbaId) {
@@ -540,6 +567,7 @@ function showPlayerDetail(nbaId) {
     ${gamesNarrow}${logs ? `<div class="table-wrap hide-sm pc-games-wrap pc-log-wrap"><table class="pc-log"><colgroup><col class="c-date"><col class="c-opp"><col class="c-wl">${statCols}</colgroup><thead><tr>${sortTh('card-sort', 'date', 'Date', so, { cls: '', down: so.dir < 0 })}<th>Matchup</th><th></th>${CS.map(([h, , , gh], i) => sortTh('card-sort', String(i), gh || h, so, { down: so.dir < 0 })).join('')}${sortTh('card-sort', 'val', VAL, so, { down: so.dir < 0 })}</tr></thead><tbody>${logs}</tbody></table></div>` : '<p class="muted small">No games played yet this season.</p>'}`;
   const d = $('#detailDialog');
   cardOpen = nbaId;
+  sportCardOpen = null;
   // his name, and who he is: team, number, positions, age, country, years in the league (his injury, if any, is the note
   // under the photo, its word first)
   $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posColored(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</span>`;
