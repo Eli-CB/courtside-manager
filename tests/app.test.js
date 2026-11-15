@@ -2218,12 +2218,18 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     const spotOf = new Map([...picks].sort((a, b) => a.raw.fx.adp - b.raw.fx.adp).map((p, i) => [p.nbaId, i + 1]));
     const totals = {}, counts = {};
     for (const p of picks) { totals[p.teamId] = (totals[p.teamId] || 0) + p.pick - spotOf.get(p.nbaId); counts[p.teamId] = (counts[p.teamId] || 0) + 1; }
-    const avgs = Object.fromEntries(Object.keys(totals).map(t => [t, Math.round(totals[t] / counts[t] * 10) / 10])); // (a pick, to a tenth)
-    const top = Math.max(...Object.values(avgs)), won = Object.keys(avgs).filter(t => avgs[t] === top);
+    // each team's typical pick (the median), the average breaking a tie
+    const lates = {};
+    for (const p of picks) (lates[p.teamId] = lates[p.teamId] || []).push(p.pick - spotOf.get(p.nbaId));
+    const med = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+    const meds = Object.fromEntries(Object.entries(lates).map(([t, vs]) => [t, med(vs)]));
+    const avgOf = t => Math.round(totals[t] / counts[t] * 10);
+    const top = Math.max(...Object.values(meds)), atTop = Object.keys(meds).filter(t => meds[t] === top);
+    const won = atTop.filter(t => avgOf(t) === Math.max(...atTop.map(avgOf)));
     const auto = awards.find(x => x.label === 'Autopilot');
     assert.ok(top > 0 && auto, `a team ahead of consensus: ${top}`);
     for (const t of won) assert.ok(auto.text.includes(app.fxTeamName(t)), `${app.fxTeamName(t)} in ${auto.text}`);
-    assert.ok(auto.text.endsWith(`their picks went ${top.toFixed(1)} spots late on average`), auto.text);
+    assert.ok(auto.text.endsWith(`their typical pick went ${top} spot${top === 1 ? '' : 's'} late`), auto.text);
     assert.equal(auto.p, undefined, "a team's award: no player's photo in the picture");
     // on the Draft tab, with Share; shared as a picture or as the text and a link to the league's Draft tab
     const card = app.draftAwardsCard(d);
@@ -2239,9 +2245,9 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     assert.ok((reaches.match(/<li>/g) || []).length <= 10);
     const teamTotals = details.get('Autopilot').html;
     assert.equal((teamTotals.match(/<li>/g) || []).length, Object.keys(totals).length, 'every team');
-    // each team's average a pick, in words, not signs: "4.4 late" (value), "8.0 early" (reaches), "even"
+    // each team's typical pick, in words, not signs: "3 late" (value), "6 early" (reaches), "even"
     const shown = [...teamTotals.matchAll(/<b class="aw-break-v [^"]*">([^<]+)<\/b>/g)].map(m => (m[1] === 'even' ? 0 : m[1].endsWith(' late') ? 1 : -1) * parseFloat(m[1]) || 0);
-    assert.deepEqual(shown, Object.values(avgs).sort((a, b) => b - a), 'the most late a pick first');
+    assert.deepEqual(shown, Object.values(meds).sort((a, b) => b - a), 'the latest typical pick first');
     // under it: the pick that fell furthest (how far) and the biggest reach (who), by name, each opening his card; no pick count
     const name = '<button[^>]*data-action="player-detail"[^>]*>[^<]+</button>';
     assert.ok(new RegExp(`fell: ${name}, \\d+ spots?`).test(teamTotals), teamTotals.slice(0, 600));
@@ -2303,41 +2309,48 @@ test('Draft awards: Autopilot, the team furthest ahead of consensus over its who
     const pick = (n, tid, r) => ({ round: 1, pick: n, teamId: tid, nbaId: r.id, raw: r, name: r.name });
     const d = { picks: [pick(1, A, w), pick(2, B, x), pick(3, C, y), pick(4, D, z)], keepers: {} };
     const auto = app.draftAwards(d).find(a => a.label === 'Autopilot');
-    assert.equal(auto.text, `${app.fxTeamName(B)} and ${app.fxTeamName(D)} tied: their picks went 1.0 spots late on average`);
+    assert.equal(auto.text, `${app.fxTeamName(B)} and ${app.fxTeamName(D)} tied: their typical pick went 1 spot late`);
     assert.match(auto.html, /<b>.*<\/b> and <b>.*<\/b> tied/);
     // D's player a spot later still: D alone, with its picks and how far a pick
     z.fx.adp = 0.5; // (z first in consensus, so D's pick at #4 is 3 spots late)
     const solo = app.draftAwards(d).find(a => a.label === 'Autopilot');
-    assert.equal(solo.text, `${app.fxTeamName(D)}: their picks went 3.0 spots late on average`);
-    // its breakdown: D 3.0 late a pick, its pick the one that fell; A 2.0 early, its pick the reach
+    assert.equal(solo.text, `${app.fxTeamName(D)}: their typical pick went 3 spots late`);
+    // its breakdown: D 3 late, its pick the one that fell; A 2 early, its pick the reach
     const rows = app.draftAwards(d).find(a => a.label === 'Autopilot').detail.html.split('<li>').slice(1);
-    assert.match(rows[0], /fell: <button[^>]*>[^<]+<\/button>, 3 spots<\/div>.*>3\.0 late<\/b>/);
-    assert.match(rows[rows.length - 1], /reach: <button[^>]*>[^<]+<\/button><\/div>.*>2\.0 early<\/b>/);
+    assert.match(rows[0], /fell: <button[^>]*>[^<]+<\/button>, 3 spots<\/div>.*>3 late<\/b>/);
+    assert.match(rows[rows.length - 1], /reach: <button[^>]*>[^<]+<\/button><\/div>.*>2 early<\/b>/);
     assert.ok(rows.some(r => />even<\/b>/.test(r)), "B's pick right on its spot: even");
   } finally {
     for (const [r, fx, adp] of saved) { if (fx) r.fx = fx; else delete r.fx; if (adp != null) r.adp = adp; else delete r.adp; }
   }
 });
 
-test('Draft awards: Autopilot goes by the average a pick, not the total, among teams with enough picks', async () => {
+test("Draft awards: Autopilot goes by each team's typical pick (the median), so one big reach doesn't sink a team", async () => {
   const L = await app.useLeague(CATS9);
   const [A, B, C, D] = L.teams.map(t => t.id);
   const players = app.NBA.players, saved = players.map(r => [r, r.fx && { ...r.fx }, r.adp]);
   try {
     for (const r of players) { if (r.fx) delete r.fx.adp; delete r.adp; }
-    const r = players.slice(0, 8);
-    const pick = (n, tid, x) => ({ round: 1, pick: n, teamId: tid, nbaId: x.id, raw: x, name: x.name });
-    const d = { keepers: {}, picks: [pick(1, C, r[0]), pick(2, C, r[1]), pick(3, A, r[2]), pick(4, B, r[3]), pick(5, A, r[4]), pick(6, B, r[5]), pick(7, A, r[6])] };
-    // consensus: A's 3 picks 2, 2 and 0 spots late (4 in all, 1.3 a pick), B's 2 picks 2 and 1 late (3 in all, 1.5 a pick)
-    [[r[2], 1], [r[3], 2], [r[4], 3], [r[0], 4], [r[5], 5], [r[1], 6], [r[6], 7]].forEach(([x, adp]) => { x.fx = { ...(x.fx || {}), adp }; });
+    const r = players.slice(0, 10);
+    const pick = (n, tid) => ({ round: 1, pick: n, teamId: tid, nbaId: r[n - 1].id, raw: r[n - 1], name: r[n - 1].name });
+    const d = { keepers: {}, picks: [pick(1, A), pick(2, B), pick(3, C), pick(4, A), pick(5, B), pick(6, C), pick(7, A), pick(8, C), pick(9, B)] };
+    // consensus: A reaches 6 spots at #1, then two picks fall 2 spots each (typical 2 late, average 0.7 early); B's three
+    // each fall a spot (typical 1 late, average 1 late); C's on their spots or a spot early
+    [[1, 7], [2, 1], [3, 3], [4, 2], [5, 4], [6, 6], [7, 5], [8, 9], [9, 8]].forEach(([n, adp]) => { r[n - 1].fx = { ...(r[n - 1].fx || {}), adp }; });
     const auto = () => app.draftAwards(d).find(a => a.label === 'Autopilot');
-    assert.equal(auto().text, `${app.fxTeamName(B)}: their picks went 1.5 spots late on average`, 'B: more a pick, though A has more in all');
-    const order = auto().detail.html.split('<li>').slice(1).map(x => x.match(/data-team="([^"]+)"/)[1]);
-    assert.deepEqual(order, [B, A, C]);
-    // a team with one pick, the steal of the draft: under half as many picks as A, so not in it
-    d.picks.push(pick(8, D, r[7]));
-    r[7].fx = { ...(r[7].fx || {}), adp: 0.1 };
-    assert.ok(auto().text.startsWith(`${app.fxTeamName(B)}: `), auto().text);
+    assert.equal(auto().text, `${app.fxTeamName(A)}: their typical pick went 2 spots late`, 'A, though its reach puts its average below B');
+    const order = () => auto().detail.html.split('<li>').slice(1).map(x => x.match(/data-team="([^"]+)"/)[1]);
+    assert.deepEqual(order(), [A, B, C]);
+    // the same typical pick, 2 late: the average breaks the tie (A's 0.7 early, B's picks falling 1, 2 and 3 spots: 2 late)
+    [[1, 7], [2, 1], [3, 4], [4, 2], [5, 3], [6, 8], [7, 5], [8, 9], [9, 6]].forEach(([n, adp]) => { r[n - 1].fx.adp = adp; });
+    assert.equal(auto().text, `${app.fxTeamName(B)}: their typical pick went 2 spots late`);
+    assert.deepEqual(order(), [B, A, C]);
+    assert.deepEqual(auto().detail.html.match(/>(\d+ late|\d+ early|even)<\/b>/g), ['>2 late</b>', '>2 late</b>', '>1 early</b>']);
+    // a team with one pick, the steal of the draft: under half as many picks as the most, so not in it
+    [[1, 7], [2, 1], [3, 3], [4, 2], [5, 4], [6, 6], [7, 5], [8, 9], [9, 8]].forEach(([n, adp]) => { r[n - 1].fx.adp = adp; });
+    d.picks.push(pick(10, D));
+    r[9].fx = { ...(r[9].fx || {}), adp: 0.1 };
+    assert.ok(auto().text.startsWith(`${app.fxTeamName(A)}: `), auto().text);
     assert.ok(!auto().detail.html.includes(`data-team="${D}"`));
   } finally {
     for (const [x, fx, adp] of saved) { if (fx) x.fx = fx; else delete x.fx; if (adp != null) x.adp = adp; else delete x.adp; }
