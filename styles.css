@@ -374,6 +374,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rc-final .rc-t { min-width: 0; overflow-wrap: anywhere; }
 .rc-final .rc-t:last-child { text-align: right; }
 .rc-final .rc-t.won { font-weight: 800; }
+.rc-mark { margin: 0 4px; cursor: default; } /* the week's top 👑 and bottom 💩 team */
 .rc-score { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .rc-item { display: flex; gap: 12px; align-items: flex-start; font-size: .92rem; }

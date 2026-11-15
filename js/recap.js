@@ -76,6 +76,14 @@ function buildRecap(L, P, period) {
     const rec = R.filter(O => O !== S).map(O => outcome(weekScore(S.tot, O.tot)));
     return { tid: S.tid, w: rec.filter(x => x > 0).length, l: rec.filter(x => x < 0).length, t: rec.filter(x => !x).length };
   });
+  // the week's top and bottom teams, crowned and pooped in the results: points leagues by score, category leagues by the
+  // all-play record (the week against every other team's); a tie marks each. { top, bottom: [tid], score/rec: tid -> }
+  let rank = null;
+  if (R.length > 2) {
+    const val = new Map(isPoints() ? R.map(S => [S.tid, lineFp(S.tot)]) : allPlay.map(a => [a.tid, a.w + a.t / 2]));
+    const hi = Math.max(...val.values()), lo = Math.min(...val.values()), at = v => [...val].filter(([, x]) => Math.abs(x - v) < 1e-9).map(([t]) => t);
+    if (hi > lo) rank = { top: at(hi), bottom: at(lo), score: Object.fromEntries(val), rec: Object.fromEntries(allPlay.map(a => [a.tid, a])) };
+  }
   // the starters who missed the most of their NBA team's games while in a starting lineup that week
   const missedBy = Object.entries(startersMissed({ ...L, weeks: rps, fidNba: currentFidNba() }, P.G) || {}).flatMap(([tid, ps]) => ps.filter(x => x.games).map(x => ({ ...x, tid })));
   const most = Math.max(0, ...missedBy.map(x => x.games));
@@ -121,7 +129,17 @@ function buildRecap(L, P, period) {
     regret,
     allPlay: best(allPlay, x => x.w + x.t / 2),
     teams: R.length,
+    rank,
   };
+}
+
+// The week's top team 👑 and bottom team 💩 in the results (and the picture's), and why, for its tooltip
+const recapMark = (X, tid) => (!X.rank ? '' : X.rank.top.includes(tid) ? '👑' : X.rank.bottom.includes(tid) ? '💩' : '');
+function recapMarkTip(X, tid) {
+  const top = X.rank.top.includes(tid);
+  if (isPoints()) return `${top ? 'Most' : 'Fewest'} points this week: ${fmtFp(X.rank.score[tid])}`;
+  const a = X.rank.rec[tid];
+  return `${top ? 'Best' : 'Worst'} week in the league: ${a.w}-${a.l}${a.t ? `-${a.t}` : ''} against every other team`;
 }
 
 const scoreLine = sc => (isPoints() ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
@@ -223,7 +241,9 @@ function viewRecap() {
   // every finished week, newest by default: ‹ Week 2 › steps back through the earlier ones
   const picker = done.length > 1 ? stepper('recap-step', 'week', `<select class="ctx-team" data-change="recap-week" aria-label="Week">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Week ${p.n}</option>`).join('')}</select>`,
     { first: period.n === done[0].n, last: period.n === done[done.length - 1].n }) : '';
-  const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}</span></li>`).join('');
+  // the finals, the week's top and bottom teams marked on the row's outer edge (before the left team, after the right)
+  const mark = tid => { const e = recapMark(X, tid); return e ? `<span class="rc-mark" title="${esc(recapMarkTip(X, tid))}" aria-label="${esc(recapMarkTip(X, tid))}">${e}</span>` : ''; };
+  const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${mark(g.a)}${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}${mark(g.b)}</span></li>`).join('');
   const items = recapItems(X).map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div><div class="rc-label">${x.label}</div>${x.html}</div></li>`).join('');
   return `<div class="card">
     <div class="card-head"><h2>Week ${period.n} standouts ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
@@ -434,12 +454,12 @@ function fitText(ctx, text, max) {
 
 // The picture of a week's recap: its standouts, then every final
 const recapCanvas = (L, X) => shareCanvas({
-  kicker: `WEEK ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games,
+  kicker: `WEEK ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games, mark: tid => recapMark(X, tid),
   sub: `${fmtDay(X.period.start)} – ${fmtDay(matchDates(X.period.start).slice(-1)[0] || X.period.end)}`,
 });
 
 // A picture to share in a league chat (1080 px wide): a kicker, the league's name and a line under it, then each standout
-// in a card (a player's with his photo), then any finals. H: { kicker, title, sub, items, games }
+// in a card (a player's with his photo), then any finals. H: { kicker, title, sub, items, games, mark: tid -> its emoji }
 async function shareCanvas(H) {
   const C = RC_IMG, W = C.w, inner = W - C.pad * 2, sheet = await loadSheet();
   const cv = document.createElement('canvas');
@@ -505,9 +525,16 @@ async function shareCanvas(H) {
   for (const g of H.games || []) {
     font(34, 800); const colW = (inner - 64 - ctx.measureText(scoreLine(g.sc)).width - 48) / 2; // the names share what the score leaves
     round(C.pad, y, inner, 76, 18, C.card);
-    font(31, g.margin ? 800 : 500); text(fitText(ctx, fxTeamName(g.a), colW), C.pad + 32, y + 21);
+    // a team's name cut to fit with its mark (👑 💩) kept whole, on the outer edge
+    const named = (tid, left) => {
+      const m = H.mark ? H.mark(tid) : '';
+      if (!m) return fitText(ctx, fxTeamName(tid), colW);
+      const n = fitText(ctx, fxTeamName(tid), colW - ctx.measureText(`${m} `).width);
+      return left ? `${m} ${n}` : `${n} ${m}`;
+    };
+    font(31, g.margin ? 800 : 500); text(named(g.a, true), C.pad + 32, y + 21);
     font(34, 800); text(scoreLine(g.sc), W / 2, y + 19, C.accent, 'center');
-    font(31, 500); text(fitText(ctx, fxTeamName(g.b), colW), W - C.pad - 32, y + 21, C.muted, 'right');
+    font(31, 500); text(named(g.b, false), W - C.pad - 32, y + 21, C.muted, 'right');
     y += 88;
   }
 

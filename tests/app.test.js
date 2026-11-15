@@ -1651,6 +1651,15 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     if (X.missed.length) assert.ok(html.includes('Street clothes') && html.includes('while starting'));
     if (X.regret) assert.ok(X.regret.up > 0, 'a bench regret changes a result');
     assert.ok(X.allPlay.w + X.allPlay.l + X.allPlay.t === L.teams.length - 1);
+    // the results crown the week's best all-play record and mark the worst, every team tied included
+    const recs = Object.values(X.rank.rec), vals = recs.map(a => a.w + a.t / 2);
+    assert.deepEqual(Array.from(X.rank.top, String).sort(), recs.filter(a => a.w + a.t / 2 === Math.max(...vals)).map(a => String(a.tid)).sort());
+    assert.deepEqual(Array.from(X.rank.bottom, String).sort(), recs.filter(a => a.w + a.t / 2 === Math.min(...vals)).map(a => String(a.tid)).sort());
+    assert.ok(X.rank.top.includes(X.allPlay.tid), 'Best week is the crowned one');
+    const results = html.split('class="rc-finals"')[1];
+    assert.equal((results.match(/>👑</g) || []).length, X.rank.top.length);
+    assert.equal((results.match(/>💩</g) || []).length, X.rank.bottom.length);
+    assert.match(results, /title="Best week in the league: \d+-\d+(-\d+)? against every other team"/);
     for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);
     assert.match(html, /would have beaten (every other team|\d+ of \d+ teams)/, 'Best week counts teams beaten, not categories');
     // the message: the standouts only (everyone has the results), each with its full line in the league's categories
@@ -2694,6 +2703,13 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     if (X.missed.length) assert.ok(html.includes('started without playing a game'));
     // a points week's best is the top score, already in the finals; the share text and the image come from the same list
     assert.ok(X.allPlay && !app.recapItems(X).some(x => x.label === 'Best week') && !html.includes('Best week') && !app.recapText(L, X).includes('Best week'));
+    // the results crown the week's top score and mark the lowest
+    const scores = Object.entries(X.rank.score), hi = Math.max(...scores.map(s => s[1])), lo = Math.min(...scores.map(s => s[1]));
+    assert.deepEqual(Array.from(X.rank.top, String), scores.filter(s => s[1] === hi).map(s => s[0]));
+    assert.deepEqual(Array.from(X.rank.bottom, String), scores.filter(s => s[1] === lo).map(s => s[0]));
+    assert.equal(app.recapMark(X, X.rank.top[0]), '👑');
+    assert.equal(app.recapMark(X, X.rank.bottom[0]), '💩');
+    assert.ok(html.includes(`title="Most points this week: ${app.fmtFp(hi)}"`) && html.includes(`title="Fewest points this week: ${app.fmtFp(lo)}"`));
     // a points week's luck: the best score that lost and the worst that won (each only on the wrong side of the middle),
     // the closest final, and the starter with the biggest share of his team's points
     const decided = X.games.filter(g => g.margin > 0);
