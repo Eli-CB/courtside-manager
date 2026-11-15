@@ -110,6 +110,51 @@ function draftData() {
   return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals, season: W && W.win };
 }
 
+// ----- Draft awards: this season's draft against consensus ADP (Fantrax's average draft position over its drafts) -----
+// A pick is compared with where consensus would take its player in this draft: the league's keepers come off the board
+// first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in ADP
+// order among the players not kept. Not for a past season: today's ADP says nothing about a past draft. Each award is
+// { e, label, html, text, p, tid, stats }, as the Recap's standouts, so the same picture and Share work for both.
+const adpOf = raw => (raw && ((raw.fx && raw.fx.adp) || raw.adp)) || null;
+function draftAwards(d) {
+  if (seasonCtx || !d || !d.picks || !d.picks.length) return [];
+  const kept = new Set(Object.values(d.keepers || {}).flat().map(k => k.nbaId));
+  const board = NBA.players.filter(r => adpOf(r) && !kept.has(r.id)).sort((a, b) => adpOf(a) - adpOf(b));
+  const spot = new Map(board.map((r, i) => [r.id, i + 1]));
+  const rated = d.picks.filter(p => p.nbaId && spot.has(p.nbaId)).map(p => ({ p, adp: adpOf(p.raw), cons: spot.get(p.nbaId), early: spot.get(p.nbaId) - p.pick }));
+  if (rated.length < d.picks.length / 2) return []; // (too few picks with an ADP to say)
+  const out = [];
+  const name = p => `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}"><b>${esc(p.name)}</b></button>`;
+  const award = (e, label, x, said) => out.push({
+    e, label, html: `${name(x.p)} <span class="muted">${teamLink(x.p.teamId)}</span><div class="rc-stats">${said}</div>`,
+    text: `${x.p.name} (${fxTeamName(x.p.teamId)}): ${said[0].toLowerCase()}${said.slice(1)}`, p: { nbaId: x.p.nbaId, name: x.p.name }, tid: x.p.teamId, stats: said,
+  });
+  // The Reacher: taken furthest ahead of consensus
+  const reach = sortDesc(rated, x => x.early)[0];
+  if (reach && reach.early > 0) award('🦒', 'The Reacher', reach, `Taken #${reach.p.pick}, ${reach.early} picks early: consensus #${reach.cons} (ADP ${fmt(reach.adp, 1)})`);
+  return out;
+}
+// The card at the top of the Draft tab, with Share
+function draftAwardsCard(d) {
+  const items = draftAwards(d);
+  if (!items.length) return '';
+  return `<div class="card dr-awards">
+    <div class="card-head"><h2>Draft awards ${infoBtn('draftAwards')}</h2><button type="button" class="btn sm primary" data-action="draft-share">Share</button></div>
+    <ul class="rc-items">${items.map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div><div class="rc-label">${x.label}</div>${x.html}</div></li>`).join('')}</ul>
+  </div>`;
+}
+// Sharing them (shareWith, recap.js): a picture, or the text and a link that opens the league's Draft tab
+const draftUrl = L => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}#draft`;
+const draftText = (L, items) => [`${SPORT.emoji} ${L.name} · ${L.year ? `${seasonLabel(L.year)} ` : ''}draft awards`, ...items.map(x => `${x.e} ${x.label}: ${x.text}`)].join('\n\n');
+function draftShare(L, d, items) {
+  const kind = d.type ? `${d.type[0].toUpperCase()}${d.type.slice(1)} draft` : 'Draft';
+  return {
+    title: 'Draft awards', name: `${L.name} · Draft awards`, what: 'Draft awards', link: 'Full draft', text: draftText(L, items), url: draftUrl(L),
+    file: `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-draft-awards.png`, alt: `Draft awards for ${L.name}`,
+    draw: () => shareCanvas({ kicker: `${L.year ? `${seasonLabel(L.year)} ` : ''}DRAFT AWARDS`, title: L.name, items, sub: `${kind}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks` }),
+  };
+}
+
 function draftRow(p, mine) {
   const gainCls = p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted';
   return `<tr class="${p.teamId === mine ? 'dr-mine' : ''}">
@@ -228,11 +273,12 @@ function viewDraft() {
   return `
   <div class="page-sub-row">${modeSeg}<p class="page-sub">${kind}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${gradedBy} ${infoBtn('draft')}</p></div>
   ${!seasonCtx && d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
+  ${draftAwardsCard(d)}
   ${d.graded ? `<div class="trade-grid">
     ${draftList(seasonCtx ? 'Best picks' : 'Best picks so far', best, mine, true)}
     ${draftList(seasonCtx ? 'Worst picks' : 'Worst picks so far', worst, mine, false)}
   </div>` : ''}
-  <div class="card" style="margin-top:16px">
+  <div class="card dr-gap">
     <div class="card-head"><h2>Team drafts</h2><span class="muted small">ranked by average +/− per pick</span></div>
     <div class="table-wrap"><table class="dr-teams">
       <thead><tr><th class="num">#</th><th>Team</th><th class="num">Avg +/−</th><th class="num">${d.totals ? draftValueLabel() : `Total ${valueLabel()}`}</th><th>Best pick</th><th>Worst pick</th></tr></thead>
@@ -242,7 +288,7 @@ function viewDraft() {
         <td>${inlinePlayer(t.low, esc(lastName(t.low.name)))} <span class="muted small">#${t.low.pick}</span> <span class="pos-bad small">${t.low.gp ? signed(t.low.gain, 0) : 'DNP'}</span></td></tr>`).join('')}</tbody>
     </table></div>
   </div>
-  <div class="card" style="margin-top:16px">
+  <div class="card dr-gap">
     <div class="card-head"><h2>Draft board ${infoBtn('board')}</h2></div>
     <div class="table-wrap"><table class="dr-board">
       <thead><tr><th></th>${cols.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${teamLink(t)}</th>`).join('')}</tr></thead>

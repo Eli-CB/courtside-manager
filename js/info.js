@@ -168,6 +168,11 @@ const INFO = {
     <p><b>Colors.</b> Each pick and keeper is shaded green (outplaying his slot) to red (underplaying it). Early in the season, a single game can move these a lot.</p>
     <p><b>Keepers</b> fill the top two rows. This season, the one with the better Fantrax ADP is graded as if he were the #5 pick, the other as the #15 pick, against where he ranks among this year's picks. In a past season, the better keeper is the one with more value per game the season before (today's ADP says nothing about a past draft).</p>
     <p><b>Board.</b> One row per round, one column per draft slot. Traded picks stay in their original slot, marked with the team that made the pick. "No pick" means the slot went unused.</p>`],
+  draftAwards: ['Draft awards', `
+    <p>This season's draft against <b>consensus ADP</b>: Fantrax's average draft position, from every draft on Fantrax.</p>
+    <p><b>Consensus spot.</b> Where consensus would take a player in this draft: his place in ADP order once the league's keepers are off the board. In a keeper league pick #1 is the first player after the keepers, so a pick is compared with the players who were there to take.</p>
+    <p><b>The Reacher</b> 🦒 is the pick taken furthest ahead of his consensus spot. Taken #73 with a consensus spot of #159 is 86 picks early.</p>
+    <p>A past season has no awards here: today's ADP says nothing about a draft from another year.</p>`],
   board: ['Reading the draft board', `
     <p><b>Each cell</b> is one pick: the pick number, the player, and his <b>+/−</b>.</p>
     <p><b>How a pick is ranked.</b> Every drafted player is ranked against the others using this season's stats so far, or that season's full stats for a past draft. #1 is the best player of the whole draft class. Players who haven't played rank below everyone who has.</p>

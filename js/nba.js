@@ -100,7 +100,10 @@ async function fetchSport(key, fresh = false) {
   if (!r.ok) throw new Error(r.status);
   const data = await r.json();
   if (!data || !Array.isArray(data.players)) throw new Error('bad data');
-  for (const raw of data.players) raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
+  for (const raw of data.players) {
+    raw.basePos = NBA_POS_MAP[raw.nbaPos] || raw.pos;
+    if (raw.fx && raw.fx.adp) raw.adp = raw.fx.adp; // (the daily file's consensus ADP, Fantrax's: kept for a league on any site)
+  }
   if (key === 'nfl') { // football's stats are whatever Sleeper scores: the file names them
     const T = SPORTS.nfl, keys = data.statKeys.slice(1);
     T.playerKeys = keys;

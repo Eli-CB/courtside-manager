@@ -99,45 +99,30 @@ const actions = {
     const n = done[at + +el.dataset.step];
     if (n != null) { ui.recapWeek = n; render(); }
   },
-  // the recap as a picture, in a popup: share it, copy it, save it, or send the text and link instead
+  // the recap as a picture, in a popup: share it, copy it, save it, or send the text and link instead (shareWith, recap.js)
   async 'recap-share'(el) {
     const { L, X } = recapOn(el);
-    if (!X) return;
-    el.disabled = true;
-    try {
-      const blob = await recapBlob(await recapCanvas(L, X));
-      if (!blob) throw new Error('no image');
-      if (ui.recapImg) URL.revokeObjectURL(ui.recapImg.url);
-      ui.recapImg = { blob, url: URL.createObjectURL(blob) };
-      $('#infoTitle').textContent = `Week ${X.period.n} recap`;
-      $('#infoBody').innerHTML = recapSharePopup(L, X, ui.recapImg.url);
-      const d = $('#infoDialog');
-      if (!d.open) d.showModal();
-    } catch (e) { await actions['recap-text'](el); } finally { el.disabled = false; }
+    if (X) await shareWith(el, recapShare(L, X));
   },
-  async 'recap-img-share'(el) {
-    const L = fxLeague(), X = L && recaps.get(`${L.id}|${+el.dataset.week}`), I = ui.recapImg;
-    if (!X || !I) return;
-    const file = new File([I.blob], recapFileName(L, X), { type: 'image/png' });
-    const data = { files: [file], title: `${L.name} · Week ${X.period.n} recap`, text: `Full recap: ${recapUrl(L, X.period.n)}` };
+  // this season's draft awards, the same way
+  async 'draft-share'(el) {
+    const L = fxLeague(), d = draftData(), items = d && !d.loading ? draftAwards(d) : [];
+    if (L && items.length) await shareWith(el, draftShare(L, d, items));
+  },
+  // the popup's buttons: the picture to the share sheet, copied, or the text and link
+  async 'share-img'() {
+    const S = ui.share;
+    if (!S || !S.blob) return;
+    const data = { files: [new File([S.blob], S.file, { type: 'image/png' })], title: S.name, text: `${S.link}: ${S.url}` };
     if (!navigator.canShare(data)) { toast("This browser can't share images: use Copy or Save"); return; }
     try { await navigator.share(data); } catch (e) { if (e.name !== 'AbortError') toast("Couldn't share the image: use Copy or Save"); }
   },
-  async 'recap-img-copy'() {
-    const I = ui.recapImg;
-    if (!I) return;
-    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': I.blob })]); toast('Image copied: paste it in your league chat'); } catch (e) { toast("Couldn't copy the image: use Save instead"); }
+  async 'share-copy'() {
+    const S = ui.share;
+    if (!S || !S.blob) return;
+    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': S.blob })]); toast('Image copied: paste it in your league chat'); } catch (e) { toast("Couldn't copy the image: use Save instead"); }
   },
-  // the text and link: on phones the share sheet (the league chat is one tap away); elsewhere copied
-  async 'recap-text'(el) {
-    const { L, X } = recapOn(el);
-    if (!X) return;
-    const text = recapText(L, X), url = recapUrl(L, X.period.n);
-    if (navigator.share && matchMedia('(pointer: coarse)').matches) {
-      try { await navigator.share({ title: `${L.name} · Week ${X.period.n} standouts`, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
-    }
-    try { await navigator.clipboard.writeText(`${text}\n\nFull recap: ${url}`); toast('Recap copied: paste it in your league chat'); } catch (e) { toast("Couldn't copy the recap"); }
-  },
+  async 'share-text'() { if (ui.share) await shareText(ui.share); },
   'cs-toggle'(el) {
     const open = !ui.csOpen.delete(el.dataset.cat);
     if (open) ui.csOpen.add(el.dataset.cat);

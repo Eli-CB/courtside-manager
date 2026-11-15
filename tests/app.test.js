@@ -2190,6 +2190,57 @@ test("a team's card has its record: its finals, then today's game once it's over
   } finally { app.set('BOX', saved); live.games = was; doc.querySelector = realQuery; }
 });
 
+test("Draft awards: The Reacher is the pick taken furthest ahead of consensus ADP, keepers off the board first; shareable", async () => {
+  const L = await app.useLeague(CATS9);
+  const d = app.draftData();
+  assert.ok(d && d.picks.length > 20, 'the fixture league has a draft');
+  const players = app.NBA.players, saved = players.map(r => [r, r.fx && { ...r.fx }, r.adp]);
+  const setAdp = (r, v) => { r.fx = { ...(r.fx || {}), adp: v }; delete r.adp; };
+  try {
+    for (const r of players) { if (r.fx) delete r.fx.adp; delete r.adp; }
+    // the keepers: the best ADPs of all, and still off the board (in a keeper league pick #1 is the first player after them)
+    const keepers = Object.values(d.keepers).flat().map(k => k.nbaId);
+    keepers.forEach((id, i) => setAdp(app.nbaById.get(id), i + 1));
+    // every pick where consensus has him: no reach anywhere, so no award
+    const picks = d.picks.filter(p => p.raw).sort((a, b) => a.pick - b.pick);
+    picks.forEach(p => setAdp(p.raw, keepers.length + p.pick));
+    assert.equal(app.draftAwards(d).length, 0, 'nobody taken early');
+    // one taken far ahead of consensus: his spot is last of the drafted players
+    const reacher = picks[Math.floor(picks.length / 3)];
+    setAdp(reacher.raw, 999);
+    const [award] = app.draftAwards(d);
+    assert.equal(award.label, 'The Reacher');
+    assert.equal(award.p.nbaId, reacher.nbaId);
+    const early = picks.length - reacher.pick;
+    assert.equal(award.stats, `Taken #${reacher.pick}, ${early} picks early: consensus #${picks.length} (ADP 999.0)`, award.stats);
+    assert.equal(award.text, `${reacher.name} (${app.fxTeamName(reacher.teamId)}): taken #${reacher.pick}, ${early} picks early: consensus #${picks.length} (ADP 999.0)`);
+    // on the Draft tab, with Share; shared as a picture or as the text and a link to the league's Draft tab
+    const card = app.draftAwardsCard(d);
+    assert.match(card, /data-action="draft-share"/);
+    assert.ok(card.includes(`data-nba="${reacher.nbaId}"`));
+    const S = app.draftShare(L, d, [award]);
+    assert.ok(S.url.endsWith(`?league=${L.id}#draft`), S.url);
+    assert.equal(S.text, `${app.SPORT.emoji} ${L.name} · ${app.seasonLabel(L.year)} draft awards\n\n🦒 The Reacher: ${award.text}`);
+    assert.match(S.file, /-draft-awards\.png$/);
+    // the Recap shares the same way
+    assert.equal(typeof app.recapShare, 'function');
+    // an ESPN or Sleeper league's players have the daily file's ADP (Fantrax's) instead
+    assert.equal(app.adpOf({ adp: 12.5 }), 12.5);
+    assert.equal(app.adpOf({ fx: { adp: 3 }, adp: 12.5 }), 3, "a Fantrax league's own first");
+    // too few picks with an ADP to say: no awards
+    for (const p of picks.slice(0, Math.ceil(picks.length * 0.6))) delete p.raw.fx.adp;
+    assert.equal(app.draftAwards(d).length, 0);
+    // a past season: today's ADP says nothing about its draft
+    picks.forEach(p => setAdp(p.raw, keepers.length + p.pick));
+    setAdp(reacher.raw, 999);
+    app.set('seasonCtx', { basis: null, label: '2025-26' });
+    assert.equal(app.draftAwards(d).length, 0);
+  } finally {
+    app.set('seasonCtx', null);
+    for (const [r, fx, adp] of saved) { if (fx) r.fx = fx; else delete r.fx; if (adp != null) r.adp = adp; else delete r.adp; }
+  }
+});
+
 test("a Fantrax league of a sport the site doesn't read (golf) says so, instead of loading as basketball", async () => {
   const group = code => ({ scoringSystem: { scoringCategorySettings: [{ group: { code } }] } });
   assert.equal(app.fxSport(group('BASKETBALL_PLAYER')), 'nba');

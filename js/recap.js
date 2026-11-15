@@ -432,7 +432,15 @@ function fitText(ctx, text, max) {
   return t.trimEnd() + '…';
 }
 
-async function recapCanvas(L, X) {
+// The picture of a week's recap: its standouts, then every final
+const recapCanvas = (L, X) => shareCanvas({
+  kicker: `WEEK ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games,
+  sub: `${fmtDay(X.period.start)} – ${fmtDay(matchDates(X.period.start).slice(-1)[0] || X.period.end)}`,
+});
+
+// A picture to share in a league chat (1080 px wide): a kicker, the league's name and a line under it, then each standout
+// in a card (a player's with his photo), then any finals. H: { kicker, title, sub, items, games }
+async function shareCanvas(H) {
   const C = RC_IMG, W = C.w, inner = W - C.pad * 2, sheet = await loadSheet();
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = 5000;
@@ -460,14 +468,14 @@ async function recapCanvas(L, X) {
   };
 
   let y = C.pad;
-  // the top: week, league, days
-  font(28, 800); text(`WEEK ${X.period.n} RECAP`, C.pad, y, C.accent); y += 44;
+  // the top: what it is, the league, when
+  font(28, 800); text(H.kicker, C.pad, y, C.accent); y += 44;
   font(58, 800);
-  for (const l of wrapText(ctx, L.name, inner).slice(0, 2)) { text(l, C.pad, y); y += 70; }
-  font(30); text(`${fmtDay(X.period.start)} – ${fmtDay(matchDates(X.period.start).slice(-1)[0] || X.period.end)}`, C.pad, y, C.muted); y += 64;
+  for (const l of wrapText(ctx, H.title, inner).slice(0, 2)) { text(l, C.pad, y); y += 70; }
+  font(30); text(H.sub, C.pad, y, C.muted); y += 64;
 
   // the standouts, each in a card
-  for (const it of recapItems(X)) {
+  for (const it of H.items) {
     const d = it.p ? 112 : 0, tx = C.pad + 32 + (d ? d + 28 : 0), tw = W - C.pad - 32 - tx;
     let body;
     if (it.p) {
@@ -493,9 +501,8 @@ async function recapCanvas(L, X) {
   }
 
   // every final, winner on the left in bold
-  y += 28;
-  font(28, 800); text('RESULTS', C.pad, y, C.accent); y += 52;
-  for (const g of X.games) {
+  if ((H.games || []).length) { y += 28; font(28, 800); text('RESULTS', C.pad, y, C.accent); y += 52; }
+  for (const g of H.games || []) {
     font(34, 800); const colW = (inner - 64 - ctx.measureText(scoreLine(g.sc)).width - 48) / 2; // the names share what the score leaves
     round(C.pad, y, inner, 76, 18, C.card);
     font(31, g.margin ? 800 : 500); text(fitText(ctx, fxTeamName(g.a), colW), C.pad + 32, y + 21);
@@ -520,16 +527,45 @@ async function recapCanvas(L, X) {
 const recapBlob = cv => new Promise(res => cv.toBlob(res, 'image/png'));
 const recapFileName = (L, X) => `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-week-${X.period.n}.png`;
 
+// ----- Sharing: the Recap's week and the Draft tab's awards, as a picture in a popup, or as text and a link -----
+// S: { title (the popup's), name (the share sheet's), what ('Recap': the toast's), text, url, link ('Full recap': before
+// the url), file, alt, draw: () => its canvas }
+const recapShare = (L, X) => ({
+  title: `Week ${X.period.n} recap`, name: `${L.name} · Week ${X.period.n} recap`, what: 'Recap', link: 'Full recap',
+  text: recapText(L, X), url: recapUrl(L, X.period.n), file: recapFileName(L, X), alt: `Week ${X.period.n} recap for ${L.name}`,
+  draw: () => recapCanvas(L, X),
+});
+// The picture in the popup; the text and link (copied, or the share sheet) where a picture can't be made
+async function shareWith(el, S) {
+  if (el) el.disabled = true;
+  try {
+    const blob = await recapBlob(await S.draw());
+    if (!blob) throw new Error('no image');
+    if (ui.share && ui.share.img) URL.revokeObjectURL(ui.share.img);
+    ui.share = { ...S, blob, img: URL.createObjectURL(blob) };
+    $('#infoTitle').textContent = S.title;
+    $('#infoBody').innerHTML = sharePopup(ui.share);
+    const d = $('#infoDialog');
+    if (!d.open) d.showModal();
+  } catch (e) { ui.share = S; await shareText(S); } finally { if (el) el.disabled = false; }
+}
 // The popup: the picture, then Share (the share sheet, with the picture, where the browser can), Copy, Save, or the
-// text and link as before
-function recapSharePopup(L, X, url) {
+// text and link
+function sharePopup(S) {
   const canFiles = !!(navigator.canShare && navigator.share);
-  return `<img class="rc-img" src="${url}" alt="Week ${X.period.n} recap for ${esc(L.name)}">
+  return `<img class="rc-img" src="${S.img}" alt="${esc(S.alt)}">
     <div class="fb-actions">
-      ${canFiles ? `<button type="button" class="btn primary" data-action="recap-img-share" data-week="${X.period.n}">Share image</button>` : ''}
-      ${window.ClipboardItem ? `<button type="button" class="btn${canFiles ? '' : ' primary'}" data-action="recap-img-copy">Copy image</button>` : ''}
-      <a class="btn" href="${url}" download="${esc(recapFileName(L, X))}">Save image</a>
-      <button type="button" class="btn" data-action="recap-text" data-week="${X.period.n}">Copy text and link</button>
+      ${canFiles ? '<button type="button" class="btn primary" data-action="share-img">Share image</button>' : ''}
+      ${window.ClipboardItem ? `<button type="button" class="btn${canFiles ? '' : ' primary'}" data-action="share-copy">Copy image</button>` : ''}
+      <a class="btn" href="${S.img}" download="${esc(S.file)}">Save image</a>
+      <button type="button" class="btn" data-action="share-text">Copy text and link</button>
     </div>`;
+}
+// the text and link: on phones the share sheet (the league chat is one tap away); elsewhere copied
+async function shareText(S) {
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+    try { await navigator.share({ title: S.name, text: S.text, url: S.url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(`${S.text}\n\n${S.link}: ${S.url}`); toast(`${S.what} copied: paste it in your league chat`); } catch (e) { toast(`Couldn't copy the ${S.what.toLowerCase()}`); }
 }
 
