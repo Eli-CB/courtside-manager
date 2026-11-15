@@ -2295,6 +2295,9 @@ test("Draft tab: a pick's fantasy team opens its card, and each team's best and 
   const rows = teams.split('<tr class=').slice(1);
   assert.ok(rows.length > 2);
   for (const r of rows) assert.equal((r.match(/data-action="player-detail"/g) || []).length, 2, 'its best and worst pick by name');
+  // the draft awards come last: set once the draft is over, under the sections that change through the season
+  assert.ok(html.includes('dr-awards'), 'the fixture draft has awards');
+  assert.ok(html.indexOf('dr-awards') > html.indexOf('<table class="dr-board">'), 'under the draft board');
 });
 
 test('Draft awards: Value Meal, the team furthest ahead of consensus over its whole draft; a tie names each team', async () => {

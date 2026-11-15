@@ -381,7 +381,6 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rc-stats { font-size: .82rem; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .rc-stats span { white-space: nowrap; } /* "7 REB" stays together */
 .rc-item .pname { font-size: inherit; }
-.dr-awards { margin-bottom: 16px; } /* the Draft tab's awards, above its best and worst picks */
 .dr-gap { margin-top: 16px; }
 /* an award's title opens its breakdown: the label's look, underlined on hover */
 button.dr-award-btn { display: block; padding: 0; text-align: left; font-size: .74rem; font-weight: 800; color: var(--muted); }
@@ -1106,7 +1105,6 @@ a.lm-item { text-decoration: none; }
   #view .dash-fold > summary { padding: 12px 16px; border-radius: 0; }
   #view .table-wrap { margin: 0 -16px; padding: 0 16px; }
   #view .awards > .card { margin-inline: -16px; }
-  #view .dr-awards { margin-bottom: 0; }
   #view .dr-gap { margin-top: 0; }
   /* a section after the first: its heading, a chevron, and nothing else until tapped */
   .card.rollable > .card-head > h2 { cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1 1 100%; min-width: 0; } /* its own line: what's beside it wraps under, never squeezed */

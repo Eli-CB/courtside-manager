@@ -323,7 +323,8 @@ function draftAwards(d) {
   }
   return out;
 }
-// The card at the top of the Draft tab, with Share; an award's title opens its breakdown ('draft-award', in the popup the
+// The card at the bottom of the Draft tab (set once the draft is over: the sections above change as the season goes on, the
+// owner's ask), with Share; an award's title opens its breakdown ('draft-award', in the popup the
 // (i) buttons use)
 const draftAwardDetails = new Map(); // award label -> { title, html }, written as the card draws
 function draftAwardsCard(d) {
@@ -335,7 +336,7 @@ function draftAwardsCard(d) {
     draftAwardDetails.set(x.label, x.detail);
     return `<button type="button" class="link-btn rc-label dr-award-btn" data-action="draft-award" data-key="${esc(x.label)}" title="${esc(x.label)}: the breakdown">${x.label}</button>`;
   };
-  return `<div class="card dr-awards">
+  return `<div class="card dr-awards dr-gap">
     <div class="card-head"><h2>Draft awards ${infoBtn('draftAwards')}</h2><button type="button" class="btn sm primary" data-action="draft-share">Share</button></div>
     <ul class="rc-items">${items.map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div>${label(x)}${x.html}</div></li>`).join('')}</ul>
   </div>`;
@@ -471,7 +472,6 @@ function viewDraft() {
   return `
   <div class="page-sub-row">${modeSeg}<p class="page-sub">${kind}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks · ${gradedBy} ${infoBtn('draft')}</p></div>
   ${!seasonCtx && d.maxGp < 10 ? `<div class="sample-banner"><span>It's early: players have ${d.maxGp} game${d.maxGp === 1 ? '' : 's'} at most, so one big night can swing a ranking a lot. This settles down after a few weeks.</span></div>` : ''}
-  ${draftAwardsCard(d)}
   ${d.graded ? `<div class="trade-grid">
     ${draftList(seasonCtx ? 'Best picks' : 'Best picks so far', best, mine, true)}
     ${draftList(seasonCtx ? 'Worst picks' : 'Worst picks so far', worst, mine, false)}
@@ -492,7 +492,8 @@ function viewDraft() {
       <thead><tr><th></th>${cols.map(t => `<th class="${t === mine ? 'dr-mine-col' : ''}">${teamLink(t)}</th>`).join('')}</tr></thead>
       <tbody>${board}</tbody>
     </table></div>
-  </div>`;
+  </div>
+  ${draftAwardsCard(d)}`;
 }
 
 // ----- Saved leagues -----
