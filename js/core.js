@@ -460,8 +460,9 @@ const posColored = pos => pos.map(x => { const c = (SPORT.slotColors || {})[x]; 
 // A fantasy team's name that opens its card (this season's teams; names in a past season stay plain)
 function teamLink(tid, label) {
   const name = label ?? esc(fxTeamName(tid));
-  if (!tid || ui.season || !fxLeague() || !fxPickable().some(t => t.id === tid)) return name;
-  return `<button type="button" class="link-btn team-link" data-action="team-card" data-team="${esc(tid)}">${name}</button>`;
+  const mine = !!tid && tid === myTeamId(); // (your own team: its name in orange everywhere)
+  if (!tid || ui.season || !fxLeague() || !fxPickable().some(t => t.id === tid)) return mine ? `<span class="team-mine">${name}</span>` : name;
+  return `<button type="button" class="link-btn team-link${mine ? ' mine' : ''}" data-action="team-card" data-team="${esc(tid)}">${name}</button>`;
 }
 
 function playerCell(p, link = true, photo = true) {

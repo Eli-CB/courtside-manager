@@ -187,6 +187,8 @@ function dayDots(p, ctx, counts) {
   return `<span class="dots">${ctx.dates.map(d => {
     if (!playsOn(p, d)) return dot('none', 'No game');
     const bench = counts ? '' : ' bench';
+    const on = liveGame(p, d);
+    if (on && on.state === 'in' && !gameFinal(p, d)) return dot(`live${bench}`, `Playing now: ${esc(String(on.detail || ''))}${bench ? '<div class="tip-dim">On the bench, so it won&rsquo;t count</div>' : ''}`);
     if (gameFinal(p, d)) {
       const line = actualLine(p, d);
       if (!line) return dot('dnp', "His team played, but he didn't");
@@ -552,7 +554,7 @@ function pastWeekCard(start) {
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const pair = (L.matchups[String(period.n)] || []).find(m => m.includes(leftId));
   if (!pair) return '';
-  const head = `<div class="card-head"><h2>How week ${period.n} ended ${infoBtn('benchswaps')}</h2><span class="muted small">the week's real lineups and box scores</span></div>`;
+  const head = ''; // (no heading: the week's name is at the top of the page)
   const note = msg => `<div class="card">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
   const P = pastWeeksOf(L);
   if (P.state === 'loading') return note(`${loaderMark('sm')}Loading the week's lineups from ${sourceName(L)}…`);

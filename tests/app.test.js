@@ -175,7 +175,7 @@ test('a finished week: its real result, and the bench swaps that would have chan
     app.pastWeekCard(app.weekStart()); // starts loading the week's lineups and box scores
     await new Promise(r => setTimeout(r, 10));
     const html = app.pastWeekCard(app.weekStart());
-    assert.ok(html.includes('How week 1 ended') && html.includes('class="alert good"') && html.includes('Would have won'), html.slice(0, 400));
+    assert.ok(!html.includes('How week 1 ended') && html.includes('class="pw-final"') && html.includes('class="alert good"') && html.includes('Would have won'), html.slice(0, 400)); // (no heading: straight to the final)
     // the page shows the week as it was played, with nothing projected
     const page = app.viewWeek();
     assert.ok(page.includes('Week total') && !/project|win chance|to win the week|Plan next week/i.test(page), 'a finished week, not a projection');
@@ -2134,6 +2134,24 @@ test("a Fantrax league of a sport the site doesn't read (golf) says so, instead 
   const err = await app.fetchFantraxLeague('golffixture0001').then(() => null, e => e);
   assert.ok(err && err.message === 'not supported: golf', err && err.message);
   assert.equal(app.leagueError('golffixture0001', err).message, "That's a Fantrax golf league. League Layer covers basketball and hockey leagues on Fantrax (and football on Sleeper) for now.");
+});
+
+test("Plan Ahead's schedule bubble of a game on now is red; your own team's name is orange wherever it's drawn", async () => {
+  const L = await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const live = app.get('live'), was = live.games;
+  const p = app.nbaPlayers().find(x => x.team && app.get('teamDates').get(x.team) && app.get('teamDates').get(x.team).has('2026-10-28'));
+  try {
+    live.games = [{ id: 'x', d: '2026-10-28', home: p.team, away: 'ZZZ', state: 'in', detail: '4:12 - 3rd', start: 0 }];
+    const html = await onDay('2026-10-28', () => app.dayDots(p, { dates: ['2026-10-27', '2026-10-28', '2026-10-29'] }, true));
+    assert.match(html, /<i class="live" data-tip="Playing now: 4:12 - 3rd"><\/i>/, 'the game on now: red');
+    live.games = [];
+    assert.doesNotMatch(await onDay('2026-10-28', () => app.dayDots(p, { dates: ['2026-10-28'] }, true)), /class="live/, 'not once ESPN has nothing on');
+  } finally { live.games = was; }
+  const me = L.teams[0].id, other = L.teams[1].id;
+  useTeam(me);
+  assert.match(app.teamLink(me), /class="link-btn team-link mine"/, 'yours: orange');
+  assert.doesNotMatch(app.teamLink(other), /mine/, "anyone else's: as it was");
 });
 
 test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {

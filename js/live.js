@@ -111,8 +111,10 @@ function espnLines(sm, teamOf) {
 const liveLines = d => live.lines.get(d) || new Map();
 const savedFinal = g => !!(BOX && BOX.finals.has(`${g.d} ${g.home}`));
 const espnDate = d => d.replace(/-/g, '');
-const liveTab = () => ui.tab === 'dashboard' || ui.tab === 'players' || footballWeekTab();
-const liveWanted = () => !document.hidden && (footballWeekTab() || (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && !['day', 'last', 'avg', 'proj'].includes(ui.perfRange) && !(ui.perfRange === 'year' && ui.perfPer)));
+// Plan Ahead on the week underway (any sport): its games as they're played, a game on now marked in its schedule bubble
+const weekTabLive = () => ui.tab === 'week' && !ui.weekShift;
+const liveTab = () => ui.tab === 'dashboard' || ui.tab === 'players' || weekTabLive();
+const liveWanted = () => !document.hidden && (weekTabLive() || (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && !['day', 'last', 'avg', 'proj'].includes(ui.perfRange) && !(ui.perfRange === 'year' && ui.perfPer)));
 
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {
@@ -358,5 +360,6 @@ function liveStatus(p, d) {
   if (!g || g.state === 'pre') return '';
   // ESPN's "4:12 - 3rd" as "Q3 4:12" (hockey: "P3 4:12", "2:00 - OT" as "OT 2:00"); Halftime, End of 3rd and the like as they are
   const clock = String(g.detail || '').replace(/^([\d:.]+) - (?:(\d)(?:st|nd|rd|th)|(\d*OT))$/, (m, t, q, ot) => `${q ? `${SPORT.game.tag}${q}` : ot} ${t}`);
-  return g.state === 'in' ? `<span class="lv-dot" aria-hidden="true"></span>${esc(clock)}` : 'Final';
+  const said = clock === 'Halftime' && matchMedia('(max-width: 640px)').matches ? 'Half' : clock; // (phones: the room it saves)
+  return g.state === 'in' ? `<span class="lv-dot" aria-hidden="true"></span>${esc(said)}` : 'Final';
 }
