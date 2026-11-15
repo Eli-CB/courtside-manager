@@ -2132,6 +2132,28 @@ test("a team's code opens its card in the popup: its schedule, then its players 
   } finally { doc.querySelector = realQuery; }
 });
 
+test("a player's game on the Matchup tab is in a bubble, as on Fantrax: DET 144 @ WAS 140 F", async () => {
+  await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const box = app.get('BOX'), live = app.get('live'), ui = app.get('ui'), was = live.games;
+  // a player with a finished game, for the team he's on now
+  const p = app.nbaPlayers().find(x => (box.byPlayer.get(x.nbaId) || []).some(g => g[3] === x.team));
+  const d = box.byPlayer.get(p.nbaId).find(g => g[3] === p.team)[0], s = box.scores.get(`${d} ${p.team}`);
+  try {
+    live.games = [];
+    assert.equal(app.dashGame(p, d), `<span class="game-pill">${s.away} ${s.as} @ ${s.home} ${s.hs} F</span>`);
+    ui.hideScores = true;
+    assert.equal(app.dashGame(p, d), `<span class="game-pill">${s.home === p.team ? `vs ${s.away}` : `@${s.home}`} · Final</span>`, 'scores hidden: the opponent');
+    ui.hideScores = false;
+    // on now: the score in one piece, then the clock (on a phone only the clock goes to a second line)
+    live.games = [{ d, home: s.home, away: s.away, hs: 88, as: 80, state: 'in', detail: '4:12 - 3rd', period: 3, start: new Date() }];
+    assert.match(app.dashGame(p, d), new RegExp(`^<span class="game-pill"><span class="gp-part">${s.away} 80 @ ${s.home} 88</span> <span class="gp-part"><span class="lv-dot"[^>]*></span>Q3 4:12</span></span>$`));
+    // before it: where and when
+    live.games[0].state = 'pre';
+    assert.match(app.dashGame(p, d), /^<span class="game-pill">(vs [A-Z]{2,3}|@[A-Z]{2,3}) \d/);
+  } finally { live.games = was; ui.hideScores = false; }
+});
+
 test("a team's card has its record: its finals, then today's game once it's over (not a preseason one)", async () => {
   await app.useLeague(CATS9);
   await app.loadBoxes();

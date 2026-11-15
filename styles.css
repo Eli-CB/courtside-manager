@@ -245,6 +245,10 @@ a { color: var(--accent); }
 .mu-row.bench .mu-p, .mu-p.bench, .mu-p.out { opacity: .62; }
 .mu-game { font-size: .78rem; color: var(--muted); }
 .mu-game b { color: var(--bad); }
+/* the game itself, in a bubble as on Fantrax: "DET 144 @ WAS 140 F", the clock while it's on, the tip-off before */
+.game-pill { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); color: var(--text);
+  font-variant-numeric: tabular-nums; }
+.game-pill .gp-part { white-space: nowrap; }
 .mu-chips { display: flex; flex-wrap: wrap; gap: 3px; }
 .mu-p.right .mu-chips { justify-content: flex-end; }
 .mu-chip { font-size: .72rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px; white-space: nowrap; color: var(--muted); }

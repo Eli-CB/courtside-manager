@@ -36,20 +36,22 @@ function dashDays() {
   return { today: all.includes(today) && P.today ? today : null, started: P.started, day, week: all.filter(d => d <= today), all };
 }
 
-// A player's game that day: tip-off, the score and clock while it's on, the final score (just the opponent with
-// Hide game scores on)
+// A player's game that day, in a bubble as Fantrax shows it: tip-off, the score then the clock while it's on, the final
+// score ("DET 144 @ WAS 140 F"; just the opponent with Hide game scores on). DNP and a goalie's start come after the bubble.
+// The score stays in one piece: on a phone only the clock goes to a second line.
 function dashGame(p, d) {
   if (!playsOn(p, d)) return '<span class="muted">No game</span>';
   const g = liveGame(p, d), s = g || (BOX.scores && BOX.scores.get(`${d} ${p.team}`));
   const vs = x => (x.home === p.team ? `vs ${x.away}` : `@${x.home}`);
+  const bubble = x => `<span class="game-pill">${x}</span>`, whole = x => `<span class="gp-part">${x}</span>`;
   const inGoal = isGoalie(p) && !lineOn(p, d) ? ` · ${startWords(p, d)}` : '';
-  if (g && g.state === 'pre') return `${vs(g)} ${fmtTime(g.start)}${inGoal}`;
+  if (g && g.state === 'pre') return `${bubble(`${vs(g)} ${fmtTime(g.start)}`)}${inGoal}`;
   const score = !s ? '' : ui.hideScores ? vs(s) : `${s.away} ${s.as} @ ${s.home} ${s.hs}`;
-  if (g && g.state === 'in') return `${liveStatus(p, d)} · ${score}`;
+  if (g && g.state === 'in') return bubble(`${whole(score)} ${whole(liveStatus(p, d))}`);
   const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
-  if (s) return `${score}${ui.hideScores ? ' · Final' : ' F'}${dnp}`;
+  if (s) return `${bubble(`${score}${ui.hideScores ? ' · Final' : ' F'}`)}${dnp}`;
   const nx = NBA.teams && NBA.teams[p.team] && NBA.teams[p.team].next;
-  return nx && nx.date === d ? `${nx.home ? `vs ${nx.opp}` : `@${nx.opp}`}${inGoal}` : `Final${dnp}`;
+  return nx && nx.date === d ? `${bubble(nx.home ? `vs ${nx.opp}` : `@${nx.opp}`)}${inGoal}` : `${bubble('Final')}${dnp}`;
 }
 
 // A line in the league's own categories: makes-attempts for the percentages, fantasy points first in points leagues;
