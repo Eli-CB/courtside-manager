@@ -2204,16 +2204,26 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     // every pick where consensus has him: no reach anywhere, so no award
     const picks = d.picks.filter(p => p.raw).sort((a, b) => a.pick - b.pick);
     picks.forEach(p => setAdp(p.raw, keepers.length + p.pick));
-    assert.equal(app.draftAwards(d).length, 0, 'nobody taken early');
+    assert.ok(!app.draftAwards(d).some(x => x.label === 'The Reacher'), 'nobody taken early');
     // one taken far ahead of consensus: his spot is last of the drafted players
     const reacher = picks[Math.floor(picks.length / 3)];
     setAdp(reacher.raw, 999);
-    const [award] = app.draftAwards(d);
+    const awards = app.draftAwards(d), award = awards[0];
     assert.equal(award.label, 'The Reacher');
     assert.equal(award.p.nbaId, reacher.nbaId);
     const early = picks.length - reacher.pick;
     assert.equal(award.stats, `Taken #${reacher.pick}, ${early} picks early: consensus #${picks.length} (ADP 999.0)`, award.stats);
     assert.equal(award.text, `${reacher.name} (${app.fxTeamName(reacher.teamId)}): taken #${reacher.pick}, ${early} picks early: consensus #${picks.length} (ADP 999.0)`);
+    // Autopilot: the team whose picks went furthest after their consensus spots, added up (worked out here from the ADPs set)
+    const spotOf = new Map([...picks].sort((a, b) => a.raw.fx.adp - b.raw.fx.adp).map((p, i) => [p.nbaId, i + 1]));
+    const totals = {};
+    for (const p of picks) totals[p.teamId] = (totals[p.teamId] || 0) + p.pick - spotOf.get(p.nbaId);
+    const top = Math.max(...Object.values(totals)), won = Object.keys(totals).filter(t => totals[t] === top);
+    const auto = awards.find(x => x.label === 'Autopilot');
+    assert.ok(top > 0 && auto, `a team ahead of consensus: ${top}`);
+    for (const t of won) assert.ok(auto.text.includes(app.fxTeamName(t)), `${app.fxTeamName(t)} in ${auto.text}`);
+    assert.ok(auto.text.includes(`${top} spot${top === 1 ? '' : 's'} after consensus in all`), auto.text);
+    assert.equal(auto.p, undefined, "a team's award: no player's photo in the picture");
     // on the Draft tab, with Share; shared as a picture or as the text and a link to the league's Draft tab
     const card = app.draftAwardsCard(d);
     assert.match(card, /data-action="draft-share"/);
@@ -2237,6 +2247,29 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     assert.equal(app.draftAwards(d).length, 0);
   } finally {
     app.set('seasonCtx', null);
+    for (const [r, fx, adp] of saved) { if (fx) r.fx = fx; else delete r.fx; if (adp != null) r.adp = adp; else delete r.adp; }
+  }
+});
+
+test('Draft awards: Autopilot, the team furthest ahead of consensus over its whole draft; a tie names each team', async () => {
+  const L = await app.useLeague(CATS9);
+  const [A, B, C, D] = L.teams.map(t => t.id);
+  const players = app.NBA.players, saved = players.map(r => [r, r.fx && { ...r.fx }, r.adp]);
+  try {
+    for (const r of players) { if (r.fx) delete r.fx.adp; delete r.adp; }
+    // four picks: A and C each take a player one spot early, B and D each one a spot late
+    const [w, x, y, z] = players.slice(0, 4);
+    [[w, 2], [x, 1], [y, 4], [z, 3]].forEach(([r, adp]) => { r.fx = { ...(r.fx || {}), adp }; });
+    const pick = (n, tid, r) => ({ round: 1, pick: n, teamId: tid, nbaId: r.id, raw: r, name: r.name });
+    const d = { picks: [pick(1, A, w), pick(2, B, x), pick(3, C, y), pick(4, D, z)], keepers: {} };
+    const auto = app.draftAwards(d).find(a => a.label === 'Autopilot');
+    assert.equal(auto.text, `${app.fxTeamName(B)} and ${app.fxTeamName(D)} tied: their picks went 1 spot after consensus in all`);
+    assert.match(auto.html, /<b>.*<\/b> and <b>.*<\/b> tied/);
+    // D's player a spot later still: D alone, with its picks and how far a pick
+    z.fx.adp = 0.5; // (z first in consensus, so D's pick at #4 is 3 spots late)
+    const solo = app.draftAwards(d).find(a => a.label === 'Autopilot');
+    assert.equal(solo.text, `${app.fxTeamName(D)}: 1 pick went 3 spots after consensus in all, 3.0 a pick`);
+  } finally {
     for (const [r, fx, adp] of saved) { if (fx) r.fx = fx; else delete r.fx; if (adp != null) r.adp = adp; else delete r.adp; }
   }
 });

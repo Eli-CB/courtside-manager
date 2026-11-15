@@ -131,7 +131,21 @@ function draftAwards(d) {
   });
   // The Reacher: taken furthest ahead of consensus
   const reach = sortDesc(rated, x => x.early)[0];
-  if (reach && reach.early > 0) award('🦒', 'The Reacher', reach, `Taken #${reach.p.pick}, ${reach.early} picks early: consensus #${reach.cons} (ADP ${fmt(reach.adp, 1)})`);
+  if (reach && reach.early > 0) award('🦒', 'The Reacher', reach, `Taken #${reach.p.pick}, ${reach.early} pick${reach.early === 1 ? '' : 's'} early: consensus #${reach.cons} (ADP ${fmt(reach.adp, 1)})`);
+  // Autopilot: the most value against consensus over a team's whole draft (each pick's spots after his consensus spot,
+  // added up; a reach counts against): what taking the top of the ADP list every time gives, as the computer does for
+  // whoever isn't there. A tie names every team in it.
+  const byTeam = new Map();
+  for (const x of rated) byTeam.set(x.p.teamId, [...(byTeam.get(x.p.teamId) || []), x]);
+  const teams = [...byTeam].map(([tid, xs]) => ({ tid, n: xs.length, total: -sum(xs.map(x => x.early)) }));
+  const top = Math.max(0, ...teams.map(t => t.total));
+  const auto = top > 0 ? teams.filter(t => t.total === top) : [];
+  if (auto.length) {
+    const and = list => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]);
+    const one = auto.length === 1 && auto[0], spots = `${top} spot${top === 1 ? '' : 's'}`;
+    const said = one ? `: ${one.n} pick${one.n === 1 ? '' : 's'} went ${spots} after consensus in all, ${fmt(top / one.n, 1)} a pick` : ` tied: their picks went ${spots} after consensus in all`;
+    out.push({ e: '🤖', label: 'Autopilot', html: `${and(auto.map(t => `<b>${teamLink(t.tid)}</b>`))}${said}`, text: `${and(auto.map(t => fxTeamName(t.tid)))}${said}` });
+  }
   return out;
 }
 // The card at the top of the Draft tab, with Share
