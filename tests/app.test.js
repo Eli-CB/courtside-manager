@@ -2469,6 +2469,47 @@ test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (
   assert.ok(!app.draftAwards(d).some(x => x.label === 'Trigger Finger'));
 });
 
+test("Matchup: a player on the floor right now has a green row and a dot; one on his team's bench in a game on now doesn't", async () => {
+  await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const live = app.get('live'), was = live.games, day = '2026-10-28';
+  // ESPN's box score marks the five on the floor of each team `active`
+  const sm = JSON.parse(readFixture('espn/live/summary-401909881.json'));
+  for (const t of sm.boxscore.players) t.statistics[0].athletes.forEach((a, i) => { a.active = i < 5; });
+  const floor = app.espnFloor(sm);
+  assert.ok(floor.size >= 8 && floor.size <= 10, `five a team, matched to NBA ids: ${floor.size}`);
+  // a game on now: one player on the floor, his teammate on the bench
+  const p = app.nbaPlayers().find(x => (app.get('teamDates').get(x.team) || new Set()).has(day));
+  const mate = app.nbaPlayers().find(x => x.team === p.team && x.nbaId !== p.nbaId);
+  const g = { id: 'floor-test', d: day, home: p.team, away: 'ZZZ', hs: 50, as: 48, state: 'in', clock: 300, detail: '5:00 - 2nd', period: 2, start: new Date() };
+  try {
+    live.games = [g];
+    live.floor.set(g.id, new Set([p.nbaId]));
+    await onDay(day, () => {
+      assert.equal(app.onFloor(p, day), true);
+      assert.equal(app.onFloor(mate, day), false);
+      const C = { D: { all: [day] }, dates: [day], range: 'day', today: day, hasOpp: true };
+      const on = app.dashCell(C, p, false, true), off = app.dashCell(C, mate, false, true);
+      assert.match(on, /class="mu-p live"/);
+      assert.match(on, /<span class="floor-dot" title="On the floor now"/);
+      assert.match(off, /class="mu-p"/, 'on the bench: a plain row');
+      assert.ok(!off.includes('floor-dot'));
+      // between periods (the five who ended one) and after the buzzer: not known
+      Object.assign(g, { detail: 'Halftime', clock: 0 });
+      assert.equal(app.onFloor(p, day), null);
+      assert.ok(!app.dashCell(C, p, false, true).includes('floor-dot'));
+      Object.assign(g, { detail: '12:00 - 3rd', clock: 720 });
+      assert.equal(app.onFloor(p, day), true, 'the third quarter under way');
+      g.state = 'post';
+      assert.equal(app.onFloor(p, day), null);
+      // a game whose box score hasn't been read: not known either
+      g.state = 'in';
+      live.floor.delete(g.id);
+      assert.equal(app.onFloor(p, day), null);
+    });
+  } finally { live.games = was; live.floor.delete(g.id); }
+});
+
 test("a Fantrax league of a sport the site doesn't read (golf) says so, instead of loading as basketball", async () => {
   const group = code => ({ scoringSystem: { scoringCategorySettings: [{ group: { code } }] } });
   assert.equal(app.fxSport(group('BASKETBALL_PLAYER')), 'nba');

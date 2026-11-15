@@ -14,7 +14,7 @@ const LIVE_IDLE = 30 * 60e3; // nothing on: look again in half an hour (or at th
 const liveEvery = () => (navigator.connection && navigator.connection.saveData ? 60e3 : LIVE_EVERY);
 // games: the scoreboard's; lines: date -> NBA id -> stat line; done: finished games (and days) already read;
 // read: game id -> { sc: its score when its box score was read, at }; hold: a live update is drawing (rows keep their order)
-const live = { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, busy: false, error: '', timer: null, hold: false };
+const live = { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), floor: new Map(), at: 0, busy: false, error: '', timer: null, hold: false };
 // (another sport: its games and lines, from nothing)
 keep('sport', () => { clearTimeout(live.timer); Object.assign(live, { day: null, games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, tried: 0, error: '', fails: 0, timer: null }); });
 
@@ -107,6 +107,30 @@ function espnLines(sm, teamOf) {
   return out;
 }
 
+// Who's on the floor in an ESPN basketball box score: its `active` flag, which marks exactly five a team while a game is on
+// (checked on four live games against the substitutions in their play-by-play). After the buzzer it still marks the last
+// five, so it's read only while a game is on (onFloor). A Set of NBA ids; none for hockey or football.
+function espnFloor(sm) {
+  const out = new Set();
+  if (isHockey() || isFootball()) return out;
+  for (const team of (sm.boxscore && sm.boxscore.players) || []) {
+    const tri = espnTri(team.team), st = (team.statistics || [])[0];
+    for (const a of (st && st.athletes) || []) {
+      const raw = a.active && !a.didNotPlay ? espnPlayer(a.athlete, tri) : null;
+      if (raw) out.add(raw.id);
+    }
+  }
+  return out;
+}
+// A player on the floor right now (true), on the bench (false), or not known (null): his game isn't on, it's between
+// periods (the five who ended one), or its box score hasn't been read yet. As fresh as the box score: a minute at most.
+function onFloor(p, d) {
+  const g = liveGame(p, d);
+  if (!g || g.state !== 'in' || !g.clock || /half|end of/i.test(g.detail || '')) return null;
+  const f = live.floor.get(g.id);
+  return f && f.size ? f.has(p.nbaId) : null;
+}
+
 // ESPN's lines: date -> NBA id -> line, for games the saved box scores don't have yet
 const liveLines = d => live.lines.get(d) || new Map();
 const savedFinal = g => !!(BOX && BOX.finals.has(`${g.d} ${g.home}`));
@@ -119,7 +143,8 @@ const liveWanted = () => !document.hidden && (weekTabLive() || (ui.tab === 'dash
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error
 async function readBoxes(games) {
   const res = await Promise.allSettled(games.map(async g => {
-    const lines = espnLines(await espnSite(`summary?event=${g.id}`));
+    const sm = await espnSite(`summary?event=${g.id}`), lines = espnLines(sm);
+    live.floor.set(g.id, espnFloor(sm)); // (who's on the floor: the Matchup tab's)
     if (!live.lines.has(g.d)) live.lines.set(g.d, new Map());
     for (const [id, line] of lines) live.lines.get(g.d).set(id, line);
     live.read.set(g.id, { sc: liveScore(g), at: Date.now() });

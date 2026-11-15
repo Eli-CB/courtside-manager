@@ -170,9 +170,13 @@ function dashCell(C, p, right, counts, tag = '', cls = '') {
     if (isFootball()) game = fbDay ? `${fmtDay(fbDay).split(',')[0]} ${dashGame(p, fbDay)}` : 'Bye';
   } else game = dashGame(p, dates[0]);
   game = linkTeams(game); // (its opponent's code opens that team's players)
-  const on = dates.some(d => liveOn(p, d) && lineOn(p, d)); // playing right now
+  // in a game on now: on the floor, green with a dot; on the bench, plain. Between periods (or before his game's box
+  // score is read) not known, so green as before for anyone who's played
+  const floor = dates.includes(today) ? onFloor(p, today) : null;
+  const on = floor != null ? floor : dates.some(d => liveOn(p, d) && lineOn(p, d));
+  const dot = floor ? '<span class="floor-dot" title="On the floor now" aria-label="On the floor now"></span>' : '';
   return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
-    <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
+    <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${dot}${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
     <div class="mu-game">${game}</div>
     ${lines.length ? `<div class="mu-chips">${lineChips(tot, C.flash && C.flash(p, tot))}</div>` : ''}
   </div>`;
