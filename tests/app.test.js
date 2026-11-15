@@ -1582,6 +1582,16 @@ test('popups scroll inside, without collapsing on older iPhone Safari', () => {
   for (const [, sel, body] of rules) assert.match(body, /flex:\s*1 1 auto/, `${sel.trim()}: flex-basis auto, not 0`);
 });
 
+test("a popup's scrolling stays in the popup, and the page behind stays put", () => {
+  // scrolling to the end of a player's card went on to scroll the tab behind it
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); // (comments hold commas)
+  const rule = sel => [...css.matchAll(/([^{}]*)\{([^}]*)\}/g)].filter(m => m[1].split(',').some(x => x.trim() === sel)).map(m => m[2]).join(';');
+  for (const sel of ['.modal', '.modal-body']) assert.match(rule(sel), /overscroll-behavior:\s*contain/, sel);
+  assert.match(rule('html:has(dialog[open])'), /overflow:\s*hidden/, 'the page is frozen while a popup is open');
+  // a table inside the card (its games) still hands on to the card when it ends
+  assert.doesNotMatch(rule('.pc-games-wrap'), /overscroll-behavior/);
+});
+
 test('value weights follow the league: two leagues of the same size with different categories', async () => {
   const L = await app.useLeague(CATS9);
   const keys = () => Object.keys(app.winWeights()).sort().join();

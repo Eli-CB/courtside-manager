@@ -608,6 +608,11 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .detail-title { margin: 0; min-width: 0; font-size: 1.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .modal-foot { border-top: 1px solid var(--border); justify-content: flex-end; }
 .modal-body { padding: 16px; overflow-y: auto; }
+/* a popup keeps its scrolling: at the end of a card the page behind doesn't take over (a table inside still hands on to
+   the card), and the page stays where it was while any popup is open (over the backdrop too). The gutter keeps the page
+   from shifting sideways where its scrollbar takes room. */
+.modal, .modal-body { overscroll-behavior: contain; }
+html:has(dialog[open]) { overflow: hidden; scrollbar-gutter: stable; }
 
 /* ---------- Toast ---------- */
 .toast {
