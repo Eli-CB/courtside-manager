@@ -110,76 +110,186 @@ function draftData() {
   return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals, season: W && W.win };
 }
 
-// ----- Draft awards: this season's draft against consensus ADP (Fantrax's average draft position over its drafts) -----
-// A pick is compared with where consensus would take its player in this draft: the league's keepers come off the board
-// first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in ADP
-// order among the players not kept. Not for a past season: today's ADP says nothing about a past draft. Each award is
-// { e, label, html, text, p, tid, stats }, as the Recap's standouts, so the same picture and Share work for both, and
-// detail: { title, html }, the breakdown its title opens (as the Awards tab's).
+// ----- Draft awards: this season's draft, for the league to share -----
+// The ADP ones (The Reacher, The Fall, Autopilot) go against consensus ADP (Fantrax's average draft position over its
+// drafts): a pick is compared with where consensus would take its player in this draft. The league's keepers come off the
+// board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
+// ADP order among the players not kept. The rest come from the players themselves: Glass (games missed the last two
+// seasons), Youngins and Uncs (age on draft day), The Homer and The Globalist (their real teams now). Team awards count
+// only teams with at least half as many picks as the most of any team, and a tie names every team in it. Not for a past
+// season: today's ADP, ages and teams say nothing about a draft from another year. Each award is { e, label, html, text,
+// p, tid, stats }, as the Recap's standouts, so the same picture and Share work for both, and detail: { title, html },
+// the breakdown its title opens (as the Awards tab's).
 const adpOf = raw => (raw && ((raw.fx && raw.fx.adp) || raw.adp)) || null;
+// Glass's seasons: the two before this one, from the season archives (loaded the first time they're asked for: null until then)
+const glassLoading = new Set();
+function glassSeasons() {
+  const y = +String(NBA.season || '').slice(0, 4);
+  if (!y) return null;
+  const seasons = [seasonOf(y - 1), seasonOf(y - 2)];
+  for (const s of seasons) {
+    if (s in archives || glassLoading.has(s)) continue;
+    glassLoading.add(s);
+    loadArchive(s).then(() => { glassLoading.delete(s); if (ui.tab === 'draft') render(); });
+  }
+  return seasons.every(s => s in archives) ? seasons : null;
+}
+// A player's games missed in each of those seasons: his team's season (SPORT.seasonGames) less his games. A season he
+// wasn't in the league yet (by his years in it, raw.exp) isn't his; one he was in but isn't in its archive he missed
+// whole (out hurt all year). Goalies are left out: a healthy backup sits most games. null: no seasons to count (a rookie).
+function missedSeasons(raw, seasons) {
+  if (!raw || isGoalie(raw)) return null;
+  const out = [];
+  seasons.forEach((s, i) => {
+    if (!archives[s]) return; // (a season with no archive counts for nobody)
+    const st = archivedStats(raw, s);
+    if (st) out.push(Math.max(0, SPORT.seasonGames - st.gp));
+    else if ((raw.exp || 0) > i) out.push(SPORT.seasonGames);
+  });
+  return out.length ? out : null;
+}
 function draftAwards(d) {
   if (seasonCtx || !d || !d.picks || !d.picks.length) return [];
-  const kept = new Set(Object.values(d.keepers || {}).flat().map(k => k.nbaId));
-  const board = NBA.players.filter(r => adpOf(r) && !kept.has(r.id)).sort((a, b) => adpOf(a) - adpOf(b));
-  const spot = new Map(board.map((r, i) => [r.id, i + 1]));
-  const rated = d.picks.filter(p => p.nbaId && spot.has(p.nbaId)).map(p => ({ p, adp: adpOf(p.raw), cons: spot.get(p.nbaId), early: spot.get(p.nbaId) - p.pick }));
-  if (rated.length < d.picks.length / 2) return []; // (too few picks with an ADP to say)
   const out = [];
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  // "A, B and C", "A, B, C and 2 others"
+  const and = list => (list.length <= 1 ? list[0] || '' : list.length <= 3 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : `${list.slice(0, 3).join(', ')} and ${plural(list.length - 3, 'other')}`);
   const name = p => `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}"><b>${esc(p.name)}</b></button>`;
+  const who = p => playerBtn(p.nbaId, lastName(p.name)); // (a name inside a line: his card)
   const award = (e, label, x, said) => out.push({
     e, label, html: `${name(x.p)} <span class="muted">${teamLink(x.p.teamId)}</span><div class="rc-stats">${said}</div>`,
     text: `${x.p.name} (${fxTeamName(x.p.teamId)}): ${said[0].toLowerCase()}${said.slice(1)}`, p: { nbaId: x.p.nbaId, name: x.p.name }, tid: x.p.teamId, stats: said,
   });
   // a breakdown's rows, as the Awards tab's: photo (or not), name, a line under it, its number on the right
-  const row = (who, meta, v, cls = '') => `<li><div class="bplayer">${who}<div class="muted small">${meta}</div></div></div><b class="aw-break-v ${cls}">${v}</b></li>`;
-  const pickWho = x => `${headshot({ nbaId: x.p.nbaId, name: x.p.name }, hsPx(32, 28))}<div class="bmain">${playerBtn(x.p.nbaId, x.p.name)}`;
-  const spotsLine = x => `${esc(fxTeamName(x.p.teamId))} · taken #${x.p.pick} · consensus #${x.cons} (ADP ${fmt(x.adp, 1)})`;
-  // The Reacher: taken furthest ahead of consensus; the breakdown, the 10 furthest
-  const reaches = sortDesc(rated, x => x.early).filter(x => x.early > 0), reach = reaches[0];
-  if (reach) {
-    award('🦒', 'The Reacher', reach, `Taken #${reach.p.pick}, ${reach.early} pick${reach.early === 1 ? '' : 's'} early: consensus #${reach.cons} (ADP ${fmt(reach.adp, 1)})`);
-    out[out.length - 1].detail = {
-      title: '🦒 The Reacher',
-      html: `<p class="aw-break-total">The ${Math.min(10, reaches.length)} picks taken furthest ahead of consensus</p>
-        <ul class="aw-break">${reaches.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${x.early} early`)).join('')}</ul>`,
-    };
-  }
-  // Autopilot: the team whose typical pick came out furthest ahead of consensus: the median of its picks' spots after
-  // their consensus spots (before it, a reach, counts as early), so one big reach or one big fall doesn't decide it (the
-  // owner's ask: a team with one 86-spot reach and its other picks falling to it isn't sunk by it); what taking the top
-  // of the ADP list every time gives, as the computer does for whoever isn't there. Medians tie often: the average (to a
-  // tenth) breaks a tie, and teams still level are all named. Only teams with at least half as many picks as the most.
-  const byTeam = new Map();
-  for (const x of rated) byTeam.set(x.p.teamId, [...(byTeam.get(x.p.teamId) || []), x]);
-  const most = Math.max(0, ...[...byTeam.values()].map(xs => xs.length));
-  const median = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-  const tenth = v => Math.round(v * 10);
-  const teams = [...byTeam].filter(([, xs]) => xs.length >= most / 2).map(([tid, xs]) => {
-    const late = xs.map(x => -x.early);
-    return { tid, xs, n: xs.length, med: median(late), avg: tenth(sum(late) / late.length) };
+  const row = (whoHtml, meta, v, cls = '') => `<li><div class="bplayer">${whoHtml}<div class="muted small">${meta}</div></div></div><b class="aw-break-v ${cls}">${v}</b></li>`;
+  const teamWho = t => `<div class="bmain"><b>${teamLink(t.tid)}</b>`;
+  const breakdown = (e, label, head, rows) => ({ title: `${e} ${label}`, html: `<p class="aw-break-total">${head}</p><ul class="aw-break">${rows}</ul>` });
+  // a team award: the winners (all of them on a tie), what they did, the breakdown
+  const teamAward = (e, label, winners, said, head, rows) => out.push({
+    e, label, html: `${and(winners.map(t => `<b>${teamLink(t.tid)}</b>`))}${winners.length > 1 ? ' tied' : ''}${said}`,
+    text: `${and(winners.map(t => fxTeamName(t.tid)))}${winners.length > 1 ? ' tied' : ''}${said}`, detail: breakdown(e, label, head, rows),
   });
-  const topMed = Math.max(0, ...teams.map(t => t.med));
-  const atTop = topMed > 0 ? teams.filter(t => t.med === topMed) : [];
-  const topAvg = Math.max(...atTop.map(t => t.avg));
-  const auto = atTop.filter(t => t.avg === topAvg);
-  if (auto.length) {
-    const and = list => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]);
-    const num = v => fmt(Math.abs(v), v % 1 ? 1 : 0); // (a median is whole, or a half)
-    const said = `${auto.length > 1 ? ' tied' : ''}: their typical pick went ${num(topMed)} spot${topMed === 1 ? '' : 's'} late`;
-    // the breakdown: every team, the latest typical pick first (then the average), in words rather than signs: "late"
-    // after a player's consensus spot (he fell to them: value), "early" before it (a reach), as The Reacher's "86 picks
-    // early"; under it the pick that fell furthest (how far) and its biggest reach (just who), each only when it has one
-    const way = v => (v === 0 ? 'even' : `${num(v)} ${v > 0 ? 'late' : 'early'}`);
-    const pickOf = (xs, f) => sortDesc(xs, f)[0];
-    const teamRows = sortDesc(teams, t => t.med * 1e4 + t.avg).map(t => {
-      const steal = pickOf(t.xs, x => -x.early), reach = pickOf(t.xs, x => x.early), who = x => playerBtn(x.p.nbaId, lastName(x.p.name));
-      const notes = [steal.early < 0 && `fell: ${who(steal)}, ${-steal.early} spot${steal.early === -1 ? '' : 's'}`, reach.early > 0 && `reach: ${who(reach)}`].filter(Boolean);
-      return row(`<div class="bmain"><b>${teamLink(t.tid)}</b>`, notes.join(' · ') || 'every pick on his consensus spot', way(t.med), t.med > 0 ? 'pos-good' : t.med < 0 ? 'pos-bad' : '');
+  // the teams on top by f (then by g on a tie), or none when the top isn't worth an award
+  const best = (list, f, g = () => 0) => {
+    const top = Math.max(...list.map(f)), at = list.filter(t => f(t) === top), top2 = Math.max(...at.map(g));
+    return at.filter(t => g(t) === top2);
+  };
+  const tenth = v => Math.round(v * 10);
+  const median = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const byTeam = list => {
+    const m = new Map();
+    for (const x of list) m.set(x.p.teamId, [...(m.get(x.p.teamId) || []), x]);
+    const most = Math.max(0, ...[...m.values()].map(xs => xs.length));
+    return [...m].filter(([, xs]) => xs.length >= most / 2).map(([tid, xs]) => ({ tid, xs, n: xs.length }));
+  };
+
+  // ----- against consensus ADP -----
+  const kept = new Set(Object.values(d.keepers || {}).flat().map(k => k.nbaId));
+  const board = NBA.players.filter(r => adpOf(r) && !kept.has(r.id)).sort((a, b) => adpOf(a) - adpOf(b));
+  const spot = new Map(board.map((r, i) => [r.id, i + 1]));
+  const rated = d.picks.filter(p => p.nbaId && spot.has(p.nbaId)).map(p => ({ p, adp: adpOf(p.raw), cons: spot.get(p.nbaId), early: spot.get(p.nbaId) - p.pick }));
+  if (rated.length >= d.picks.length / 2) { // (too few picks with an ADP to say otherwise)
+    const pickWho = x => `${headshot({ nbaId: x.p.nbaId, name: x.p.name }, hsPx(32, 28))}<div class="bmain">${playerBtn(x.p.nbaId, x.p.name)}`;
+    const spotsLine = x => `${esc(fxTeamName(x.p.teamId))} · taken #${x.p.pick} · consensus #${x.cons} (ADP ${fmt(x.adp, 1)})`;
+    const said = (x, n, way) => `Taken #${x.p.pick}, ${plural(n, 'pick')} ${way}: consensus #${x.cons} (ADP ${fmt(x.adp, 1)})`;
+    // The Reacher: taken furthest ahead of consensus; The Fall, its inverse: taken furthest past it. Each breakdown, the 10 furthest
+    const reaches = sortDesc(rated, x => x.early).filter(x => x.early > 0);
+    if (reaches.length) {
+      award('🦒', 'The Reacher', reaches[0], said(reaches[0], reaches[0].early, 'early'));
+      out[out.length - 1].detail = breakdown('🦒', 'The Reacher', `The ${Math.min(10, reaches.length)} picks taken furthest ahead of consensus`,
+        reaches.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${x.early} early`)).join(''));
+    }
+    const falls = sortDesc(rated, x => -x.early).filter(x => x.early < 0);
+    if (falls.length) {
+      award('🗼', 'The Fall', falls[0], said(falls[0], -falls[0].early, 'late'));
+      out[out.length - 1].detail = breakdown('🗼', 'The Fall', `The ${Math.min(10, falls.length)} picks taken furthest past consensus`,
+        falls.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${-x.early} late`)).join(''));
+    }
+    // Autopilot: the team whose typical pick came out furthest ahead of consensus: the median of its picks' spots after
+    // their consensus spots (before it, a reach, counts as early), so one big reach or one big fall doesn't decide it (the
+    // owner's ask: a team with one 86-spot reach and its other picks falling to it isn't sunk by it); what taking the top
+    // of the ADP list every time gives, as the computer does for whoever isn't there. Medians tie often: the average (to a
+    // tenth) breaks a tie
+    const teams = byTeam(rated).map(t => { const late = t.xs.map(x => -x.early); return { ...t, med: median(late), avg: tenth(sum(late) / late.length) }; });
+    const auto = best(teams, t => t.med, t => t.avg);
+    if (auto.length && auto[0].med > 0) {
+      const num = v => fmt(Math.abs(v), v % 1 ? 1 : 0); // (a median is whole, or a half)
+      // the breakdown: every team, the latest typical pick first (then the average), in words rather than signs: "late"
+      // after a player's consensus spot (he fell to them: value), "early" before it (a reach), as The Reacher's "86 picks
+      // early"; under it the pick that fell furthest (how far) and its biggest reach (just who), each only when it has one
+      const way = v => (v === 0 ? 'even' : `${num(v)} ${v > 0 ? 'late' : 'early'}`);
+      const rows = sortDesc(teams, t => t.med * 1e4 + t.avg).map(t => {
+        const steal = sortDesc(t.xs, x => -x.early)[0], reach = sortDesc(t.xs, x => x.early)[0];
+        const notes = [steal.early < 0 && `fell: ${who(steal.p)}, ${plural(-steal.early, 'spot')}`, reach.early > 0 && `reach: ${who(reach.p)}`].filter(Boolean);
+        return row(teamWho(t), notes.join(' · ') || 'every pick on his consensus spot', way(t.med), t.med > 0 ? 'pos-good' : t.med < 0 ? 'pos-bad' : '');
+      }).join('');
+      teamAward('🤖', 'Autopilot', auto, `: their typical pick went ${num(auto[0].med)} spot${auto[0].med === 1 ? '' : 's'} late`,
+        "Each team's typical pick against consensus: the middle one of its picks. Late: players who fell to them. Early: reaches.", rows);
+    }
+  }
+
+  // ----- from the players themselves: each team's picks, as the players they are now -----
+  const squads = byTeam(d.picks.filter(p => p.raw).map(p => ({ p })));
+  if (!squads.length) return out;
+  // Glass: the most games missed a season, the last two seasons, by the team's picks (each player-season counted once;
+  // a rookie has none). Shown once the two seasons' archives are in.
+  const seasons = glassSeasons();
+  if (seasons) {
+    const glass = squads.map(t => {
+      const each = t.xs.map(x => ({ x, m: missedSeasons(x.p.raw, seasons) })).filter(y => y.m);
+      const all = each.flatMap(y => y.m);
+      return all.length ? { ...t, each, avg: sum(all) / all.length } : null;
+    }).filter(Boolean);
+    const won = glass.length ? best(glass, t => tenth(t.avg)) : [];
+    if (won.length && won[0].avg > 0) {
+      const rows = sortDesc(glass, t => t.avg).map(t => {
+        const worst = sortDesc(t.each, y => sum(y.m) / y.m.length)[0];
+        return row(teamWho(t), `most: ${who(worst.x.p)}, ${Math.round(sum(worst.m) / worst.m.length)} a season`, `${Math.round(t.avg)} a season`);
+      }).join('');
+      teamAward('🪟', 'Glass', won, `: their picks missed ${Math.round(won[0].avg)} games a season, the last two seasons`,
+        `Games each team's picks missed a season, the last two seasons (${esc(seasons[1])} and ${esc(seasons[0])}). Rookies have none to count.`, rows);
+    }
+  }
+  // Youngins and Uncs: the youngest and oldest picks on average, by age on draft day
+  const day = Date.parse(`${d.date || todayIso()}T12:00:00`);
+  const ageOf = raw => (raw.born ? (day - Date.parse(`${raw.born}T12:00:00`)) / (365.25 * 864e5) : null);
+  const ages = squads.map(t => {
+    const each = t.xs.map(x => ({ x, a: ageOf(x.p.raw) })).filter(y => y.a != null);
+    return each.length ? { ...t, each, avg: sum(each.map(y => y.a)) / each.length } : null;
+  }).filter(Boolean);
+  if (ages.length > 1) {
+    const ageRows = (sign, word) => sortDesc(ages, t => sign * t.avg).map(t => {
+      const end = sortDesc(t.each, y => sign * y.a)[0];
+      return row(teamWho(t), `${word}: ${who(end.x.p)}, ${Math.floor(end.a)}`, fmt(t.avg, 1));
     }).join('');
+    const young = best(ages, t => -tenth(t.avg)), old = best(ages, t => tenth(t.avg));
+    teamAward('👶', 'Youngins', young, `: their picks averaged ${fmt(young[0].avg, 1)} years old`, "Each team's picks' average age on draft day, youngest first", ageRows(-1, 'youngest'));
+    teamAward('👴', 'Uncs', old, `: their picks averaged ${fmt(old[0].avg, 1)} years old`, "Each team's picks' average age on draft day, oldest first", ageRows(1, 'oldest'));
+  }
+  // The Homer: the most picks from one real team (by each player's team now); The Globalist: the most different real teams
+  const stacks = squads.map(t => {
+    const by = new Map();
+    for (const x of t.xs) if (x.p.raw.team) by.set(x.p.raw.team, [...(by.get(x.p.raw.team) || []), x.p]);
+    const top = sortDesc([...by], ([, ps]) => ps.length - Math.min(...ps.map(p => p.pick)) / 1e4)[0]; // (on a tie, the stack taken first)
+    return { ...t, teams: by.size, club: top && top[0], ps: (top && top[1]) || [] };
+  });
+  const homers = best(stacks, t => t.ps.length);
+  if (homers.length && homers[0].ps.length >= 2) {
+    const n = homers[0].ps.length, one = homers.length === 1 && homers[0], full = tri => (SPORT.teamNames || {})[tri] || tri;
+    const rows = sortDesc(stacks, t => t.ps.length * 100 + t.teams).map(t => row(teamWho(t), t.ps.length > 1 ? `${teamBtn(t.club)}: ${t.ps.map(who).join(', ')}` : 'one player from each team', String(t.ps.length))).join('');
     out.push({
-      e: '🤖', label: 'Autopilot', html: `${and(auto.map(t => `<b>${teamLink(t.tid)}</b>`))}${said}`, text: `${and(auto.map(t => fxTeamName(t.tid)))}${said}`,
-      detail: { title: '🤖 Autopilot', html: `<p class="aw-break-total">Each team's typical pick against consensus: the middle one of its picks. Late: players who fell to them. Early: reaches.</p><ul class="aw-break">${teamRows}</ul>` },
+      e: '🏠', label: 'The Homer',
+      // one team: whose players and who; a tie: each team and its real team
+      html: one ? `<b>${teamLink(one.tid)}</b> took ${n} ${esc(full(one.club))} players: ${and(one.ps.map(who))}` : `${and(homers.map(t => `<b>${teamLink(t.tid)}</b> (${teamBtn(t.club)})`))} tied: ${n} players each from one team`,
+      text: one ? `${fxTeamName(one.tid)} took ${n} ${full(one.club)} players: ${and(one.ps.map(p => lastName(p.name)))}` : `${and(homers.map(t => `${fxTeamName(t.tid)} (${t.club})`))} tied: ${n} players each from one team`,
+      detail: breakdown('🏠', 'The Homer', 'The most picks each team took from one real team (by his team now)', rows),
     });
+  }
+  const globe = best(stacks, t => t.teams);
+  if (globe.length && globe[0].teams > 1) {
+    const rows = sortDesc(stacks, t => t.teams * 100 - t.n).map(t => row(teamWho(t), `${plural(t.n, 'pick')}${t.ps.length > 1 ? ` · ${t.ps.length} from ${teamBtn(t.club)}` : ''}`, `${t.teams} teams`)).join('');
+    teamAward('🌍', 'The Globalist', globe, `: their picks came from ${globe[0].teams} different teams${globe.length > 1 ? ' each' : ''}`,
+      'How many different real teams each team drafted from (by his team now)', rows);
   }
   return out;
 }

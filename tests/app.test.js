@@ -2271,9 +2271,9 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     // an ESPN or Sleeper league's players have the daily file's ADP (Fantrax's) instead
     assert.equal(app.adpOf({ adp: 12.5 }), 12.5);
     assert.equal(app.adpOf({ fx: { adp: 3 }, adp: 12.5 }), 3, "a Fantrax league's own first");
-    // too few picks with an ADP to say: no awards
+    // too few picks with an ADP to say: none of the ADP awards (the players' own, ages and teams, still)
     for (const p of picks.slice(0, Math.ceil(picks.length * 0.6))) delete p.raw.fx.adp;
-    assert.equal(app.draftAwards(d).length, 0);
+    assert.ok(!app.draftAwards(d).some(x => ['The Reacher', 'The Fall', 'Autopilot'].includes(x.label)));
     // a past season: today's ADP says nothing about its draft
     picks.forEach(p => setAdp(p.raw, keepers.length + p.pick));
     setAdp(reacher.raw, 999);
@@ -2354,6 +2354,63 @@ test("Draft awards: Autopilot goes by each team's typical pick (the median), so 
     assert.ok(!auto().detail.html.includes(`data-team="${D}"`));
   } finally {
     for (const [x, fx, adp] of saved) { if (fx) x.fx = fx; else delete x.fx; if (adp != null) x.adp = adp; else delete x.adp; }
+  }
+});
+
+test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist', async () => {
+  const L = await app.useLeague(CATS9);
+  const [A, B, C] = L.teams.map(t => t.id);
+  const players = app.NBA.players, archives = app.get('archives');
+  const r = players.slice(0, 9);
+  const saved = players.map(x => [x, x.fx && { ...x.fx }, x.adp]), fields = r.map(x => [x, x.born, x.team, x.exp]);
+  const y = +String(app.NBA.season).slice(0, 4), seasons = [app.seasonOf(y - 1), app.seasonOf(y - 2)];
+  const hadArchives = seasons.map(s => [s, s in archives, archives[s]]);
+  try {
+    for (const x of players) { if (x.fx) delete x.fx.adp; delete x.adp; }
+    const pick = (n, tid) => ({ round: Math.ceil(n / 3), pick: n, teamId: tid, nbaId: r[n - 1].id, raw: r[n - 1], name: r[n - 1].name });
+    const d = { keepers: {}, date: '2026-10-20', picks: [pick(1, A), pick(2, B), pick(3, C), pick(4, A), pick(5, B), pick(6, C), pick(7, A), pick(8, C), pick(9, B)] };
+    const [a1, b1, c1, a2, b2, c2, a3, c3, b3] = r; // (each team's picks, in draft order)
+    // consensus as drafted, but #9 the top of the board: it fell 8 picks, every other a pick early
+    r.forEach((x, i) => { x.fx = { ...(x.fx || {}), adp: i === 8 ? 0.5 : i + 1 }; });
+    // A drafted young and all Thunder; B old and from three teams; C in between, two Celtics
+    [[a1, '2005-06-01', 'OKC'], [a2, '2005-06-01', 'OKC'], [a3, '2005-06-01', 'OKC'], [b1, '1990-06-01', 'BOS'], [b2, '1990-06-01', 'LAL'], [b3, '1990-06-01', 'MIA'],
+      [c1, '1998-06-01', 'BOS'], [c2, '1998-06-01', 'BOS'], [c3, '1998-06-01', 'DEN']].forEach(([x, born, team]) => Object.assign(x, { born, team, exp: 5 }));
+    // the last two seasons' games: A's 80 of 82; B's one 40, one out hurt both years (not in either archive), one 82;
+    // C's a rookie (no seasons), one 82, one 70
+    c1.exp = 0;
+    const gp = new Map([[a1.id, 80], [a2.id, 80], [a3.id, 80], [b1.id, 40], [b3.id, 82], [c2.id, 82], [c3.id, 70]]);
+    for (const s of seasons) archives[s] = { keys: ['gp'], players: new Map([...gp].map(([id, g]) => [id, { n: '', s: [g] }])) };
+    const awards = app.draftAwards(d), get = label => awards.find(x => x.label === label);
+    assert.deepEqual(Array.from(awards, x => x.label), ['The Reacher', 'The Fall', 'Glass', 'Youngins', 'Uncs', 'The Homer', 'The Globalist'], 'no Autopilot: no typical pick went late');
+    // The Fall: the pick taken furthest past consensus
+    assert.equal(get('The Fall').text, `${b3.name} (${app.fxTeamName(B)}): taken #9, 8 picks late: consensus #1 (ADP 0.5)`);
+    assert.equal(get('The Fall').p.nbaId, b3.id);
+    assert.ok(get('The Fall').detail.html.includes('>8 late</b>'));
+    // Glass: B's picks missed (42 + 42 + 82 + 82 + 0 + 0) / 6 = 41 a season; its most, the one out both years
+    assert.equal(get('Glass').text, `${app.fxTeamName(B)}: their picks missed 41 games a season, the last two seasons`);
+    const glassRows = get('Glass').detail.html.split('<li>').slice(1);
+    assert.deepEqual(Array.from(glassRows, x => x.match(/data-team="([^"]+)"/)[1]), [B, C, A], 'B 41, C 6 (its rookie left out), A 2');
+    assert.match(glassRows[0], new RegExp(`most: <button[^>]*data-nba="${b2.id}"[^>]*>[^<]+</button>, 82 a season`));
+    // Youngins and Uncs: average age on draft day
+    const age = born => (Date.parse('2026-10-20T12:00:00') - Date.parse(`${born}T12:00:00`)) / (365.25 * 864e5);
+    assert.equal(get('Youngins').text, `${app.fxTeamName(A)}: their picks averaged ${age('2005-06-01').toFixed(1)} years old`);
+    assert.equal(get('Uncs').text, `${app.fxTeamName(B)}: their picks averaged ${age('1990-06-01').toFixed(1)} years old`);
+    assert.ok(get('Uncs').detail.html.indexOf(`data-team="${B}"`) < get('Uncs').detail.html.indexOf(`data-team="${A}"`), 'oldest first');
+    // The Homer: three Thunder; The Globalist: three different teams
+    assert.equal(get('The Homer').text, `${app.fxTeamName(A)} took 3 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1')}`);
+    assert.equal(get('The Globalist').text, `${app.fxTeamName(B)}: their picks came from 3 different teams`);
+    // a tie names each team (with its real team on The Homer)
+    c3.team = 'BOS';
+    assert.equal(app.draftAwards(d).find(x => x.label === 'The Homer').text, `${app.fxTeamName(A)} (OKC) and ${app.fxTeamName(C)} (BOS) tied: 3 players each from one team`);
+    // the seasons' archives not in yet (on their way): no Glass until they are
+    const loading = app.get('glassLoading');
+    for (const s of seasons) { delete archives[s]; loading.add(s); }
+    assert.ok(!app.draftAwards(d).some(x => x.label === 'Glass'));
+    for (const s of seasons) loading.delete(s);
+  } finally {
+    for (const [x, born, team, exp] of fields) Object.assign(x, { born, team, exp });
+    for (const [x, fx, adp] of saved) { if (fx) x.fx = fx; else delete x.fx; if (adp != null) x.adp = adp; else delete x.adp; }
+    for (const [s, had, v] of hadArchives) { if (had) archives[s] = v; else delete archives[s]; }
   }
 });
 

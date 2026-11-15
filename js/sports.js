@@ -7,6 +7,7 @@
 const SPORTS = {
   nba: {
     key: 'nba', name: 'NBA', emoji: '🏀', data: 'data/', fantrax: 'NBA',
+    seasonGames: 82, // a team's regular season (the Draft tab's Glass: games a player missed)
     positions: ['PG', 'SG', 'SF', 'PF', 'C'],
     slotTypes: ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'FLX'],
     elig: { PG: ['PG'], SG: ['SG'], SF: ['SF'], PF: ['PF'], C: ['C'], G: ['PG', 'SG'], F: ['SF', 'PF'], FLX: ['PG', 'SG', 'SF', 'PF', 'C'] },
@@ -80,6 +81,7 @@ const SPORTS = {
   // keys (gg, ag, gpim), so a league can score them apart from a skater's and no total mixes them; gt is his hours played.
   nhl: {
     key: 'nhl', name: 'NHL', emoji: '🏒', data: 'data/nhl/', fantrax: 'NHL',
+    seasonGames: 82,
     steadyMinutes: true, // ice time doesn't swing with blowouts and fouls: no "short minutes" notes
     positions: ['C', 'LW', 'RW', 'D', 'G'],
     slotTypes: ['C', 'LW', 'RW', 'W', 'F', 'D', 'G', 'FLX'],
@@ -168,6 +170,7 @@ const SPORTS = {
   // the league does. No past seasons or Fantrax yet; a team defense is a player, with a number made from its team code.
   nfl: {
     key: 'nfl', name: 'NFL', emoji: '🏈', data: 'data/nfl/', fantrax: 'NFL',
+    seasonGames: 17,
     // What a football week is like, for the pages that aren't football's own (football.js does the football):
     weekLineup: true,   // one lineup for the week, whatever the league's site calls it
     gameLocks: true,    // a lineup spot locks when its player's game starts (spotLocked), not all at once
