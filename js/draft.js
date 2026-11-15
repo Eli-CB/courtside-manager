@@ -111,12 +111,13 @@ function draftData() {
 }
 
 // ----- Draft awards: this season's draft, for the league to share -----
-// The ADP ones (The Reacher, The Fall, Autopilot) go against consensus ADP (Fantrax's average draft position over its
+// The ADP ones (The Reacher, The Fall, AFK) go against consensus ADP (Fantrax's average draft position over its
 // drafts): a pick is compared with where consensus would take its player in this draft. The league's keepers come off the
 // board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
 // ADP order among the players not kept. Trigger Finger and Clock Milker come from how long each pick took (Fantrax's pick
 // times). The rest come from the players themselves: Glass (games missed the last two seasons), Youngins and Uncs (age
-// on draft day), The Homer (their real teams now) and The Globalist (their countries). Team awards count
+// on draft day), The Homer (their real teams now) and The Globalist (their countries), each team's keepers counted with
+// its picks (the owner's ask: a draft-day roster); the ADP and pick-time ones are picks only. Team awards count
 // only teams with at least half as many picks as the most of any team, and a tie names every team in it. Not for a past
 // season: today's ADP, ages and teams say nothing about a draft from another year. Each award is { e, label, html, text,
 // p, tid, stats }, as the Recap's standouts, so the same picture and Share work for both, and detail: { title, html },
@@ -154,7 +155,7 @@ function draftAwards(d) {
   const out = [];
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   // "A, B and C", "A, B, C and 2 others"
-  const and = list => (list.length <= 1 ? list[0] || '' : list.length <= 3 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : `${list.slice(0, 3).join(', ')} and ${plural(list.length - 3, 'other')}`);
+  const and = (list, max = 3) => (list.length <= 1 ? list[0] || '' : list.length <= max ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : `${list.slice(0, max).join(', ')} and ${plural(list.length - max, 'other')}`);
   const name = p => `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}"><b>${esc(p.name)}</b></button>`;
   const who = p => playerBtn(p.nbaId, lastName(p.name)); // (a name inside a line: his card)
   const award = (e, label, x, said) => out.push({
@@ -206,7 +207,7 @@ function draftAwards(d) {
       out[out.length - 1].detail = breakdown('🗼', 'The Fall', `The ${Math.min(10, falls.length)} picks taken furthest past consensus`,
         falls.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${-x.early} late`)).join(''));
     }
-    // Autopilot: the team whose typical pick came out furthest ahead of consensus: the median of its picks' spots after
+    // AFK (was Autopilot): the team whose typical pick came out furthest ahead of consensus: the median of its picks' spots after
     // their consensus spots (before it, a reach, counts as early), so one big reach or one big fall doesn't decide it (the
     // owner's ask: a team with one 86-spot reach and its other picks falling to it isn't sunk by it); what taking the top
     // of the ADP list every time gives, as the computer does for whoever isn't there. Medians tie often: the average (to a
@@ -224,7 +225,7 @@ function draftAwards(d) {
         const notes = [steal.early < 0 && `fell: ${who(steal.p)}, ${plural(-steal.early, 'spot')}`, reach.early > 0 && `reach: ${who(reach.p)}`].filter(Boolean);
         return row(teamWho(t), notes.join(' · ') || 'every pick on his consensus spot', way(t.med), t.med > 0 ? 'pos-good' : t.med < 0 ? 'pos-bad' : '');
       }).join('');
-      teamAward('🤖', 'Autopilot', auto, `: their typical pick went ${num(auto[0].med)} spot${auto[0].med === 1 ? '' : 's'} late`,
+      teamAward('💤', 'AFK', auto, `: their typical pick went ${num(auto[0].med)} spot${auto[0].med === 1 ? '' : 's'} late`,
         "Each team's typical pick against consensus: the middle one of its picks. Late: players who fell to them. Early: reaches.", rows);
     }
   }
@@ -249,10 +250,12 @@ function draftAwards(d) {
     }
   }
 
-  // ----- from the players themselves: each team's picks, as the players they are now -----
-  const squads = byTeam(d.picks.filter(p => p.raw).map(p => ({ p })));
+  // ----- from the players themselves: each team's draft-day roster, its picks and its keepers, as the players they are now -----
+  const keepers = Object.entries(d.keepers || {}).flatMap(([tid, ks]) => ks.map(k => ({ p: { teamId: tid, nbaId: k.nbaId, name: k.name, raw: nbaById.get(k.nbaId), pick: 0, keeper: true } })));
+  const squads = byTeam([...d.picks.map(p => ({ p })), ...keepers].filter(x => x.p.raw));
   if (!squads.length) return out;
-  // Glass: the most games missed a season, the last two seasons, by the team's picks (each player-season counted once;
+  const named = p => `${who(p)}${p.keeper ? ' (keeper)' : ''}`; // (a breakdown's name, a keeper marked)
+  // Glass: the most games missed a season, the last two seasons, by the team's players (each player-season counted once;
   // a rookie has none). Shown once the two seasons' archives are in.
   const seasons = glassSeasons();
   if (seasons) {
@@ -265,13 +268,14 @@ function draftAwards(d) {
     if (won.length && won[0].avg > 0) {
       const rows = sortDesc(glass, t => t.avg).map(t => {
         const worst = sortDesc(t.each, y => sum(y.m) / y.m.length)[0];
-        return row(teamWho(t), `most: ${who(worst.x.p)}, ${Math.round(sum(worst.m) / worst.m.length)} a season`, `${Math.round(t.avg)} a season`);
+        return row(teamWho(t), `most: ${named(worst.x.p)}, ${Math.round(sum(worst.m) / worst.m.length)} a season`, `${Math.round(t.avg)} a season`);
       }).join('');
-      teamAward('🪟', 'Glass', won, `: their picks missed ${Math.round(won[0].avg)} games a season, the last two seasons`,
-        `Games each team's picks missed a season, the last two seasons (${esc(seasons[1])} and ${esc(seasons[0])}). Rookies have none to count.`, rows);
+      // 🍷 (a glass), not 🪟: Windows 10 has no window emoji
+      teamAward('🍷', 'Glass', won, `: their players missed ${Math.round(won[0].avg)} games a season, the last two seasons`,
+        `Games each team's players (picks and keepers) missed a season, the last two seasons (${esc(seasons[1])} and ${esc(seasons[0])}). Rookies have none to count.`, rows);
     }
   }
-  // Youngins and Uncs: the youngest and oldest picks on average, by age on draft day
+  // Youngins and Uncs: the youngest and oldest players on average, by age on draft day
   const day = Date.parse(`${d.date || todayIso()}T12:00:00`);
   const ageOf = raw => (raw.born ? (day - Date.parse(`${raw.born}T12:00:00`)) / (365.25 * 864e5) : null);
   const ages = squads.map(t => {
@@ -281,18 +285,18 @@ function draftAwards(d) {
   if (ages.length > 1) {
     const ageRows = (sign, word) => sortDesc(ages, t => sign * t.avg).map(t => {
       const end = sortDesc(t.each, y => sign * y.a)[0];
-      return row(teamWho(t), `${word}: ${who(end.x.p)}, ${Math.floor(end.a)}`, fmt(t.avg, 1));
+      return row(teamWho(t), `${word}: ${named(end.x.p)}, ${Math.floor(end.a)}`, fmt(t.avg, 1));
     }).join('');
     const young = best(ages, t => -tenth(t.avg)), old = best(ages, t => tenth(t.avg));
-    teamAward('👶', 'Youngins', young, `: their picks averaged ${fmt(young[0].avg, 1)} years old`, "Each team's picks' average age on draft day, youngest first", ageRows(-1, 'youngest'));
-    teamAward('👴', 'Uncs', old, `: their picks averaged ${fmt(old[0].avg, 1)} years old`, "Each team's picks' average age on draft day, oldest first", ageRows(1, 'oldest'));
+    teamAward('👶', 'Youngins', young, `: their players averaged ${fmt(young[0].avg, 1)} years old`, "Each team's players' average age on draft day (picks and keepers), youngest first", ageRows(-1, 'youngest'));
+    teamAward('👴', 'Uncs', old, `: their players averaged ${fmt(old[0].avg, 1)} years old`, "Each team's players' average age on draft day (picks and keepers), oldest first", ageRows(1, 'oldest'));
   }
-  // The Homer: the most picks from one real team (by each player's team now); The Globalist: the most countries (the
+  // The Homer: the most players from one real team (by each player's team now); The Globalist: the most countries (the
   // owner's ask: players' nationalities, from the daily file's ISO codes)
   const stacks = squads.map(t => {
     const by = new Map();
     for (const x of t.xs) if (x.p.raw.team) by.set(x.p.raw.team, [...(by.get(x.p.raw.team) || []), x.p]);
-    const top = sortDesc([...by], ([, ps]) => ps.length - Math.min(...ps.map(p => p.pick)) / 1e4)[0]; // (on a tie, the stack taken first)
+    const top = sortDesc([...by], ([, ps]) => ps.length - Math.min(...ps.map(p => p.pick)) / 1e4)[0]; // (on a tie, the stack taken first: keepers count as before the draft)
     const nats = new Map();
     for (const x of t.xs) if (x.p.raw.nat) nats.set(x.p.raw.nat, (nats.get(x.p.raw.nat) || 0) + 1);
     return { ...t, teams: by.size, club: top && top[0], ps: (top && top[1]) || [], nats };
@@ -300,13 +304,13 @@ function draftAwards(d) {
   const homers = best(stacks, t => t.ps.length);
   if (homers.length && homers[0].ps.length >= 2) {
     const n = homers[0].ps.length, one = homers.length === 1 && homers[0], full = tri => (SPORT.teamNames || {})[tri] || tri;
-    const rows = sortDesc(stacks, t => t.ps.length * 100 + t.teams).map(t => row(teamWho(t), t.ps.length > 1 ? `${teamBtn(t.club)}: ${t.ps.map(who).join(', ')}` : 'one player from each team', String(t.ps.length))).join('');
+    const rows = sortDesc(stacks, t => t.ps.length * 100 + t.teams).map(t => row(teamWho(t), t.ps.length > 1 ? `${teamBtn(t.club)}: ${t.ps.map(named).join(', ')}` : 'one player from each team', String(t.ps.length))).join('');
     out.push({
       e: '🏠', label: 'The Homer',
       // one team: whose players and who; a tie: each team and its real team
-      html: one ? `<b>${teamLink(one.tid)}</b> took ${n} ${esc(full(one.club))} players: ${and(one.ps.map(who))}` : `${and(homers.map(t => `<b>${teamLink(t.tid)}</b> (${teamBtn(t.club)})`))} tied: ${n} players each from one team`,
-      text: one ? `${fxTeamName(one.tid)} took ${n} ${full(one.club)} players: ${and(one.ps.map(p => lastName(p.name)))}` : `${and(homers.map(t => `${fxTeamName(t.tid)} (${t.club})`))} tied: ${n} players each from one team`,
-      detail: breakdown('🏠', 'The Homer', 'The most picks each team took from one real team (by his team now)', rows),
+      html: one ? `<b>${teamLink(one.tid)}</b> has ${n} ${esc(full(one.club))} players: ${and(one.ps.map(who), Infinity)}` : `${and(homers.map(t => `<b>${teamLink(t.tid)}</b> (${teamBtn(t.club)})`))} tied: ${n} players each from one team`,
+      text: one ? `${fxTeamName(one.tid)} has ${n} ${full(one.club)} players: ${and(one.ps.map(p => lastName(p.name)), Infinity)}` : `${and(homers.map(t => `${fxTeamName(t.tid)} (${t.club})`))} tied: ${n} players each from one team`,
+      detail: breakdown('🏠', 'The Homer', 'The most players each team has from one real team, picks and keepers (by his team now)', rows),
     });
   }
   const globe = best(stacks, t => t.nats.size);
@@ -314,8 +318,8 @@ function draftAwards(d) {
     // each team's countries as flags, the most picks first (×2 for two)
     const flags = t => sortDesc([...t.nats], ([, k]) => k).map(([c, k]) => `${flagImg(c)}${k > 1 ? `×${k}` : ''}`).join(' ');
     const rows = sortDesc(stacks, t => t.nats.size * 100 - t.n).map(t => row(teamWho(t), flags(t) || 'no countries known', `${t.nats.size} ${t.nats.size === 1 ? 'country' : 'countries'}`)).join('');
-    teamAward('🌍', 'The Globalist', globe, `: their picks came from ${globe[0].nats.size} countries${globe.length > 1 ? ' each' : ''}`,
-      "How many countries each team's picks come from", rows);
+    teamAward('🌍', 'The Globalist', globe, `: their players came from ${globe[0].nats.size} countries${globe.length > 1 ? ' each' : ''}`,
+      "How many countries each team's players come from, picks and keepers", rows);
   }
   return out;
 }
