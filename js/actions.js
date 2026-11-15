@@ -170,6 +170,15 @@ const actions = {
     } catch (e) { toast(`Couldn't reach ${sourceName()} (${e.message})`); }
     render();
   },
+  // a draft award's breakdown, from its title on the Draft tab
+  'draft-award'(el) {
+    const D = draftAwardDetails.get(el.dataset.key);
+    if (!D) return;
+    $('#infoTitle').textContent = D.title;
+    $('#infoBody').innerHTML = D.html;
+    const d = $('#infoDialog');
+    if (!d.open) d.showModal();
+  },
   // one team's keepers and picks from the Draft tab's Team drafts
   'draft-team'(el) {
     const D = draftTeamCards.get(el.dataset.team);

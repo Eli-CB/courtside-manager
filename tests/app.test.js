@@ -2228,6 +2228,27 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     const card = app.draftAwardsCard(d);
     assert.match(card, /data-action="draft-share"/);
     assert.ok(card.includes(`data-nba="${reacher.nbaId}"`));
+    // each award's title opens its breakdown: the 10 biggest reaches; every team's total, most value first
+    assert.match(card, /data-action="draft-award" data-key="The Reacher"/);
+    assert.match(card, /data-action="draft-award" data-key="Autopilot"/);
+    const details = app.get('draftAwardDetails');
+    const reaches = details.get('The Reacher').html;
+    assert.ok(reaches.indexOf(`data-nba="${reacher.nbaId}"`) < reaches.indexOf('</li>'), 'the biggest reach first');
+    assert.ok(reaches.includes(`<b class="aw-break-v ">${early} early</b>`), reaches.slice(0, 400));
+    assert.ok((reaches.match(/<li>/g) || []).length <= 10);
+    const teamTotals = details.get('Autopilot').html;
+    assert.equal((teamTotals.match(/<li>/g) || []).length, Object.keys(totals).length, 'every team');
+    const shown = [...teamTotals.matchAll(/<b class="aw-break-v [^"]*">([^<]+)<\/b>/g)].map(m => +m[1].replace('−', '-'));
+    assert.deepEqual(shown, Object.values(totals).sort((a, b) => b - a), 'most value first');
+    assert.ok(!/reach [^·<]*\+\d/.test(teamTotals) && !/best [^·<]*−/.test(teamTotals) && /reach [^·<]*−\d/.test(teamTotals), 'a reach is only ever a reach, a value pick only value');
+    const doc = app.document, realQuery = doc.querySelector, els = {};
+    doc.querySelector = sel => (['#infoBody', '#infoTitle', '#infoDialog'].includes(sel) ? (els[sel] = els[sel] || { innerHTML: '', textContent: '', open: false, showModal() { this.open = true; } }) : realQuery(sel));
+    try {
+      app.actions['draft-award']({ dataset: { key: 'Autopilot' } });
+      assert.equal(els['#infoDialog'].open, true);
+      assert.equal(els['#infoTitle'].textContent, '🤖 Autopilot');
+      assert.equal(els['#infoBody'].innerHTML, teamTotals);
+    } finally { doc.querySelector = realQuery; }
     const S = app.draftShare(L, d, [award]);
     assert.ok(S.url.endsWith(`?league=${L.id}#draft`), S.url);
     assert.equal(S.text, `${app.SPORT.emoji} ${L.name} · ${app.seasonLabel(L.year)} draft awards\n\n🦒 The Reacher: ${award.text}`);
@@ -2249,6 +2270,18 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     app.set('seasonCtx', null);
     for (const [r, fx, adp] of saved) { if (fx) r.fx = fx; else delete r.fx; if (adp != null) r.adp = adp; else delete r.adp; }
   }
+});
+
+test("Draft tab: a pick's fantasy team opens its card, and each team's best and worst pick open the player's", async () => {
+  await app.useLeague(CATS9);
+  const html = app.viewDraft();
+  const best = html.split('<table class="dr-table">')[1].split('</table>')[0];
+  const teamLinks = [...best.matchAll(/<div class="pmeta"><button[^>]*data-action="team-card" data-team="([^"]+)"/g)].map(m => m[1]);
+  assert.equal(teamLinks.length, (best.match(/<tr class=/g) || []).length, 'every pick in Best picks: its team a link');
+  const teams = html.split('<table class="dr-teams">')[1].split('</table>')[0];
+  const rows = teams.split('<tr class=').slice(1);
+  assert.ok(rows.length > 2);
+  for (const r of rows) assert.equal((r.match(/data-action="player-detail"/g) || []).length, 2, 'its best and worst pick by name');
 });
 
 test('Draft awards: Autopilot, the team furthest ahead of consensus over its whole draft; a tie names each team', async () => {

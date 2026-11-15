@@ -173,6 +173,7 @@ const INFO = {
     <p><b>Consensus spot.</b> Where consensus would take a player in this draft: his place in ADP order once the league's keepers are off the board. In a keeper league pick #1 is the first player after the keepers, so a pick is compared with the players who were there to take.</p>
     <p><b>The Reacher</b> 🦒 is the pick taken furthest ahead of his consensus spot. Taken #73 with a consensus spot of #159 is 86 picks early.</p>
     <p><b>Autopilot</b> 🤖 is the team whose whole draft came out furthest ahead of consensus: each pick's spots after his consensus spot, added up (a reach counts against). Taking the top of the ADP list every time does that, which is what the computer does for a team whose manager didn't show up. A tie names every team in it.</p>
+    <p><b>The breakdowns.</b> Tap an award's title: The Reacher's lists the 10 biggest reaches, Autopilot's every team's total, with its best value pick (+, taken after his consensus spot) and its biggest reach (−, before it).</p>
     <p>A past season has no awards here: today's ADP says nothing about a draft from another year.</p>`],
   board: ['Reading the draft board', `
     <p><b>Each cell</b> is one pick: the pick number, the player, and his <b>+/−</b>.</p>

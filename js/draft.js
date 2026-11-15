@@ -114,7 +114,8 @@ function draftData() {
 // A pick is compared with where consensus would take its player in this draft: the league's keepers come off the board
 // first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in ADP
 // order among the players not kept. Not for a past season: today's ADP says nothing about a past draft. Each award is
-// { e, label, html, text, p, tid, stats }, as the Recap's standouts, so the same picture and Share work for both.
+// { e, label, html, text, p, tid, stats }, as the Recap's standouts, so the same picture and Share work for both, and
+// detail: { title, html }, the breakdown its title opens (as the Awards tab's).
 const adpOf = raw => (raw && ((raw.fx && raw.fx.adp) || raw.adp)) || null;
 function draftAwards(d) {
   if (seasonCtx || !d || !d.picks || !d.picks.length) return [];
@@ -129,32 +130,62 @@ function draftAwards(d) {
     e, label, html: `${name(x.p)} <span class="muted">${teamLink(x.p.teamId)}</span><div class="rc-stats">${said}</div>`,
     text: `${x.p.name} (${fxTeamName(x.p.teamId)}): ${said[0].toLowerCase()}${said.slice(1)}`, p: { nbaId: x.p.nbaId, name: x.p.name }, tid: x.p.teamId, stats: said,
   });
-  // The Reacher: taken furthest ahead of consensus
-  const reach = sortDesc(rated, x => x.early)[0];
-  if (reach && reach.early > 0) award('🦒', 'The Reacher', reach, `Taken #${reach.p.pick}, ${reach.early} pick${reach.early === 1 ? '' : 's'} early: consensus #${reach.cons} (ADP ${fmt(reach.adp, 1)})`);
+  // a breakdown's rows, as the Awards tab's: photo (or not), name, a line under it, its number on the right
+  const row = (who, meta, v, cls = '') => `<li><div class="bplayer">${who}<div class="muted small">${meta}</div></div></div><b class="aw-break-v ${cls}">${v}</b></li>`;
+  const pickWho = x => `${headshot({ nbaId: x.p.nbaId, name: x.p.name }, hsPx(32, 28))}<div class="bmain">${playerBtn(x.p.nbaId, x.p.name)}`;
+  const spotsLine = x => `${esc(fxTeamName(x.p.teamId))} · taken #${x.p.pick} · consensus #${x.cons} (ADP ${fmt(x.adp, 1)})`;
+  // The Reacher: taken furthest ahead of consensus; the breakdown, the 10 furthest
+  const reaches = sortDesc(rated, x => x.early).filter(x => x.early > 0), reach = reaches[0];
+  if (reach) {
+    award('🦒', 'The Reacher', reach, `Taken #${reach.p.pick}, ${reach.early} pick${reach.early === 1 ? '' : 's'} early: consensus #${reach.cons} (ADP ${fmt(reach.adp, 1)})`);
+    out[out.length - 1].detail = {
+      title: '🦒 The Reacher',
+      html: `<p class="aw-break-total">The ${Math.min(10, reaches.length)} picks taken furthest ahead of consensus</p>
+        <ul class="aw-break">${reaches.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${x.early} early`)).join('')}</ul>`,
+    };
+  }
   // Autopilot: the most value against consensus over a team's whole draft (each pick's spots after his consensus spot,
   // added up; a reach counts against): what taking the top of the ADP list every time gives, as the computer does for
   // whoever isn't there. A tie names every team in it.
   const byTeam = new Map();
   for (const x of rated) byTeam.set(x.p.teamId, [...(byTeam.get(x.p.teamId) || []), x]);
-  const teams = [...byTeam].map(([tid, xs]) => ({ tid, n: xs.length, total: -sum(xs.map(x => x.early)) }));
+  const teams = [...byTeam].map(([tid, xs]) => ({ tid, xs, n: xs.length, total: -sum(xs.map(x => x.early)) }));
   const top = Math.max(0, ...teams.map(t => t.total));
   const auto = top > 0 ? teams.filter(t => t.total === top) : [];
   if (auto.length) {
     const and = list => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]);
     const one = auto.length === 1 && auto[0], spots = `${top} spot${top === 1 ? '' : 's'}`;
     const said = one ? `: ${one.n} pick${one.n === 1 ? '' : 's'} went ${spots} after consensus in all, ${fmt(top / one.n, 1)} a pick` : ` tied: their picks went ${spots} after consensus in all`;
-    out.push({ e: '🤖', label: 'Autopilot', html: `${and(auto.map(t => `<b>${teamLink(t.tid)}</b>`))}${said}`, text: `${and(auto.map(t => fxTeamName(t.tid)))}${said}` });
+    // the breakdown: every team, most value first, with its best value pick and its biggest reach
+    const pickOf = (xs, f) => sortDesc(xs, f)[0];
+    const teamRows = sortDesc(teams, t => t.total).map(t => {
+      const best = pickOf(t.xs, x => -x.early), worst = pickOf(t.xs, x => x.early);
+      const note = (x, word) => ` · ${word} ${esc(lastName(x.p.name))} ${signed(-x.early, 0)}`; // (only a real one: a value pick after his spot, a reach before it)
+      return row(`<div class="bmain"><b>${teamLink(t.tid)}</b>`, `${t.n} pick${t.n === 1 ? '' : 's'}, ${signed(t.total / t.n, 1)} a pick${best.early < 0 ? note(best, 'best') : ''}${worst.early > 0 ? note(worst, 'reach') : ''}`,
+        signed(t.total, 0), t.total > 0 ? 'pos-good' : t.total < 0 ? 'pos-bad' : '');
+    }).join('');
+    out.push({
+      e: '🤖', label: 'Autopilot', html: `${and(auto.map(t => `<b>${teamLink(t.tid)}</b>`))}${said}`, text: `${and(auto.map(t => fxTeamName(t.tid)))}${said}`,
+      detail: { title: '🤖 Autopilot', html: `<p class="aw-break-total">Every team's picks against consensus, added up</p><ul class="aw-break">${teamRows}</ul>` },
+    });
   }
   return out;
 }
-// The card at the top of the Draft tab, with Share
+// The card at the top of the Draft tab, with Share; an award's title opens its breakdown ('draft-award', in the popup the
+// (i) buttons use)
+const draftAwardDetails = new Map(); // award label -> { title, html }, written as the card draws
 function draftAwardsCard(d) {
   const items = draftAwards(d);
+  draftAwardDetails.clear();
   if (!items.length) return '';
+  const label = x => {
+    if (!x.detail) return `<div class="rc-label">${x.label}</div>`;
+    draftAwardDetails.set(x.label, x.detail);
+    return `<button type="button" class="link-btn rc-label dr-award-btn" data-action="draft-award" data-key="${esc(x.label)}" title="${esc(x.label)}: the breakdown">${x.label}</button>`;
+  };
   return `<div class="card dr-awards">
     <div class="card-head"><h2>Draft awards ${infoBtn('draftAwards')}</h2><button type="button" class="btn sm primary" data-action="draft-share">Share</button></div>
-    <ul class="rc-items">${items.map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div><div class="rc-label">${x.label}</div>${x.html}</div></li>`).join('')}</ul>
+    <ul class="rc-items">${items.map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div>${label(x)}${x.html}</div></li>`).join('')}</ul>
   </div>`;
 }
 // Sharing them (shareWith, recap.js): a picture, or the text and a link that opens the league's Draft tab
@@ -173,7 +204,7 @@ function draftRow(p, mine) {
   const gainCls = p.gain > 0 ? 'pos-good' : p.gain < 0 ? 'pos-bad' : 'muted';
   return `<tr class="${p.teamId === mine ? 'dr-mine' : ''}">
     <td class="st-name"><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain"><div class="bname">${p.nbaId ? `${playerBtn(p.nbaId, p.name)}` : esc(p.name)}</div>
-      <div class="pmeta">${esc(p.team)}${p.teamId === mine ? ' <span class="badge accent">you</span>' : ''}</div></div></div></td>
+      <div class="pmeta">${teamLink(p.teamId)}${p.teamId === mine ? ' <span class="badge accent">you</span>' : ''}</div></div></div></td>
     <td class="num">R${p.round} · <b>#${p.pick}</b></td>
     <td class="num">${p.gp ? `#${p.rank}` : '<span class="muted">—</span>'}</td>
     <td class="num"><b class="${gainCls}">${p.gp ? signed(p.gain, 0) : 'DNP'}</b></td>
@@ -237,6 +268,7 @@ function viewDraft() {
     return { id, name: fxTeamName(id), n: ps.length, avg, top, low, total };
   }).sort((a, b) => b.avg - a.avg);
   draftTeamCards.clear();
+  const pickName = p => (p.nbaId ? playerBtn(p.nbaId, lastName(p.name)) : esc(lastName(p.name))); // (his card, by his last name)
   for (const [id, ps] of Object.entries(byTeam)) draftTeamCards.set(id, draftTeamCard(d, id, ps));
 
   // board: one column per draft slot (round-1 order), one row per round. Traded picks stay in
@@ -298,8 +330,8 @@ function viewDraft() {
       <thead><tr><th class="num">#</th><th>Team</th><th class="num">Avg +/−</th><th class="num">${d.totals ? draftValueLabel() : `Total ${valueLabel()}`}</th><th>Best pick</th><th>Worst pick</th></tr></thead>
       <tbody>${teamRows.map((t, i) => `<tr class="${t.id === mine ? 'dr-mine' : ''}"><td class="num">${i + 1}</td><td><button type="button" class="link-btn aw-team" data-action="draft-team" data-team="${esc(t.id)}" title="See ${esc(t.name)}'s picks and keepers"><b>${esc(t.name)}</b></button>${t.id === mine ? ' <span class="badge accent">you</span>' : ''}</td>
         <td class="num"><b class="${t.avg > 0 ? 'pos-good' : t.avg < 0 ? 'pos-bad' : ''}">${signed(t.avg, 1)}</b></td><td class="num">${fmtValue(t.total)}</td>
-        <td>${inlinePlayer(t.top, esc(lastName(t.top.name)))} <span class="muted small">#${t.top.pick}</span> <span class="pos-good small">${t.top.gp ? signed(t.top.gain, 0) : ''}</span></td>
-        <td>${inlinePlayer(t.low, esc(lastName(t.low.name)))} <span class="muted small">#${t.low.pick}</span> <span class="pos-bad small">${t.low.gp ? signed(t.low.gain, 0) : 'DNP'}</span></td></tr>`).join('')}</tbody>
+        <td>${inlinePlayer(t.top, pickName(t.top))} <span class="muted small">#${t.top.pick}</span> <span class="pos-good small">${t.top.gp ? signed(t.top.gain, 0) : ''}</span></td>
+        <td>${inlinePlayer(t.low, pickName(t.low))} <span class="muted small">#${t.low.pick}</span> <span class="pos-bad small">${t.low.gp ? signed(t.low.gain, 0) : 'DNP'}</span></td></tr>`).join('')}</tbody>
     </table></div>
   </div>
   <div class="card dr-gap">
