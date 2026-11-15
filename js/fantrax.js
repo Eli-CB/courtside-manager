@@ -340,10 +340,13 @@ async function fetchFantraxLeague(id, opts = {}) {
   };
   const picks = ((draft && draft.draftPicks) || []).filter(d => d.playerId);
   if (picks.length) {
+    // Fantrax's times read as "2026-10-17T19:00:02.0-0400" (an offset without a colon, which not every browser takes)
+    const at = s => { const m = String(s || '').match(/^(.+?)(?:\.\d+)?([+-]\d\d):?(\d\d)$/); return (m && Date.parse(`${m[1]}${m[2]}:${m[3]}`)) || null; };
     league.draft = {
       date: String(draft.draftDate || '').slice(0, 10), type: draft.draftType || '', state: draft.draftState || '',
       perRound: Math.max(...draft.draftPicks.map(d => d.pickInRound || 0)),
-      picks: picks.map(d => [d.round, d.pick, d.teamId, toNba[d.playerId] || null, names[d.playerId] || '']),
+      start: at(draft.startDate), // (when the draft opened, and each pick's time: how long each took, for the Draft awards)
+      picks: picks.map(d => [d.round, d.pick, d.teamId, toNba[d.playerId] || null, names[d.playerId] || '', d.time || null]),
       // pick slots per team, unused ones included
       rounds: Math.max(0, ...Object.values((draft.draftPicks || []).reduce((n, d) => { n[d.teamId] = (n[d.teamId] || 0) + 1; return n; }, {}))),
     };

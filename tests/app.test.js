@@ -2362,7 +2362,7 @@ test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist
   const [A, B, C] = L.teams.map(t => t.id);
   const players = app.NBA.players, archives = app.get('archives');
   const r = players.slice(0, 9);
-  const saved = players.map(x => [x, x.fx && { ...x.fx }, x.adp]), fields = r.map(x => [x, x.born, x.team, x.exp]);
+  const saved = players.map(x => [x, x.fx && { ...x.fx }, x.adp]), fields = r.map(x => [x, x.born, x.team, x.exp, x.nat]);
   const y = +String(app.NBA.season).slice(0, 4), seasons = [app.seasonOf(y - 1), app.seasonOf(y - 2)];
   const hadArchives = seasons.map(s => [s, s in archives, archives[s]]);
   try {
@@ -2372,9 +2372,9 @@ test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist
     const [a1, b1, c1, a2, b2, c2, a3, c3, b3] = r; // (each team's picks, in draft order)
     // consensus as drafted, but #9 the top of the board: it fell 8 picks, every other a pick early
     r.forEach((x, i) => { x.fx = { ...(x.fx || {}), adp: i === 8 ? 0.5 : i + 1 }; });
-    // A drafted young and all Thunder; B old and from three teams; C in between, two Celtics
-    [[a1, '2005-06-01', 'OKC'], [a2, '2005-06-01', 'OKC'], [a3, '2005-06-01', 'OKC'], [b1, '1990-06-01', 'BOS'], [b2, '1990-06-01', 'LAL'], [b3, '1990-06-01', 'MIA'],
-      [c1, '1998-06-01', 'BOS'], [c2, '1998-06-01', 'BOS'], [c3, '1998-06-01', 'DEN']].forEach(([x, born, team]) => Object.assign(x, { born, team, exp: 5 }));
+    // A drafted young, all Thunder and American; B old, from three teams and three countries; C in between, two Celtics
+    [[a1, '2005-06-01', 'OKC', 'US'], [a2, '2005-06-01', 'OKC', 'US'], [a3, '2005-06-01', 'OKC', 'US'], [b1, '1990-06-01', 'BOS', 'US'], [b2, '1990-06-01', 'LAL', 'FR'], [b3, '1990-06-01', 'MIA', 'CA'],
+      [c1, '1998-06-01', 'BOS', 'US'], [c2, '1998-06-01', 'BOS', 'US'], [c3, '1998-06-01', 'DEN', 'RS']].forEach(([x, born, team, nat]) => Object.assign(x, { born, team, nat, exp: 5 }));
     // the last two seasons' games: A's 80 of 82; B's one 40, one out hurt both years (not in either archive), one 82;
     // C's a rookie (no seasons), one 82, one 70
     c1.exp = 0;
@@ -2396,9 +2396,13 @@ test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist
     assert.equal(get('Youngins').text, `${app.fxTeamName(A)}: their picks averaged ${age('2005-06-01').toFixed(1)} years old`);
     assert.equal(get('Uncs').text, `${app.fxTeamName(B)}: their picks averaged ${age('1990-06-01').toFixed(1)} years old`);
     assert.ok(get('Uncs').detail.html.indexOf(`data-team="${B}"`) < get('Uncs').detail.html.indexOf(`data-team="${A}"`), 'oldest first');
-    // The Homer: three Thunder; The Globalist: three different teams
+    // The Homer: three Thunder; The Globalist: three countries (players' nationalities, not their teams)
     assert.equal(get('The Homer').text, `${app.fxTeamName(A)} took 3 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1')}`);
-    assert.equal(get('The Globalist').text, `${app.fxTeamName(B)}: their picks came from 3 different teams`);
+    assert.equal(get('The Globalist').text, `${app.fxTeamName(B)}: their picks came from 3 countries`);
+    const globeRows = get('The Globalist').detail.html.split('<li>').slice(1);
+    assert.match(globeRows[0], />3 countries<\/b>/);
+    assert.equal((globeRows[0].match(/<img class="flag"/g) || []).length, 3, "B's three flags");
+    assert.match(globeRows.find(x => x.includes(`data-team="${C}"`)), /alt="United States"[^>]*>×2/, "C's two Americans: one flag, ×2");
     // a tie names each team (with its real team on The Homer)
     c3.team = 'BOS';
     assert.equal(app.draftAwards(d).find(x => x.label === 'The Homer').text, `${app.fxTeamName(A)} (OKC) and ${app.fxTeamName(C)} (BOS) tied: 3 players each from one team`);
@@ -2408,10 +2412,39 @@ test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist
     assert.ok(!app.draftAwards(d).some(x => x.label === 'Glass'));
     for (const s of seasons) loading.delete(s);
   } finally {
-    for (const [x, born, team, exp] of fields) Object.assign(x, { born, team, exp });
+    for (const [x, born, team, exp, nat] of fields) Object.assign(x, { born, team, exp, nat });
     for (const [x, fx, adp] of saved) { if (fx) x.fx = fx; else delete x.fx; if (adp != null) x.adp = adp; else delete x.adp; }
     for (const [s, had, v] of hadArchives) { if (had) archives[s] = v; else delete archives[s]; }
   }
+});
+
+test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (each team's typical pick)", async () => {
+  const L = await app.useLeague(CATS9);
+  const [A, B, C] = L.teams.map(t => t.id);
+  // Fantrax's times come through with the draft: each pick's, and when the draft opened
+  assert.equal(app.fxLeague().draft.picks[0].length, 6);
+  const dd = app.draftData();
+  assert.ok('at' in dd.picks[0] && 'start' in dd, 'the pick times reach the Draft tab');
+  const r = app.NBA.players.slice(0, 9);
+  const start = Date.parse('2026-10-17T23:00:00Z');
+  // each pick's wait: A 5 s each; B 100, 100 and a 400 s pause; C 30 s each
+  const wait = { [A]: [5, 5, 5], [B]: [100, 100, 400], [C]: [30, 30, 30] }, used = { [A]: 0, [B]: 0, [C]: 0 };
+  const order = [A, B, C, C, B, A, A, B, C];
+  let t = start;
+  const picks = order.map((tid, i) => { t += wait[tid][used[tid]++] * 1000; return { round: Math.ceil((i + 1) / 3), pick: i + 1, teamId: tid, nbaId: r[i].id, raw: r[i], name: r[i].name, at: t }; });
+  const d = { keepers: {}, date: '2026-10-17', start, picks };
+  const get = label => app.draftAwards(d).find(x => x.label === label);
+  assert.equal(get('Trigger Finger').text, `${app.fxTeamName(A)}: their typical pick took 5 seconds (5 on average)`);
+  assert.equal(get('Clock Milker').text, `${app.fxTeamName(B)}: their typical pick took 100 seconds (200 on average)`, "the pause doesn't decide it, but it's in the average");
+  const rows = get('Clock Milker').detail.html.split('<li>').slice(1);
+  assert.deepEqual(Array.from(rows, x => x.match(/data-team="([^"]+)"/)[1]), [B, C, A], 'slowest first');
+  assert.match(rows[0], new RegExp(`longest: <button[^>]*data-nba="${r[7].id}"[^>]*>[^<]+</button>, 400 s</div>.*>100 s</b>`));
+  // a draft whose picks all carry one time (Fantrax rewrites an old draft's): no pick clocks
+  for (const p of picks) p.at = start + 1000;
+  assert.ok(!app.draftAwards(d).some(x => x.label === 'Trigger Finger' || x.label === 'Clock Milker'));
+  // no times at all (ESPN, Sleeper, Yahoo): none either
+  for (const p of picks) p.at = null;
+  assert.ok(!app.draftAwards(d).some(x => x.label === 'Trigger Finger'));
 });
 
 test("a Fantrax league of a sport the site doesn't read (golf) says so, instead of loading as basketball", async () => {

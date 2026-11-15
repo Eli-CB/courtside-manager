@@ -309,14 +309,15 @@ function viewPlayers() {
   return topPerformancesCard(); // (ideas for pickups: the Matchups tab's, made against this week's matchup)
 }
 
-// A country's flag (ISO code from the daily data job), named on hover
-const flag = iso => {
+// A country's flag (ISO code from the daily data job), named on hover: flagImg alone, flag after a " · " (the player card)
+const flagImg = iso => {
   if (!iso) return '';
   let name = iso;
   try { name = new Intl.DisplayNames(['en'], { type: 'region' }).of(iso); } catch (e) { /* the code, then */ }
   const c = iso.toLowerCase();
-  return ` · <img class="flag" src="https://flagcdn.com/w20/${c}.png" srcset="https://flagcdn.com/w40/${c}.png 2x" width="20" height="15" alt="${esc(name)}" title="${esc(name)}" loading="lazy">`;
+  return `<img class="flag" src="https://flagcdn.com/w20/${c}.png" srcset="https://flagcdn.com/w40/${c}.png 2x" width="20" height="15" alt="${esc(name)}" title="${esc(name)}" loading="lazy">`;
 };
+const flag = iso => (iso ? ` · ${flagImg(iso)}` : '');
 // Whose he is in the league: the fantasy team and where in its lineup, else free agent or waivers
 function cardOwner(raw) {
   const L = fxLeague();

@@ -62,11 +62,11 @@ function draftData() {
   const W = draftSeason(L, basis);
   if (W && W.loading) return { loading: true };
   const statsOf = raw => (W ? W.stats.get(raw.id) || null : nbaStats(raw, basis));
-  const picks = L.draft.picks.map(([round, pick, teamId, nba, name]) => {
+  const picks = L.draft.picks.map(([round, pick, teamId, nba, name, at]) => {
     const raw = nba ? nbaById.get(nba) : null;
     const s = raw && basis ? statsOf(raw) : null;
     const gp = s ? Math.round(s.gp) : 0;
-    const p = { round, pick, teamId, team: fxTeamName(teamId), raw, nbaId: nba, name: raw ? raw.name : name, gp, val: null, s };
+    const p = { round, pick, teamId, team: fxTeamName(teamId), raw, nbaId: nba, name: raw ? raw.name : name, gp, val: null, s, at: at || null };
     if (s && gp) p.val = value({ ...s, pos: raw.pos });
     return p;
   });
@@ -107,15 +107,16 @@ function draftData() {
     }).sort((a, b) => a.rank - b.rank);
     keepers[tid].forEach((k, i) => { k.slot = KEEPER_SLOTS[i] || 25; k.gain = k.like == null ? null : k.slot - k.like; });
   }
-  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals, season: W && W.win };
+  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, start: L.draft.start || null, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals, season: W && W.win };
 }
 
 // ----- Draft awards: this season's draft, for the league to share -----
 // The ADP ones (The Reacher, The Fall, Autopilot) go against consensus ADP (Fantrax's average draft position over its
 // drafts): a pick is compared with where consensus would take its player in this draft. The league's keepers come off the
 // board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
-// ADP order among the players not kept. The rest come from the players themselves: Glass (games missed the last two
-// seasons), Youngins and Uncs (age on draft day), The Homer and The Globalist (their real teams now). Team awards count
+// ADP order among the players not kept. Trigger Finger and Clock Milker come from how long each pick took (Fantrax's pick
+// times). The rest come from the players themselves: Glass (games missed the last two seasons), Youngins and Uncs (age
+// on draft day), The Homer (their real teams now) and The Globalist (their countries). Team awards count
 // only teams with at least half as many picks as the most of any team, and a tie names every team in it. Not for a past
 // season: today's ADP, ages and teams say nothing about a draft from another year. Each award is { e, label, html, text,
 // p, tid, stats }, as the Recap's standouts, so the same picture and Share work for both, and detail: { title, html },
@@ -228,6 +229,26 @@ function draftAwards(d) {
     }
   }
 
+  // ----- how long each pick took: Fantrax's pick times (ESPN, Sleeper and Yahoo give none) -----
+  // A pick's time is the wait since the pick before (the first pick's, since the draft opened). Only real times: a draft
+  // whose picks all carry one time (Fantrax rewrites an old draft's) has none. Each team's typical (median) pick time, so
+  // a pause in the draft (a break, the commissioner's) doesn't decide it; the average breaks a tie.
+  const timed = d.picks.filter(p => p.at).sort((a, b) => a.pick - b.pick);
+  if (timed.length >= d.picks.length / 2 && new Set(timed.map(p => p.at)).size >= timed.length / 2) {
+    const waits = [];
+    let prev = d.start;
+    for (const p of timed) { if (prev && p.at >= prev) waits.push({ p, s: (p.at - prev) / 1000 }); prev = p.at; }
+    const clocks = byTeam(waits).map(t => { const ss = t.xs.map(x => x.s); return { ...t, med: median(ss), avg: sum(ss) / ss.length, long: sortDesc(t.xs, x => x.s)[0] }; });
+    if (clocks.length > 1) {
+      const sec = s => `${Math.round(s)} s`;
+      const said = t => `: their typical pick took ${plural(Math.round(t.med), 'second')} (${Math.round(t.avg)} on average)`;
+      const rows = sign => sortDesc(clocks, t => sign * (t.med * 1e4 + t.avg)).map(t => row(teamWho(t), `${Math.round(t.avg)} s on average · longest: ${who(t.long.p)}, ${sec(t.long.s)}`, sec(t.med))).join('');
+      const fast = best(clocks, t => -t.med, t => -tenth(t.avg)), slow = best(clocks, t => t.med, t => tenth(t.avg));
+      teamAward('⚡', 'Trigger Finger', fast, said(fast[0]), "Each team's typical pick time (the middle one of its picks), fastest first. A pause in the draft counts as pick time.", rows(-1));
+      teamAward('⏳', 'Clock Milker', slow, said(slow[0]), "Each team's typical pick time (the middle one of its picks), slowest first. A pause in the draft counts as pick time.", rows(1));
+    }
+  }
+
   // ----- from the players themselves: each team's picks, as the players they are now -----
   const squads = byTeam(d.picks.filter(p => p.raw).map(p => ({ p })));
   if (!squads.length) return out;
@@ -266,12 +287,15 @@ function draftAwards(d) {
     teamAward('👶', 'Youngins', young, `: their picks averaged ${fmt(young[0].avg, 1)} years old`, "Each team's picks' average age on draft day, youngest first", ageRows(-1, 'youngest'));
     teamAward('👴', 'Uncs', old, `: their picks averaged ${fmt(old[0].avg, 1)} years old`, "Each team's picks' average age on draft day, oldest first", ageRows(1, 'oldest'));
   }
-  // The Homer: the most picks from one real team (by each player's team now); The Globalist: the most different real teams
+  // The Homer: the most picks from one real team (by each player's team now); The Globalist: the most countries (the
+  // owner's ask: players' nationalities, from the daily file's ISO codes)
   const stacks = squads.map(t => {
     const by = new Map();
     for (const x of t.xs) if (x.p.raw.team) by.set(x.p.raw.team, [...(by.get(x.p.raw.team) || []), x.p]);
     const top = sortDesc([...by], ([, ps]) => ps.length - Math.min(...ps.map(p => p.pick)) / 1e4)[0]; // (on a tie, the stack taken first)
-    return { ...t, teams: by.size, club: top && top[0], ps: (top && top[1]) || [] };
+    const nats = new Map();
+    for (const x of t.xs) if (x.p.raw.nat) nats.set(x.p.raw.nat, (nats.get(x.p.raw.nat) || 0) + 1);
+    return { ...t, teams: by.size, club: top && top[0], ps: (top && top[1]) || [], nats };
   });
   const homers = best(stacks, t => t.ps.length);
   if (homers.length && homers[0].ps.length >= 2) {
@@ -285,11 +309,13 @@ function draftAwards(d) {
       detail: breakdown('🏠', 'The Homer', 'The most picks each team took from one real team (by his team now)', rows),
     });
   }
-  const globe = best(stacks, t => t.teams);
-  if (globe.length && globe[0].teams > 1) {
-    const rows = sortDesc(stacks, t => t.teams * 100 - t.n).map(t => row(teamWho(t), `${plural(t.n, 'pick')}${t.ps.length > 1 ? ` · ${t.ps.length} from ${teamBtn(t.club)}` : ''}`, `${t.teams} teams`)).join('');
-    teamAward('🌍', 'The Globalist', globe, `: their picks came from ${globe[0].teams} different teams${globe.length > 1 ? ' each' : ''}`,
-      'How many different real teams each team drafted from (by his team now)', rows);
+  const globe = best(stacks, t => t.nats.size);
+  if (globe.length && globe[0].nats.size > 1) {
+    // each team's countries as flags, the most picks first (×2 for two)
+    const flags = t => sortDesc([...t.nats], ([, k]) => k).map(([c, k]) => `${flagImg(c)}${k > 1 ? `×${k}` : ''}`).join(' ');
+    const rows = sortDesc(stacks, t => t.nats.size * 100 - t.n).map(t => row(teamWho(t), flags(t) || 'no countries known', `${t.nats.size} ${t.nats.size === 1 ? 'country' : 'countries'}`)).join('');
+    teamAward('🌍', 'The Globalist', globe, `: their picks came from ${globe[0].nats.size} countries${globe.length > 1 ? ' each' : ''}`,
+      "How many countries each team's picks come from", rows);
   }
   return out;
 }
