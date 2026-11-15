@@ -52,6 +52,13 @@ class Small(unittest.TestCase):
         self.assertIsInstance(D.per_game(3.0), int)
         self.assertEqual(D.per_game(3.456), 3.46)
 
+    def test_fantrax_times_as_the_page_keeps_them(self):
+        # Fantrax's offset has no colon; the page's pick clocks read milliseconds since 1970
+        self.assertEqual(D.fx_ms('2026-10-17T19:00:02.0-0400'), 1792278002000)
+        self.assertEqual(D.fx_ms('2026-10-17T19:00:02-04:00'), 1792278002000)
+        self.assertIsNone(D.fx_ms(None))
+        self.assertIsNone(D.fx_ms('not a time'))
+
     def test_the_season_index_lists_seasons_only(self):
         with tempfile.TemporaryDirectory() as folder:
             for f in ('2024-25.json', '2024-25-games.json', '2025-26.json', 'index.json'):

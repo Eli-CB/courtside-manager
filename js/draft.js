@@ -111,7 +111,7 @@ function draftData() {
 }
 
 // ----- Draft awards: this season's draft, for the league to share -----
-// The ADP ones (The Reacher, The Fall, AFK) go against consensus ADP (Fantrax's average draft position over its
+// The ADP ones (The Reacher, The Fall, Value Meal) go against consensus ADP (Fantrax's average draft position over its
 // drafts): a pick is compared with where consensus would take its player in this draft. The league's keepers come off the
 // board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
 // ADP order among the players not kept. Trigger Finger and Clock Milker come from how long each pick took (Fantrax's pick
@@ -207,7 +207,7 @@ function draftAwards(d) {
       out[out.length - 1].detail = breakdown('🗼', 'The Fall', `The ${Math.min(10, falls.length)} picks taken furthest past consensus`,
         falls.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${-x.early} late`)).join(''));
     }
-    // AFK (was Autopilot): the team whose typical pick came out furthest ahead of consensus: the median of its picks' spots after
+    // Value Meal (was Autopilot, then AFK): the team whose typical pick came out furthest ahead of consensus: the median of its picks' spots after
     // their consensus spots (before it, a reach, counts as early), so one big reach or one big fall doesn't decide it (the
     // owner's ask: a team with one 86-spot reach and its other picks falling to it isn't sunk by it); what taking the top
     // of the ADP list every time gives, as the computer does for whoever isn't there. Medians tie often: the average (to a
@@ -225,7 +225,7 @@ function draftAwards(d) {
         const notes = [steal.early < 0 && `fell: ${who(steal.p)}, ${plural(-steal.early, 'spot')}`, reach.early > 0 && `reach: ${who(reach.p)}`].filter(Boolean);
         return row(teamWho(t), notes.join(' · ') || 'every pick on his consensus spot', way(t.med), t.med > 0 ? 'pos-good' : t.med < 0 ? 'pos-bad' : '');
       }).join('');
-      teamAward('💤', 'AFK', auto, `: their typical pick went ${num(auto[0].med)} spot${auto[0].med === 1 ? '' : 's'} late`,
+      teamAward('🍔', 'Value Meal', auto, `: their typical pick went ${num(auto[0].med)} spot${auto[0].med === 1 ? '' : 's'} late`,
         "Each team's typical pick against consensus: the middle one of its picks. Late: players who fell to them. Early: reaches.", rows);
     }
   }

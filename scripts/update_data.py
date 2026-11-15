@@ -582,6 +582,17 @@ def fantrax_name(name):
     return f'{first} {last}'.strip() if first else name
 
 
+def fx_ms(s):
+    """A Fantrax time ("2026-10-17T19:00:02.0-0400") as milliseconds since 1970, as the page keeps it (None if unreadable)."""
+    m = re.match(r'^(.+?)(?:\.\d+)?([+-]\d\d):?(\d\d)$', str(s or ''))
+    if not m:
+        return None
+    try:
+        return int(dt.datetime.fromisoformat(f'{m.group(1)}{m.group(2)}:{m.group(3)}').timestamp() * 1000)
+    except ValueError:
+        return None
+
+
 def roster_period_days(periods):
     """Typical length in days of the league's lineup lock periods (None if unknown)."""
     from datetime import datetime
@@ -679,11 +690,13 @@ def fantrax(league_id, index, saved_league=None):
         'standings': [dict(zip(('w', 'l', 't'), [int(x) if x.isdigit() else 0 for x in (str(r.get('points') or '0-0-0').split('-') + ['0', '0'])[:3]]),
                            id=r['teamId'], name=r.get('teamName', ''), rank=r.get('rank'), gb=r.get('gamesBack') or 0)
                       for r in (standings if isinstance(standings, list) else []) if r.get('teamId')],
-        # [round, overall pick, fantasy team id, NBA.com player id, name] for every pick made
+        # [round, overall pick, fantasy team id, NBA.com player id, name, when it was made (ms)] for every pick made, and
+        # when the draft opened: how long each pick took, for the Draft tab's Trigger Finger and Clock Milker (as js/fantrax.js)
         'draft': {
             'date': (draft.get('draftDate') or '')[:10], 'type': draft.get('draftType', ''), 'state': draft.get('draftState', ''),
             'perRound': max((d.get('pickInRound') or 0) for d in draft.get('draftPicks', [])) if draft.get('draftPicks') else 0,
-            'picks': [[d['round'], d['pick'], d['teamId'], fx_to_nba.get(d['playerId']), fx_names.get(d['playerId'], '')]
+            'start': fx_ms(draft.get('startDate')),
+            'picks': [[d['round'], d['pick'], d['teamId'], fx_to_nba.get(d['playerId']), fx_names.get(d['playerId'], ''), d.get('time')]
                       for d in draft.get('draftPicks', []) if d.get('playerId')],
         } if draft.get('draftPicks') else None,
         'rosters': {
