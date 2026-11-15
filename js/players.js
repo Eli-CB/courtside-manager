@@ -479,12 +479,12 @@ function showSportTeamCard(tri) {
       <tbody>${rows || `<tr><td colspan="5" class="muted small">No players on ${esc(tri)} in the data.</td></tr>`}</tbody>
     </table></div>
     <p style="margin:14px 0 0"><button type="button" class="link-btn quiet" data-action="team-players" data-team="${esc(tri)}">See ${esc(tri)} on the Players tab</button></p>`;
-  // the title: its name, then its code and record (filled in once the box scores are in, if they weren't yet)
+  // the title: its name, then its record (filled in once the box scores are in, if they weren't yet; no code: the name says it)
   const name = (SPORT.teamNames || {})[tri] || tri;
   const recTip = isHockey() ? 'Wins-losses-overtime losses' : isFootball() ? 'Wins-losses(-ties)' : 'Wins-losses';
   const title = () => {
     const rec = teamRecord(tri);
-    return `<span class="dt-name">${teamLogo(tri, 22)} ${esc(name)}</span><span class="dt-bio">${esc(tri)}${rec ? ` · <span class="dt-rec" title="${recTip}, this regular season">${rec}</span>` : ''}</span>`;
+    return `<span class="dt-name">${IMG && IMG.logos[tri] ? `${teamLogo(tri, 22)} ` : ''}${esc(name)}</span>${rec ? `<span class="dt-bio"><span class="dt-rec" title="${recTip}, this regular season">${rec}</span></span>` : ''}`;
   };
   $('#detailTitle').innerHTML = title();
   cardOpen = null;

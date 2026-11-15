@@ -2173,7 +2173,8 @@ test("a team's card has its record: its finals, then today's game once it's over
     live.games = [];
     assert.equal(app.teamRecord(tri), '2-1');
     app.actions['sport-team']({ dataset: { team: tri } });
-    assert.match(els['#detailTitle'].innerHTML, /PHI · <span class="dt-rec"[^>]*>2-1<\/span>/, 'in the title, after its code');
+    assert.match(els['#detailTitle'].innerHTML, /<span class="dt-bio"><span class="dt-rec"[^>]*>2-1<\/span><\/span>$/, 'in the title, under its name');
+    assert.doesNotMatch(els['#detailTitle'].innerHTML.replace(/<[^>]*>/g, ''), /\bPHI\b/, 'without its code: the full name says it');
     // tonight's game counts once it's over; a preseason game (not on its schedule) never does
     live.games = [{ d: dates[3], home: 'ATL', away: tri, hs: 90, as: 95, state: 'in', period: 4 }, { d: '2026-10-05', home: tri, away: 'ORL', hs: 80, as: 120, state: 'post', period: 4 }];
     assert.equal(app.teamRecord(tri), '2-1', 'not while it is on');
