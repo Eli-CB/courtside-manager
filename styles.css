@@ -1135,6 +1135,9 @@ tr.me-row td { background: var(--accent-soft); }
 .lm-mark { width: 32px; height: 24px; flex: none; shape-rendering: geometricPrecision; }
 .lm-mark .m-a { fill: var(--text); }
 .lm-mark .m-b { fill: #7f8a9c; }
+/* an ordinary (1x) screen: the mark's shallow slopes draw as stair-steps however they sit on the pixels, so a third of a pixel of blur
+   smooths them (tried side by side at 0, .25, .35 and .5: .5 reads as soft). Sharper screens don't need it */
+@media (max-resolution: 1.4dppx) { .lm-mark { filter: blur(.3px); } }
 .lm summary::-webkit-details-marker { display: none; }
 .lm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lm-caret { width: 15px; height: 15px; flex: none; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
