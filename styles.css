@@ -396,7 +396,14 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .pc-log td:first-child, .pc-log th:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pc-log-wrap { overflow-y: auto; scrollbar-gutter: stable; }
 .perf-q { display: block; width: 100%; max-width: 280px; margin: 0 0 8px; }
-/* position and team menus look like the pills beside them, with a caret */
+/* position and team menus look like the pills beside them, with a caret; each opens a box of choices, any number of them
+   (teams in a grid); on phones the box hangs from the row, so it can't run off the screen */
+.pm { position: relative; display: inline-flex; }
+.pm-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; display: flex; flex-wrap: wrap; gap: 6px; width: max-content; max-width: min(340px, calc(100vw - 32px)); padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); }
+.pm-pop.pm-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: 340px; }
+.pm-pop .pill { padding: 5px 0; min-width: 44px; text-align: center; }
+.pm-pop .pm-all { grid-column: 1 / -1; flex: 1 0 100%; text-align: left; padding: 4px 2px 0; }
+@media (max-width: 640px) { .pp-row .perf-filters { position: relative; } .pm { position: static; } }
 .pill.pill-menu, .pill.pill-menu.on { appearance: none; -webkit-appearance: none; width: auto; height: auto; line-height: inherit; padding-right: 24px;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: right 12px center, right 8px center; background-size: 4px 4px; background-repeat: no-repeat; }

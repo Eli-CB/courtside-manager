@@ -371,7 +371,14 @@ const actions = {
     render();
   },
   'perf-more'() { ui.perfMore.n += 100; render(); },
-  'perf-filt'() { ui.perfFiltOpen = !ui.perfFiltOpen; render(); },
+  'perf-filt'() { ui.perfFiltOpen = !ui.perfFiltOpen; ui.perfMenu = null; render(); },
+  // the position and team menus: one open at a time, each choice on or off (no value: all of them again)
+  'perf-menu'(el) { ui.perfMenu = ui.perfMenu === el.dataset.menu ? null : el.dataset.menu; render(); },
+  'perf-pick'(el) {
+    const k = el.dataset.menu, v = el.dataset.val;
+    ui[k] = !v ? [] : ui[k].includes(v) ? ui[k].filter(x => x !== v) : [...ui[k], v];
+    render();
+  },
   // whose players: any of them, but never none
   'perf-whose'(el) {
     const k = el.dataset.key, next = { ...ui.perfWhose, [k]: !ui.perfWhose[k] };
@@ -386,14 +393,14 @@ const actions = {
   'team-players'(el) {
     const d = $('#detailDialog');
     if (d && d.open) d.close();
-    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: '', perfTeam: el.dataset.team, perfQ: '', perfFiltOpen: true });
+    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: [], perfTeam: [el.dataset.team], perfMenu: null, perfQ: '', perfFiltOpen: true });
     if (!isFootball()) Object.assign(ui, { perfRange: 'year', perfMore: { sig: '', n: 0 } });
     Object.assign(ui.perfOnly, { rookie: false, inj: false });
     if (location.hash === '#players') render(); else location.hash = '#players';
     window.scrollTo(0, 0);
   },
   'perf-clear'() {
-    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: '', perfTeam: '' });
+    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: [], perfTeam: [], perfMenu: null });
     Object.assign(ui.perfOnly, { rookie: false, inj: false });
     render();
   },
@@ -485,6 +492,7 @@ function setNav(open) {
   $('.tab-more')?.setAttribute('aria-expanded', open);
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('nav-open')) setNav(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.perfMenu) { ui.perfMenu = null; render(); } });
 
 // The browser's offer to install, kept for the settings menu's Install the app
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ui.installPrompt = e; if (state) render(); });
@@ -591,6 +599,8 @@ document.addEventListener('click', e => {
   if (team && team.open && !e.target.closest('#teamMenu')) team.removeAttribute('open');
   const gear = $('#gearMenu details');
   if (gear && gear.open && !e.target.closest('#gearMenu') && !e.target.closest('#infoDialog')) gear.removeAttribute('open');
+  // the Players tab's position or team menu shuts on a tap anywhere else
+  if (ui.perfMenu && !e.target.closest('.pm')) { ui.perfMenu = null; if (ui.tab === 'players') render(); }
   const el = e.target.closest('[data-action]');
   // a player's photo opens his card, as his name does (not in a trade list, where the row is a checkbox, or on the card itself)
   const photo = !el && e.target.closest('[data-photo]');
@@ -623,12 +633,6 @@ document.addEventListener('change', e => {
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
-  } else if (el.dataset.change === 'perf-pos') {
-    ui.perfPos = el.value;
-    render();
-  } else if (el.dataset.change === 'perf-team') {
-    ui.perfTeam = el.value;
-    render();
   } else if (el.dataset.change === 'trade-team') {
     ui.tradeTeam = el.value;
     ui.tradeGet.clear();

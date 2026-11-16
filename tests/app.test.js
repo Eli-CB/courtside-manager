@@ -1270,15 +1270,21 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     assert.ok(ids(html).includes(best.raw.id) && ids(html).every(id => app.normName(app.nbaById.get(id).name).includes(app.normName(ui.perfQ))));
     ui.perfQ = '';
     // position
-    ui.perfPos = 'C';
+    ui.perfPos = ['C'];
     html = app.topPerformancesCard();
     assert.ok(ids(html).length && ids(html).every(id => app.nbaById.get(id).pos.includes('C')), 'centers only');
-    ui.perfPos = '';
+    ui.perfPos = ['C', 'PG'];
+    html = app.topPerformancesCard();
+    assert.ok(['C', 'PG'].every(x => ids(html).some(id => app.nbaById.get(id).pos.includes(x))) && ids(html).every(id => ['C', 'PG'].some(x => app.nbaById.get(id).pos.includes(x))), 'any number of positions: a player at any of them');
+    ui.perfPos = [];
     // NBA team
-    ui.perfTeam = 'OKC';
+    ui.perfTeam = ['OKC'];
     html = app.topPerformancesCard();
     assert.ok(ids(html).length && ids(html).every(id => app.nbaById.get(id).team === 'OKC'), 'one NBA team');
-    ui.perfTeam = '';
+    ui.perfTeam = ['OKC', 'LAC'];
+    html = app.topPerformancesCard();
+    assert.ok(['OKC', 'LAC'].every(t => ids(html).some(id => app.nbaById.get(id).team === t)) && ids(html).every(id => ['OKC', 'LAC'].includes(app.nbaById.get(id).team)), 'or several');
+    ui.perfTeam = [];
     // the top 300 over a season
     assert.equal((app.topPerformancesCard().split('<tbody>')[1].match(/<\/tr>/g) || []).length, Math.min(300, rows.length), 'Per game: the top 300');
     // Show more: 100 more rows each time, until another sort or filter starts the list over
@@ -1293,8 +1299,23 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     // position and team are pill-style menus, then Rookies and Injured (in the Filters panel)
     ui.perfFiltOpen = true;
     html = app.topPerformancesCard();
-    assert.ok(/<select class="pill pill-menu" data-change="perf-pos"/.test(html) && /<select class="pill pill-menu" data-change="perf-team"/.test(html));
-    assert.ok(html.indexOf('data-change="perf-team"') < html.indexOf('data-key="rookie"') && html.indexOf('data-key="rookie"') < html.indexOf('data-key="inj"'));
+    assert.ok(/<button type="button" class="pill pill-menu" data-action="perf-menu" data-menu="perfPos"[^>]*>All positions</.test(html) && /class="pill pill-menu" data-action="perf-menu" data-menu="perfTeam"[^>]*>All teams</.test(html));
+    assert.ok(html.indexOf('data-menu="perfTeam"') < html.indexOf('data-key="rookie"') && html.indexOf('data-key="rookie"') < html.indexOf('data-key="inj"'));
+    // each opens a box to pick any number from: a tap puts one in, another takes it out, "All" empties it
+    assert.doesNotMatch(html, /pm-pop/, 'shut until asked for');
+    app.actions['perf-menu']({ dataset: { menu: 'perfTeam' } });
+    const pick = v => app.actions['perf-pick']({ dataset: { menu: 'perfTeam', val: v } });
+    pick('OKC'); pick('LAC'); pick('BOS');
+    assert.deepEqual([...ui.perfTeam], ['OKC', 'LAC', 'BOS']);
+    html = app.topPerformancesCard();
+    assert.match(html, /data-menu="perfTeam"[^>]*aria-expanded="true">3 teams</, 'the menu stays open and counts them');
+    assert.match(html, /data-val="LAC" aria-pressed="true"/);
+    pick('BOS');
+    assert.match(app.topPerformancesCard(), /aria-expanded="true">LAC, OKC</, 'two fit by name');
+    pick('');
+    assert.equal(ui.perfTeam.length, 0);
+    app.actions['perf-menu']({ dataset: { menu: 'perfTeam' } });
+    assert.equal(ui.perfMenu, null);
     ui.perfOnly.rookie = true;
     html = app.topPerformancesCard();
     assert.ok(ids(html).length && ids(html).every(id => !app.nbaById.get(id).exp), 'rookies only');
@@ -1316,7 +1337,7 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     ui.perfRange = 'avg';
     ui.tab = 'players';
     assert.equal(app.liveWanted(), false);
-  } finally { ui.perfRange = null; ui.perfQ = ''; ui.perfPos = ''; ui.perfTeam = ''; Object.assign(ui.perfOnly, { rookie: false, inj: false }); ui.perfFiltOpen = false; ui.tab = 'standings'; }
+  } finally { ui.perfRange = null; ui.perfQ = ''; ui.perfPos = []; ui.perfTeam = []; ui.perfMenu = null; Object.assign(ui.perfOnly, { rookie: false, inj: false }); ui.perfFiltOpen = false; ui.tab = 'standings'; }
 });
 
 test('performances: Active and Bench filters, and an Active badge', async () => {
@@ -2080,17 +2101,17 @@ test("team codes link to the Players tab filtered by that team; a player's photo
   assert.deepEqual(links, [a, b], 'each known code in the text, nothing else');
   assert.ok(html.includes(`${a}X`) && html.includes('ZZZ') && html.includes('class="x"'), 'longer words, unknown codes and tags left as they are');
   const ui = app.get('ui');
-  Object.assign(ui, { perfPos: 'C', perfQ: 'smith', perfTeam: '' });
+  Object.assign(ui, { perfPos: ['C'], perfQ: 'smith', perfTeam: [] });
   app.actions['team-players']({ dataset: { team: a } });
-  assert.equal(ui.perfTeam, a);
-  assert.equal(ui.perfPos, '', 'other filters off, so the whole team shows');
+  assert.deepEqual([...ui.perfTeam], [a]);
+  assert.equal(ui.perfPos.length, 0, 'other filters off, so the whole team shows');
   assert.equal(ui.perfQ, '');
   assert.equal(ui.perfFiltOpen, true, 'and the panel open to say why the list is short');
   assert.equal(ui.perfRange, 'year', "over the season: a day could have no game of theirs");
   const raw = app.NBA.players.find(r => r.team === a);
   assert.match(app.headshot({ nbaId: raw.id, name: raw.name }, 28), new RegExp(`data-photo="${raw.id}"`));
   assert.doesNotMatch(app.headshot({ name: 'No One' }, 28), /data-photo/, 'no player id: nothing to open');
-  Object.assign(ui, { perfTeam: '', perfFiltOpen: false });
+  Object.assign(ui, { perfTeam: [], perfFiltOpen: false });
 });
 
 test("the Recap's Trends: last 5 games against the usual one, per category, with the reason when the box scores tell it", async () => {
