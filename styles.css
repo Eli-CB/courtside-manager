@@ -317,6 +317,8 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .detail-title .dt-bio { font-size: .82rem; font-weight: 400; color: var(--muted); }
 .detail-title .dt-name .tlogo { vertical-align: -4px; margin-right: 2px; }
 .detail-title .dt-rec { color: var(--text); font-weight: 600; } /* a team's record, after its code */
+/* a fantasy team's "This week vs …": one piece, onto the next line whole where the line is full (a long name ends in …) */
+.detail-title .dt-vs { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 /* an NBA (NHL, NFL) team's card: its tiles, then its players */
 .proj-grid.tc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .tc-table td { vertical-align: middle; }
@@ -489,9 +491,9 @@ td.player { min-width: 170px; }
 .tc-cats { display: flex; flex-wrap: wrap; gap: 6px; }
 .tc-cat { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; white-space: nowrap; }
 .tc-roster td { vertical-align: middle; }
-/* a fantasy team's card: Starters, Bench, Injured reserve, each a small label over its players (no lineup spots) */
-.tc-roster tr.tc-group td { padding: 14px 4px 4px; font-size: .7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-.tc-roster tr.tc-group:first-child td { padding-top: 6px; }
+/* a fantasy team's card: its parts 16 px apart; the roster's starters, bench and IR with no labels, a heavier line where the bench and IR start */
+.tc-body > * + * { margin-top: 16px; }
+.tc-roster tr.tc-split td { border-top: 1px solid var(--border); }
 .tc-roster td.sc { border-bottom: 1px solid var(--border); } /* (no shaded cells here: the row's line runs across) */
 .tc-roster .pf-name .pmeta.inj { white-space: nowrap; } /* an injury's note on one line, phones too (the whole note is its tip and on his card) */
 .pmeta { color: var(--muted); font-size: .8rem; }

@@ -300,6 +300,10 @@ test("a fantasy team's name opens its card: record, opponent, roster by spot, ca
   assert.ok(!html.includes(`<h2>${app.esc(other.name)}`), 'and not again in the card');
   assert.match(title, /<span class="dt-bio"><span class="dt-rec">\d+-\d+(-\d+)?<\/span> · \d+(st|nd|rd|th) of 10/, 'its record and standing in the title, beside or under its name');
   assert.doesNotMatch(html, /\d+(st|nd|rd|th) of 10/, 'and not in the card');
+  const opp = app.fxOpponentFor(app.weekStartAt(0), other.id);
+  if (opp) assert.ok(title.includes(`<span class="dt-vs">This week vs <span class="dt-rec">${app.teamLink(opp.id)}</span></span>`), "this week's opponent in the title too");
+  assert.doesNotMatch(html, /This week vs|No matchup this week/, 'and not in the card');
+  assert.doesNotMatch(html, /slot-label|>Roster<|>Starters<|>Bench</, 'no lineup spots or group labels');
   assert.match(html, /Compare on Plan Ahead/);
   assert.match(html, /By category/);
   const side = app.fxTeamSide(other.id);
