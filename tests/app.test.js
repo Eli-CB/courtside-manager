@@ -2469,7 +2469,7 @@ test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (
   assert.ok(!app.draftAwards(d).some(x => x.label === 'Trigger Finger'));
 });
 
-test("Matchup: a player on the floor right now has a green row and a dot; one on his team's bench in a game on now doesn't", async () => {
+test("Matchup: a player on the floor right now has a green row and 'on floor' in his game's bubble; one on his team's bench in a game on now doesn't", async () => {
   await app.useLeague(CATS9);
   await app.loadBoxes();
   const live = app.get('live'), was = live.games, day = '2026-10-28';
@@ -2491,13 +2491,13 @@ test("Matchup: a player on the floor right now has a green row and a dot; one on
       const C = { D: { all: [day] }, dates: [day], range: 'day', today: day, hasOpp: true };
       const on = app.dashCell(C, p, false, true), off = app.dashCell(C, mate, false, true);
       assert.match(on, /class="mu-p live"/);
-      assert.match(on, /<span class="floor-dot" title="On the floor now"/);
+      assert.match(on, /<span class="gp-part"><span class="lv-dot"[^>]*><\/span>Q2 5:00 · <span class="on-floor" title="On the floor now">on floor<\/span><\/span>/, 'after the clock, kept with it');
       assert.match(off, /class="mu-p"/, 'on the bench: a plain row');
-      assert.ok(!off.includes('floor-dot'));
+      assert.ok(!off.includes('on-floor'));
       // between periods (the five who ended one) and after the buzzer: not known
       Object.assign(g, { detail: 'Halftime', clock: 0 });
       assert.equal(app.onFloor(p, day), null);
-      assert.ok(!app.dashCell(C, p, false, true).includes('floor-dot'));
+      assert.ok(!app.dashCell(C, p, false, true).includes('on-floor'));
       Object.assign(g, { detail: '12:00 - 3rd', clock: 720 });
       assert.equal(app.onFloor(p, day), true, 'the third quarter under way');
       g.state = 'post';

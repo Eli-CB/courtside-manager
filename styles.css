@@ -243,8 +243,8 @@ a { color: var(--accent); }
 .mu-p.right .bname { justify-content: flex-end; }
 .mu-p.live { --live-bg: color-mix(in srgb, var(--good) 7%, var(--surface)); background: var(--live-bg); }
 .mu-row.bench .mu-p, .mu-p.bench, .mu-p.out { opacity: .62; }
-/* on the floor right now (ESPN's box score), beside his name */
-.floor-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 5px; }
+/* on the floor right now (ESPN's box score), after the clock in his game's bubble */
+.on-floor { color: var(--good); font-weight: 600; }
 .mu-game { font-size: .78rem; color: var(--muted); }
 .mu-game b { color: var(--bad); }
 /* the game itself, in a bubble as on Fantrax: "DET 144 @ WAS 140 F", the clock while it's on, the tip-off before */
