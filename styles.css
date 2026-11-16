@@ -489,6 +489,11 @@ td.player { min-width: 170px; }
 .tc-cats { display: flex; flex-wrap: wrap; gap: 6px; }
 .tc-cat { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; white-space: nowrap; }
 .tc-roster td { vertical-align: middle; }
+/* a fantasy team's card: Starters, Bench, Injured reserve, each a small label over its players (no lineup spots) */
+.tc-roster tr.tc-group td { padding: 14px 4px 4px; font-size: .7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tc-roster tr.tc-group:first-child td { padding-top: 6px; }
+.tc-roster td.sc { border-bottom: 1px solid var(--border); } /* (no shaded cells here: the row's line runs across) */
+.tc-roster .pf-name .pmeta.inj { white-space: nowrap; } /* an injury's note on one line, phones too (the whole note is its tip and on his card) */
 .pmeta { color: var(--muted); font-size: .8rem; }
 
 .badge {

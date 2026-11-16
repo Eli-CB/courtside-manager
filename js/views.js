@@ -182,11 +182,30 @@ function teamCardHtml(tid) {
   // each player's worth: football's projection this week, points per game, or categories won per game
   const worth = p => (football ? (gamesIn(p, week) ? `${fmt(footballPts(p, week), 1)}` : '<span class="muted">Bye</span>') : isPoints() ? fmt(fantasyPoints(p), 1) : fmtValue(value(p)));
   const unit = football ? 'Proj' : isPoints() ? 'FP/G' : valueLabel();
-  const row = (p, slot) => `<tr${slot === 'IL' ? ' class="muted-row"' : ''}><td>${slotBadge(slot)}</td><td>${playerCell(p)}</td><td>${p.status !== 'Healthy' ? statusBadge(p) : ''}</td><td class="num"><b>${worth(p)}</b></td></tr>`;
-  const starters = side.lineup.map((id, i) => (id && byId.get(id) ? row(byId.get(id), state.slots[i]) : '')).join('');
+  // each player's season a game, as the Players tab's Per game shows it (the stats chosen under Stats used): games, minutes,
+  // then the league's categories (a points league: every stat it scores); football shows its projection alone
+  const cols = football ? [] : scoreCats().filter(c => !c.fp);
+  const cell = (p, c) => {
+    if (!p.gp) return '<td class="sc muted">—</td>';
+    if (!c.pct) return `<td class="sc">${fmt(statVal(p, c.key), c.dec || 1)}</td>`;
+    const m = statVal(p, c.made), a = statVal(p, c.att);
+    return `<td class="sc"${c.rate ? '' : ` title="${c.label}: ${fmt(m, 1)}-${fmt(a, 1)} a game"`}>${!a ? '—' : c.rate ? fmt(m / a, 2) : fmtPct(m / a)}</td>`;
+  };
+  // the player: photo, name, then his positions in their lineup-spot colors, his NBA team and his next game; any injury under it
+  const who = p => {
+    const raw = nbaById.get(p.nbaId) || {};
+    const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note) : ''}</div>` : '';
+    return `<td class="pf-name"><div class="bplayer">${headshot(p, 34)}<div class="bmain">
+      <div class="bname">${p.nbaId ? playerBtn(p.nbaId, p.name) : `<span class="pname">${esc(p.name)}</span>`}${rookieBadge(raw, 'by-name')}</div>
+      <div class="pmeta">${rookieBadge(raw, 'in-meta')}${[posColored(p.pos), p.team && teamBtn(p.team), p.next && linkTeams(nextGame(p.next))].filter(Boolean).join(' · ')}</div>${inj}</div></div></td>`;
+  };
+  const row = (p, ir) => `<tr${ir ? ' class="muted-row"' : ''}>${who(p)}${football ? '' : `<td class="sc">${p.gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>`}${cols.map(c => cell(p, c)).join('')}<td class="num pf-v">${worth(p)}</td></tr>`;
+  // starters in lineup order, then the bench by value, then injured reserve: no lineup spots, a line before each group
+  const group = (label, html) => (html ? `<tr class="tc-group"><td class="pf-name">${label}</td><td colspan="${cols.length + (football ? 1 : 3)}"></td></tr>${html}` : '');
+  const starters = side.lineup.map(id => (id && byId.get(id) ? row(byId.get(id)) : '')).join('');
   const on = new Set([...side.lineup, ...side.il]);
-  const bench = sortDesc(side.players.filter(p => !on.has(p.id)), value).map(p => row(p, 'BN')).join('');
-  const ir = side.il.map(id => byId.get(id)).filter(Boolean).map(p => row(p, 'IL')).join('');
+  const bench = sortDesc(side.players.filter(p => !on.has(p.id)), value).map(p => row(p)).join('');
+  const ir = side.il.map(id => byId.get(id)).filter(Boolean).map(p => row(p, true)).join('');
   // its starters' totals in each category against every team's, ranked (as Category strengths ranks them)
   let cats = '';
   if (!football && !isPoints()) {
@@ -207,8 +226,8 @@ function teamCardHtml(tid) {
     </div>
     ${cats}
     <h3 class="sub" style="margin-top:16px">Roster</h3>
-    <div class="table-wrap"><table class="tc-roster"><thead><tr><th></th><th>Player</th><th></th><th class="num">${unit}</th></tr></thead>
-      <tbody>${starters}${bench}${ir}</tbody></table></div>`;
+    <div class="perf-wrap"><table class="perf-table tc-roster"><thead><tr><th class="pf-name">Player</th>${football ? '' : '<th class="sc" title="Games played">GP</th><th class="sc" title="Minutes a game">MIN</th>'}${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}<th class="num pf-v">${unit}</th></tr></thead>
+      <tbody>${group('Starters', starters)}${group('Bench', bench)}${group('Injured reserve', ir)}</tbody></table></div>`;
 }
 
 // ----- Season totals: what each team's starters actually produced -----
