@@ -129,7 +129,7 @@ function onFloor(p, d) {
   const g = liveGame(p, d);
   if (!g || g.state !== 'in' || betweenPeriods(g)) return null;
   const f = live.floor.get(g.id);
-  return f && f.size ? f.has(p.nbaId) : null;
+  return f && f.size ? f.has(p.nbaId != null ? p.nbaId : p.id) : null; // (a row's player, or the data's: raw.id)
 }
 
 // ESPN's lines: date -> NBA id -> line, for games the saved box scores don't have yet
@@ -380,10 +380,11 @@ function gameMinLeft(g) {
 }
 const liveGame = (p, d) => live.games.find(g => g.d === d && (g.home === p.team || g.away === p.team)) || null;
 const liveOn = (p, d) => { const g = liveGame(p, d); return !!g && g.state === 'in'; };
-// a game's state for its row: the clock while it's on (after a pulsing green dot), Final once it's over. With floor (the
-// Matchup tab's), the dot says where he is: solid and pulsing while he's on the floor, a light dot while he's on his team's
-// bench, and between periods (nobody's playing); just the game's, as elsewhere, when it isn't known
-function liveStatus(p, d, floor = false) {
+// a game's state for its row: the clock while it's on (after a pulsing green dot), Final once it's over. The dot says
+// where he is: solid and pulsing while he's on the floor, a light dot while he's on his team's bench, and between periods
+// (nobody's playing); just the game's when it isn't known (hockey, football, a box score not read yet). Everywhere a
+// player's clock shows (the Matchup and Players tabs): a solid dot for everyone in a game read as "all on the floor"
+function liveStatus(p, d, floor = true) {
   const g = liveGame(p, d);
   if (!g || g.state === 'pre') return '';
   if (g.state !== 'in') return 'Final';

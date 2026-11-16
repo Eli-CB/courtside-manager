@@ -2493,8 +2493,9 @@ test("Matchup: the dot by a game's clock is solid while he's on the floor, light
       assert.match(on, /<span class="gp-part"><span class="lv-dot" title="On the floor now" aria-label="On the floor now"><\/span>Q2 5:00<\/span>/);
       assert.match(off, /<span class="lv-dot out" title="On the bench now"[^>]*><\/span>Q2 5:00/);
       assert.ok(!/class="mu-p[^"]*live/.test(on + off), 'no green rows');
-      // elsewhere (the Players tab) just the game's dot
-      assert.equal(app.liveStatus(p, day), '<span class="lv-dot" aria-hidden="true"></span>Q2 5:00');
+      // the Players tab too (its rows have the data's player, raw.id, not a row's nbaId): on the floor or on the bench, as on the Matchup
+      assert.match(app.liveStatus(app.nbaById.get(p.nbaId), day), /^<span class="lv-dot" title="On the floor now"/);
+      assert.match(app.liveStatus(app.nbaById.get(mate.nbaId), day), /^<span class="lv-dot out" title="On the bench now"/);
       // between periods (the five who ended one) and after the buzzer: not known
       Object.assign(g, { detail: 'Halftime', clock: 0 });
       assert.equal(app.onFloor(p, day), null);
