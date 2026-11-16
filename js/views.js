@@ -2,16 +2,9 @@
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
-// ----- Roster: category strengths vs your league -----
-const STR_KEY = 'courtside-strengths';
 const DRAFT_MODE_KEY = 'courtside-draft-mode';
 ui.draftMode = (() => { try { return localStorage.getItem(DRAFT_MODE_KEY) || 'game'; } catch (e) { return 'game'; } })();
-ui.strBasis = (() => { try { return localStorage.getItem(STR_KEY) || 'starters'; } catch (e) { return 'starters'; } })();
-
-function teamCatAvg(players) {
-  const zs = players.map(catZ);
-  return Object.fromEntries(scoreCats().map(c => [c.key, zs.length ? sum(zs.map(z => z[c.key] || 0)) / zs.length : 0]));
-}
+try { localStorage.removeItem('courtside-strengths'); } catch (e) { /* the Standings card's Starters / Active roster choice: the card is gone */ }
 
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 
@@ -31,84 +24,70 @@ function teamRaw(players) {
 
 const fmtRaw = (c, v) => (c.pct ? fmtPct(v) : fmt(v, 1));
 
-function strengthsCard() {
-  const starterBasis = ui.strBasis === 'starters';
-  const mine = starterBasis ? starters() : state.players.filter(p => !state.il.includes(p.id));
-  const toggle = `<div class="seg seg-sm" role="group" aria-label="Players to include">${[['starters', 'Starters'], ['active', 'Active roster']].map(([k, l]) => `<button type="button" class="${ui.strBasis === k ? 'on' : ''}" data-action="str-basis" data-basis="${k}" aria-pressed="${ui.strBasis === k}">${l}</button>`).join('')}</div>`;
-  const head = `<div class="card-head"><h2>Category strengths ${infoBtn('strengths')}</h2>${toggle}</div>`;
-  if (!mine.length) return `<div class="card">${head}<div class="empty"><strong>No players yet</strong>Load your roster to see your category profile.</div></div>`;
-
-  const me = { name: state.teamName, raw: teamRaw(mine), avg: teamCatAvg(mine), mine: true };
-  const teams = [me];
-  if (fxLeague()) {
-    for (const t of fxPickable()) {
-      if (t.id === (ui.viewing ? ui.viewA : state.fxTeam)) continue;
-      const side = fxTeamSide(t.id);
-      const ps = starterBasis ? side.players.filter(p => side.starters.includes(p.id)) : side.players.filter(p => !side.il.includes(p.id));
-      if (ps.length) teams.push({ name: t.id === state.fxTeam ? `${t.name} (you)` : t.name, raw: teamRaw(ps), avg: teamCatAvg(ps) });
-    }
-  }
-  const league = teams.length > 1;
-  const n = teams.length;
-
+// ----- A fantasy team's card: category strengths (was a card on Standings, for your own team only) -----
+// Each team's best players by their season's value (seasonTotal), as many as the league starts (injured reserve left out):
+// an end-of-bench player, a one-off start or a game or two doesn't move it. Per category: the team's number, the league's
+// average, how far from it (in team-to-team spreads), its rank and every team on one line; a row opens to who helped and hurt
+function teamStrengths(tid) {
+  const N = state.slots.length;
+  const top = id => { const s = fxTeamSide(id), il = new Set(s.il); return sortDesc(s.players.filter(p => !il.has(p.id)), p => seasonTotal(nbaById.get(p.nbaId)).v).slice(0, N); };
+  const teams = fxPickable().map(t => { const ps = top(t.id); return { id: t.id, name: t.name, ps, raw: teamRaw(ps) }; }).filter(t => t.ps.length);
+  const me = teams.find(t => t.id === tid), n = teams.length;
+  if (!me || n < 2) return '';
   const rows = scoreCats().map(c => {
     const vals = teams.map(t => t.raw[c.key]);
     const mean = sum(vals) / n;
     const sd = Math.sqrt(sum(vals.map(v => (v - mean) ** 2)) / n) || 1e-9;
     // how far each team is from the league average, in team-to-team spreads (fewer TO is better)
-    const gap = v => (league ? (c.neg ? -1 : 1) * (v - mean) / sd : 0);
-    const z = league ? gap(me.raw[c.key]) : me.avg[c.key];
-    const ranked = [...teams].sort((a, b) => gap(b.raw[c.key]) - gap(a.raw[c.key]));
-    const rank = ranked.indexOf(me) + 1;
+    const gap = v => (c.neg ? -1 : 1) * (v - mean) / sd;
+    const z = gap(me.raw[c.key]);
+    const rank = teams.filter(t => gap(t.raw[c.key]) - z > 1e-9).length + 1;
     // who helps or hurts: each player's own number against the league average shown in this row.
     // For FG%/FT% that's makes above or below average at the player's volume.
-    const ref = league ? mean : (BASE[c.key] || [0])[0];
     const att = c.att;
-    const impact = p => (c.neg ? -1 : 1) * (c.pct ? (pctOf(p, c) - ref) * statVal(p, att) : statOf(p, c) - ref);
-    const byImpact = mine.map(p => ({ p, d: impact(p) })).sort((a, b) => b.d - a.d);
-    const big = c.pct ? 0.1 : Math.max(0.1, ref * 0.1);
+    const num = p => (c.fp ? fantasyPoints(p) : statOf(p, c));
+    const impact = p => (c.neg ? -1 : 1) * (c.pct ? (pctOf(p, c) - mean) * statVal(p, att) : num(p) - mean);
+    const byImpact = sortDesc(me.ps.map(p => ({ p, d: impact(p) })), x => x.d);
+    const big = c.pct ? 0.1 : Math.max(0.1, Math.abs(mean) * 0.1);
     const drivers = byImpact.filter(x => x.d > big).slice(0, 2);
     const drag = byImpact.filter(x => x.d < -big).slice(-1);
     const tip = x => c.pct
-      ? `${x.p.name}: ${fmtPct(pctOf(x.p, c))} on ${fmt(statVal(x.p, att), 1)} attempts a game, ${fmt(Math.abs(x.d), 1)} ${x.d > 0 ? 'more' : 'fewer'} makes a game than the ${league ? 'league' : 'typical'} average of ${fmtPct(ref)} would give`
-      : `${x.p.name}: ${fmt(statOf(x.p, c), 1)} ${c.label} a game vs the ${league ? 'league' : 'typical'} average of ${fmt(ref, 1)} per ${starterBasis ? 'starter' : 'player'}`;
+      ? `${x.p.name}: ${fmtPct(pctOf(x.p, c))} on ${fmt(statVal(x.p, att), 1)} attempts a game, ${fmt(Math.abs(x.d), 1)} ${x.d > 0 ? 'more' : 'fewer'} makes a game than the league average of ${fmtPct(mean)} would give`
+      : `${x.p.name}: ${fmt(num(x.p), 1)} ${c.label} a game vs the league average of ${fmt(mean, 1)} per player`;
     const csName = x => `<button type="button" class="link-btn cs-name" data-action="player-detail" data-nba="${x.p.nbaId}">${inlinePlayer(x.p, esc(lastName(x.p.name)))}</button>`;
-    const csNum = x => `<b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(pctOf(x.p, c)) : fmt(statOf(x.p, c), 1)}</b>`;
+    const csNum = x => `<b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(pctOf(x.p, c)) : fmt(num(x.p), 1)}</b>`;
     const csAtt = x => (c.pct ? `<span class="muted small"> on ${fmt(statVal(x.p, att), 1)} ${att.toUpperCase()}</span>` : '');
     const who = list => list.map(x => `<span class="cs-p" title="${esc(tip(x))}">${csName(x)}${csNum(x)}${csAtt(x)}</span>`).join('');
     const w = Math.min(Math.abs(z) / 2, 1) * 50; // bar edge = 2 spreads from the league average
     const pos = v => ((Math.max(-2.5, Math.min(2.5, gap(v))) + 2.5) / 5) * 100;
     const open = ui.csOpen.has(c.key);
+    // every team on one line: this card's team the big dot, your own team orange (orange is only ever your team)
+    const dot = t => `<span class="sdot${t.id === tid ? ' this' : ''}${t.id === state.fxTeam ? ' me' : ''}" style="left:${pos(t.raw[c.key]).toFixed(1)}%" title="${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}: ${fmtRaw(c, t.raw[c.key])}"></span>`;
     return { c, z, rank, html: `<tr class="cs-row" data-action="cs-toggle" data-cat="${c.key}" aria-expanded="${open}" title="Show who helped (green) and hurt (red) most">
       <td><span class="cs-chev" aria-hidden="true">▸</span><b>${c.label}</b></td>
-      <td class="num"><b>${fmtRaw(c, me.raw[c.key])}</b>${league ? `<span class="cs-avg">avg ${fmtRaw(c, mean)}</span>` : ''}</td>
-      ${league ? `<td class="num muted cs-lavg">${fmtRaw(c, mean)}</td>` : ''}
-      <td class="cs-bar" title="${signed(z, 2)} spreads ${league ? 'from the league average' : 'from a typical player'}"><span class="track"><span class="fill ${z >= 0 ? 'up' : 'down'}" style="width:${w}%"></span></span></td>
-      ${league ? `<td class="num cs-rank ${rank <= 3 ? 'pos-good' : rank > n - 3 ? 'pos-bad' : ''}"><b>${ordinal(rank)}</b><span class="muted hide-sm"> / ${n}</span></td>
-      <td class="cs-strip"><div class="strip">${teams.map(t => `<span class="sdot${t.mine ? ' me' : ''}" style="left:${pos(t.raw[c.key]).toFixed(1)}%" title="${esc(t.name)}: ${fmtRaw(c, t.raw[c.key])}"></span>`).join('')}</div></td>` : ''}
+      <td class="num"><b>${fmtRaw(c, me.raw[c.key])}</b><span class="cs-avg">avg ${fmtRaw(c, mean)}</span></td>
+      <td class="num muted cs-lavg">${fmtRaw(c, mean)}</td>
+      <td class="cs-bar" title="${signed(z, 2)} spreads from the league average"><span class="track"><span class="fill ${z >= 0 ? 'up' : 'down'}" style="width:${w}%"></span></span></td>
+      <td class="num cs-rank ${rank <= 3 ? 'pos-good' : rank > n - 3 ? 'pos-bad' : ''}"><b>${ordinal(rank)}</b><span class="muted hide-sm"> / ${n}</span></td>
+      <td class="cs-strip"><div class="strip">${teams.map(dot).join('')}</div></td>
     </tr>
-    <tr class="cs-detail"${open ? '' : ' hidden'}><td colspan="${league ? 6 : 3}"><div class="cs-who">
+    <tr class="cs-detail"${open ? '' : ' hidden'}><td colspan="6"><div class="cs-who">
       ${drivers.length || drag.length ? `${drivers.length ? `<div class="cs-grp"><span class="cs-tag up">Helped</span>${who(drivers)}</div>` : ''}${drag.length ? `<div class="cs-grp"><span class="cs-tag down">Hurt</span>${who(drag)}</div>` : ''}` : '<span class="muted small">No one stands out</span>'}
     </div></td></tr>` };
   });
-
-  // with a league, strengths and weaknesses are about rank; without one, about the gap
-  const strong = rows.filter(r => (league ? r.rank <= 3 : r.z > 0.2)).sort((a, b) => (a.rank - b.rank) || (b.z - a.z));
-  const weak = rows.filter(r => (league ? r.rank > n - 3 : r.z < 0)).sort((a, b) => (b.rank - a.rank) || (a.z - b.z));
-  const label = r => `<b>${r.c.label}</b>${league ? ` (${ordinal(r.rank)})` : ''}`;
-  const unit = starterBasis ? 'per starter' : 'per player';
-  const summary = `<div class="cs-summary">
-      <div><span class="muted small">Strengths</span><br>${strong.slice(0, 4).map(label).join(', ') || '—'}</div>
-      <div><span class="muted small">Weaknesses</span><br>${weak.slice(0, 4).map(label).join(', ') || '—'}</div>
-    </div>`;
-  return `<div class="card">
-    ${head}
+  const strong = rows.filter(r => r.rank <= 3).sort((a, b) => (a.rank - b.rank) || (b.z - a.z));
+  const weak = rows.filter(r => r.rank > n - 3).sort((a, b) => (b.rank - a.rank) || (a.z - b.z));
+  const label = r => `<b>${r.c.label}</b> (${ordinal(r.rank)})`;
+  const mine = tid === state.fxTeam;
+  return `<div><h3 class="sub" style="margin-top:0">By category <span class="muted small" title="Each team's ${N} best players by their value this season (injured reserve left out), as many as a lineup starts">top ${N}, against every team</span> ${infoBtn('strengths')}</h3>
     <div class="table-wrap"><table class="cs-table">
-      <thead><tr><th>Cat</th><th class="num">You <span class="muted hide-sm">${unit}</span></th>${league ? '<th class="num cs-lavg">League avg</th>' : ''}<th class="cs-bar">${league ? 'Below · league avg · above' : 'Below · typical · above'}</th>${league ? `<th class="num">Rank</th><th class="cs-strip"><span class="hide-sm">Every team (you in orange)</span><span class="show-sm-inline">All ${n} teams</span></th>` : ''}</tr></thead>
+      <thead><tr><th>Cat</th><th class="num">Per player</th><th class="num cs-lavg">League avg</th><th class="cs-bar">Below · league avg · above</th><th class="num">Rank</th><th class="cs-strip"><span class="hide-sm">Every team (${mine ? 'you in orange' : state.fxTeam ? 'this one bigger, you in orange' : 'this one bigger'})</span><span class="show-sm-inline">All ${n} teams</span></th></tr></thead>
       <tbody>${rows.map(r => r.html).join('')}</tbody>
     </table></div>
-    ${summary}
-  </div>`;
+    <div class="cs-summary">
+      <div><span class="muted small">Strengths</span><br>${strong.slice(0, 4).map(label).join(', ') || '—'}</div>
+      <div><span class="muted small">Weaknesses</span><br>${weak.slice(0, 4).map(label).join(', ') || '—'}</div>
+    </div></div>`;
 }
 
 function slotBadge(slot) {
@@ -149,11 +128,10 @@ function viewStandings() {
       }).join('')}</tbody>
     </table></div>${waiverLine()}` : `<div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div>`}
   </div>
-  ${!ui.season && !isFootball() && state.players.length ? strengthsCard() : ''}
   ${L ? seasonTotalsCard(L, rows) : ''}`;
 }
 
-// ----- A fantasy team's card: its record and this week's opponent (the title), how it ranks in each category, its roster -----
+// ----- A fantasy team's card: its record and this week's opponent (the title), its category strengths (teamStrengths), its roster -----
 function showTeamCard(tid) {
   const html = teamCardHtml(tid);
   if (!html) return;
@@ -207,23 +185,7 @@ function teamCardHtml(tid) {
   const order = p => (football ? (gamesIn(p, week) ? footballPts(p, week) : -1) : tot.get(p.id).gp ? tot.get(p.id).v : -1e9);
   const row = p => `<tr${il.has(p.id) ? ' class="muted-row"' : ''}>${who(p)}${football ? '' : `<td class="sc">${tot.get(p.id).gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>`}${cols.map(c => cell(p, c)).join('')}<td class="num pf-v">${worth(p)}</td></tr>`;
   const rows = sortDesc(side.players, order).map(row).join('');
-  // its best players by their season's value (seasonTotal), as many as the league starts (injured reserve left out), against
-  // every team's best as many, ranked in each category (as Category strengths ranks them): an end-of-bench player, a one-off
-  // start or a game or two doesn't move it
-  let cats = '';
-  if (!football && !isPoints()) {
-    const n = state.slots.length;
-    const top = id => { const s = fxTeamSide(id), il = new Set(s.il); return sortDesc(s.players.filter(p => !il.has(p.id)), p => seasonTotal(nbaById.get(p.nbaId)).v).slice(0, n); };
-    const raws = fxPickable().map(t => ({ id: t.id, raw: teamRaw(top(t.id)) })).filter(x => Object.keys(x.raw).length);
-    const mine = raws.find(x => x.id === tid);
-    if (mine && raws.length > 1) {
-      cats = `<div><h3 class="sub" style="margin-top:0">By category <span class="muted small" title="Each team's ${n} best players by their value this season (injured reserve left out), as many as a lineup starts">top ${n}, against every team</span></h3><div class="tc-cats">${scoreCats().map(c => {
-        const better = raws.filter(x => (c.neg ? x.raw[c.key] < mine.raw[c.key] : x.raw[c.key] > mine.raw[c.key]) && Math.abs(x.raw[c.key] - mine.raw[c.key]) > 1e-9).length;
-        const rank = better + 1;
-        return `<span class="tc-cat ${rank <= 3 ? 'pos-good' : rank > raws.length - 3 ? 'pos-bad' : ''}"><b>${c.label}</b> ${ordinal(rank)}</span>`;
-      }).join('')}</div></div>`;
-    }
-  }
+  const cats = football ? '' : teamStrengths(tid);
   // (each part 16 px below the one before: .tc-body)
   return `<div class="tc-body">
     ${!me && state.fxTeam ? `<div><button type="button" class="btn sm" data-action="team-compare" data-team="${esc(tid)}">Compare on Plan Ahead</button></div>` : ''}

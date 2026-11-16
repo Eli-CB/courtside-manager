@@ -87,12 +87,13 @@ const INFO = {
     <p><b>Smart blend (default):</b> this season's averages with 10 games of last season mixed in: (this season × games played + last season × 10) ÷ (games played + 10). Early on it leans on last season; after a month or two it's mostly this season.</p>
     <p>Switch to this season only, last season only, or the last 10 games from the league menu at the top.</p>`],
   strengths: ['Category strengths', `
-    <p><b>You.</b> Your players' real per-game numbers: the average per player for counting stats (starters, or your whole active roster), and team FG% and FT% as total makes ÷ total attempts.</p>
-    <p><b>League avg.</b> The same number averaged across every team in your league, using each team's current roster and lineup.</p>
-    <p><b>Bar.</b> How far you are from that league average, measured in the typical gap between teams (one standard deviation across the league). The bar reaches the edge at two gaps above or below. Fewer turnovers counts as above average.</p>
-    <p><b>Rank and dots.</b> Your place among the teams in that category, and every team on the same scale, with you in orange.</p>
+    <p><b>Who counts.</b> Each team's best players by their value this season, as many as a lineup starts, injured reserve left out. An end-of-bench player or a one-off start doesn't move it.</p>
+    <p><b>Per player.</b> Those players' real per-game numbers: the average per player for counting stats, and FG% and FT% as total makes ÷ total attempts.</p>
+    <p><b>League avg.</b> The same number averaged across every team in the league.</p>
+    <p><b>Bar.</b> How far the team is from that league average, measured in the typical gap between teams (one standard deviation across the league). The bar reaches the edge at two gaps above or below. Fewer turnovers counts as above average.</p>
+    <p><b>Rank and dots.</b> The team's place in that category, and every team on the same scale: this team is the bigger dot, your own team is orange.</p>
     <p><b>Who helped and hurt.</b> Click a category's row to show the players who helped most (green) and hurt most (red). Each player's own per-game number in that category, compared with the league average in the same row. For FG% and FT% it's their percentage and attempts a game ("<b>.700</b> on 6.2 FTA"), ranked by makes above or below what the league average would give at that volume, so a poor shooter who takes a lot of shots hurts more than one who rarely shoots. Hover a name for the detail.</p>
-    <p><b>Strengths and weaknesses.</b> Your top-three and bottom-three categories by league rank.</p>`],
+    <p><b>Strengths and weaknesses.</b> The team's top-three and bottom-three categories by league rank.</p>`],
   totals: ['Season totals', `
     <p><b>Who counts.</b> Fantrax keeps every team's lineup for each lineup period (a week, or a day in daily leagues). A player's games count for the team that had him <b>starting</b> in that period. Bench and IR games don't count, and a player who changed teams counts for whoever was starting him at the time.</p>
     <p><b>Player games.</b> Every starter's games added up, so it depends on how many starters your league has and how often their NBA teams played. A team with more player games has had more chances to pile up counting stats.</p>

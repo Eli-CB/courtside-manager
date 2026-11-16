@@ -538,8 +538,6 @@ td.player { min-width: 170px; }
 .team-link { color: inherit; font-weight: inherit; text-align: inherit; }
 .team-link.mine, .team-mine { color: var(--accent); } /* your own team, wherever its name is */
 .team-link:hover { text-decoration: underline; }
-.tc-cats { display: flex; flex-wrap: wrap; gap: 6px; }
-.tc-cat { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; white-space: nowrap; }
 .tc-roster td { vertical-align: middle; }
 /* a fantasy team's card: its parts 16 px apart */
 .tc-body > * + * { margin-top: 16px; }
@@ -978,7 +976,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .strip::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--border); }
 .strip::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 1px; background: var(--muted); opacity: .45; }
 .sdot { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--muted); opacity: .55; }
-.sdot.me { width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--accent); opacity: 1; z-index: 1; box-shadow: 0 0 0 2px var(--surface); }
+/* the card's team: the big dot; your own team: orange (both when the card is yours) */
+.sdot.this { width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--text); opacity: 1; z-index: 1; box-shadow: 0 0 0 2px var(--surface); }
+.sdot.me { background: var(--accent); opacity: 1; }
 .cs-row { cursor: pointer; }
 .cs-row td:first-child { white-space: nowrap; }
 .cs-chev { display: inline-block; width: 1em; color: var(--muted); font-size: .75rem; transition: transform .15s; }

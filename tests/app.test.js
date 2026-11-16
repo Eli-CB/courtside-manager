@@ -323,7 +323,14 @@ test("a fantasy team's name opens its card: record, opponent, roster by spot, ca
   assert.match(html, /Compare on Plan Ahead/);
   assert.match(html, /By category <span[^>]*>top \d+, against every team</, "each team's best players, as many as it starts");
   const side = app.fxTeamSide(other.id);
-  assert.equal((html.match(/data-action="player-detail"/g) || []).length, side.players.length, 'every player, each opening his card');
+  assert.equal((html.slice(html.indexOf('tc-roster')).match(/data-action="player-detail"/g) || []).length, side.players.length, 'every player, each opening his card');
+  // the full category strengths (once a card on Standings): a row a category with its rank, the league's teams on one line
+  assert.equal((html.match(/<tr class="cs-row"/g) || []).length, app.scoreCats().length, 'a row for each category');
+  assert.equal((html.match(/class="sdot this"/g) || []).length, app.scoreCats().length, "this team's dot in each row");
+  assert.equal((html.match(/class="sdot me"/g) || []).length, app.scoreCats().length, 'and your own, in orange');
+  assert.match(html, /Strengths<\/span>.*Weaknesses<\/span>/s);
+  assert.match(app.teamCardHtml(L.standings[0].id), /class="sdot this me"/, 'your own card: one dot, both');
+  assert.doesNotMatch(app.viewStandings(), /Category strengths|cs-table/, 'no longer on Standings');
   // a past season's names stay plain
   app.get('ui').season = 'x';
   assert.equal(app.teamLink(other.id), app.esc(other.name));

@@ -220,11 +220,6 @@ const actions = {
     try { localStorage.setItem(DRAFT_MODE_KEY, ui.draftMode); } catch (e) { /* ignore */ }
     render();
   },
-  'str-basis'(el) {
-    ui.strBasis = el.dataset.basis;
-    try { localStorage.setItem(STR_KEY, ui.strBasis); } catch (e) { /* ignore */ }
-    render();
-  },
   'land-team'(el) {
     adoptTeam(el.dataset.id);
     commit(`Welcome, ${state.teamName}`);
@@ -715,7 +710,7 @@ function route() {
   }
   if (!sid && ui.season) { ui.season = null; ui.pastTeam = null; }
   let tab = hashTab || 'dashboard';
-  if (tab === 'lineup' || tab === 'roster') tab = 'standings'; // the old Lineup and Roster tabs: their Category strengths is on Standings
+  if (tab === 'lineup' || tab === 'roster') tab = 'standings'; // the old Lineup and Roster tabs: Category strengths is on a team's card now
   if (tab === 'live') tab = 'dashboard'; // and the old Live tab on Performances (Today)
   if (tab === 'rosters' && !ui.season) tab = 'standings';
   ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : state.browse ? 'players' : 'dashboard';
