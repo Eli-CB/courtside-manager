@@ -543,8 +543,10 @@ def season_from_boxes(games):
 
     def avg(rows, ex):
         n = len(rows)
-        cols = [round(sum(x[i] for x in rows) / n, 1) for i in range(3, 15)]  # min .. fta in LOG_KEYS order
-        more = [round(sum(x[i] for x in ex) / n, 1) for i in range(5)] + [round(sum(x[i] for x in ex) / n, 3) for i in (5, 6)]
+        # Makes and attempts keep three decimals: the site divides them for FG%, FT% and 3P%, and at one decimal
+        # 4-8 over 3 games (1.3 / 2.7) read .481
+        cols = [round(sum(x[i] for x in rows) / n, 3 if i in (9, 11, 12, 13, 14) else 1) for i in range(3, 15)]  # min .. fta in LOG_KEYS order
+        more = [round(sum(x[i] for x in ex) / n, 3 if i == 2 else 1) for i in range(5)] + [round(sum(x[i] for x in ex) / n, 3) for i in (5, 6)]
         return [n] + cols + more
 
     cur = {pid: avg(rows, extra[pid]) for pid, rows in per.items()}

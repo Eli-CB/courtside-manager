@@ -139,6 +139,13 @@ class Season(unittest.TestCase):
         self.assertEqual(l10[7][2], 16.5, 'the newest ten')
         self.assertEqual(per[7][0][0], '2026-11-12', 'newest first')
 
+    def test_shooting_averages_are_fine_enough_for_a_percentage(self):
+        fts = [(1, 4), (0, 0), (3, 4)]  # 4 of 8: one decimal (1.3 / 2.7) made it .481
+        games = {str(i): self.game(f'2026-11-{i + 1:02}', [row(7, 'BOS')[:12] + [m, a] + row(7, 'BOS')[14:]]) for i, (m, a) in enumerate(fts)}
+        cur, _, _ = D.season_from_boxes(games)
+        ftm, fta = cur[7][D.STAT_KEYS.index('ftm')], cur[7][D.STAT_KEYS.index('fta')]
+        self.assertEqual(round(ftm / fta, 3), 0.5)
+
     def test_a_game_log_says_who_and_how_it_went(self):
         _, _, per = D.season_from_boxes({'1': self.game('2026-11-01', [row(7, 'BOS'), row(8, 'NYK')])})
         self.assertEqual(per[7][0][1:3], ['BOS vs. NYK', 'W'])
