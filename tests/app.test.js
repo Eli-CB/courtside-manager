@@ -295,9 +295,11 @@ test("a fantasy team's name opens its card: record, opponent, roster by spot, ca
   const other = L.teams.find(t => t.id !== L.standings[0].id);
   assert.match(app.viewStandings(), new RegExp(`data-action="team-card" data-team="${other.id}"`));
   const html = app.teamCardHtml(other.id);
-  assert.ok(app.teamCardTitle(other.id).includes(app.esc(other.name)), 'its name is the title');
+  const title = app.teamCardTitle(other.id);
+  assert.ok(title.includes(`<span class="dt-name">${app.esc(other.name)}</span>`), 'its name is the title');
   assert.ok(!html.includes(`<h2>${app.esc(other.name)}`), 'and not again in the card');
-  assert.match(html, /\d+-\d+(-\d+)? · \d+(st|nd|rd|th) of 10/);
+  assert.match(title, /<span class="dt-bio"><span class="dt-rec">\d+-\d+(-\d+)?<\/span> · \d+(st|nd|rd|th) of 10/, 'its record and standing in the title, beside or under its name');
+  assert.doesNotMatch(html, /\d+(st|nd|rd|th) of 10/, 'and not in the card');
   assert.match(html, /Compare on Plan Ahead/);
   assert.match(html, /By category/);
   const side = app.fxTeamSide(other.id);

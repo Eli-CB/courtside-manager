@@ -165,14 +165,17 @@ function showTeamCard(tid) {
   if (!d.open) d.showModal();
   $('#detailBody').scrollTop = 0;
 }
-// the card's title: the team's name, and (you) on your own
-const teamCardTitle = tid => `${esc(fxTeamName(tid))}${tid === state.fxTeam ? ' <span class="muted small">(you)</span>' : ''}`;
+// the card's title: the team's name, (you) on your own, then its record, standing and points for (as an NBA team's card)
+function teamCardTitle(tid) {
+  const L = fxLeague(), r = L && (L.standings || []).find(x => x.id === tid);
+  const rec = r ? `<span class="dt-bio"><span class="dt-rec">${r.w}-${r.l}${r.t ? '-' + r.t : ''}</span> · ${ordinal(r.rank || 0)} of ${fxPickable().length}${r.pf != null ? ` · ${fmtFp(r.pf)} points for` : ''}</span>` : '';
+  return `<span class="dt-name">${esc(fxTeamName(tid))}${tid === state.fxTeam ? ' <span class="muted small">(you)</span>' : ''}</span>${rec}`;
+}
 
 function teamCardHtml(tid) {
   const L = fxLeague();
   if (!L || !fxPickable().some(t => t.id === tid)) return '';
   const side = fxTeamSide(tid), me = tid === state.fxTeam;
-  const r = (L.standings || []).find(x => x.id === tid), n = fxPickable().length;
   const opp = fxOpponentFor(weekStartAt(0), tid);
   const football = isFootball(), week = matchDates(weekStartAt(0));
   const byId = new Map(side.players.map(p => [p.id, p]));
@@ -197,11 +200,9 @@ function teamCardHtml(tid) {
       }).join('')}</div>`;
     }
   }
-  const record = r ? `${r.w}-${r.l}${r.t ? '-' + r.t : ''} · ${ordinal(r.rank || 0)} of ${n}${r.pf != null ? ` · ${fmtFp(r.pf)} points for` : ''}` : '';
   return `
-    <div class="detail-head">
-      <div><p class="muted" style="margin:0">${record}</p>
-        <p style="margin:6px 0 0">${opp ? `This week vs <b>${teamLink(opp.id)}</b>` : '<span class="muted">No matchup this week</span>'}</p></div>
+    <div class="detail-head" style="align-items:center">
+      <p style="margin:0">${opp ? `This week vs <b>${teamLink(opp.id)}</b>` : '<span class="muted">No matchup this week</span>'}</p>
       ${!me && state.fxTeam ? `<button type="button" class="btn sm" data-action="team-compare" data-team="${esc(tid)}">Compare on Plan Ahead</button>` : ''}
     </div>
     ${cats}
