@@ -225,6 +225,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   runs apart; one that fails (or NFL projections failing) fails the run at the end, so GitHub says so, and the rest still publishes.
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
+- The repo must stay public on GitHub's free plan: making it private deletes the Pages site at once (leaguelayer.com answered 404, Nov 16, 2026), and
+  making it public again doesn't bring it back. To restore: `gh api -X POST repos/Eli-CB/courtside-manager/pages -f build_type=workflow`, then
+  `gh api -X PUT .../pages -f cname=leaguelayer.com`, then `gh workflow run site.yml`. Private needs GitHub Pro, and Actions minutes then count.
 - `__BUILD__` in index.html and js/core.js is replaced at deploy with the hash of the last commit that changed `index.html`, `styles.css` or `js/` (cache busting; not the latest commit: the daily data commits mustn't make visitors download the code again).
 - ESPN load (Nov 15, 2026, the owner's ask: thousands of visitors without ESPN blocking the site): every visitor's browser
   used to ask ESPN itself, about 10 requests a minute on a busy night (the scoreboard every 30 s, each live game's
