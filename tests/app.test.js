@@ -2512,6 +2512,17 @@ test("Matchup: the dot by a game's clock is solid while he's on the floor, light
   } finally { live.games = was; live.floor.delete(g.id); }
 });
 
+test("Plan Ahead: each player's positions in their lineup-spot colors, as its lineup spots and the Matchup tab's", async () => {
+  const L = await app.useLeague(CATS9);
+  useTeam(L.teams[0].id);
+  const html = app.viewWeek();
+  // the board: a PG's position as the PG spot is colored
+  const pg = app.SPORT.slotColors.PG;
+  assert.ok(html.includes(`<span class="bmeta-info"><span class="pt pt-PG pc pc-${pg}">PG</span>`) || new RegExp(`<span class="bmeta-info">(<span class="pt pt-[A-Z]+ pc pc-[a-z0-9-]+">[A-Z]+</span>,?)+</span>`).test(html), 'positions colored on the board');
+  assert.ok(!/<span class="bmeta-info"><span class="pt pt-[A-Z]+">/.test(html), 'none left plain');
+  assert.match(html, new RegExp(`class="slot-label slot-PG pc pc-${pg}"`), 'the same color as the PG spot');
+});
+
 test("a Fantrax league of a sport the site doesn't read (golf) says so, instead of loading as basketball", async () => {
   const group = code => ({ scoringSystem: { scoringCategorySettings: [{ group: { code } }] } });
   assert.equal(app.fxSport(group('BASKETBALL_PLAYER')), 'nba');
