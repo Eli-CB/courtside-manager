@@ -49,7 +49,7 @@ function perfRows(dates) {
       if (isPoints()) { v += lineFp(line); continue; }
       for (const [k, x] of Object.entries(catWins(line))) { z[k] = (z[k] || 0) + x; v += x; }
     }
-    rows.push({ raw, g: lines.length, tot, z, v, on: lines.some(([d]) => liveOn(raw, d)) });
+    rows.push({ raw, g: lines.length, tot, z, v, on: (lines.find(([d]) => liveOn(raw, d)) || [])[0] || null }); // (on: the day of his game on now)
   }
   return rows;
 }
@@ -288,7 +288,7 @@ function topPerformancesCard() {
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 34)}<div class="bmain">
           <div class="bname">${playerBtn(r.raw.id, r.raw.name)}${rookieBadge(r.raw, 'by-name')}${injBadge(r.raw.inj, 'by-name')}</div>
           <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${[ // (" · " only between pieces: no team, no dot left over)
-            proj ? esc(r.game) : avg || perWeek ? `${r.g} GP` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G` : day === today ? clock(r) : '',
+            proj ? esc(r.game) : avg || perWeek ? `${r.g} GP` : weekly ? `${r.on ? liveDot(r.raw, r.on) : ''}${r.g} G` : day === today ? clock(r) : '',
             football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''}`, who(r.raw.id)].filter(Boolean).join(' · ')}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? (avg || perWeek ? fmt(r.v, 1) : fmtFp(r.v)) : signed(r.v, 2)}</td>

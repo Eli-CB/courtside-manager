@@ -380,11 +380,19 @@ function gameMinLeft(g) {
 }
 const liveGame = (p, d) => live.games.find(g => g.d === d && (g.home === p.team || g.away === p.team)) || null;
 const liveOn = (p, d) => { const g = liveGame(p, d); return !!g && g.state === 'in'; };
-// a game's state for its row: the clock while it's on (after a pulsing green dot), Final once it's over. The dot says
-// where he is: solid and pulsing while he's on the floor, a light dot while he's on his team's bench, and between periods
-// (nobody's playing); just the game's when it isn't known (hockey, football, a box score not read yet). Everywhere a
-// player's clock shows (the Matchup and Players tabs): a solid dot for everyone in a game read as "all on the floor"
-function liveStatus(p, d, floor = true) {
+// The dot of a player in a game on now: solid and pulsing while he's on the floor, light while he's on his team's bench
+// and between periods (nobody's playing); just the game's when it isn't known (hockey, football, a box score not read
+// yet). Every live dot by a player goes through here (his clock, This period's "on now"): a solid dot for everyone in a
+// game read as "all on the floor"
+function liveDot(p, d) {
+  const g = liveGame(p, d);
+  if (!g || g.state !== 'in') return '';
+  const on = onFloor(p, d), out = on === false || betweenPeriods(g);
+  const tip = on ? 'On the floor now' : out ? (on === false ? 'On the bench now' : 'Between periods') : '';
+  return tip ? `<span class="lv-dot${out ? ' out' : ''}" title="${tip}" aria-label="${tip}"></span>` : '<span class="lv-dot" aria-hidden="true"></span>';
+}
+// a game's state for its row: the clock while it's on (after his dot, liveDot), Final once it's over
+function liveStatus(p, d) {
   const g = liveGame(p, d);
   if (!g || g.state === 'pre') return '';
   if (g.state !== 'in') return 'Final';
@@ -392,8 +400,5 @@ function liveStatus(p, d, floor = true) {
   // saves, the owner's ask); End of 3rd and the like as they are
   const clock = String(g.detail || '').replace(/^([\d:.]+) - (?:(\d)(?:st|nd|rd|th)|(\d*OT))$/, (m, t, q, ot) => `${q ? `${SPORT.game.tag}${q}` : ot} ${t}`);
   const said = clock === 'Halftime' ? 'Half' : clock;
-  const on = floor ? onFloor(p, d) : null, out = floor && (on === false || betweenPeriods(g));
-  const tip = on ? 'On the floor now' : out ? (on === false ? 'On the bench now' : 'Between periods') : '';
-  const dot = tip ? `<span class="lv-dot${out ? ' out' : ''}" title="${tip}" aria-label="${tip}"></span>` : '<span class="lv-dot" aria-hidden="true"></span>';
-  return `${dot}${esc(said)}`;
+  return `${liveDot(p, d)}${esc(said)}`;
 }

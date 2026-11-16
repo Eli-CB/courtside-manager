@@ -2508,6 +2508,9 @@ test("Matchup: the dot by a game's clock is solid while he's on the floor, light
       // the Players tab too (its rows have the data's player, raw.id, not a row's nbaId): on the floor or on the bench, as on the Matchup
       assert.match(app.liveStatus(app.nbaById.get(p.nbaId), day), /^<span class="lv-dot" title="On the floor now"/);
       assert.match(app.liveStatus(app.nbaById.get(mate.nbaId), day), /^<span class="lv-dot out" title="On the bench now"/);
+      // This period's "on now" dot on the Players tab is the same one
+      assert.equal(app.liveDot(app.nbaById.get(mate.nbaId), day), '<span class="lv-dot out" title="On the bench now" aria-label="On the bench now"></span>');
+      assert.ok(app.liveDot(app.nbaById.get(p.nbaId), day).includes('title="On the floor now"'));
       // between periods (the five who ended one) and after the buzzer: not known
       Object.assign(g, { detail: 'Halftime', clock: 0 });
       assert.equal(app.onFloor(p, day), null);

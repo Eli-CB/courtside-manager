@@ -47,7 +47,7 @@ function dashGame(p, d) {
   const inGoal = isGoalie(p) && !lineOn(p, d) ? ` · ${startWords(p, d)}` : '';
   if (g && g.state === 'pre') return `${bubble(`${vs(g)} ${fmtTime(g.start)}`)}${inGoal}`;
   const score = !s ? '' : ui.hideScores ? vs(s) : `${s.away} ${s.as} @ ${s.home} ${s.hs}`;
-  if (g && g.state === 'in') return bubble(`${whole(score)} ${whole(liveStatus(p, d, true))}`); // (its dot: on the floor or not)
+  if (g && g.state === 'in') return bubble(`${whole(score)} ${whole(liveStatus(p, d))}`); // (its dot: on the floor or not)
   const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
   if (s) return `${bubble(`${score}${ui.hideScores ? ' · Final' : ' F'}`)}${dnp}`;
   const nx = NBA.teams && NBA.teams[p.team] && NBA.teams[p.team].next;
@@ -165,7 +165,7 @@ function dashCell(C, p, right, counts, tag = '', cls = '') {
     const left = D.all.filter(d => playsOn(p, d) && !lineOn(p, d) && (d > today || (d === today && !gameFinal(p, d) && !(liveGame(p, d) && liveGame(p, d).state === 'post')))).length;
     const fbDay = isFootball() ? D.all.find(d => playsOn(p, d)) : null;
     const toCome = isGoalie(p) ? `about ${fmt(expectedGames(p, D.all.filter(d => d >= today && !gameFinal(p, d))), 1)}` : left;
-    game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${toCome} left` : ''}${liveOn(p, today) && (lineOn(p, today) || onFloor(p, today)) ? ` · ${liveStatus(p, today, true)}` : ''}`;
+    game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${toCome} left` : ''}${liveOn(p, today) && (lineOn(p, today) || onFloor(p, today)) ? ` · ${liveStatus(p, today)}` : ''}`;
     // football: his one game, or his bye
     if (isFootball()) game = fbDay ? `${fmtDay(fbDay).split(',')[0]} ${dashGame(p, fbDay)}` : 'Bye';
   } else game = dashGame(p, dates[0]);
