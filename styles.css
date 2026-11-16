@@ -301,7 +301,8 @@ a { color: var(--accent); }
 .pp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pp-label { width: 52px; flex: none; font-size: .78rem; font-weight: 600; color: var(--muted); }
 .pp-row .perf-filters { flex: 1; min-width: 0; }
-.pp-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+.pp-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; flex: none; margin-left: auto; } /* (at the end of the last row) */
+.pp-row .perf-filters:has(+ .pp-foot) { flex: 0 1 auto; } /* (the last row's filters as wide as they are, Done right after the room) */
 .link-btn.pp-clear, .link-btn.quiet { color: var(--muted); font-size: .85rem; } /* not orange: that's for your team */
 /* a team's code (UTA, CLE) that opens its players: looks like the text around it until pointed at */
 .link-btn.tm-link { color: inherit; font-weight: inherit; text-decoration: none; text-underline-offset: 2px; }
@@ -331,7 +332,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 @media (max-width: 640px) { .pc-who { flex: 1 1 0; } .proj-grid.pc-tiles { flex-basis: 100%; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); } }
 .link-btn.pp-clear:hover, .link-btn.quiet:hover { color: var(--text); text-decoration: underline; }
 .seg button:disabled { opacity: .45; cursor: default; }
-@media (max-width: 640px) { .pp-row { gap: 6px; } .pp-label { width: 100%; } }
+@media (max-width: 640px) { .pp-row { gap: 6px; } .pp-label { width: 100%; } .pp-foot { flex: 1 0 100%; } } /* (phones: Done under the filters) */
 @media (max-width: 640px) { .perf-when { margin: 0; text-align: left; } .perf-bar { column-gap: 10px; } .perf-bar .perf-q { flex: 1 1 120px; } } /* phones: search, Filters and (i) on one line */
 /* when: the menu, and Totals / Per game beside it (one row, phones too) */
 .perf-when-pick { display: flex; align-items: center; gap: 8px; min-width: 0; }

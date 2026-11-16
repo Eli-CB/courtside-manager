@@ -150,13 +150,15 @@ function perfFilters(owner, opp, rows) {
   const spots = [['all', 'All', ''], ['active', 'Active', "In their team's starting lineup"], ['bench', 'Bench', "On their team's bench or IR"]];
   const menu = (action, label, val, opts) => `<select class="pill pill-menu${val ? ' on' : ''}" data-change="${action}" aria-label="${label}"><option value="">${label === 'Position' ? 'All positions' : 'All teams'}</option>${opts.map(x => `<option ${val === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
   const only = (k, l, title) => `<button type="button" class="pill${ui.perfOnly[k] ? ' on' : ''}" data-action="perf-only" data-key="${k}" aria-pressed="${!!ui.perfOnly[k]}" title="${title}">${l}</button>`;
-  const row = (label, body) => `<div class="pp-row"><span class="pp-label">${label}</span><div class="perf-filters">${body}</div></div>`;
+  // a row of the panel: its label only beside others (a league's Show and Lineup); Done (and Clear filters) at the end of
+  // the last, on its line where there's room (the owner's ask)
   const league = owner.size && rows.length;
+  const row = (label, body, tail = '') => `<div class="pp-row">${league ? `<span class="pp-label">${label}</span>` : ''}<div class="perf-filters">${body}</div>${tail}</div>`;
+  const foot = `<div class="pp-foot">${n ? '<button type="button" class="link-btn pp-clear" data-action="perf-clear">Clear filters</button>' : ''}<button type="button" class="btn sm" data-action="perf-filt">Done</button></div>`;
   const panel = `<div class="perf-panel" id="perfPanel" role="group" aria-label="Filters">
     ${league ? row('Show', `${toggle('me', 'My team')}${opp ? toggle('opp', 'Opponent', opp.name) : ''}${toggle('other', 'Other teams')}${toggle('fa', 'Waivers', 'Not on a roster in your league')}`) : ''}
     ${league ? row('Lineup', `<div class="seg seg-sm" role="group" aria-label="Where in the lineup">${spots.map(([k, l, t]) => `<button type="button" class="${ui.perfSpot === k ? 'on' : ''}" data-action="perf-spot" data-spot="${k}" aria-pressed="${ui.perfSpot === k}"${t ? ` title="${t}"` : ''}${rostered ? '' : ' disabled'}>${l}</button>`).join('')}</div>`) : ''}
-    ${row('Player', `${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', `${SPORT.name} team`, ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}`)}
-    <div class="pp-foot">${n ? '<button type="button" class="link-btn pp-clear" data-action="perf-clear">Clear filters</button>' : ''}<button type="button" class="btn sm" data-action="perf-filt">Done</button></div>
+    ${row('Player', `${menu('perf-pos', 'Position', ui.perfPos, POSITIONS)}${menu('perf-team', `${SPORT.name} team`, ui.perfTeam, [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}`, foot)}
   </div>`;
   return find + btn + info + panel;
 }
@@ -277,7 +279,7 @@ function topPerformancesCard() {
   const count = `${picked.length > shown.length ? `${shown.length} of ` : ''}${picked.length} player${picked.length === 1 ? '' : 's'}`;
   // today before tip-off: when the first game starts
   // a game on today: its clock (a finished one says nothing: its line is there, nothing's moving)
-  const clock = r => { const st = liveStatus(r.raw, day); return st && st !== 'Final' ? `${st} · ` : ''; };
+  const clock = r => { const st = liveStatus(r.raw, day); return st && st !== 'Final' ? st : ''; };
   const first = live.games.filter(g => g.d === day && g.state === 'pre').sort((a, b) => a.start - b.start)[0];
   const waiting = range === 'today' && !rows.length ? `<p class="muted small" style="margin:0">${live.at || live.error ? `No games have started yet.${first ? ` First tip-off ${fmtTime(first.start)}.` : ''}` : "Loading today's games…"}</p>` : '';
   const table = !rows.length ? waiting : !shown.length ? '<p class="muted small" style="margin:0">No players match these filters.</p>' : `<div class="perf-wrap${shown.length > 5 ? ' scroll' : ''}"><table class="perf-table">
@@ -285,7 +287,9 @@ function topPerformancesCard() {
       <tbody>${shown.map(r => `<tr class="${teamOf(r) === 'me' ? 'pf-me' : teamOf(r) === 'opp' ? 'pf-opp' : ''}">
         <td class="pf-name"${teamOf(r) === 'me' ? ' title="Your team"' : teamOf(r) === 'opp' ? ` title="Opponent: ${esc(opp.name)}"` : ''}><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: r.raw.id, name: r.raw.name }, 34)}<div class="bmain">
           <div class="bname">${playerBtn(r.raw.id, r.raw.name)}${rookieBadge(r.raw, 'by-name')}${injBadge(r.raw.inj, 'by-name')}</div>
-          <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${proj ? `${esc(r.game)} · ` : avg || perWeek ? `${r.g} GP · ` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G · ` : day === today ? clock(r) : ''}${football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''} · `}${who(r.raw.id)}</div></div></div></td>
+          <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${[ // (" · " only between pieces: no team, no dot left over)
+            proj ? esc(r.game) : avg || perWeek ? `${r.g} GP` : weekly ? `${r.on ? '<span class="lv-dot" aria-hidden="true"></span>' : ''}${r.g} G` : day === today ? clock(r) : '',
+            football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''}`, who(r.raw.id)].filter(Boolean).join(' · ')}</div></div></div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${valShade(r)}" data-tip="${valTip}">${pts ? (avg || perWeek ? fmt(r.v, 1) : fmtFp(r.v)) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>
