@@ -18,6 +18,14 @@
 //   GET  /espn/<sport>/<league>/<scoreboard | summary | injuries>?<dates | event>
 // Only those three feeds of the three sports, only for the site's own pages, each answer kept at Cloudflare's edge for
 // seconds (ESPN_TTL), so ESPN is asked about once per feed every 20-30 seconds however many people are watching.
+//
+// And today's games for everyone at once, the feed the site's pages read first while games are on (liveFeedGet in
+// js/live.js; ESPN directly when this can't answer):
+//   GET  /live/<sport>/<league>
+// ESPN's scoreboard and each game's box score cut to what the page reads (scores, clocks, every player's line, who's on
+// the floor: about 1 KB a game where ESPN's box score is 400), one small answer kept at the edge for LIVE_TTL seconds.
+// ESPN is asked a few times a minute per Cloudflare data center however many people are watching, and each visitor's
+// update is one request instead of one per game.
 
 const AUTH = 'https://api.login.yahoo.com/oauth2/';
 const API = 'https://fantasysports.yahooapis.com/fantasy/v2/';
@@ -29,6 +37,11 @@ const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
 const ESPN_LEAGUES = new Set(['basketball/nba', 'hockey/nhl', 'football/nfl']);
 // (10 s: ESPN's own servers already hand out copies several seconds old, so 20 s here held a live scoreboard about 40 s)
 const ESPN_TTL = { scoreboard: 10, pastScoreboard: 600, summary: 10, injuries: 300 };
+// The live feed: the whole answer is kept LIVE_TTL seconds; a game's box score is read again once LIVE_BOX_FRESH old, at
+// most LIVE_BOX_PER_BUILD of them for one build (reading one of ESPN's takes ~3 ms of CPU, and the free plan allows 10:
+// the stalest first, so with people watching every game is read every few seconds), a finished game's once; each game's
+// cut box score is kept LIVE_BOX_KEEP seconds between builds
+const LIVE_TTL = 5, LIVE_BOX_FRESH = 12e3, LIVE_BOX_PER_BUILD = 3, LIVE_BOX_KEEP = 6 * 3600;
 
 // The ESPN address for /espn/<sport>/<league>/<feed>?<query>, and how long to keep its answer; null for anything else
 function espnFeed(url) {
@@ -51,6 +64,53 @@ async function espnCached(target, ctx) {
   const res = new Response(r.body, { status: r.status, headers: { 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': `public, max-age=${target.ttl}` } });
   if (r.ok) ctx.waitUntil(cache.put(key, res.clone()));
   return res;
+}
+
+// ----- The live feed (/live/<sport>/<league>) -----
+// ESPN's scoreboard and box scores with only what the page reads (espnGames, espnLines, espnHockeyLines, espnFloor and
+// espnPlayer in js/live.js): keep these in step with those
+const liveAthlete = a => (a ? { id: a.id, displayName: a.displayName, shortName: a.shortName } : a);
+const liveTeam = t => ({ id: t.id, abbreviation: t.abbreviation });
+function liveScoreboard(sb) {
+  return {
+    day: sb.day,
+    events: (sb.events || []).map(e => ({
+      id: e.id, date: e.date,
+      status: { period: e.status.period, clock: e.status.clock, type: { state: e.status.type.state, shortDetail: e.status.type.shortDetail } },
+      competitions: [{ competitors: e.competitions[0].competitors.map(t => ({
+        homeAway: t.homeAway, score: t.score, team: liveTeam(t.team),
+        probables: (t.probables || []).map(p => ({ name: p.name, status: p.status && { type: p.status.type }, athlete: liveAthlete(p.athlete) })),
+      })) }],
+    })),
+  };
+}
+function liveBox(sm) {
+  return { boxscore: { players: ((sm.boxscore || {}).players || []).map(t => ({
+    team: liveTeam(t.team),
+    statistics: (t.statistics || []).map(st => ({ name: st.name, keys: st.keys, athletes: (st.athletes || []).map(a => ({ athlete: liveAthlete(a.athlete), active: a.active, didNotPlay: a.didNotPlay, stats: a.stats })) })),
+  })) } };
+}
+const liveKey = (origin, path) => new Request(`${origin}/__live/${path}`); // (this Worker's own cache entries)
+const espnJson = async u => { const r = await fetch(u, { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error(`ESPN ${r.status}`); return r.json(); };
+// One build: today's scoreboard, and each game under way or over with its cut box score, the stalest read again
+async function liveBuild(league, origin, ctx) {
+  const cache = caches.default, now = Date.now();
+  const scoreboard = liveScoreboard(await espnJson(`${ESPN_SITE}${league}/scoreboard`));
+  const games = league === 'football/nfl' ? [] : scoreboard.events.filter(e => e.status.type.state !== 'pre'); // (football: points from Sleeper)
+  const kept = await Promise.all(games.map(async e => { const hit = await cache.match(liveKey(origin, `${league}/box/${e.id}`)); return hit ? hit.json() : null; }));
+  const due = games.map((e, i) => ({ e, k: kept[i] })).filter(({ k }) => !k || (!k.final && now - k.at >= LIVE_BOX_FRESH))
+    .sort((x, y) => (x.k ? x.k.at : 0) - (y.k ? y.k.at : 0)).slice(0, LIVE_BOX_PER_BUILD);
+  const read = await Promise.all(due.map(async ({ e }) => {
+    try {
+      const b = { at: now, final: e.status.type.state === 'post', box: liveBox(await espnJson(`${ESPN_SITE}${league}/summary?event=${e.id}`)) };
+      ctx.waitUntil(cache.put(liveKey(origin, `${league}/box/${e.id}`), new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${LIVE_BOX_KEEP}` } })));
+      return [e.id, b];
+    } catch (err) { return null; } // (its last one, if any, until the next build)
+  }));
+  const boxes = {};
+  games.forEach((e, i) => { if (kept[i]) boxes[e.id] = kept[i]; });
+  for (const x of read) if (x) boxes[x[0]] = x[1];
+  return { v: 1, at: now, scoreboard, boxes };
 }
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -135,6 +195,22 @@ export default {
       try { r = await espnCached(target, ctx); } catch (e) { r = new Response(JSON.stringify({ error: "couldn't reach ESPN" }), { status: 502 }); }
       // to the page: never kept in the browser (its own updates decide when to ask again)
       return new Response(r.body, { status: r.status, headers: { ...cors, 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': 'no-store' } });
+    }
+
+    const live = url.pathname.match(/^\/live\/([a-z]+\/[a-z]+)$/);
+    if (live && req.method === 'GET') {
+      if (!origins.includes(origin)) return new Response('Not found', { status: 404 }); // (only for the site's own pages)
+      const head = { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+      if (!ESPN_LEAGUES.has(live[1])) return new Response(JSON.stringify({ error: 'not a sport the site reads' }), { status: 404, headers: head });
+      const key = liveKey(url.origin, live[1]);
+      let body = await caches.default.match(key).then(r => (r ? r.text() : null));
+      if (!body) {
+        try {
+          body = JSON.stringify(await liveBuild(live[1], url.origin, ctx));
+          ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${LIVE_TTL}` } })));
+        } catch (e) { return new Response(JSON.stringify({ error: "couldn't reach ESPN" }), { status: 502, headers: head }); }
+      }
+      return new Response(body, { headers: head }); // (never kept in the browser: its own updates decide when to ask again)
     }
 
     const callback = `${url.origin}/yahoo/callback`;

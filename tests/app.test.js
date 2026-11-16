@@ -3387,11 +3387,12 @@ test("ESPN not answering the site: after two misses in a row (the site itself an
   ls.removeItem(key);
   try {
     await assert.rejects(a.espnSite('scoreboard'), /403/, 'one miss: an error, as before');
-    assert.ok(!asked.some(u => u.includes('api.leaguelayer.com/espn/')));
+    // (the scoreboard: the injury report is pooled, through the Worker first, on purpose)
+    assert.ok(!asked.some(u => u.includes('api.leaguelayer.com/espn/basketball/nba/scoreboard')));
     // the visitor offline: not ESPN's fault, no switch
     net.site = false;
     await assert.rejects(a.espnSite('scoreboard'), /403/);
-    assert.ok(!asked.some(u => u.includes('api.leaguelayer.com/espn/')), 'no switch while the site itself is unreachable');
+    assert.ok(!asked.some(u => u.includes('api.leaguelayer.com/espn/basketball/nba/scoreboard')), 'no switch while the site itself is unreachable');
     net.site = true;
     const sb = await a.espnSite('scoreboard');
     assert.ok(sb.events && sb.events.length, 'the second miss in a row: the same scoreboard, through the Worker');
@@ -3447,6 +3448,132 @@ test("the Worker's ESPN route: only the site's feeds, only for its pages, kept f
     assert.equal((await ask('/espn/basketball/nba/scoreboard', null)).status, 404, 'no page at all (a script)');
     assert.equal(upstream.length, n, 'none of those reached ESPN');
   } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; }
+});
+
+test("the Worker's live feed: today's scoreboard and box scores cut to what the page reads, built once for everyone", async () => {
+  const worker = (await import('../worker/yahoo.js')).default;
+  const store = new Map(), upstream = [];
+  const realFetch = globalThis.fetch, realCaches = globalThis.caches, realNow = Date.now;
+  let now = Date.parse('2026-11-15T23:00:00Z'), espnUp = true;
+  Date.now = () => now;
+  globalThis.caches = { default: { match: async r => (store.has(r.url) ? store.get(r.url).clone() : undefined), put: async (r, res) => { store.set(r.url, res); } } };
+  // five games: three on, one over, one to come; ESPN's answers with all they carry (news, plays...) besides what the page reads
+  const team = (abbreviation, id) => ({ id, abbreviation, displayName: 'x', logo: 'https://x', color: 'fff' });
+  const event = (id, state) => ({ id, date: '2026-11-15T23:00Z', name: 'x', links: [{ href: 'x' }], status: { period: 2, clock: 300, displayClock: '5:00', type: { state, shortDetail: '5:00 - 2nd', description: 'x' } },
+    competitions: [{ venue: { fullName: 'x' }, competitors: [{ homeAway: 'home', score: '50', team: team('BOS', '2'), records: [], probables: [] }, { homeAway: 'away', score: '48', team: team('DAL', '6'), records: [] }] }] });
+  const events = [event('1', 'in'), event('2', 'in'), event('3', 'post'), event('4', 'in'), event('5', 'pre')];
+  const box = id => ({ plays: Array(200).fill({ text: 'a long play' }), news: [{ x: 1 }], header: { id }, boxscore: { players: [{ team: team('BOS', '2'), statistics: [{ name: 'x', keys: ['minutes', 'points'], labels: ['MIN', 'PTS'], athletes: [{ athlete: { id: '100', displayName: 'A Player', shortName: 'A. Player', headshot: { href: 'x' } }, active: true, starter: true, didNotPlay: false, stats: ['20', '12'] }] }] }] } });
+  globalThis.fetch = async u => {
+    u = String(u); upstream.push(u);
+    if (!espnUp) return new Response('{}', { status: 503 });
+    const body = u.includes('/scoreboard') ? { day: { date: '2026-11-15' }, leagues: [{ x: 1 }], events } : box(u.split('event=')[1]);
+    return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+  };
+  const env = { SITE_ORIGINS: 'https://leaguelayer.com,http://localhost:5173' };
+  const ask = async (path, origin = 'https://leaguelayer.com') => {
+    const waits = [];
+    const res = await worker.fetch(new Request(`https://api.leaguelayer.com${path}`, { headers: origin ? { Origin: origin } : {} }), env, { waitUntil: p => waits.push(p) });
+    await Promise.all(waits);
+    return res;
+  };
+  const expire = () => store.delete('https://api.leaguelayer.com/__live/basketball/nba'); // (the whole answer's 5 seconds up)
+  const summaries = () => upstream.filter(u => u.includes('summary')).map(u => u.split('event=')[1]);
+  try {
+    let r = await ask('/live/basketball/nba');
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://leaguelayer.com');
+    assert.equal(r.headers.get('Cache-Control'), 'no-store');
+    let f = await r.json();
+    // at most three box scores a build (the free plan's CPU), the scoreboard always
+    assert.deepEqual(summaries(), ['1', '2', '3']);
+    assert.deepEqual(Object.keys(f.boxes).sort(), ['1', '2', '3']);
+    assert.ok(f.boxes['3'].final && !f.boxes['1'].final, 'a game over: final');
+    // cut to what the page reads
+    const text = JSON.stringify(f);
+    assert.ok(!/plays|news|venue|headshot|links|records|labels|logo/.test(text), text.slice(0, 300));
+    assert.deepEqual(f.boxes['1'].box.boxscore.players[0].statistics[0].athletes[0], { athlete: { id: '100', displayName: 'A Player', shortName: 'A. Player' }, active: true, didNotPlay: false, stats: ['20', '12'] });
+    assert.deepEqual(f.scoreboard.events[0].competitions[0].competitors[0], { homeAway: 'home', score: '50', team: { id: '2', abbreviation: 'BOS' }, probables: [] });
+    assert.equal(f.scoreboard.events[0].status.type.shortDetail, '5:00 - 2nd');
+    // a second visitor within the 5 seconds: the same answer, ESPN not asked
+    const n = upstream.length;
+    await ask('/live/basketball/nba');
+    assert.equal(upstream.length, n);
+    // the next build: the box score it lacked, not the fresh ones
+    expire();
+    f = await (await ask('/live/basketball/nba')).json();
+    assert.deepEqual(summaries().slice(3), ['4']);
+    assert.deepEqual(Object.keys(f.boxes).sort(), ['1', '2', '3', '4'], 'each game with its last one');
+    // 20 seconds on: the stalest games under way read again, the finished one never
+    now += 20e3;
+    expire();
+    f = await (await ask('/live/basketball/nba')).json();
+    assert.deepEqual(summaries().slice(4).sort(), ['1', '2', '4']);
+    assert.equal(f.boxes['1'].at, now);
+    // ESPN down: an error (the page asks ESPN itself), nothing kept
+    espnUp = false;
+    expire();
+    assert.equal((await ask('/live/basketball/nba')).status, 502);
+    assert.ok(!store.has('https://api.leaguelayer.com/__live/basketball/nba'));
+    espnUp = true;
+    // football: the scoreboard only (its points come from Sleeper)
+    const before = summaries().length;
+    f = await (await ask('/live/football/nfl')).json();
+    assert.equal(summaries().length, before);
+    assert.deepEqual(f.boxes, {});
+    // only the site's own pages, only the sports it reads
+    assert.equal((await ask('/live/basketball/nba', 'https://elsewhere.example')).status, 404);
+    assert.equal((await ask('/live/basketball/nba', null)).status, 404);
+    assert.equal((await ask('/live/baseball/mlb')).status, 404);
+  } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; Date.now = realNow; }
+});
+
+test("live scores: the page reads the Worker's live feed first (one request), ESPN for what it lacks or when it's down", async () => {
+  await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const live = app.get('live'), feedState = app.get('liveFeed'), ui = app.get('ui');
+  const day = '2026-10-28';
+  const sb = JSON.parse(readFixture('espn/live/scoreboard.json'));
+  const games = app.espnGames(sb).filter(g => g.state !== 'pre');
+  const realFetch = app.fetch, asked = [];
+  let feedAt = Date.parse(`${day}T23:00:00Z`), feedUp = true, stale = null;
+  const feed = () => ({ v: 1, at: feedAt, scoreboard: sb, boxes: Object.fromEntries(games.map(g => [g.id, { at: g.id === stale ? feedAt - 60e3 : feedAt, final: g.state === 'post', box: JSON.parse(readFixture(`espn/live/summary-${g.id}.json`)) }])) });
+  app.fetch = (u, o) => {
+    const s = String(u);
+    asked.push(s);
+    if (s === 'https://api.leaguelayer.com/live/basketball/nba') return Promise.resolve(feedUp ? { ok: true, status: 200, text: async () => JSON.stringify(feed()) } : { ok: false, status: 404 });
+    return realFetch(u, o);
+  };
+  const reset = () => { live.lines.clear(); live.done.clear(); live.read.clear(); live.floor.clear(); live.at = 0; feedState.off = 0; asked.length = 0; };
+  const espn = () => asked.filter(u => u.includes('site.api.espn.com'));
+  try {
+    ui.tab = 'dashboard';
+    reset();
+    await onDay(day, () => app.pollLive());
+    clearTimeout(live.timer);
+    assert.equal(live.error, '');
+    assert.ok(asked.includes('https://api.leaguelayer.com/live/basketball/nba'));
+    assert.deepEqual(espn().filter(u => !u.includes('dates=') && !u.includes('injuries')), [], "today's scoreboard and every box score from the feed: ESPN not asked");
+    assert.ok(live.lines.get(day) && live.lines.get(day).size > 20, "everyone who's played, from the feed's box scores");
+    // a game whose box score in the feed is a minute old (few people watching): that one from ESPN
+    reset();
+    stale = games.find(g => g.state === 'in').id;
+    await onDay(day, () => app.pollLive());
+    clearTimeout(live.timer);
+    assert.deepEqual(espn().filter(u => u.includes('summary')), [`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${stale}`]);
+    stale = null;
+    // the feed not there (the Worker not deployed with it, or down): ESPN directly, as before, and the feed left alone for 10 minutes
+    reset();
+    feedUp = false;
+    await onDay(day, () => app.pollLive());
+    clearTimeout(live.timer);
+    assert.ok(espn().some(u => u.endsWith('/scoreboard')) && espn().some(u => u.includes('summary')), 'ESPN directly');
+    assert.ok(feedState.off > Date.parse(`${day}T12:00:00-04:00`) + 9 * 60e3, 'not asked again for 10 minutes');
+    asked.length = 0;
+    live.at = 0;
+    await onDay(day, () => app.pollLive());
+    clearTimeout(live.timer);
+    assert.ok(!asked.includes('https://api.leaguelayer.com/live/basketball/nba'), 'meanwhile, ESPN directly without trying it');
+  } finally { app.fetch = realFetch; reset(); ui.tab = 'standings'; clearTimeout(live.timer); live.timer = null; }
 });
 
 test("ESPN failing again and again reaches the error log, a visitor's own connection doesn't", async () => {

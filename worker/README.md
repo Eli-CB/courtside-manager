@@ -67,6 +67,33 @@ the scoreboard from the site. If it's ever used, the error log says so once per 
 directly ... its feeds come through the Worker". The free plan counts each page's request (100,000 a day); a watching
 visitor makes about 2,000 an evening, so a busy night on the fallback may need the $5 plan.
 
+## Live feed (the site's live scores)
+
+`GET /live/<sport>/<league>` (`basketball/nba`, `hockey/nhl`, `football/nfl`): today's scoreboard and each game's box
+score in one answer, cut to what the page reads (scores, clocks, every player's line, who's on the floor): about
+8 KB compressed for a night of games, where asking ESPN directly is a 16 KB scoreboard plus 37 KB per game. Built once
+and kept at Cloudflare's edge for 5 seconds, so ESPN is asked a few times a minute per Cloudflare data center however
+many people are watching, and each visitor's update every 30 seconds is one request. A build reads at most 3 box scores
+(each takes ~3 ms of CPU, and the free plan allows 10 ms a request), the oldest first; each game keeps its last one in
+the cache between builds, and a finished game is read once. The page reads this first and asks ESPN directly for a game
+whose box score here is over 45 s old (few people watching: builds are rare then), and for everything when this doesn't
+answer (not deployed yet, or down), trying it again 10 minutes later. Only for the site's own pages (`SITE_ORIGINS`).
+Nothing to set up beyond deploying:
+
+```
+npx wrangler deploy
+```
+
+Check: `https://api.leaguelayer.com/live/basketball/nba` answers 404 in a browser tab (no page origin), and the site's
+Matchup tab during games asks it once every 30 seconds and ESPN for nothing else (the browser's Network tab). The
+injury report and finished days' scoreboards and box scores also come through `/espn/` first now (one copy for
+everyone), with ESPN directly when the Worker can't answer.
+
+Cost: the free plan counts each request (100,000 a day): two a minute per visitor watching live is about 800
+visitor-hours a day. Past that, the $5 Workers Paid plan (10 million a month; then $0.30 a million) covers roughly a
+thousand people watching three hours a night all season. If the free plan's CPU limit ever trips a build (an error in
+Cloudflare's dashboard for this Worker), the page just asks ESPN directly for that update.
+
 ## Checking it
 
 `https://api.leaguelayer.com/yahoo/login?return=https://leaguelayer.com/` should open Yahoo's sign-in. After
