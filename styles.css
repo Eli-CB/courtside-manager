@@ -94,13 +94,33 @@ a { color: var(--accent); }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
 
-/* ---------- Top bar ---------- */
+/* ---------- Head: the league on the left, the team picker and settings on the right ---------- */
+.head { position: relative; z-index: 11; background: var(--surface); } /* (its menus open over the tabs) */
+.head-inner {
+  max-width: 1200px; margin: 0 auto; min-height: 46px;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.hd-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.head .icon-btn { display: grid; place-items: center; border-color: transparent; box-shadow: none; color: var(--muted); }
+.head .icon-btn:hover { color: var(--text); }
+/* the team picker: a jersey, and the team's name where there's room */
+#teamMenu { position: relative; min-width: 0; }
+.tm > summary { list-style: none; display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px; max-width: 260px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: .875rem; font-weight: 500; }
+.tm > summary::-webkit-details-marker { display: none; }
+.tm > summary:hover, .tm[open] > summary { background: var(--surface-2); color: var(--text); }
+.tm-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm.viewing > summary { box-shadow: inset 0 0 0 1px var(--border); }
+.tm-pop { max-height: calc(100vh - 80px); overflow-y: auto; }
+.tm-you { margin-left: 4px; font-size: .72rem; font-weight: 500; color: var(--muted); }
+
+/* ---------- Tabs ---------- */
 .topbar {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
   background: color-mix(in srgb, var(--surface) 85%, transparent); backdrop-filter: saturate(1.4) blur(8px);
   border-bottom: 1px solid var(--border);
 }
-/* one slim bar: tabs on the left (scroll sideways if needed), theme toggle on the right */
+/* one slim bar that stays put: the tabs (they scroll sideways if needed) */
 .topbar-inner {
   max-width: 1200px; margin: 0 auto;
   padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
@@ -118,7 +138,9 @@ a { color: var(--accent); }
 }
 .tabs a:hover { color: var(--text); }
 .tabs a.active { color: var(--text); border-bottom-color: var(--text); }
-.nav-btn { display: none; }
+/* (the icons, and More with the sections past the first four, are the phone's bottom bar) */
+.tab-ico, .tab-more { display: none; }
+.tabs-extra { display: contents; }
 
 .container {
   max-width: 1200px; margin: 0 auto; padding-block: 20px 32px; outline: none;
@@ -133,11 +155,14 @@ a { color: var(--accent); }
 .top-right .icon-btn { width: 30px; height: 30px; }
 /* settings gear */
 #gearMenu { position: relative; }
-.gear > summary { list-style: none; display: grid; place-items: center; font-size: 1rem; color: var(--muted); }
+.gear > summary { list-style: none; }
 .gear > summary::-webkit-details-marker { display: none; }
-.gear[open] > summary { background: var(--surface-2); color: var(--text); }
-.gear-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 270px; max-width: calc(100vw - 24px); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); padding: 6px; }
+.head .gear[open] > summary { background: var(--surface-2); color: var(--text); }
+.gear-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 270px; max-width: calc(100vw - 24px); max-height: calc(100vh - 70px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); padding: 6px; }
 .gear-row { padding: 6px 10px 8px; font-size: .88rem; color: var(--muted); display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.gear-pick { justify-content: space-between; gap: 8px; color: var(--text); font-size: .9rem; padding-block: 4px; }
+.gear-pick > span { display: inline-flex; align-items: center; gap: 2px; }
+.gear-pick .ctx-team { padding-block: 5px; }
 .gear-adv { margin-top: 4px; border-top: 1px solid var(--border); }
 .gear-adv > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
 .gear-adv > summary::-webkit-details-marker { display: none; }
@@ -998,7 +1023,7 @@ tr.dr-mine td { background: color-mix(in srgb, var(--accent-soft) 60%, transpare
 .dr-via { display: block; font-size: .64rem; color: var(--muted); font-style: italic; }
 
 /* ---------- Landing ---------- */
-body.landing .tabs, body.landing .nav-btn { visibility: hidden; } /* no sections before a league: phones' Menu too */
+body.landing .topbar { display: none; } /* no sections before a league */
 .landing-wrap { min-height: calc(100vh - 140px); display: grid; place-items: center; padding-block: 24px; }
 .landing-card { width: min(560px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 28px; }
 .landing-card h1 { font-size: 1.7rem; letter-spacing: -.02em; text-wrap: balance; margin-bottom: 8px; }
@@ -1052,26 +1077,19 @@ tr.me-row td { background: var(--accent-soft); }
 .aw-break-v { font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
 .aw-break-total { margin: 0 0 8px; }
 
-/* ---------- League and team bar ---------- */
-/* above the tabs: league / team on the left, week and data freshness on the right */
-.ctx { background: var(--surface); }
+/* ---------- Notes under the tabs (a past season, another team being viewed, the demo) ---------- */
 .ctx[hidden] { display: none; }
-.ctx-inner {
-  max-width: 1200px; margin: 0 auto; padding: 10px max(14px, env(safe-area-inset-right, 0px)) 2px max(14px, env(safe-area-inset-left, 0px));
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 16px;
-}
-.ctx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.ctx-sep { display: none; }
-.ctx-team-wrap { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-/* league, season and team pickers share one look: a bordered box with a caret (also inside a stepper) */
-.ctx-team, .lm summary {
+.ctx-inner { max-width: 1200px; margin: 0 auto; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
+.ctx-view { color: var(--text); font-weight: 500; }
+/* pickers share one look: a bordered box with a caret (also inside a stepper) */
+.ctx-team {
   font: inherit; font-size: .875rem; font-weight: 500; color: var(--text); line-height: 1.2; box-shadow: var(--shadow);
   background-color: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   padding: 7px 30px 7px 11px; max-width: 100%; cursor: pointer;
   appearance: none; -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a94a6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px;
 }
-.ctx-team:hover, .ctx-team:focus-visible, .lm summary:hover, .lm[open] summary { background-color: var(--surface-2); border-color: var(--muted); }
+.ctx-team:hover, .ctx-team:focus-visible { background-color: var(--surface-2); border-color: var(--muted); }
 /* ‹ [dropdown] ›: the buttons join the picker into one bordered control */
 .stepper { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; }
 .stepper .ctx-team { border-radius: 0; margin: 0 -1px; min-width: 0; text-overflow: ellipsis; }
@@ -1084,13 +1102,21 @@ tr.me-row td { background: var(--accent-soft); }
 .step-btn:hover:not(:disabled), .stepper .ctx-team:hover { z-index: 1; background-color: var(--surface-2); border-color: var(--muted); }
 .step-btn:focus-visible, .stepper .ctx-team:focus-visible { z-index: 2; }
 .step-btn:disabled { color: var(--muted); opacity: .45; cursor: default; }
-.ctx-meta { color: var(--muted); font-size: .82rem; padding-left: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ctx-meta { color: var(--muted); font-size: .82rem; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .ctx-meta .btn.sm { padding: 2px 10px; font-size: .78rem; }
-#leagueMenu { position: relative; }
-.lm summary { list-style: none; display: flex; align-items: center; max-width: 320px; }
+/* the league switcher: the site's mark, the league's name, no box */
+#leagueMenu { position: relative; min-width: 0; }
+.lm summary {
+  list-style: none; display: flex; align-items: center; gap: 8px; max-width: 420px; padding: 5px 8px; border-radius: 6px; cursor: pointer;
+  font-size: .95rem; font-weight: 600; letter-spacing: -.01em; color: var(--text);
+}
+.lm summary:hover, .lm[open] summary { background: var(--surface-2); }
+.lm-mark { width: 22px; height: 17px; flex: none; }
+.lm-mark .m-a { fill: var(--text); }
+.lm-mark .m-b { fill: #7f8a9c; }
 .lm summary::-webkit-details-marker { display: none; }
 .lm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lm-caret { display: none; }
+.lm-caret { width: 15px; height: 15px; flex: none; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .lm-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: 270px; max-height: calc(100vh - 80px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); padding: 6px; }
 .lm-sec { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 10px 10px 4px; }
 .lm-row { display: flex; align-items: center; gap: 4px; }
@@ -1111,15 +1137,6 @@ a.lm-item { text-decoration: none; }
 .lm-item.on { font-weight: 700; color: var(--accent); }
 .lm-item.danger { color: var(--bad); }
 .lm-item.lm-sub { padding: 6px 10px 6px 26px; font-size: .86rem; }
-@media (max-width: 640px) {
-  .ctx-inner { padding-top: 8px; }
-  .ctx-sep { display: none; }
-  .ctx-row { gap: 0 4px; }
-  .ctx-team, .lm summary { font-size: 1rem; }
-  .lm summary { max-width: 200px; }
-  .lm-pop { width: min(270px, calc(100vw - 32px)); }
-}
-
 /* ---------- Phones: sections run edge to edge with a line between, no rounded boxes or gaps; those after a tab's
    first one with a heading roll up to it (rollCards) ---------- */
 @media (max-width: 640px) {
@@ -1181,30 +1198,35 @@ a.lm-item { text-decoration: none; }
   .dr-table .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 }
 
-/* ---------- Phones: menu button instead of tabs, pickers stacked ---------- */
+/* ---------- Phones: the sections in a bar along the bottom, each with its icon; past five, the rest under More ---------- */
 @media (max-width: 640px) {
-  .topbar-inner { position: relative; padding-top: 6px; padding-bottom: 6px; padding-left: max(12px, env(safe-area-inset-left, 0px)); }
-  .nav-btn {
-    display: inline-flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 40px; padding: 0 12px;
-    font: inherit; font-weight: 700; font-size: 1rem; color: var(--text); background: var(--surface);
-    border: 1px solid var(--border); border-radius: 8px; cursor: pointer; text-align: left;
+  body { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+  body.landing { padding-bottom: 0; }
+  .head-inner { padding: 6px max(8px, env(safe-area-inset-right, 0px)) 6px max(8px, env(safe-area-inset-left, 0px)); gap: 4px; border-bottom: 1px solid var(--border); }
+  .top-right { gap: 2px; }
+  .top-right .icon-btn, .tm > summary { width: 40px; height: 40px; padding: 0; justify-content: center; }
+  .hd-ico { width: 21px; height: 21px; }
+  .tm-name { display: none; }
+  .lm summary { font-size: 1rem; padding: 8px; }
+  .lm-pop { width: min(300px, calc(100vw - 16px)); }
+  .topbar { position: fixed; top: auto; bottom: 0; left: 0; right: 0; border-bottom: 0; border-top: 1px solid var(--border); background: var(--surface); backdrop-filter: none; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .topbar-inner { position: relative; padding: 0 max(4px, env(safe-area-inset-right, 0px)) 0 max(4px, env(safe-area-inset-left, 0px)); }
+  .tabs { overflow: visible; gap: 0; }
+  .tab-ico { display: block; width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs a, .tab-more {
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 7px;
+    font: inherit; font-size: .68rem; font-weight: 500; line-height: 1.2; color: var(--muted); background: none; border: 0; cursor: pointer; white-space: nowrap;
   }
-  .nav-btn .nav-icon { font-size: 1.1rem; color: var(--muted); }
-  .nav-btn[aria-expanded="true"] { background: var(--surface-2); border-color: var(--muted); }
-  .tabs {
-    display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; gap: 2px;
-    padding: 6px max(12px, env(safe-area-inset-left, 0px)) 12px; background: var(--surface);
-    border-bottom: 1px solid var(--border); box-shadow: 0 14px 28px rgba(16, 24, 40, .16); overflow: visible;
+  .tabs a.active, .tab-more.active, .tab-more[aria-expanded="true"] { color: var(--text); font-weight: 600; }
+  .tabs a.active .tab-ico, .tab-more.active .tab-ico { stroke-width: 2.1; }
+  .tabs-extra {
+    display: none; position: absolute; right: 8px; bottom: calc(100% + 8px); width: 210px; flex-direction: column; gap: 2px; padding: 6px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18);
   }
-  body.nav-open .tabs { display: flex; }
-  .tabs a { padding: 12px; border-bottom: 0; border-radius: 8px; font-size: 1rem; color: var(--text); }
-  .tabs a.active { background: var(--accent-soft); color: var(--accent); }
-  .top-right .icon-btn { width: 40px; height: 40px; }
-  .ctx-inner { padding: 10px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); gap: 8px; }
-  .ctx-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; width: 100%; }
-  .ctx-team-wrap { display: contents; }
-  .lm summary { max-width: none; width: 100%; }
-  .lm-pop { width: 100%; }
-  .ctx-team, .lm summary { font-size: .95rem; width: 100%; }
-  .ctx-meta { padding-left: 0; }
+  body.nav-open .tabs-extra { display: flex; }
+  .tabs-extra a { flex: none; flex-direction: row; gap: 12px; padding: 11px 12px; border-radius: 8px; font-size: .95rem; color: var(--text); }
+  .tabs-extra a.active { background: var(--surface-2); }
+  .toast { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .ctx-inner { padding: 10px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
+}
 }

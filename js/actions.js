@@ -54,6 +54,27 @@ const actions = {
     loadFxTeam(opp.id);
   },
   'fx-view-mine'() { ui.viewA = null; ui.viewB = null; render(); },
+  // the team menu's choice: a past season's roster, the demo's team to play as, your team (none picked yet), or a
+  // team to look at, read only
+  'team-pick'(el) {
+    $('#teamMenu details')?.removeAttribute('open');
+    const id = el.dataset.id;
+    if (ui.season) {
+      ui.pastTeam = id || null;
+      if (ui.tab !== 'rosters') location.hash = seasonHash('rosters', ui.season); else render();
+    } else if (state.demo) { // the demo's team is whichever is picked
+      adoptTeam(id);
+      commit(`Now playing as ${state.teamName}`);
+    } else if (!state.fxTeam) {
+      adoptTeam(id);
+      commit(`Welcome, ${state.teamName}`);
+    } else {
+      ui.viewA = id !== state.fxTeam ? id : null;
+      ui.viewB = null;
+      if (ui.viewA && !VIEW_TABS.includes(ui.tab)) location.hash = '#dashboard';
+      else render();
+    }
+  },
   'fx-view-actual'() { ui.viewB = null; render(); },
   'stat-sort'(el) {
     const key = el.dataset.key;
@@ -420,7 +441,7 @@ const actions = {
   'close-backup'() { $('#backupDialog').close(); },
   import() { $('#importFile').click(); },
   async 'start-fresh'() {
-    $('#leagueMenu details')?.removeAttribute('open');
+    $('#gearMenu details')?.removeAttribute('open');
     if (!(await askConfirm('Reset and start over?', 'Removes your leagues, teams and matchup logs from this device. Copy a backup first if you want to keep anything.', 'Reset'))) return;
     await useSport('nba');
     state = emptyState();
@@ -458,10 +479,10 @@ const forms = {
 /* =========================================================
    Wiring
    ========================================================= */
-// phones: the sections menu opens under the top bar and closes on any choice or outside tap
+// phones: the bottom bar's More opens the rest of the sections above it, and closes on any choice or outside tap
 function setNav(open) {
   document.body.classList.toggle('nav-open', open);
-  $('.nav-btn').setAttribute('aria-expanded', open);
+  $('.tab-more')?.setAttribute('aria-expanded', open);
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('nav-open')) setNav(false); });
 
@@ -563,9 +584,11 @@ document.addEventListener('keydown', e => {
 document.addEventListener('click', e => {
   // a tap outside a popup (on its backdrop) closes it
   if (e.target instanceof HTMLDialogElement && e.target.open) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { e.target.close(); return; } }
-  if (document.body.classList.contains('nav-open') && !e.target.closest('.nav-btn') && (!e.target.closest('#tabs') || e.target.closest('#tabs a'))) setNav(false);
+  if (document.body.classList.contains('nav-open') && !e.target.closest('.tab-more') && (!e.target.closest('.tabs-extra') || e.target.closest('#tabs a'))) setNav(false);
   const menu = $('#leagueMenu details');
   if (menu && menu.open && !e.target.closest('#leagueMenu')) menu.removeAttribute('open');
+  const team = $('#teamMenu details');
+  if (team && team.open && !e.target.closest('#teamMenu')) team.removeAttribute('open');
   const gear = $('#gearMenu details');
   if (gear && gear.open && !e.target.closest('#gearMenu') && !e.target.closest('#infoDialog')) gear.removeAttribute('open');
   const el = e.target.closest('[data-action]');
@@ -587,14 +610,8 @@ document.addEventListener('toggle', e => {
 
 document.addEventListener('change', e => {
   const el = e.target;
-  if (el.dataset.change === 'fx-view' && state.demo) { // the demo's team is whichever is picked
-    adoptTeam(el.value);
-    commit(`Now playing as ${state.teamName}`);
-  } else if (el.dataset.change === 'fx-view') {
-    ui.viewA = el.value && el.value !== state.fxTeam ? el.value : null;
-    ui.viewB = null;
-    if (ui.viewA && !VIEW_TABS.includes(ui.tab)) location.hash = '#dashboard';
-    else render();
+  if (el.dataset.change === 'set-basis') {
+    actions['set-basis']({ dataset: { basis: el.value } });
   } else if (el.dataset.change === 'recap-week') {
     ui.recapWeek = +el.value;
     render();
@@ -606,14 +623,6 @@ document.addEventListener('change', e => {
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
-  } else if (el.dataset.change === 'past-team') {
-    ui.pastTeam = el.value || null;
-    if (ui.tab !== 'rosters') location.hash = '#rosters'; else render();
-  } else if (el.dataset.change === 'fx-team') {
-    if (!el.value) return;
-    adoptTeam(el.value);
-    state.demo = false;
-    commit(`Welcome, ${state.teamName}`);
   } else if (el.dataset.change === 'perf-pos') {
     ui.perfPos = el.value;
     render();

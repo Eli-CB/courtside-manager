@@ -20,20 +20,18 @@
   <link rel="stylesheet" href="styles.css?v=__BUILD__">
 </head>
 <body>
-  <div id="ctxBar" class="ctx" hidden>
-    <div class="ctx-inner">
-      <div class="ctx-row"><div id="leagueMenu"></div><span class="ctx-sep" aria-hidden="true">/</span><span class="ctx-team-wrap" id="ctxTeam"></span></div>
-      <div class="ctx-meta" id="ctxMeta"></div>
+  <!-- the league on the left; the team picker and settings on the right -->
+  <div class="head">
+    <div class="head-inner">
+      <div id="leagueMenu"></div>
+      <div class="top-right"><div id="teamMenu"></div><div id="gearMenu"></div></div>
     </div>
   </div>
+  <!-- the sections: a row of tabs under the head, and on phones a bar along the bottom -->
   <header class="topbar">
-    <div class="topbar-inner">
-      <!-- phones: the sections collapse into this menu button -->
-      <button type="button" class="nav-btn" data-action="nav-toggle" aria-expanded="false" aria-controls="tabs"><span class="nav-icon" aria-hidden="true">☰</span><span id="navCurrent">Menu</span></button>
-      <nav class="tabs" id="tabs" aria-label="Sections"></nav>
-      <div class="top-right" id="gearMenu"></div>
-    </div>
+    <div class="topbar-inner"><nav class="tabs" id="tabs" aria-label="Sections"></nav></div>
   </header>
+  <div id="ctxBar" class="ctx" hidden><div class="ctx-inner"><div class="ctx-meta" id="ctxMeta"></div></div></div>
 
   <main id="view" class="container" tabindex="-1"><div class="card"><div class="empty loading" role="status"><svg class="ll-loader" viewBox="4 14 56 40" aria-hidden="true"><polygon class="ll-edge" points="8,30 36,44 56,34 56,40 36,50 8,36"/><polygon class="ll-main" points="36,40 56,30 44,24 36,28 20,20 8,26"/></svg><strong>Loading…</strong></div></div></main>
 

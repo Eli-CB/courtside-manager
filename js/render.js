@@ -12,6 +12,28 @@ function waiverLine() {
   return mine ? `<p class="muted small waiver-line">You're <b>#${mine.rank}</b> of ${W.length} on waivers${mine.left != null ? `, with $${mine.left} of budget left` : ''} · <button type="button" class="link-btn quiet" data-action="waiver-order">See waiver order</button></p>` : '';
 }
 
+// Icons drawn as lines, so they match on every device (emoji differ by phone and computer)
+const lineIcon = (d, cls = 'lm-ico') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const menuIcon = d => lineIcon(d);
+const LOGO_MARK = '<svg class="lm-mark" viewBox="6 16 52 39" aria-hidden="true"><polygon class="m-a" points="36,37 56,27 46,22 36,27 18,18 8,23"/><polygon class="m-b" points="8,31 36,45 56,35 56,43 36,53 8,39"/></svg>';
+const ICON_JERSEY_D = '<path d="M8.5 3 3 6l2 4.5 2.5-1V21h9V9.5l2.5 1L21 6l-5.5-3a3.5 3.5 0 0 1-7 0z"/>';
+const ICON_GEAR_D = '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>';
+// each section's icon, for the phone's bottom bar
+const TAB_ICONS = {
+  dashboard: '<path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/>',
+  week: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  recap: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7M9 8h3"/>',
+  players: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>',
+  draft: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  standings: '<path d="M5 20.5V11M12 20.5V4M19 20.5V14.5"/>',
+  awards: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 5.5H5A3 3 0 0 0 8.2 10M16 5.5h3a3 3 0 0 1-3.2 4.5M12 13v4M8.5 20.5h7M10 17h4v3.5h-4z"/>',
+  trade: '<path d="M4 8h15.5L16 4.5M20 16H4.5L8 19.5"/>',
+  rosters: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/>',
+  trends: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  more: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
+};
+const TABS_SHOWN = 4; // phones: past 5 sections, the bottom bar shows this many and the rest sit under More
+
 /* =========================================================
    Rendering
    ========================================================= */
@@ -36,7 +58,7 @@ function leagueMenu() {
     }).join('') + '<button type="button" class="lm-item lm-sub" data-action="season-add">+ Add an earlier season</button>';
   }
   el.innerHTML = `<details class="lm"${wasOpen ? ' open' : ''}>
-    <summary aria-label="League menu"><span class="lm-name">${esc(L.name)}${P ? ` · ${esc(P.label)}` : ''}</span><span class="lm-caret" aria-hidden="true">▾</span></summary>
+    <summary aria-label="League menu">${LOGO_MARK}<span class="lm-name">${esc(L.name)}${P ? ` · ${esc(P.label)}` : ''}</span>${lineIcon('<path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/>', 'lm-caret')}</summary>
     <div class="lm-pop">
       <div class="lm-sec">Leagues</div>
       ${saved.map(l => {
@@ -48,12 +70,34 @@ function leagueMenu() {
       ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)}</span></div>` : ''}
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
-      <div class="lm-sec">Stats used ${infoBtn('projection')}</div>
-      ${Object.entries(BASIS_LABELS).map(([k, l]) => `<button type="button" class="lm-item${state.basis === k ? ' on' : ''}" data-action="set-basis" data-basis="${k}">${state.basis === k ? '✓ ' : ''}${l}</button>`).join('')}
-      <div class="lm-sec">This device</div>
-      <button type="button" class="lm-item" data-action="export">Backup &amp; restore</button>
-      <button type="button" class="lm-item danger" data-action="start-fresh">Reset and start over</button>
-      <div class="lm-sec">Version ${BUILD.startsWith('__') ? 'local' : esc(BUILD)}</div>
+    </div>
+  </details>`;
+}
+
+// The team picker, an icon beside the settings gear (its name too where there's room): the team whose Matchup and Plan
+// Ahead to look at (read only), the demo's team to play as, a past season's roster, or your team before one is picked
+function teamMenu() {
+  const el = $('#teamMenu');
+  if (!el) return;
+  const L = fxLeague();
+  if (!L || needsLanding()) { el.innerHTML = ''; return; }
+  const wasOpen = isOpen(el);
+  const P = pastSeason();
+  let teams, mine, shown, head;
+  if (P) {
+    const myName = fxTeamName(state.fxTeam), me = P.league.teams.find(t => t.name === myName);
+    teams = P.league.teams; mine = me ? me.id : null; shown = ui.pastTeam || mine; head = 'Team';
+  } else {
+    teams = fxPickable(); mine = state.demo ? null : state.fxTeam;
+    shown = ui.viewA && VIEW_TABS.includes(ui.tab) ? ui.viewA : state.fxTeam;
+    head = state.demo ? 'Play as' : state.fxTeam ? 'View as' : 'Your team';
+  }
+  const cur = teams.find(t => t.id === shown), label = cur ? cur.name : 'Pick your team';
+  el.innerHTML = `<details class="tm${shown && mine && shown !== mine ? ' viewing' : ''}"${wasOpen ? ' open' : ''}>
+    <summary aria-label="Team: ${esc(label)}" title="Team">${lineIcon(ICON_JERSEY_D, 'hd-ico')}<span class="tm-name">${esc(label)}</span></summary>
+    <div class="gear-pop tm-pop">
+      <div class="lm-sec">${head}</div>
+      ${teams.map(t => `<button type="button" class="lm-item${t.id === shown ? ' on' : ''}" data-action="team-pick" data-id="${esc(t.id)}">${t.id === shown ? '✓ ' : ''}${esc(t.name)}${t.id === mine ? ' <span class="tm-you">you</span>' : ''}</button>`).join('')}
     </div>
   </details>`;
 }
@@ -101,42 +145,28 @@ async function loadSeason(id, fetched) {
 // Tabs that can show another team's version (read-only); the rest are league-wide or yours
 const VIEW_TABS = ['week', 'dashboard'];
 
-// League and team bar shown above every tab
+// The notes under the tabs, when there are any: a past season and the way back, another team being viewed, the demo,
+// what the league scores that isn't projected
 function ctxBar() {
   const bar = $('#ctxBar');
   if (!bar) return;
   const L = fxLeague();
-  bar.hidden = !L || needsLanding();
-  if (bar.hidden) return;
-  const P = pastSeason();
-  let teamSel;
-  if (P) {
-    const myName = fxTeamName(state.fxTeam);
-    const teams = P.league.teams;
-    const me = teams.find(t => t.name === myName);
-    const shownId = ui.pastTeam || (me ? me.id : '');
-    teamSel = `<select class="ctx-team" data-change="past-team" aria-label="Team">${shownId ? '' : '<option value="">Pick a team</option>'}${teams.map(t => `<option value="${esc(t.id)}" ${t.id === shownId ? 'selected' : ''}>${esc(t.name)}${me && t.id === me.id ? ' (you)' : ''}</option>`).join('')}</select>`;
-  } else {
-    const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
-    const shown = viewing ? ui.viewA : state.fxTeam;
-    teamSel = `<select class="ctx-team" data-change="${state.fxTeam ? 'fx-view' : 'fx-team'}" aria-label="${state.fxTeam ? 'Team to view' : 'Your team'}">
-      ${state.fxTeam ? '' : '<option value="">Pick your team</option>'}${fxPickable().map(t => `<option value="${esc(t.id)}" ${t.id === shown ? 'selected' : ''}>${esc(t.name)}${t.id === state.fxTeam && !state.demo ? ' (you)' : ''}</option>`).join('')}
-    </select>${viewing ? '<span class="badge">Viewing only</span><button class="link-btn small" data-action="fx-view-mine">Back to my team</button>' : ''}`;
+  let html = '';
+  if (L && !needsLanding()) {
+    const P = pastSeason();
+    document.body.classList.toggle('past', !!P);
+    if (P) html = `<span class="badge accent">${esc(P.label)} season</span><button class="link-btn" data-action="season-pick" data-id="">Back to ${esc(L.year ? seasonLabel(L.year) : 'this season')}</button>`;
+    else {
+      const viewing = ui.viewA && VIEW_TABS.includes(ui.tab);
+      const notes = [
+        isPoints() && L.pointsOther && L.pointsOther.length ? `<span title="Not projected: ${esc(L.pointsOther.join(', '))}">some scoring stats not projected</span>` : '',
+        !isPoints() && L.catsOther && L.catsOther.length ? `<span title="Not projected: ${esc(L.catsOther.join(', '))}">${L.catsOther.length === 1 ? 'one category' : 'some categories'} not projected</span>` : '',
+      ].filter(Boolean);
+      html = `${viewing ? `<span class="ctx-view"><span class="badge">Viewing only</span> ${esc(fxTeamName(ui.viewA))}</span><button class="link-btn" data-action="fx-view-mine">Back to my team</button>` : ''}${demoNote()}${notes.length ? `<span>${notes.join(' · ')}</span>` : ''}`;
+    }
   }
-  $('#ctxTeam').innerHTML = teamSel;
-  document.body.classList.toggle('past', !!P);
-  if (P) {
-    $('#ctxMeta').innerHTML = `<span class="badge accent">${esc(P.label)} season</span><button class="link-btn" data-action="season-pick" data-id="">Back to ${esc(L.year ? seasonLabel(L.year) : 'this season')}</button>`;
-    $('#ctxMeta').hidden = false;
-    return;
-  }
-  const notes = [
-    isPoints() && L.pointsOther && L.pointsOther.length ? `<span title="Not projected: ${esc(L.pointsOther.join(', '))}">some scoring stats not projected</span>` : '',
-    !isPoints() && L.catsOther && L.catsOther.length ? `<span title="Not projected: ${esc(L.catsOther.join(', '))}">${L.catsOther.length === 1 ? 'one category' : 'some categories'} not projected</span>` : '',
-  ].filter(Boolean);
-  const demo = demoNote();
-  $('#ctxMeta').innerHTML = `${demo}${notes.length ? `<span>${notes.join(' · ')}</span>` : ''}`;
-  $('#ctxMeta').hidden = !notes.length && !demo;
+  $('#ctxMeta').innerHTML = html;
+  bar.hidden = !html;
 }
 
 // ----- On a phone's home screen -----
@@ -160,8 +190,7 @@ function savedSize() {
 // in: the league (its site and ID), the page, this version and the browser. A plain email link does nothing on a
 // computer without an email app, so the menu opens a popup: Gmail in the browser, the email app, or copy it all.
 const TIP_URL = 'https://ko-fi.com/leaguelayerdev'; // tips (also in index.html's footer)
-// The settings menu's icons, drawn as lines so they match on every device (emoji differ by phone and computer)
-const menuIcon = d => `<svg class="lm-ico" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+// The settings menu's icons
 const ICON_RELOAD = menuIcon('<path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 3.5v5h-5"/>');
 const ICON_MAIL = menuIcon('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>');
 const ICON_PHONE = menuIcon('<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>');
@@ -202,12 +231,13 @@ function gearMenu() {
   const colorNow = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = colorNow === 'dark' ? '#141416' : '#ffffff'; });
   const dark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
-  const league = fxLeague() && !needsLanding() && !state.demo;
+  const hasLeague = fxLeague() && !needsLanding(), league = hasLeague && !state.demo;
   el.innerHTML = `<details class="gear"${wasOpen ? ' open' : ''}>
-    <summary class="icon-btn" aria-label="Settings" title="Settings">⚙</summary>
+    <summary class="icon-btn" aria-label="Settings" title="Settings">${lineIcon(ICON_GEAR_D, 'hd-ico')}</summary>
     <div class="gear-pop">
-      ${league ? `<div class="lm-sec">League</div>
-      <button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">${reloadWait() > 0 ? 'read just now' : 'rosters, lineups, matchups and standings'}</span></button>` : ''}
+      ${hasLeague ? `<div class="lm-sec">League</div>
+      ${league ? `<button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">${reloadWait() > 0 ? 'read just now' : 'rosters, lineups, matchups and standings'}</span></button>` : ''}
+      <div class="gear-row gear-pick"><span>Stats used ${infoBtn('projection')}</span><select class="ctx-team" data-change="set-basis" aria-label="Stats used">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers on the Matchup tab</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
@@ -220,6 +250,9 @@ function gearMenu() {
         <div class="gear-row">${NBA ? `${SPORT.name} stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : `${SPORT.name} data unavailable`}</div>
         <div class="gear-row">Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
         <button type="button" class="lm-item" data-action="clear-saved">Clear saved league data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
+        <button type="button" class="lm-item" data-action="export">Backup &amp; restore</button>
+        <button type="button" class="lm-item danger" data-action="start-fresh">Reset and start over</button>
+        <div class="gear-row">Version ${BUILD.startsWith('__') ? 'local' : esc(BUILD)}</div>
       </details>
     </div>
   </details>`;
@@ -244,6 +277,7 @@ function render() {
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
   leagueMenu();
+  teamMenu();
   gearMenu();
   ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); return; }
@@ -253,13 +287,16 @@ function render() {
   const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : `now:${SPORT.key}`;
   if (nav.dataset.mode !== mode) {
     const x = nav.scrollLeft || 0;
-    nav.innerHTML = tabList().map(([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${l}</a>`).join('');
+    // (phones: a bar along the bottom, each section with its icon; past 5, the rest under More)
+    const list = tabList(), link = ([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${lineIcon(TAB_ICONS[k] || TAB_ICONS.more, 'tab-ico')}<span>${l}</span></a>`;
+    nav.innerHTML = list.length <= TABS_SHOWN + 1 ? list.map(link).join('')
+      : `${list.slice(0, TABS_SHOWN).map(link).join('')}<div class="tabs-extra">${list.slice(TABS_SHOWN).map(link).join('')}</div><button type="button" class="tab-more" data-action="nav-toggle" aria-expanded="false">${lineIcon(TAB_ICONS.more, 'tab-ico')}<span>More</span></button>`;
     nav.dataset.mode = mode;
     nav.scrollLeft = x;
   }
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === ui.tab));
-  const cur = tabList().find(([k]) => k === ui.tab);
-  $('#navCurrent').textContent = cur ? cur[1] : 'Menu';
+  const more = $('.tab-more');
+  if (more) more.classList.toggle('active', !!document.querySelector('.tabs-extra a.active'));
   if (ui.season) {
     const past = { standings: viewStandings, awards: viewAwards, draft: viewDraft, rosters: viewPastRosters };
     $('#view').innerHTML = pastSeason() ? withSeason(past[ui.tab] || viewStandings) : loadingCard('Loading that season…');
