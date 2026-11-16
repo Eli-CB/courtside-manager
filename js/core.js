@@ -22,8 +22,10 @@ const BUILD = '__BUILD__';
 const WORKER = 'https://api.leaguelayer.com';
 const ERROR_LOG = `${WORKER}/errors`;
 const errorsSent = new Set();
+// (not a search engine's crawler: Googlebot renders the page and sometimes skips a script, and every one after it fails)
+const CRAWLER = /bot\b|crawl|spider|slurp|headless|lighthouse/i;
 function reportError(msg, at, stack) {
-  if (location.hostname !== 'leaguelayer.com' || errorsSent.size >= 5 || errorsSent.has(msg + at)) return;
+  if (location.hostname !== 'leaguelayer.com' || CRAWLER.test(navigator.userAgent || '') || errorsSent.size >= 5 || errorsSent.has(msg + at)) return;
   errorsSent.add(msg + at);
   let L = null, browse = false;
   try { L = fxLeague(); browse = !!state.browse; } catch (e) { /* the league is what broke, or it hasn't loaded */ }

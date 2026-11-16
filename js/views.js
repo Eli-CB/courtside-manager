@@ -366,8 +366,10 @@ function seasonTotalsCard(L, standings) {
     return { vals, z: v => (c.neg ? -1 : 1) * (v - m) / sd, rank: v => 1 + vals.filter(x => (c.neg ? x < v : x > v)).length };
   });
   const avgRank = i => sum(stats.map(st => st.rank(st.vals[i]))) / cols.length;
-  // sort by any column: best first (clicking again flips it); standings order until a column is picked
+  // sort by any column: best first (clicking again flips it); standings order until a column is picked, or when the one
+  // picked isn't in this league's table (picked in a league with more columns: a 9-category one, then a points one)
   const so = ui.totSort;
+  if (so.key != null && !['team', 'gp', 'rank'].includes(so.key) && !cols[so.key]) so.key = null;
   const sortVal = i => (so.key === 'team' ? (fxTeamName(list[i].tid) || '').toLowerCase() : so.key === 'gp' ? list[i].T.gp
     : so.key === 'rank' ? -avgRank(i) : (cols[so.key].neg ? -1 : 1) * stats[so.key].vals[i]);
   const idx = list.map((x, i) => i);

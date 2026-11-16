@@ -2547,6 +2547,34 @@ test("Plan Ahead: each player's positions in their lineup-spot colors, as its li
   assert.match(html, new RegExp(`class="slot-label slot-PG pc pc-${pg}"`), 'the same color as the PG spot');
 });
 
+test("Season totals: a column sorted in a league with more of them doesn't break a league with fewer", async () => {
+  const L = await app.useLeague(CATS9);
+  const ui = app.get('ui');
+  useTeam(L.teams[0].id);
+  ui.tab = 'standings';
+  const was = { ...ui.totSort };
+  try {
+    app.viewStandings(); // starts loading the weekly lineups and box scores
+    await new Promise(r => setTimeout(r, 30));
+    ui.totSort.key = 14; // (a column of a league with more categories, picked there)
+    const html = app.viewStandings();
+    assert.match(html, /Season totals/);
+    assert.match(html, /data-action="tot-sort"/, 'the table, in standings order');
+    assert.equal(ui.totSort.key, null);
+    ui.totSort.key = 'rank';
+    app.viewStandings();
+    assert.equal(ui.totSort.key, 'rank', 'its own columns stay picked');
+  } finally { Object.assign(ui.totSort, was); ui.tab = 'dashboard'; }
+});
+
+test("the error log: a search engine's crawler isn't a visitor", () => {
+  const re = app.get('CRAWLER');
+  assert.ok(re.test('Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.8037.97 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'));
+  assert.ok(re.test('Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)'));
+  assert.ok(!re.test('Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1'));
+  assert.ok(!re.test('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36'));
+});
+
 test("a Fantrax league of a sport the site doesn't read (golf) says so, instead of loading as basketball", async () => {
   const group = code => ({ scoringSystem: { scoringCategorySettings: [{ group: { code } }] } });
   assert.equal(app.fxSport(group('BASKETBALL_PLAYER')), 'nba');

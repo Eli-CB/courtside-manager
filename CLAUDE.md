@@ -8,6 +8,14 @@ saved leagues are lost). Owner's league:
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
 8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26).
 
+## Keeping this file up to date (the owner's standing rule, Nov 2026)
+Whenever you learn something that any Claude starting on this site for the first time would need, add it here in the
+same piece of work, without being asked: a decision the owner made and why, a rule for how something must behave, a
+gotcha that cost time (an API's quirk, a limit, something that fails silently), where a new feature lives and which
+functions own it, a check done against real data, a step that is the owner's alone. Put it in the section it belongs to
+(Layout, Rules settled with the owner, Gotchas), fix or remove a line your change made wrong rather than adding a second
+one, and keep it short and specific. Not for here: what only matters to the task at hand, or what the code already says plainly.
+
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
   scope; they must load in the order index.html lists: sports, core, nba, info, fantrax, espn, sleeper, football, yahoo, render, history, views,
@@ -232,7 +240,7 @@ saved leagues are lost). Owner's league:
   Metrics (requests, errors incl. exceeded CPU, CPU time, subrequests), or `npx wrangler tail` (worker/README.md
   "Watching it"). Fantrax and Sleeper stay direct on purpose (per-IP limits: a proxy would pool everyone's).
 - Errors: on leaguelayer.com, `reportError` (core.js, from window `error` / `unhandledrejection` in our own js files,
-  each once a visit, 5 at most) posts to the Worker's `/errors` (KV `ERRORS`, 30 days); the owner reads
+  each once a visit, 5 at most), never from a crawler (`CRAWLER`: Googlebot renders the page and sometimes skips a script, so every one after it fails, a burst of "ui is not defined"-style reports, seen Nov 15, 2026) posts to the Worker's `/errors` (KV `ERRORS`, 30 days); the owner reads
   `api.leaguelayer.com/errors?key=<ERRORS_KEY>` (setup in `worker/README.md`). The footer says so, with the not-affiliated line.
   Caught errors don't reach it by themselves: ESPN's live feed failing 3 updates in a row does, as "ESPN live scores failing" (`noteLiveFailure`:
   a block, or a new format the site can't read; not the visitor's own connection). If that shows up: `SPORT.espn` in sports.js is where the feed is read.
