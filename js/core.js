@@ -6,23 +6,6 @@
 /* =========================================================
    Constants
    ========================================================= */
-// What the site keeps on a device was named courtside-* (the site's first name) until Nov 2026. A device's old keys
-// are moved to the new names once, here, before anything reads them: courtside-manager-v1 -> league-layer-v1,
-// courtside-<x> -> league-layer-<x>. The old key goes first, as the two copies together could pass the browser's limit
-function moveOldKeys(store) {
-  try {
-    const old = [];
-    for (let i = 0; i < store.length; i++) { const k = store.key(i); if (k && k.startsWith('courtside-')) old.push(k); }
-    for (const k of old) {
-      const to = k.replace(/^courtside-(manager-)?/, 'league-layer-'), v = store.getItem(k);
-      store.removeItem(k);
-      if (store.getItem(to) != null) continue; // already moved: a tab still open on the old version wrote it again
-      try { store.setItem(to, v); } catch (e) { store.setItem(k, v); }
-    }
-    return old.length;
-  } catch (e) { return 0; /* storage blocked */ }
-}
-moveOldKeys(localStorage);
 const STORAGE_KEY = 'league-layer-v1';
 const THEME_KEY = 'league-layer-theme';
 const SCORES_KEY = 'league-layer-hide-scores'; // this device hides game scores (no spoilers)

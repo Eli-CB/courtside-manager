@@ -4,8 +4,8 @@ Fantasy basketball (Fantrax, public ESPN leagues, Sleeper), hockey (Fantrax) and
 Live: https://leaguelayer.com (domain on Cloudflare, DNS only, set in the repo's Pages settings; the old
 eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/league-layer, renamed from courtside-manager Nov 16, 2026:
 GitHub redirects the old name as long as no new repo takes it. The site was Courtside Manager until Oct 2026; its storage keys were
-`courtside-*` until Nov 16, 2026 and are `league-layer-*` now: `moveOldKeys`, at the top of core.js, moves a device's old keys once, before anything
-reads them. Keep it for good, a device may come back after months; a key must never be renamed without such a move). Owner's league:
+`courtside-*` until Nov 16, 2026 and are `league-layer-*` now, renamed with nothing carried over, as the owner was the only visitor: with
+real visitors, a renamed key needs its old copy moved first, or their saved leagues are gone). Owner's league:
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
 8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26).
 

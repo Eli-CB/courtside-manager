@@ -4285,34 +4285,3 @@ test("a hockey team's record keeps its overtime and shootout losses apart (W-L-O
   a.get('live').games = [{ d: dates[4], home: tri, away: 'TOR', hs: 1, as: 2, state: 'post', period: 4 }];
   assert.equal(a.teamRecord(tri), '1-1-3', 'an overtime win is a win; two late losses, and tonight\'s in overtime');
 });
-
-test("a device's old courtside-* keys move to the new names once, and nothing saved is lost", () => {
-  const fake = (entries, limit) => {
-    const m = new Map(entries);
-    const size = () => [...m].reduce((n, [k, v]) => n + k.length + v.length, 0);
-    return {
-      m, getItem: k => (m.has(k) ? m.get(k) : null), removeItem: k => m.delete(k), key: i => [...m.keys()][i] ?? null, get length() { return m.size; },
-      setItem(k, v) { const was = m.get(k); m.set(k, String(v)); if (limit && size() > limit) { was === undefined ? m.delete(k) : m.set(k, was); throw new Error('QuotaExceededError'); } },
-    };
-  };
-  const saved = JSON.stringify({ fxLeagueId: 'abc', savedLeagues: [{ id: 'abc' }] });
-  const s = fake([['courtside-manager-v1', saved], ['courtside-fantrax-v2', '{"abc":1}'], ['courtside-theme', 'dark'], ['courtside-yahoo', '{"access":"a"}'], ['someone-elses', 'x']]);
-  assert.equal(app.moveOldKeys(s), 4);
-  assert.deepEqual(Object.fromEntries(s.m), { 'league-layer-v1': saved, 'league-layer-fantrax-v2': '{"abc":1}', 'league-layer-theme': 'dark', 'league-layer-yahoo': '{"access":"a"}', 'someone-elses': 'x' });
-  assert.equal(app.moveOldKeys(s), 0, 'nothing left to move on the next visit');
-  // a tab still open on the old version saves under the old name again: the moved copy stays
-  const again = fake([['league-layer-v1', saved], ['courtside-manager-v1', '{"stale":1}']]);
-  app.moveOldKeys(again);
-  assert.deepEqual(Object.fromEntries(again.m), { 'league-layer-v1': saved });
-  // nearly full storage: the old key goes before the new one is written, so the move fits
-  const big = 'x'.repeat(4000), full = fake([['courtside-fantrax-v2', big], ['courtside-manager-v1', saved]], 4400);
-  app.moveOldKeys(full);
-  assert.equal(full.getItem('league-layer-fantrax-v2'), big);
-  assert.equal(full.getItem('league-layer-v1'), saved);
-  // every key the site names is a new one
-  const fs = require('fs'), path = require('path'), dir = path.join(__dirname, '..', 'js');
-  for (const f of fs.readdirSync(dir)) {
-    const left = (fs.readFileSync(path.join(dir, f), 'utf8').match(/courtside[\w-]*/g) || []).filter(() => f !== 'core.js');
-    assert.deepEqual(left, [], `${f} still names an old key`);
-  }
-});
