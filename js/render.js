@@ -207,7 +207,7 @@ function gearMenu() {
     <summary class="icon-btn" aria-label="Settings" title="Settings">⚙</summary>
     <div class="gear-pop">
       ${league ? `<div class="lm-sec">League</div>
-      <button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">rosters, lineups, matchups and standings</span></button>` : ''}
+      <button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">${reloadWait() > 0 ? 'read just now' : 'rosters, lineups, matchups and standings'}</span></button>` : ''}
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers on the Matchup tab</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>

@@ -174,7 +174,7 @@ saved leagues are lost). Owner's league:
   shows them on next week (`withViewedTeam(viewWeek, true)`, `nextRosterPeriod()`, `fxTeamSide(tid, period)`). Every
   other tab and the saved lineup stay on this week's.
 - Fantrax: minimize requests. League data cached on the device; manual ↻ Reload (gear menu) instead of
-  loading fresh each visit; the one automatic reload is 15 minutes before a matchup period's first game and 2 minutes after
+  loading fresh each visit (no ↻ Reload within 2 minutes of the league's last read: `RELOAD_COOL`, `reloadWait`, the menu says "read just now"); the one automatic reload is 10-20 minutes before a matchup period's first game and 2-6 minutes after, each page at its own random moment in each window (`autoReload.spread`, Nov 2026: a site's worth of visitors mustn't reach Fantrax in the same minute, its busiest)
   (`checkAutoReload`, actions.js: Fantrax starts a period at its first tip-off, else ESPN's scoreboard, else 7 PM ET; only when the
   league was read before that moment; checked once a minute and on coming back to the page), so the lock's lineups and the new
   period show without a manual Reload. Weekly rosters fetched once per finished period. Shared player list/ADP once a day.

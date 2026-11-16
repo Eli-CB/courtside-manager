@@ -4105,7 +4105,7 @@ test('every site loads into the same league', async () => {
   checkLeague((await footballApp()).fxLeague(), 'football');
 });
 
-test("the league is read again from its site 15 minutes before a period's first game and 2 minutes after", async () => {
+test("the league is read again from its site 10-20 minutes before a period's first game and 2-6 after, each page at its own moment", async () => {
   const L = await app.useLeague(CATS9);
   const S = app.get('state'), ui = app.get('ui'), KEY = 'courtside-fantrax-v2';
   const keep = { fxTeam: S.fxTeam, fxLeagueId: S.fxLeagueId, demo: S.demo, browse: S.browse }, kept = app.localStorage.getItem(KEY);
@@ -4116,8 +4116,16 @@ test("the league is read again from its site 15 minutes before a period's first 
   try {
     Object.assign(S, { fxTeam: L.teams[0].id, fxLeagueId: CATS9 });
     app.setClock('2026-11-02T12:00:00-05:00');
+    const R = app.get('autoReload'), drawn = [...R.spread];
+    assert.ok(drawn.every(x => x >= 0 && x < 1), 'each page draws its own moments');
+    // the windows' ends, then the middle (6:45 and 7:04 PM)
+    R.spread = [0, 0];
+    assert.ok(app.autoReloadMarks(L).includes(tip - 20 * 60e3) && app.autoReloadMarks(L).includes(tip + 2 * 60e3));
+    R.spread = [1, 1];
+    assert.ok(app.autoReloadMarks(L).includes(tip - 10 * 60e3) && app.autoReloadMarks(L).includes(tip + 6 * 60e3));
+    R.spread = [0.5, 0.5];
     const marks = app.autoReloadMarks(L);
-    assert.ok(marks.includes(tip - 15 * 60e3) && marks.includes(tip + 2 * 60e3), 'week 3: 6:45 and 7:02 PM');
+    assert.ok(marks.includes(tip - 15 * 60e3) && marks.includes(tip + 4 * 60e3), 'week 3: 6:45 and 7:04 PM');
     readAt(Date.parse('2026-11-02T09:00:00-05:00'));
     assert.equal(app.autoReloadDue(), null, 'noon: nothing yet');
     app.setClock('2026-11-02T18:50:00-05:00');
@@ -4130,7 +4138,7 @@ test("the league is read again from its site 15 minutes before a period's first 
     assert.equal(asked.length, 1, 'read once');
     assert.equal(app.autoReloadDue(), null, 'and not again before the game');
     app.setClock('2026-11-02T19:05:00-05:00');
-    assert.equal(app.autoReloadDue(), tip + 2 * 60e3, 'after tip-off: the new period and its locked lineups');
+    assert.equal(app.autoReloadDue(), tip + 4 * 60e3, 'after tip-off: the new period and its locked lineups');
     await app.checkAutoReload();
     assert.equal(asked.length, 2);
     app.setClock('2026-11-02T23:00:00-05:00');
@@ -4140,11 +4148,22 @@ test("the league is read again from its site 15 minutes before a period's first 
     app.get('autoReload').done.clear();
     readAt(Date.parse('2026-11-02T19:10:00-05:00'));
     assert.equal(app.autoReloadDue(), null);
+    // ↻ Reload: not again within 2 minutes of the league's last read (the menu says so), then as before
+    app.setClock('2026-11-02T19:11:00-05:00');
+    assert.ok(app.reloadWait() > 0);
+    asked.length = 0;
+    await app.actions['league-reload']({ textContent: '' });
+    assert.equal(asked.length, 0, 'read a minute ago: not asked again');
+    app.setClock('2026-11-02T19:12:30-05:00');
+    assert.ok(app.reloadWait() <= 0);
+    await app.actions['league-reload']({ textContent: '' });
+    assert.equal(asked.length, 1, 'two minutes on: reloaded');
   } finally {
     app.fetch = realFetch;
     app.setClock();
     clearTimeout(app.get('autoReload').timer);
     app.get('autoReload').done.clear();
+    app.get('autoReload').spread = [Math.random(), Math.random()];
     Object.assign(S, keep);
     if (kept == null) app.localStorage.removeItem(KEY); else app.localStorage.setItem(KEY, kept);
   }

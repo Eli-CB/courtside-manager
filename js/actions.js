@@ -270,6 +270,8 @@ const actions = {
   async 'league-reload'(el) {
     $('#leagueMenu details')?.removeAttribute('open');
     if (el.disabled) return;
+    const wait = reloadWait();
+    if (wait > 0) { toast(`Just read from ${sourceName()}: reload again in ${Math.ceil(wait / 1000)} s`); return; }
     el.disabled = true;
     const label = el.textContent;
     el.textContent = 'Reloading…';
@@ -476,12 +478,18 @@ document.addEventListener('error', e => { const t = e.target; if (t && t.classLi
 
 // ----- The league read again as a matchup period starts -----
 // The league is kept on the device (6 hours, or until ↻ Reload) and a page can sit open for days, so across a lock last
-// week's period and lineups would stay on screen. It's read again from its site 15 minutes before a period's first game
-// (the lineups as finally set, next week's too on Plan Ahead) and 2 minutes after it (the new period and its locked
-// lineups), when what's here was read before that moment: twice a period at most on a device, quietly, on a visit or
-// while the page is open. Not in a past season, the demo, browsing, or before a team is picked.
-const AUTO_BEFORE = 15 * 60e3, AUTO_AFTER = 2 * 60e3;
-const autoReload = { timer: null, busy: false, done: new Set() };
+// week's period and lineups would stay on screen. It's read again from its site 10 to 20 minutes before a period's first
+// game (the lineups as finally set, next week's too on Plan Ahead) and 2 to 6 minutes after it (the new period and its
+// locked lineups), when what's here was read before that moment: twice a period at most on a device, quietly, on a visit
+// or while the page is open. Not in a past season, the demo, browsing, or before a team is picked. Each page draws its
+// own moment in each window (spread), so a site's worth of visitors doesn't reach the league's site in the same minute,
+// its busiest (lineups locking): the same requests, the peak about ten times lower (the owner's ask, Nov 2026).
+const AUTO_BEFORE = [20 * 60e3, 10 * 60e3], AUTO_AFTER = [2 * 60e3, 6 * 60e3]; // (from, to, around the first game)
+const autoReload = { timer: null, busy: false, done: new Set(), spread: [Math.random(), Math.random()] };
+// ↻ Reload once in a while: lineups don't change faster, and each is several requests to the league's site; within
+// RELOAD_COOL of the league's last read (by hand, automatic, or on connecting) the menu says so and nothing is asked
+const RELOAD_COOL = 2 * 60e3;
+const reloadWait = () => { const L = fxLeague(); return L ? RELOAD_COOL - (Date.now() - leagueReadAt(L.id)) : 0; };
 
 // Reload the league from its site and everything read from it (↻ Reload, and the automatic one)
 async function reloadLeague() {
@@ -513,7 +521,10 @@ function autoReloadMarks(L = fxLeague()) {
   if (!L || !L.periods) return [];
   const today = todayIso(), from = addDays(today, -2), to = addDays(today, 8);
   return L.periods.filter(p => { const s = String(p.start).slice(0, 10); return s >= from && s <= to; })
-    .flatMap(p => { const t = periodFirstGame(p); return t == null ? [] : [t - AUTO_BEFORE, t + AUTO_AFTER]; }).sort((a, b) => a - b);
+    .flatMap(p => {
+      const t = periodFirstGame(p), [b, a] = autoReload.spread;
+      return t == null ? [] : [Math.round(t - AUTO_BEFORE[0] + b * (AUTO_BEFORE[0] - AUTO_BEFORE[1])), Math.round(t + AUTO_AFTER[0] + a * (AUTO_AFTER[1] - AUTO_AFTER[0]))];
+    }).sort((a, b) => a - b);
 }
 // When the league here was read from its site (the site's own league: this morning's file, or a reload since)
 function leagueReadAt(id) {
