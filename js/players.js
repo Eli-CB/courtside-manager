@@ -359,11 +359,20 @@ function cardOwner(raw) {
     const x = r.find(y => y.nba === raw.id);
     if (!x) continue;
     const how = cardHow(L, raw, tid, x.fid);
-    return `<p class="pc-owner"><b>${teamLink(tid)}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span>${how ? `<span class="pc-how muted">${esc(how)}</span>` : ''}</p>`;
+    return `<p class="pc-owner"><b>${teamLink(tid)}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span>${howBadge(how)}</p>`;
   }
   return raw.fx ? `<p class="pc-owner"><span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span></p>` : '';
 }
 
+// The card's line for it: the Roster tab's badge (same colors; Drafted blue, as grey is a free agent's), then the rest in grey
+const HOW_BADGE = [[/^Keeper$/, 'Keeper', 'accent'], [/^Drafted · /, 'Drafted', 'info'], [/^Waiver add · /, 'Waiver add', 'good'], [/^Added /, 'Added', 'good'], [/^Traded /, 'Trade', 'warn']];
+function howBadge(how) {
+  if (!how) return '';
+  const b = HOW_BADGE.find(([re]) => re.test(how));
+  if (!b) return `<span class="pc-how muted">${esc(how)}</span>`;
+  const rest = how.replace(b[0], '');
+  return `<span class="pc-how muted"><span class="badge ${b[2]}">${b[1]}</span>${rest ? ' ' + esc(rest) : ''}</span>`;
+}
 // How a rostered player came to his fantasy team: kept, drafted (round and pick), a waiver add or a trade, and when.
 // Weekly rosters (Fantrax, Sleeper) follow him back to the week he joined; elsewhere the draft is all there is.
 function cardHow(L, raw, tid, fid) {

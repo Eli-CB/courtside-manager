@@ -14,6 +14,8 @@
   --bad-soft: #fee2e2;
   --warn: #b45309;
   --warn-soft: #fef3c7;
+  --info: #2563eb; /* Drafted */
+  --info-soft: #dbeafe;
   --shadow: 0 1px 2px 0 rgb(0 0 0 / .05);
   --ring: #a1a1aa; /* focus rings */
   --radius: 12px;
@@ -39,6 +41,8 @@
     --bad-soft: #450a0a;
     --warn: #fbbf24;
     --warn-soft: #422006;
+    --info: #60a5fa;
+    --info-soft: #172554;
     --shadow: none;
     --ring: #52525b;
     --b2b: #facc15;
@@ -65,6 +69,8 @@
   --bad-soft: #450a0a;
   --warn: #fbbf24;
   --warn-soft: #422006;
+  --info: #60a5fa;
+  --info-soft: #172554;
   --shadow: none;
   --ring: #52525b;
   color-scheme: dark;
@@ -380,7 +386,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .perf-when-pick .seg { flex: none; }
 .flag { vertical-align: -2px; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
 .pc-owner { margin: 4px 0 0; font-size: .9rem; }
-.pc-how { display: block; margin-top: 2px; font-size: .85rem; } /* how he joined: drafted, kept, added, traded */
+.pc-how { display: block; margin-top: 4px; font-size: .85rem; } /* how he joined: drafted, kept, added, traded */
 .pc-rank { font-size: .78rem; color: var(--muted); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
 /* the season's games: five show, the rest scroll */
 .pc-games-wrap { max-height: 300px; overflow-y: auto; }
@@ -554,6 +560,7 @@ td.player { min-width: 170px; }
 .badge.bad { background: var(--bad-soft); color: var(--bad); }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
 .badge.accent { background: var(--accent-soft); color: var(--accent); }
+.badge.info { background: var(--info-soft); color: var(--info); }
 .pos-good { color: var(--good); }
 .pos-bad { color: var(--bad); }
 

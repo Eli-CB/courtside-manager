@@ -638,7 +638,7 @@ function viewPastRosters() {
 
 function pastStarters(L, G, tid, r, teams) {
   const total = ui.pastRosterMode === 'total';
-  const how = { start: ['Drafted', ''], keeper: ['Keeper', 'accent'], trade: ['Trade', 'warn'], pickup: ['Pickup', 'good'] };
+  const how = { start: ['Drafted', 'info'], keeper: ['Keeper', 'accent'], trade: ['Trade', 'warn'], pickup: ['Pickup', 'good'] };
   const per = (P, k) => (total ? P.s[k] || 0 : P.gp ? (P.s[k] || 0) / P.gp : 0);
   // any column sorts, following the Totals / Per game choice
   const so = ui.pastRosterSort;
