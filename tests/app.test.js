@@ -2113,6 +2113,18 @@ test("the Recap's Trends: last 5 games against the usual one, per category, with
     ui.trendDir = 'down';
     const down = section(await onDay('2026-10-26', () => app.trendsCard(L, period)), 'Points');
     assert.ok(down.includes(`data-nba="${cold.id}"`) && down.includes('<b>8.0</b> <span class="muted">vs 20.0</span>') && down.includes('−60%'), 'cooling off: 8.0 vs 20.0, -60%');
+    // no league (browsing): through a day, one list by value for everyone
+    const st = app.get('state'), wasBrowse = st.browse;
+    st.browse = true; // (no league: fxLeague() is null)
+    try {
+      assert.equal(app.fxLeague(), null);
+      ui.trendDir = 'up';
+      const all = await onDay('2026-10-26', () => app.trendsCard(null, null, '2026-10-25'));
+      const list = all.split('<section class="tr-cat"').find(x => x.includes('All players')) || '';
+      assert.ok(list.includes(`data-nba="${hot.id}"`), 'the one heating up, by value');
+      assert.ok(!all.includes('<span>Rostered</span>') && !all.includes('<span>Waivers</span>'), 'no Rostered or Waivers lists');
+      assert.ok(section(all, 'Points').includes(`data-nba="${hot.id}"`), 'the categories as in a league');
+    } finally { st.browse = wasBrowse; ui.trendDir = 'down'; }
     // too few games: nothing to say yet
     app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer: new Map([[hot.id, games(i => (i > 8 ? line(20, 6) : null))]]) });
     assert.match(await onDay('2026-10-26', () => app.trendsCard(L, period)), /Not enough games yet/);
@@ -2899,7 +2911,7 @@ test('the waiver order: from ESPN and Sleeper, a line under the standings and a 
   } finally { st.fxTeam = was; }
 });
 
-test('browsing without a league: just the Players tab, no league anywhere', async () => {
+test('browsing without a league: the Players and Trends tabs, no league anywhere', async () => {
   await app.loadBoxes();
   const st = app.get('state'), ui = app.get('ui');
   const saved = app.NBA.players.map(r => [r, r.fx, r.pos]);
@@ -2912,13 +2924,18 @@ test('browsing without a league: just the Players tab, no league anywhere', asyn
     app.actions['land-browse']();
     assert.ok(st.browse && !app.needsLanding());
     assert.equal(app.fxLeague(), null, "the site's league isn't this visitor's");
-    assert.deepEqual([...app.tabList().map(t => t[0])], ['players']);
+    assert.deepEqual([...app.tabList().map(t => t[0])], ['players', 'trends']);
     assert.ok(app.NBA.players.every(r => !r.fx), "nobody shows as free in someone else's league");
     const html = app.viewPlayers();
     assert.match(html, /No league connected[\s\S]*data-action="browse-exit"/);
     assert.ok(!html.includes('perf-owner') && !html.includes('badge good'), 'no fantasy teams or free-agent badges');
     assert.ok(/data-nba="\d+"/.test(html), 'players listed');
     assert.equal(app.scoreCats().length, 9, 'a standard 9-category league');
+    // Trends: the Recap's, through the latest saved day, with the same note, and no fantasy teams
+    ui.tab = 'trends';
+    const tr = app.viewTrends();
+    assert.match(tr, /No league connected[\s\S]*<div class="card trends">/);
+    assert.ok(!tr.includes('perf-owner') && !tr.includes('Rostered') && !tr.includes('Waivers'), 'nobody rostered');
     // back out: the landing page again
     app.actions['browse-exit']();
     assert.ok(!st.browse && app.needsLanding());

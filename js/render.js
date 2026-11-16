@@ -65,7 +65,7 @@ function leagueMenu() {
 // (the addresses keep the tabs' old names, dashboard and week, so saved links still work)
 const TABS_NOW = [['dashboard', 'Matchup'], ['week', 'Plan Ahead'], ['recap', 'Recap'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
-const TABS_BROWSE = [['players', 'Players']]; // browsing without a league
+const TABS_BROWSE = [['players', 'Players'], ['trends', 'Trends']]; // browsing without a league (Trends: the Recap's, on its own)
 const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
@@ -267,7 +267,7 @@ function render() {
   }
   const early = preDraft();
   if (early && ['week', 'dashboard', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
-  const views = { week: () => withViewedTeam(viewWeek, true), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade, recap: viewRecap };
+  const views = { week: () => withViewedTeam(viewWeek, true), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade, recap: viewRecap, trends: viewTrends };
   // keep scroll position of inner lists (e.g. trade picker, performances) across re-renders
   const inner = '.pick-list, .perf-wrap.scroll';
   const scrolls = [...document.querySelectorAll(inner)].map(el => [el.scrollTop, el.scrollLeft]);

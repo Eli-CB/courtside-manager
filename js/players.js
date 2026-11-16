@@ -302,12 +302,12 @@ function viewPlayers() {
   // the latest games come from the box scores, loaded on first need; today's as they're played
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'players') render(); }).catch(() => {});
   startLive();
-  if (!fxLeague()) { // browsing without a league
-    return `<div class="sample-banner browse-note"><span>No league connected: values are for a standard 9-category league.</span><button type="button" class="btn sm" data-action="browse-exit">Connect a league</button></div>
-  ${topPerformancesCard()}`;
-  }
+  if (!fxLeague()) return `${browseNote()}${topPerformancesCard()}`; // browsing without a league
   return topPerformancesCard(); // (ideas for pickups: the Matchups tab's, made against this week's matchup)
 }
+
+// Browsing without a league (the Players and Trends tabs): what the values are for, and the way to connect one
+const browseNote = () => `<div class="sample-banner browse-note"><span>No league connected: values are for a standard 9-category league.</span><button type="button" class="btn sm" data-action="browse-exit">Connect a league</button></div>`;
 
 // A country's flag (ISO code from the daily data job), named on hover: flagImg alone, flag after a " · " (the player card)
 const flagImg = iso => {

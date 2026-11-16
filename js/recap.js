@@ -345,14 +345,15 @@ function teamRegulars(end) {
   return out;
 }
 
-function trendsCard(L, period) {
+// The Recap's week (period: through its last game day so far), or through a day (endDay: browsing without a league, L null)
+function trendsCard(L, period, endDay) {
   if (!BOX || isFootball()) return '';
   const up = ui.trendDir !== 'down';
-  const days = matchDates(String(period.start).slice(0, 10)).filter(d => d <= todayIso());
-  const end = days[days.length - 1] || String(period.end).slice(0, 10);
+  const days = period ? matchDates(String(period.start).slice(0, 10)).filter(d => d <= todayIso()) : [];
+  const end = endDay || days[days.length - 1] || String(period.end).slice(0, 10);
   const { stats, players } = trendPlayers(end);
   const owner = new Map();
-  for (const [tid, r] of Object.entries(L.rosters || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
+  for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
   const mine = myTeamId(), regulars = up ? teamRegulars(end) : null;
   const whose = raw => {
     const tid = owner.get(raw.id);
@@ -393,6 +394,7 @@ function trendsCard(L, period) {
     .sort((a, b) => (up ? b.gain - a.gain : a.gain - b.gain)).slice(0, n);
   const rostered = fxLeague() ? byValue(players.filter(row => owner.has(row.id)), TREND_TOP) : [];
   const waivers = fxLeague() ? byValue(players.filter(row => !owner.has(row.id) && row.raw.fx && row.raw.fx.st !== 'T'), TREND_WAIVERS) : [];
+  const everyone = fxLeague() ? [] : byValue(players, TREND_TOP); // (no league: nobody's rostered, one list)
   const valueRows = list => list.map((row, i) => {
     // why: a teammate out (heating up), and the two stats that moved most his way
     const moved = stats.filter(st => !st.pct && !st.role && row.stats[st.key] && (up ? row.stats[st.key].move > 0 : row.stats[st.key].move < 0) && row.stats[st.key].was > 0)
@@ -404,7 +406,7 @@ function trendsCard(L, period) {
     return rowHtml(row, i, num, note);
   }).join('');
   const valueList = (title, list) => (list.length ? `<section class="tr-cat"><h3 class="sub tr-head"><span>${title}</span><span class="tr-col">${VAL}</span></h3><ol class="tr-list">${valueRows(list)}</ol></section>` : '');
-  const valueLists = [valueList('Rostered', rostered), valueList('Waivers', waivers)].filter(Boolean);
+  const valueLists = [valueList('Rostered', rostered), valueList('Waivers', waivers), valueList('All players', everyone)].filter(Boolean);
 
   const seg = `<div class="seg seg-sm" role="group" aria-label="Trending">${[['up', 'Heating up'], ['down', 'Cooling off']].map(([k, l]) =>
     `<button type="button" class="${(k === 'up') === up ? 'on' : ''}" data-action="trend-dir" data-dir="${k}" aria-pressed="${(k === 'up') === up}">${l}</button>`).join('')}</div>`;
@@ -418,6 +420,17 @@ function trendsCard(L, period) {
   </div>`;
 }
 
+// The Trends on a tab of their own when browsing without a league (state.browse): every player's last games through the
+// latest day the saved box scores have, valued for a standard 9-category league, one list by value (nobody's rostered)
+function viewTrends() {
+  if (!NBA) return '';
+  if (!BOX) {
+    loadBoxes().then(() => { if (ui.tab === 'trends') render(); }).catch(() => {});
+    return `${browseNote()}${loadingCard('Trends', "Loading the season's box scores…")}`;
+  }
+  const end = [...BOX.finals].map(k => k.slice(0, 10)).sort().pop();
+  return `${browseNote()}${end ? trendsCard(null, null, end) : ''}`;
+}
 
 // ----- The recap as a picture, for the league chat -----
 // 1080 px wide, as tall as it needs: the league and week, the standouts (photos for the players), every final, the

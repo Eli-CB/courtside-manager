@@ -111,7 +111,7 @@ saved leagues are lost). Owner's league:
     connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
   - No league (`state.browse`, the landing page's "Just browse players"): `fxLeague()` is null (the daily file's site
     league stays loaded for the demo), `clearLeaguePlayers()` drops its rosters/positions from the players, the tabs are
-    just Players (`TABS_BROWSE`), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
+    Players and Trends (`TABS_BROWSE`; `viewTrends`, recap.js: the Recap's `trendsCard` through the latest saved day, one All players list by value instead of Rostered/Waivers; `browseNote` heads both; the owner's ask), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
     any league ends it. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
