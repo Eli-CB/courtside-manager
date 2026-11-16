@@ -379,6 +379,18 @@ const actions = {
     ui[k] = !v ? [] : ui[k].includes(v) ? ui[k].filter(x => x !== v) : [...ui[k], v];
     render();
   },
+  // the Other teams menu: a team in or out (the last one out = all of them again), all of them, or none (never when
+  // nothing else is shown)
+  'perf-other'(el) {
+    const v = el.dataset.val, w = ui.perfWhose;
+    if (v === 'none') { if (!['me', 'opp', 'fa'].some(k => w[k])) return; ui.perfWhose = { ...w, other: false }; ui.perfOthers = []; }
+    else {
+      const now = w.other ? perfOtherTeams().picked : [];
+      ui.perfOthers = v === 'all' ? [] : now.includes(v) ? now.filter(x => x !== v) : [...now, v];
+      ui.perfWhose = { ...w, other: true };
+    }
+    render();
+  },
   // whose players: any of them, but never none
   'perf-whose'(el) {
     const k = el.dataset.key, next = { ...ui.perfWhose, [k]: !ui.perfWhose[k] };
@@ -393,14 +405,14 @@ const actions = {
   'team-players'(el) {
     const d = $('#detailDialog');
     if (d && d.open) d.close();
-    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: [], perfTeam: [el.dataset.team], perfMenu: null, perfQ: '', perfFiltOpen: true });
+    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfOthers: [], perfSpot: 'all', perfPos: [], perfTeam: [el.dataset.team], perfMenu: null, perfQ: '', perfFiltOpen: true });
     if (!isFootball()) Object.assign(ui, { perfRange: 'year', perfMore: { sig: '', n: 0 } });
     Object.assign(ui.perfOnly, { rookie: false, inj: false });
     if (location.hash === '#players') render(); else location.hash = '#players';
     window.scrollTo(0, 0);
   },
   'perf-clear'() {
-    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfSpot: 'all', perfPos: [], perfTeam: [], perfMenu: null });
+    Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfOthers: [], perfSpot: 'all', perfPos: [], perfTeam: [], perfMenu: null });
     Object.assign(ui.perfOnly, { rookie: false, inj: false });
     render();
   },

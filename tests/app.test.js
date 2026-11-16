@@ -1154,7 +1154,7 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
     assert.ok(html.includes('data-action="perf-filt" aria-expanded="false"') && !html.includes('perf-panel'), 'the filters wait behind one button');
     app.ui.perfFiltOpen = true;
     html = app.topPerformancesCard();
-    assert.ok(['me', 'other', 'fa'].every(k => html.includes(`data-key="${k}" aria-pressed="true"`)) && html.includes('data-spot="all" aria-pressed="true"'), 'everyone by default');
+    assert.ok(['me', 'other', 'fa'].every(k => new RegExp(`data-key="${k}"[^>]* aria-pressed="true"`).test(html)) && html.includes('data-spot="all" aria-pressed="true"'), 'everyone by default');
     assert.equal(count(html), played.length);
     app.ui.perfWhose = { me: true, opp: false, other: false, fa: false };
     html = app.topPerformancesCard();
@@ -1185,9 +1185,39 @@ test('performances: filter by my team, the opponent, waivers and other teams', a
       assert.ok(ids(app.topPerformancesCard()).every(id => [me, opp.id].includes(owned.get(id))), 'both sides of my matchup');
       assert.ok(html.includes('<tr class="pf-opp">') && html.includes(`title="Opponent: ${opp.name.replace(/'/g, '&#39;')}"`), "the opponent's rows are marked");
     }
+    // Other teams is also a menu of those teams: any number picked, none picked = all of them
+    const others = [...new Set(played.map(r => owned.get(r.raw.id)))].filter(t => t && t !== me && !(opp && t === opp.id));
+    assert.ok(others.length > 2);
+    const pickOther = v => app.actions['perf-other']({ dataset: { val: v } });
+    app.ui.perfWhose = { me: false, opp: false, other: false, fa: true };
+    app.ui.perfMenu = 'perfOthers';
+    html = app.topPerformancesCard();
+    assert.match(html, /data-menu="perfOthers"[^>]*aria-expanded="true" aria-pressed="false">Other teams</);
+    assert.ok(others.every(t => html.includes(`data-action="perf-other" data-val="${t}" aria-pressed="false"`)) && !html.includes(`data-action="perf-other" data-val="${me}"`), 'the box lists the other teams, not mine');
+    pickOther(others[0]);
+    assert.equal(app.ui.perfWhose.other, true, 'picking a team shows other teams again, that one only');
+    html = app.topPerformancesCard();
+    assert.ok(ids(html).some(id => owned.get(id) === others[0]) && ids(html).some(id => !owned.has(id)) && ids(html).every(id => !owned.has(id) || owned.get(id) === others[0]), 'one other team, beside waivers');
+    assert.match(html, new RegExp(`aria-pressed="true">${app.esc(app.fxTeamName(others[0])).replace(/[.*+?^$()|[\]\\]/g, '\\$&')}<`), 'the pill names it');
+    assert.match(html, /Filters <b>1<\/b>/, 'one filter with Show');
+    pickOther(others[1]);
+    app.ui.perfWhose = { me: false, opp: false, other: true, fa: false };
+    html = app.topPerformancesCard();
+    assert.ok(others.slice(0, 2).every(t => ids(html).some(id => owned.get(id) === t)) && ids(html).every(id => others.slice(0, 2).includes(owned.get(id))), 'two of them');
+    assert.match(html, /aria-pressed="true">2 teams</);
+    assert.doesNotMatch(html, /data-val="none"/, 'no None when nothing else is shown');
+    pickOther('none');
+    assert.equal(app.ui.perfWhose.other, true, 'never nobody');
+    pickOther(others[0]); pickOther(others[1]);
+    assert.equal(app.ui.perfOthers.length, 0, 'the last one out: all of them again');
+    pickOther(others[2]); pickOther('all');
+    assert.equal(app.ui.perfOthers.length, 0);
+    app.ui.perfWhose = { me: true, opp: false, other: true, fa: false };
+    pickOther(others[0]); pickOther('none');
+    assert.ok(!app.ui.perfWhose.other && !app.ui.perfOthers.length, 'None turns them off');
   } finally {
     app.state.fxTeam = was;
-    Object.assign(app.ui, { perfWhose: { me: true, opp: true, other: true, fa: true }, perfSpot: 'all', perfFiltOpen: false });
+    Object.assign(app.ui, { perfWhose: { me: true, opp: true, other: true, fa: true }, perfOthers: [], perfMenu: null, perfSpot: 'all', perfFiltOpen: false });
   }
 });
 

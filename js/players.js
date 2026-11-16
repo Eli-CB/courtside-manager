@@ -138,7 +138,27 @@ function perfBadges(rows, { range, day, avg, perWeek, cuts: given }) {
 // team (each a menu to pick any number from: `perfMenu`; `ui.perfPos` / `ui.perfTeam` are lists, empty = all; the one open
 // is `ui.perfMenu`), only rookies, only injured. The button counts the filters that are on.
 const PERF_WHOSE = { me: true, opp: true, other: true, fa: true };
-const perfFilterCount = () => (Object.values(ui.perfWhose).some(v => !v) ? 1 : 0) + (ui.perfSpot !== 'all') + !!ui.perfPos.length + !!ui.perfTeam.length + !!ui.perfOnly.rookie + !!ui.perfOnly.inj;
+const perfFilterCount = () => (Object.values(ui.perfWhose).some(v => !v) || perfOtherTeams().picked.length ? 1 : 0) + (ui.perfSpot !== 'all') + !!ui.perfPos.length + !!ui.perfTeam.length + !!ui.perfOnly.rookie + !!ui.perfOnly.inj;
+
+// The other teams (not yours, not this matchup's opponent) and which of them are picked (`ui.perfOthers`, team ids):
+// none picked = all of them, and one that isn't an other team any more (another league, next week's opponent) doesn't count
+function perfOtherTeams() {
+  const L = fxLeague(), mine = ui.viewing ? ui.viewA : state.fxTeam;
+  const opp = L && mine ? fxOpponentFor(weekStartAt(0), mine) : null;
+  const teams = L ? L.teams.filter(t => t.id !== mine && !(opp && t.id === opp.id)) : [];
+  return { teams, picked: ui.perfOthers.filter(id => teams.some(t => t.id === id)) };
+}
+// Other teams: on or off as the pills beside it, and a menu of those teams to pick any number of (the owner's ask); All
+// brings every one back, None turns them off (unless nothing else is shown)
+function perfOtherMenu() {
+  const { teams, picked } = perfOtherTeams(), on = ui.perfWhose.other, open = ui.perfMenu === 'perfOthers';
+  const text = !on || !picked.length ? 'Other teams' : picked.length === 1 ? teams.find(t => t.id === picked[0]).name : `${picked.length} teams`;
+  const link = (val, l) => `<button type="button" class="link-btn quiet" data-action="perf-other" data-val="${val}">${l}</button>`;
+  const canHide = on && ['me', 'opp', 'fa'].some(k => ui.perfWhose[k]);
+  const foot = [(!on || picked.length) && link('all', 'All other teams'), canHide && link('none', 'None')].filter(Boolean).join('');
+  const pop = open ? `<div class="pm-pop pm-list" role="group" aria-label="Other teams">${teams.map(t => { const p = on && picked.includes(t.id); return `<button type="button" class="pill${p ? ' on' : ''}" data-action="perf-other" data-val="${esc(t.id)}" aria-pressed="${p}">${esc(t.name)}</button>`; }).join('')}${foot ? `<span class="pm-all">${foot}</span>` : ''}</div>` : '';
+  return `<span class="pm"><button type="button" class="pill pill-menu${on ? ' on' : ''}" data-action="perf-menu" data-menu="perfOthers" data-key="other" aria-label="Other teams: ${on ? esc(picked.length ? text : 'all') : 'hidden'}" aria-haspopup="true" aria-expanded="${open}" aria-pressed="${!!on}">${esc(text)}</button>${pop}</span>`;
+}
 
 // A menu to pick any number from (positions, teams): a pill saying what's picked, opening a box of the choices that stays
 // open while they're tapped (a tap elsewhere or Escape closes it: actions.js)
@@ -165,7 +185,7 @@ function perfFilters(owner, opp, rows) {
   const row = (label, body, tail = '') => `<div class="pp-row">${league ? `<span class="pp-label">${label}</span>` : ''}<div class="perf-filters">${body}</div>${tail}</div>`;
   const foot = `<div class="pp-foot">${n ? '<button type="button" class="link-btn pp-clear" data-action="perf-clear">Clear filters</button>' : ''}<button type="button" class="btn sm" data-action="perf-filt">Done</button></div>`;
   const panel = `<div class="perf-panel" id="perfPanel" role="group" aria-label="Filters">
-    ${league ? row('Show', `${toggle('me', 'My team')}${opp ? toggle('opp', 'Opponent', opp.name) : ''}${toggle('other', 'Other teams')}${toggle('fa', 'Waivers', 'Not on a roster in your league')}`) : ''}
+    ${league ? row('Show', `${toggle('me', 'My team')}${opp ? toggle('opp', 'Opponent', opp.name) : ''}${perfOtherMenu()}${toggle('fa', 'Waivers', 'Not on a roster in your league')}`) : ''}
     ${league ? row('Lineup', `<div class="seg seg-sm" role="group" aria-label="Where in the lineup">${spots.map(([k, l, t]) => `<button type="button" class="${ui.perfSpot === k ? 'on' : ''}" data-action="perf-spot" data-spot="${k}" aria-pressed="${ui.perfSpot === k}"${t ? ` title="${t}"` : ''}${rostered ? '' : ' disabled'}>${l}</button>`).join('')}</div>`) : ''}
     ${row('Player', `${perfMenu('perfPos', 'Position', 'positions', POSITIONS)}${perfMenu('perfTeam', `${SPORT.name} team`, 'teams', [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}`, foot)}
   </div>`;
@@ -261,11 +281,11 @@ function topPerformancesCard() {
   // whose players (yours, the opponent's, the other teams', waivers: any of them) and, for rostered players, where they
   // are: active or bench (IR counts as bench); waivers have no lineup, so Active or Bench leaves them be
   const teamOf = r => { const tid = owner.get(r.raw.id); return !tid ? null : tid === mine ? 'me' : opp && tid === opp.id ? 'opp' : 'other'; };
-  const filters = perfFilters(owner, opp, rows);
+  const filters = perfFilters(owner, opp, rows), otherPick = perfOtherTeams().picked;
   const q = normName(ui.perfQ);
   const picked = rows.filter(r => {
     const t = teamOf(r);
-    return (!owner.size || (ui.perfWhose[t || 'fa'] && (!t || ui.perfSpot === 'all' || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q))
+    return (!owner.size || (ui.perfWhose[t || 'fa'] && (t !== 'other' || !otherPick.length || otherPick.includes(owner.get(r.raw.id))) && (!t || ui.perfSpot === 'all' || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q))
       && (!ui.perfPos.length || ui.perfPos.some(x => (r.raw.pos || []).includes(x))) && (!ui.perfTeam.length || ui.perfTeam.includes(r.raw.team))
       && (!ui.perfOnly.rookie || isRookie(r.raw)) && (!ui.perfOnly.inj || !!r.raw.inj);
   });
@@ -274,7 +294,7 @@ function topPerformancesCard() {
   const sorted = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
   // a live update keeps the rows where they were (numbers and ranks change in place; anyone new goes below) so the
   // table doesn't jump while it's read; anything you do sorts it again
-  const sig = [range, perWeek, dates.join(), so.key, so.dir, JSON.stringify(ui.perfWhose), ui.perfSpot, mine, ui.perfQ, ui.perfPos.join(), ui.perfTeam.join(), JSON.stringify(ui.perfOnly)].join('|');
+  const sig = [range, perWeek, dates.join(), so.key, so.dir, JSON.stringify(ui.perfWhose), otherPick.join(), ui.perfSpot, mine, ui.perfQ, ui.perfPos.join(), ui.perfTeam.join(), JSON.stringify(ui.perfOnly)].join('|');
   // rows shown: the top 300 over the season, 100 for a day or week, and 100 more each time Show more is tapped (for this
   // list: any other sort, filter or range starts over)
   if (ui.perfMore.sig !== sig) ui.perfMore = { sig, n: 0 };
