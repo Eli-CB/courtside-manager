@@ -216,6 +216,21 @@ saved leagues are lost). Owner's league:
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
 - `__BUILD__` in index.html and js/core.js is replaced at deploy with the hash of the last commit that changed `index.html`, `styles.css` or `js/` (cache busting; not the latest commit: the daily data commits mustn't make visitors download the code again).
+- ESPN load (Nov 15, 2026, the owner's ask: thousands of visitors without ESPN blocking the site): every visitor's browser
+  used to ask ESPN itself, about 10 requests a minute on a busy night (the scoreboard every 30 s, each live game's
+  400 KB box score about once a minute), all marked as from leaguelayer.com, while the page reads about 1% of each box
+  score. Now the Worker's live feed (`/live/<sport>/<league>`, see the live bullet above and worker/README.md "Live feed")
+  builds today's scores once for everyone (~8 KB compressed a night, kept 5 s at the edge): ESPN is asked a few times a
+  minute per Cloudflare data center whatever the number of visitors, each visitor makes one small request every 30 s, and
+  the injury report and finished days go through `/espn/` first. Direct ESPN stays the fallback, so the site works with
+  the Worker down or not yet deployed. The Worker is the owner's to deploy (`npx wrangler deploy` in worker/; never run
+  it or `wrangler secret put` yourself): the /live route was written Nov 15, 2026; until it's deployed, pages ask for it,
+  get a 404 and go to ESPN for 10 minutes. Measured on a real night: the feed matched ESPN's raw answers exactly through
+  the page's own parsers (games, lines, who's on the floor). Cost: the free plan's 100,000 Worker requests a day are about
+  800 hours of live viewing; past that the $5 Workers Paid plan. A build reads at most 3 box scores (LIVE_BOX_PER_BUILD,
+  ~3 ms CPU each against the free plan's 10 ms). Watch it in Cloudflare's dashboard: Workers & Pages, leaguelayer-yahoo,
+  Metrics (requests, errors incl. exceeded CPU, CPU time, subrequests), or `npx wrangler tail` (worker/README.md
+  "Watching it"). Fantrax and Sleeper stay direct on purpose (per-IP limits: a proxy would pool everyone's).
 - Errors: on leaguelayer.com, `reportError` (core.js, from window `error` / `unhandledrejection` in our own js files,
   each once a visit, 5 at most) posts to the Worker's `/errors` (KV `ERRORS`, 30 days); the owner reads
   `api.leaguelayer.com/errors?key=<ERRORS_KEY>` (setup in `worker/README.md`). The footer says so, with the not-affiliated line.

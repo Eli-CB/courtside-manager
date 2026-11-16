@@ -98,3 +98,25 @@ Cloudflare's dashboard for this Worker), the page just asks ESPN directly for th
 
 `https://api.leaguelayer.com/yahoo/login?return=https://leaguelayer.com/` should open Yahoo's sign-in. After
 allowing access you land back on the site with your Yahoo leagues listed.
+
+## Watching it
+
+Cloudflare's dashboard: https://dash.cloudflare.com, then **Workers & Pages** and **leaguelayer-yahoo** (this Worker's
+`name` in `wrangler.toml`). Its **Metrics** tab shows requests, errors, CPU time and subrequests (its own requests to
+ESPN and Yahoo) over the last hours and days, nothing to set up. During games, look for:
+
+- **Requests** against the free plan's 100,000 a day (the account's Workers & Pages overview shows the day's total).
+  About two a minute per person watching live, plus the injury report and the odd fallback.
+- **Errors**, and in them **exceeded CPU**: a live feed build over the free plan's 10 ms. The page then asks ESPN
+  directly for that update, so nothing breaks, but many of them mean the $5 plan (or a lower LIVE_BOX_PER_BUILD).
+- **CPU time**: most requests are cache hits, well under 1 ms; builds a few ms each.
+- **Subrequests**: the ESPN requests. With the live feed on, a handful a minute per Cloudflare data center, whatever
+  the number of visitors.
+
+Live, request by request, from this folder (Ctrl+C to stop):
+
+```
+npx wrangler tail
+```
+
+And the site's own error log (pages that broke in someone's browser, ESPN not answering): see Error log above.
