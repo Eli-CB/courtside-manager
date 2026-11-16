@@ -491,7 +491,8 @@ function showSportTeamCard(tri) {
   const recTip = isHockey() ? 'Wins-losses-overtime losses' : isFootball() ? 'Wins-losses(-ties)' : 'Wins-losses';
   const title = () => {
     const rec = teamRecord(tri);
-    return `<span class="dt-name">${IMG && IMG.logos[tri] ? `${teamLogo(tri, 22)} ` : ''}${esc(name)}</span>${rec ? `<span class="dt-bio"><span class="dt-rec" title="${recTip}, this regular season">${rec}</span></span>` : ''}`;
+    // (dt-team: a bigger logo, and the record set off by a line on the same row; a long name gives way)
+    return `<span class="dt-name dt-team">${IMG && IMG.logos[tri] ? teamLogo(tri, 32) : ''}${esc(name)}</span>${rec ? `<span class="dt-bio dt-team-rec"><span class="dt-rec" title="${recTip}, this regular season">${rec}</span></span>` : ''}`;
   };
   $('#detailTitle').innerHTML = title();
   cardOpen = null;
