@@ -104,7 +104,7 @@ const actions = {
     const { L, X } = recapOn(el);
     if (X) await shareWith(el, recapShare(L, X));
   },
-  // this season's draft awards, the same way
+  // this season's Draft Retrospective, the same way
   async 'draft-share'(el) {
     const L = fxLeague(), d = draftData(), items = d && !d.loading ? draftAwards(d) : [];
     if (L && items.length) await shareWith(el, draftShare(L, d, items));

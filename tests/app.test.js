@@ -2287,8 +2287,8 @@ test("Draft awards: The Reacher is the pick taken furthest ahead of consensus AD
     } finally { doc.querySelector = realQuery; }
     const S = app.draftShare(L, d, [award]);
     assert.ok(S.url.endsWith(`?league=${L.id}#draft`), S.url);
-    assert.equal(S.text, `${app.SPORT.emoji} ${L.name} · ${app.seasonLabel(L.year)} draft awards\n\n🦒 The Reacher: ${award.text}`);
-    assert.match(S.file, /-draft-awards\.png$/);
+    assert.equal(S.text, `${app.SPORT.emoji} ${L.name} · ${app.seasonLabel(L.year)} Draft Retrospective\n\n🦒 The Reacher: ${award.text}`);
+    assert.match(S.file, /-draft-retrospective\.png$/);
     // the Recap shares the same way
     assert.equal(typeof app.recapShare, 'function');
     // an ESPN or Sleeper league's players have the daily file's ADP (Fantrax's) instead
