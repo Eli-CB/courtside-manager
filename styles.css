@@ -77,7 +77,18 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+/* a section that opens on a tap: one chevron for all of them, pointing down and turning over when open */
+:root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+.gear-adv > summary::after, .dash-fold > summary::after, .card.rollable > .card-head > h2::after {
+  content: ''; flex: none; width: 18px; height: 18px; background: var(--muted);
+  -webkit-mask: var(--chev) center / contain no-repeat; mask: var(--chev) center / contain no-repeat; transition: transform .2s ease;
+}
+.gear-adv[open] > summary::after, .dash-fold[open] > summary::after, .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(180deg); }
+@keyframes fold-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: no-preference) {
+  .dash-fold[open] > :not(summary), .gear-adv[open] > :not(summary), .card.rollable:not(.rolled) > :not(.card-head) { animation: fold-in .18s ease; }
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -166,8 +177,6 @@ a { color: var(--accent); }
 .gear-adv { margin-top: 4px; border-top: 1px solid var(--border); }
 .gear-adv > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
 .gear-adv > summary::-webkit-details-marker { display: none; }
-.gear-adv > summary::after { content: '▸'; font-size: .8rem; transition: transform .15s; }
-.gear-adv[open] > summary::after { transform: rotate(90deg); }
 .lm-ico { width: 17px; height: 17px; margin: 0 8px 0 0; vertical-align: -3px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .gear-sub { display: block; font-size: .76rem; color: var(--muted); font-weight: 400; margin-top: 1px; }
 .lm-ico ~ .gear-sub { padding-left: 25px; } /* under the label, not the icon */
@@ -216,9 +225,8 @@ a { color: var(--accent); }
 .dash-folds > .dash-fold { padding: 0; }
 .dash-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 12px 16px; min-height: 48px; border-radius: var(--radius); }
 .dash-fold > summary::-webkit-details-marker { display: none; }
-.dash-fold > summary::after { content: '▸'; margin-left: auto; padding-left: 4px; color: var(--muted); font-size: .85rem; transition: transform .15s; }
-.dash-fold[open] > summary::after { transform: rotate(90deg); }
-.dash-fold > summary:hover { background: var(--surface-2); }
+.dash-fold > summary::after { margin-left: auto; }
+.dash-fold > summary:hover, .dash-fold > summary:active { background: var(--surface-2); }
 .dash-fold[open] > summary:hover { border-radius: var(--radius) var(--radius) 0 0; }
 .df-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .df-dot.bad { background: var(--bad); } .df-dot.warn { background: var(--warn); } .df-dot.good { background: var(--good); }
@@ -1155,8 +1163,9 @@ a.lm-item { text-decoration: none; }
   #view .dr-gap { margin-top: 0; }
   /* a section after the first: its heading, a chevron, and nothing else until tapped */
   .card.rollable > .card-head > h2 { cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1 1 100%; min-width: 0; } /* its own line: what's beside it wraps under, never squeezed */
-  .card.rollable > .card-head > h2::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: .85rem; transition: transform .15s; }
-  .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(90deg); }
+  .card.rollable > .card-head > h2::after { margin-left: auto; }
+  .card.rolled { transition: background-color .15s; }
+  .card.rolled:active { background: var(--surface-2); }
   .card.rolled > :not(.card-head), .card.rolled > .card-head > :not(h2) { display: none; }
   .card.rolled > .card-head { margin-bottom: 0; }
   .card.rolled { padding-block: 12px; }
