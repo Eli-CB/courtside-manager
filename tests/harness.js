@@ -83,7 +83,7 @@ function loadApp() {
     document, console, setTimeout, clearTimeout, URL, URLSearchParams, Intl, Math, JSON, Promise, Map, Set,
     Date: FixedDate,
     location: { hostname: 'example.test', hash: '', search: '', reload() {} },
-    localStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
+    localStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k), key: i => [...store.keys()][i] ?? null, get length() { return store.size; } },
     fetch: fakeFetch,
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     navigator: { clipboard: { writeText: async () => {} } },

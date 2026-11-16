@@ -11,8 +11,8 @@
 // proxy: the helper's address (empty hides Yahoo). While Yahoo is being tried out, the sign-in shows only on a
 // device that opened the site with ?yahoo=1 once (or is already signed in)
 const yahoo = { proxy: 'https://api.leaguelayer.com', leagues: null, beta: true };
-const YAHOO_KEY = 'courtside-yahoo'; // { access, refresh, until } on this device
-const YAHOO_BETA_KEY = 'courtside-yahoo-beta';
+const YAHOO_KEY = 'league-layer-yahoo'; // { access, refresh, until } on this device
+const YAHOO_BETA_KEY = 'league-layer-yahoo-beta';
 try { if (/[?&]yahoo=1(&|$)/.test(location.search)) localStorage.setItem(YAHOO_BETA_KEY, '1'); } catch (e) { /* blocked */ }
 const yahooTokens = () => { try { return JSON.parse(localStorage.getItem(YAHOO_KEY)); } catch (e) { return null; } };
 const yahooSave = t => { try { if (t) localStorage.setItem(YAHOO_KEY, JSON.stringify(t)); else localStorage.removeItem(YAHOO_KEY); } catch (e) { /* blocked */ } };

@@ -259,7 +259,7 @@ function rosterPeriodDays(periods) {
 // Fantrax's player list (about 200 KB) and ADP are the same for every league and barely change:
 // fetched at most once a day and kept on this device, a list for each sport. The NHL's holds everyone it has ever
 // listed (over 1 MB): only those on a team, with what matching reads, are kept.
-const FX_SHARED_KEY = 'courtside-fantrax-shared-v1';
+const FX_SHARED_KEY = 'league-layer-fantrax-shared-v1';
 const fxSharedKey = sport => (sport === 'nba' ? FX_SHARED_KEY : `${FX_SHARED_KEY}-${sport}`);
 let fxShared = null, fxSharedOther = {};
 async function fxPlayerLists(sport = 'nba') {
@@ -504,9 +504,9 @@ function syncLeagueRules() {
 
 // Every league loaded from Fantrax or ESPN is kept on this device (the five most recent). The site's own
 // league uses it until the daily data file is newer; any other league for 6 hours, or until ↻ Reload.
-const FX_CACHE_KEY = 'courtside-fantrax-v2';
+const FX_CACHE_KEY = 'league-layer-fantrax-v2';
 const LEAGUE_FRESH_MS = 6 * 36e5;
-try { localStorage.removeItem('courtside-fantrax-v1'); } catch (e) { /* the old one-league copy */ }
+try { localStorage.removeItem('league-layer-fantrax-v1'); } catch (e) { /* the old one-league copy */ }
 const readLeagueCache = () => { try { return JSON.parse(localStorage.getItem(FX_CACHE_KEY)) || {}; } catch (e) { return {}; } };
 function cachedLeague(id) {
   const c = readLeagueCache()[id];

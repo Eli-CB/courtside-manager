@@ -27,7 +27,7 @@ const espnSeason = () => (NBA && NBA.season ? +NBA.season.slice(0, 4) + 1 : new 
 
 // ESPN's list of NBA players (about 250 KB) is the same for every league: fetched at most once a day and
 // kept on this device, small: { ESPN id: [name, NBA team, eligible slots] }
-const ESPN_SHARED_KEY = 'courtside-espn-shared-v1';
+const ESPN_SHARED_KEY = 'league-layer-espn-shared-v1';
 let espnShared = null;
 async function espnPlayerList(season) {
   if (!espnShared) { try { espnShared = JSON.parse(localStorage.getItem(ESPN_SHARED_KEY)); } catch (e) { espnShared = null; } }

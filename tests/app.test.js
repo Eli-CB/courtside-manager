@@ -637,7 +637,7 @@ test('Fantrax: leagues are reused from the device, shared lists fetched once, fa
   const realFetch = app.fetch;
   app.fetch = url => { calls.push(String(url)); return realFetch(url); };
   try {
-    app.localStorage.removeItem('courtside-fantrax-shared-v1');
+    app.localStorage.removeItem('league-layer-fantrax-shared-v1');
     app.set('fxShared', null);
     await app.getLeague(POINTS, true);
     await app.getLeague(CATS9, true);
@@ -763,7 +763,7 @@ test('ESPN: leagues are reused from the device, the player list fetched once, pr
   const realFetch = app.fetch;
   app.fetch = (url, init) => { calls.push(String(url)); return realFetch(url, init); };
   try {
-    app.localStorage.removeItem('courtside-espn-shared-v1');
+    app.localStorage.removeItem('league-layer-espn-shared-v1');
     app.set('espnShared', null);
     await app.getLeague(ESPN, true);
     await app.getLeague(ESPN, true);
@@ -1855,7 +1855,7 @@ test('Matchups steps through every week of the league, a two-week matchup once',
 // ----- Yahoo -----
 function yahooSignedIn(tokens = { access: 'a', refresh: 'r', until: app.NOW + 36e5 }) {
   app.get('yahoo').proxy = 'https://yahoo.test';
-  app.localStorage.setItem('courtside-yahoo', JSON.stringify(tokens));
+  app.localStorage.setItem('league-layer-yahoo', JSON.stringify(tokens));
 }
 
 test("Yahoo's JSON: numbered objects become lists, one-key arrays become objects", () => {
@@ -1876,18 +1876,18 @@ test('Yahoo league IDs and addresses', () => {
 
 test('Yahoo: sign-in needed, an expired token renewed, the leagues on the account', async () => {
   app.get('yahoo').proxy = 'https://yahoo.test';
-  app.localStorage.removeItem('courtside-yahoo');
+  app.localStorage.removeItem('league-layer-yahoo');
   await assert.rejects(app.yahooGet('users;use_login=1/games;game_keys=nba/leagues'), /yahoo sign-in/);
   assert.match(app.leagueError(YAHOO, new Error('yahoo sign-in')).message, /Sign in with Yahoo/);
   yahooSignedIn({ access: 'old', refresh: 'r', until: app.NOW - 1 });
   const leagues = [...await app.yahooLeagues()];
-  assert.equal(JSON.parse(app.localStorage.getItem('courtside-yahoo')).access, 'new', 'renewed before asking');
+  assert.equal(JSON.parse(app.localStorage.getItem('league-layer-yahoo')).access, 'new', 'renewed before asking');
   assert.deepEqual(JSON.parse(JSON.stringify(leagues)), [{ key: '466.l.777', name: 'Test Hoops', teams: 4, season: 2026 }]);
   // back from Yahoo's sign-in: the tokens after #yahoo= are kept and the address tidied
   const loc = app.location;
   loc.hash = '#yahoo=' + encodeURIComponent(Buffer.from(JSON.stringify({ access: 'x', refresh: 'y', until: 1 })).toString('base64'));
   assert.equal(app.yahooFromAddress(), 'in');
-  assert.equal(JSON.parse(app.localStorage.getItem('courtside-yahoo')).refresh, 'y');
+  assert.equal(JSON.parse(app.localStorage.getItem('league-layer-yahoo')).refresh, 'y');
   loc.hash = '#yahoo-error=access_denied';
   assert.match(app.yahooFromAddress(), /cancelled/);
   loc.hash = '';
@@ -3274,7 +3274,7 @@ test('changing sports: each league comes back as it was, and one that does not l
   // a saved hockey league opens as hockey after a refresh
   const saved = a.get('state');
   saved.sport = 'nhl';
-  a.localStorage.setItem('courtside-manager-v1', JSON.stringify({ ...saved, slots: ['C', 'W', 'D', 'G'], players: [{ name: 'A Goalie', pos: ['G'] }] }));
+  a.localStorage.setItem('league-layer-v1', JSON.stringify({ ...saved, slots: ['C', 'W', 'D', 'G'], players: [{ name: 'A Goalie', pos: ['G'] }] }));
   const s = a.load();
   assert.equal(a.get('SPORT').key, 'nhl');
   assert.equal(s.slots.join(), 'C,W,D,G');
@@ -3491,7 +3491,7 @@ test("ESPN not answering the site: after two misses in a row (the site itself an
     if (s.includes('site.api.espn.com') && !net.espn) return Promise.resolve({ ok: false, status: 403 });
     return real(u, o);
   };
-  const ls = a.localStorage, key = 'courtside-espn-route';
+  const ls = a.localStorage, key = 'league-layer-espn-route';
   ls.removeItem(key);
   try {
     await assert.rejects(a.espnSite('scoreboard'), /403/, 'one miss: an error, as before');
@@ -4204,14 +4204,14 @@ test('every site loads into the same league', async () => {
   for (const [label, id] of [['Fantrax categories', CATS9], ['Fantrax points', POINTS], ['Fantrax daily', DAILY], ['ESPN', ESPN], ['Sleeper', SLEEPER], ['Yahoo', YAHOO]]) {
     checkLeague(await app.useLeague(id), label);
   }
-  app.localStorage.removeItem('courtside-yahoo');
+  app.localStorage.removeItem('league-layer-yahoo');
   checkLeague((await hockeyApp()).fxLeague(), 'hockey');
   checkLeague((await footballApp()).fxLeague(), 'football');
 });
 
 test("the league is read again from its site 10-20 minutes before a period's first game and 2-6 after, each page at its own moment", async () => {
   const L = await app.useLeague(CATS9);
-  const S = app.get('state'), ui = app.get('ui'), KEY = 'courtside-fantrax-v2';
+  const S = app.get('state'), ui = app.get('ui'), KEY = 'league-layer-fantrax-v2';
   const keep = { fxTeam: S.fxTeam, fxLeagueId: S.fxLeagueId, demo: S.demo, browse: S.browse }, kept = app.localStorage.getItem(KEY);
   const tip = Date.parse('2026-11-02T19:00:00-05:00'); // week 3 starts on Fantrax at its first tip-off
   const readAt = t => { const all = JSON.parse(app.localStorage.getItem(KEY) || '{}'); all[CATS9] = { at: t, res: null }; app.localStorage.setItem(KEY, JSON.stringify(all)); };
@@ -4284,4 +4284,35 @@ test("a hockey team's record keeps its overtime and shootout losses apart (W-L-O
   a.set('BOX', { ...box, scores: new Map([...game(dates[0], tri, 'BOS', 3, 2, 'OT'), ...game(dates[1], tri, 'BOS', 2, 3, 'OT'), ...game(dates[2], 'NYR', tri, 4, 3, 'SO'), ...game(dates[3], 'NYR', tri, 5, 1, 'REG')]) });
   a.get('live').games = [{ d: dates[4], home: tri, away: 'TOR', hs: 1, as: 2, state: 'post', period: 4 }];
   assert.equal(a.teamRecord(tri), '1-1-3', 'an overtime win is a win; two late losses, and tonight\'s in overtime');
+});
+
+test("a device's old courtside-* keys move to the new names once, and nothing saved is lost", () => {
+  const fake = (entries, limit) => {
+    const m = new Map(entries);
+    const size = () => [...m].reduce((n, [k, v]) => n + k.length + v.length, 0);
+    return {
+      m, getItem: k => (m.has(k) ? m.get(k) : null), removeItem: k => m.delete(k), key: i => [...m.keys()][i] ?? null, get length() { return m.size; },
+      setItem(k, v) { const was = m.get(k); m.set(k, String(v)); if (limit && size() > limit) { was === undefined ? m.delete(k) : m.set(k, was); throw new Error('QuotaExceededError'); } },
+    };
+  };
+  const saved = JSON.stringify({ fxLeagueId: 'abc', savedLeagues: [{ id: 'abc' }] });
+  const s = fake([['courtside-manager-v1', saved], ['courtside-fantrax-v2', '{"abc":1}'], ['courtside-theme', 'dark'], ['courtside-yahoo', '{"access":"a"}'], ['someone-elses', 'x']]);
+  assert.equal(app.moveOldKeys(s), 4);
+  assert.deepEqual(Object.fromEntries(s.m), { 'league-layer-v1': saved, 'league-layer-fantrax-v2': '{"abc":1}', 'league-layer-theme': 'dark', 'league-layer-yahoo': '{"access":"a"}', 'someone-elses': 'x' });
+  assert.equal(app.moveOldKeys(s), 0, 'nothing left to move on the next visit');
+  // a tab still open on the old version saves under the old name again: the moved copy stays
+  const again = fake([['league-layer-v1', saved], ['courtside-manager-v1', '{"stale":1}']]);
+  app.moveOldKeys(again);
+  assert.deepEqual(Object.fromEntries(again.m), { 'league-layer-v1': saved });
+  // nearly full storage: the old key goes before the new one is written, so the move fits
+  const big = 'x'.repeat(4000), full = fake([['courtside-fantrax-v2', big], ['courtside-manager-v1', saved]], 4400);
+  app.moveOldKeys(full);
+  assert.equal(full.getItem('league-layer-fantrax-v2'), big);
+  assert.equal(full.getItem('league-layer-v1'), saved);
+  // every key the site names is a new one
+  const fs = require('fs'), path = require('path'), dir = path.join(__dirname, '..', 'js');
+  for (const f of fs.readdirSync(dir)) {
+    const left = (fs.readFileSync(path.join(dir, f), 'utf8').match(/courtside[\w-]*/g) || []).filter(() => f !== 'core.js');
+    assert.deepEqual(left, [], `${f} still names an old key`);
+  }
 });

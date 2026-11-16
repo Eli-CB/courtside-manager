@@ -3,8 +3,9 @@
 Fantasy basketball (Fantrax, public ESPN leagues, Sleeper), hockey (Fantrax) and football (Sleeper, part of the site so far) weekly matchup site. Static GitHub Pages site, no build step, no backend.
 Live: https://leaguelayer.com (domain on Cloudflare, DNS only, set in the repo's Pages settings; the old
 eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/league-layer, renamed from courtside-manager Nov 16, 2026:
-GitHub redirects the old name as long as no new repo takes it. The site was Courtside Manager until Oct 2026; every `courtside-*`
-storage key keeps the old name so nobody's saved leagues are lost). Owner's league:
+GitHub redirects the old name as long as no new repo takes it. The site was Courtside Manager until Oct 2026; its storage keys were
+`courtside-*` until Nov 16, 2026 and are `league-layer-*` now: `moveOldKeys`, at the top of core.js, moves a device's old keys once, before anything
+reads them. Keep it for good, a device may come back after months; a key must never be renamed without such a move). Owner's league:
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
 8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26).
 
@@ -28,8 +29,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     "NBA", `nbaId`, `nbaPlayers` and the like mean "the sport's data" (as "fx" names mean "the league's site")
   - core: constants, the cache registry (`keep(from, reset)` beside each cache's declaration, `changed('sport' | 'box' | 'league' | 'players', leagueId)` wherever one of
     those changes: never clear another file's cache by hand; a new cache signs up with `keep`), `withState(over, fn)` (the one place the page's state is swapped: a draw as
-    another team or with next week's lineups, `withViewedTeam`; fn mustn't wait, and `save` refuses meanwhile), `state` (localStorage `courtside-manager-v1`), `ui`, helpers (every time of day through `fmtTime`:
-    the gear menu's 24-hour toggle, `courtside-clock`, else the device's own clock), headshots (team colors from
+    another team or with next week's lineups, `withViewedTeam`; fn mustn't wait, and `save` refuses meanwhile), `state` (localStorage `league-layer-v1`), `ui`, helpers (every time of day through `fmtTime`:
+    the gear menu's 24-hour toggle, `league-layer-clock`, else the device's own clock), headshots (team colors from
     `TEAM_COLORS`; logos only where there is no photo; `hsPx(desktop, phone)` sizes them). `playerBtn(id, name)`: a player's name as the button that opens his card (his photo too: `data-photo` on every headshot, actions.js; not inside a `label`, where the row is a checkbox); `teamBtn(tri)` / `linkTeams(html)`: a team's code (in a line's text, not its tags) as a link to that team's card ('sport-team', `showSportTeamCard` in players.js; its record from `teamRecord`: the box scores' finals, then today's once over on ESPN's scoreboard; hockey W-L-OT from each final's `last`; checked against ESPN's records; its foot links to the Players tab filtered by the team, 'team-players'). The player card: `pc-who` (fantasy team and how he got there), `pc-tiles`, `pc-log` (averages and games on one column grid), games sortable (`card-sort`, `ui.cardSort`), picture `playerPhoto` (the full cutout, NBA.com's for basketball, ESPN's by `espn` id otherwise, in front of the team logo; the round photo if it won't load). `sortDesc(list, fn)`: highest first, fn asked once per item (never `sort((a, b) => value(b) - value(a))`)
   - nba: NBA data load (`data/players.json`), projections (`projectSide`, `compareCats`, `matchOdds`), category
     model (`scoreCats`, `catZ`, `BASE`: each stat's mean/spread from the data via `baseNow`, the league's teams × roster
@@ -68,7 +69,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   - football: a player's week (`footballProj`, `footballNow`, `footballEntry`), lineups (`bestFootballIds`), live points (`footballLines`). What a football week is like is said once, in its sport table (sports.js: `weekLineup`, `gameLocks` + `spotLocked`, `oneNumber`, `samePosDrops`; hockey's `steadyMinutes`): other pages read those traits, and branch on `isFootball()` only to call football's own functions.
   - yahoo: Yahoo leagues through a Yahoo login (OAuth): the helper server `worker/yahoo.js` (Cloudflare Worker at
     api.leaguelayer.com, setup in `worker/README.md`) runs the sign-in and passes API requests through (Yahoo's API isn't
-    CORS-open); tokens stay in the browser (`courtside-yahoo`). `yahoo.proxy` empty = Yahoo hidden; while `yahoo.beta`, the sign-in shows only on a device that opened `?yahoo=1` (or is signed in). `yflat` turns Yahoo's
+    CORS-open); tokens stay in the browser (`league-layer-yahoo`). `yahoo.proxy` empty = Yahoo hidden; while `yahoo.beta`, the sign-in shows only on a device that opened `?yahoo=1` (or is signed in). `yflat` turns Yahoo's
     JSON ("0","1"…+count objects, arrays of one-key objects) into plain lists/objects; `fetchYahooLeague` maps to the league
     shape (`source: 'yahoo'`, ids = league keys `nba.l.N`). Test fixtures are made up in Yahoo's layout
     (`tests/make_yahoo_fixtures.py`): check against a real league once signed in.
@@ -103,7 +104,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     minutes moved 4+). Owners are today's rosters. Info text `trends`
   - live: live box scores for the Dashboard matchup's and Performances' Today (and This week). Live scores come first from the Worker's live feed (`liveFeedGet`: `/live/<sport>/<league>`, worker/yahoo.js: today's scoreboard and each game's box score cut to what the page reads, ~8 KB compressed a night, built once and kept 5 s at the edge, at most 3 box scores read a build for the free plan's 10 ms of CPU; `readBoxes(games, feed)` uses a game's box score from it when under 45 s old, else asks ESPN if due; the feed failing = ESPN directly for 10 minutes; keep `liveScoreboard`/`liveBox` in step with what espnGames/espnLines/espnHockeyLines/espnFloor/espnPlayer read). The injury report and finished days go through `/espn/` first (`espnSite(path, tries, pooled)`). Every other ESPN site-feed request goes through `espnSite(path)`:
     direct from the browser; after `ESPN_SWITCH` (2) misses in a row while leaguelayer.com answers, through the Worker's cached `/espn/` route (worker/yahoo.js)
-    for 6 hours on that device (`courtside-espn-route`), logged once. Failing feeds back off (`feedWait`: ×2 per miss, 5 min at most) for live scores,
+    for 6 hours on that device (`league-layer-espn-route`), logged once. Failing feeds back off (`feedWait`: ×2 per miss, 5 min at most) for live scores,
     ESPN/Sleeper league points and the late finals. Fantrax and Sleeper stay direct on purpose: their limits are per IP, and a proxy would pool everyone's. The browser polls ESPN's site API
     (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) every 30 s (60 s with Save-Data) while the Dashboard or Players tab is visible,
     it isn't set to the last game day (`ui.dashRange` / `ui.perfRange`), and games are on: scoreboard + the box score of each game in progress

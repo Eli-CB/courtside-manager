@@ -279,7 +279,7 @@ const feedWait = (feed, base) => Math.min(base * 2 ** Math.min(feedFails[feed] |
 // for everyone and keeps the answer for seconds. The switch lasts ESPN_ROUTE_HOURS on this device, then direct is tried
 // again; it's logged once, so the owner knows.
 const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
-const ESPN_SWITCH = 2, ESPN_ROUTE_HOURS = 6, ESPN_ROUTE_KEY = 'courtside-espn-route';
+const ESPN_SWITCH = 2, ESPN_ROUTE_HOURS = 6, ESPN_ROUTE_KEY = 'league-layer-espn-route';
 const espnRoute = { misses: 0 };
 const espnViaWorker = () => { try { return +localStorage.getItem(ESPN_ROUTE_KEY) > Date.now(); } catch (e) { return false; } };
 // pooled: a feed that's the same for everyone and changes slowly (the injury report, finished days), asked of the Worker

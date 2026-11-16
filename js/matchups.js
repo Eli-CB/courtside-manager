@@ -218,7 +218,7 @@ document.addEventListener('click', e => { const el = e.target.closest('[data-tip
 window.addEventListener('scroll', hideTip, { passive: true });
 
 // ----- Lineups board views: schedule dots, or category stats shaded by contribution -----
-const BOARD_KEY = 'courtside-board';
+const BOARD_KEY = 'league-layer-board';
 ui.boardMode = (() => { try { return localStorage.getItem(BOARD_KEY) || 'sched'; } catch (e) { return 'sched'; } })();
 
 // Smooth shading: strength grows with the size of the contribution, so close values look alike (base: an opaque

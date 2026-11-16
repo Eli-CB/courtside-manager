@@ -181,10 +181,10 @@ const canInstall = () => !isInstalled() && (!!ui.installPrompt || isIos());
 // Settings (the gear at the right of the tab bar): data freshness, reloading the league, the theme
 // What this site keeps in the browser (about 5 MB is allowed), counted in characters
 // (league data from Fantrax and ESPN: what "Clear saved league data" removes)
-const SAVED_LEAGUE_DATA = ['courtside-fantrax-v2', 'courtside-fantrax-shared-v1', 'courtside-espn-shared-v1', 'courtside-roster-weeks-v2'];
+const SAVED_LEAGUE_DATA = ['league-layer-fantrax-v2', 'league-layer-fantrax-shared-v1', 'league-layer-espn-shared-v1', 'league-layer-roster-weeks-v2'];
 function savedSize() {
   let n = 0;
-  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('courtside-')) n += k.length + (localStorage.getItem(k) || '').length; } } catch (e) { return 'unknown'; }
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('league-layer-')) n += k.length + (localStorage.getItem(k) || '').length; } } catch (e) { return 'unknown'; }
   return n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`;
 }
 

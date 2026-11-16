@@ -13,19 +13,19 @@ const awardAmount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
 // team's roster = a trade; on nobody's roster = a free-agent or waiver pickup. Finished seasons never
 // change, so the weekly rosters are fetched once and kept on this device.
 // Kept per league with when it was last used; only the 8 most recently used leagues and seasons stay
-const ROSTER_WEEKS_KEY = 'courtside-roster-weeks-v2';
+const ROSTER_WEEKS_KEY = 'league-layer-roster-weeks-v2';
 const ROSTER_WEEKS_KEEP = 8;
 function readRosterWeeks() {
   try {
     const all = JSON.parse(localStorage.getItem(ROSTER_WEEKS_KEY));
     if (all) return all;
     // the earlier format ({ league: { period: rosters } }) carries over, so nothing is fetched again
-    const old = JSON.parse(localStorage.getItem('courtside-roster-weeks-v1')) || {};
-    localStorage.removeItem('courtside-roster-weeks-v1');
+    const old = JSON.parse(localStorage.getItem('league-layer-roster-weeks-v1')) || {};
+    localStorage.removeItem('league-layer-roster-weeks-v1');
     return Object.fromEntries(Object.entries(old).map(([id, p]) => [id, { at: Date.now(), p }]));
   } catch (e) { return {}; }
 }
-try { localStorage.removeItem('courtside-roster-history-v1'); } catch (e) { /* older format, no statuses */ }
+try { localStorage.removeItem('league-layer-roster-history-v1'); } catch (e) { /* older format, no statuses */ }
 // one load per league at a time, shared by Season totals and Awards
 const rosterWeeksLoad = {};
 keep('league', id => dropKept(rosterWeeksLoad, id));
