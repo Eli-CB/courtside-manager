@@ -241,10 +241,7 @@ a { color: var(--accent); }
    spilling into the left side */
 .mu-p.right .bplayer { align-self: stretch; }
 .mu-p.right .bname { justify-content: flex-end; }
-.mu-p.live { --live-bg: color-mix(in srgb, var(--good) 7%, var(--surface)); background: var(--live-bg); }
 .mu-row.bench .mu-p, .mu-p.bench, .mu-p.out { opacity: .62; }
-/* on the floor right now (ESPN's box score), after the clock in his game's bubble */
-.on-floor { color: var(--good); font-weight: 600; }
 .mu-game { font-size: .78rem; color: var(--muted); }
 .mu-game b { color: var(--bad); }
 /* the game itself, in a bubble as on Fantrax: "DET 144 @ WAS 140 F", the clock while it's on, the tip-off before */
@@ -287,8 +284,6 @@ a { color: var(--accent); }
   .mu-slot .slot-label { font-size: .62rem; padding: 2px 2px; }
   .mu-p { padding: 7px 2px; }
   /* phones: the card runs edge to edge, so a game on's green runs to the screen's edge too, not 16px short of it */
-  .mu-p.live:not(.right) { box-shadow: -16px 0 0 var(--live-bg); }
-  .mu-p.live.right { box-shadow: 16px 0 0 var(--live-bg); }
   .mu-cats { font-size: .74rem; }
   .mu-cats thead th { font-size: .64rem; }
 }
@@ -421,7 +416,12 @@ button.dr-award-btn:hover { text-decoration: underline; color: var(--text); }
 .perf-table td.pf-v { font-weight: 800; font-variant-numeric: tabular-nums; }
 .perf-table td.pf-name { padding-left: 6px; }
 /* a game still on: a pulsing dot by the clock */
-.lv-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); margin-right: 4px; vertical-align: 1px; animation: lv-pulse 1.6s ease-in-out infinite; }
+/* a game on now: a pulsing green dot by its clock; light and still on the Matchup tab while he's on his team's bench (or
+   between periods) */
+.lv-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 4px; vertical-align: 1px; animation: lv-ring 1.6s ease-out infinite; }
+/* (the dot stays solid and a ring pulses out of it: fading it would make it look like the light one) */
+@keyframes lv-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); } 100% { box-shadow: 0 0 0 5px transparent; } }
+.lv-dot.out { background: color-mix(in srgb, var(--good) 30%, var(--surface)); animation: none; }
 @keyframes lv-pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
 .perf-rank { flex: none; min-width: 1.5em; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }

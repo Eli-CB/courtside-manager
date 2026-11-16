@@ -36,9 +36,6 @@ function dashDays() {
   return { today: all.includes(today) && P.today ? today : null, started: P.started, day, week: all.filter(d => d <= today), all };
 }
 
-// " · on floor" after a game's clock while he's on the floor right now (onFloor, live.js), in words: the bubble's dot is
-// the game's, red, and words don't ask anyone to tell red from green
-const floorTag = (p, d) => (onFloor(p, d) ? ' · <span class="on-floor" title="On the floor now">on floor</span>' : '');
 // A player's game that day, in a bubble as Fantrax shows it: tip-off, the score then the clock while it's on, the final
 // score ("DET 144 @ WAS 140 F"; just the opponent with Hide game scores on). DNP and a goalie's start come after the bubble.
 // The score stays in one piece: on a phone only the clock goes to a second line.
@@ -50,7 +47,7 @@ function dashGame(p, d) {
   const inGoal = isGoalie(p) && !lineOn(p, d) ? ` · ${startWords(p, d)}` : '';
   if (g && g.state === 'pre') return `${bubble(`${vs(g)} ${fmtTime(g.start)}`)}${inGoal}`;
   const score = !s ? '' : ui.hideScores ? vs(s) : `${s.away} ${s.as} @ ${s.home} ${s.hs}`;
-  if (g && g.state === 'in') return bubble(`${whole(score)} ${whole(`${liveStatus(p, d)}${floorTag(p, d)}`)}`);
+  if (g && g.state === 'in') return bubble(`${whole(score)} ${whole(liveStatus(p, d, true))}`); // (its dot: on the floor or not)
   const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
   if (s) return `${bubble(`${score}${ui.hideScores ? ' · Final' : ' F'}`)}${dnp}`;
   const nx = NBA.teams && NBA.teams[p.team] && NBA.teams[p.team].next;
@@ -168,16 +165,13 @@ function dashCell(C, p, right, counts, tag = '', cls = '') {
     const left = D.all.filter(d => playsOn(p, d) && !lineOn(p, d) && (d > today || (d === today && !gameFinal(p, d) && !(liveGame(p, d) && liveGame(p, d).state === 'post')))).length;
     const fbDay = isFootball() ? D.all.find(d => playsOn(p, d)) : null;
     const toCome = isGoalie(p) ? `about ${fmt(expectedGames(p, D.all.filter(d => d >= today && !gameFinal(p, d))), 1)}` : left;
-    game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${toCome} left` : ''}${liveOn(p, today) && (lineOn(p, today) || onFloor(p, today)) ? ` · ${liveStatus(p, today)}${floorTag(p, today)}` : ''}`;
+    game = `${lines.length} G${counted && lines.length > 1 ? `, ${counts ? 'this one counts' : 'latest'}` : ''}${left && p.status !== 'Out' ? ` · ${toCome} left` : ''}${liveOn(p, today) && (lineOn(p, today) || onFloor(p, today)) ? ` · ${liveStatus(p, today, true)}` : ''}`;
     // football: his one game, or his bye
     if (isFootball()) game = fbDay ? `${fmtDay(fbDay).split(',')[0]} ${dashGame(p, fbDay)}` : 'Bye';
   } else game = dashGame(p, dates[0]);
   game = linkTeams(game); // (its opponent's code opens that team's players)
-  // in a game on now: on the floor, green (and "on floor" in his game's bubble); on the bench, plain. Between periods
-  // (or before his game's box score is read) not known, so green as before for anyone who's played
-  const floor = dates.includes(today) ? onFloor(p, today) : null;
-  const on = floor != null ? floor : dates.some(d => liveOn(p, d) && lineOn(p, d));
-  return `<div class="mu-p${right ? ' right' : ''}${on ? ' live' : ''}${counts ? '' : ' bench'}${cls}">
+  // (in a game on now, the dot by its clock says whether he's on the floor: liveStatus; no green row, the owner's ask)
+  return `<div class="mu-p${right ? ' right' : ''}${counts ? '' : ' bench'}${cls}">
     <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
     <div class="mu-game">${game}</div>
     ${lines.length ? `<div class="mu-chips">${lineChips(tot, C.flash && C.flash(p, tot))}</div>` : ''}

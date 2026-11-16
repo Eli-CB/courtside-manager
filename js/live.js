@@ -124,9 +124,10 @@ function espnFloor(sm) {
 }
 // A player on the floor right now (true), on the bench (false), or not known (null): his game isn't on, it's between
 // periods (the five who ended one), or its box score hasn't been read yet. As fresh as the box score: a minute at most.
+const betweenPeriods = g => !g.clock || /half|end of/i.test(g.detail || ''); // (the clock run out, or Halftime, End of 3rd)
 function onFloor(p, d) {
   const g = liveGame(p, d);
-  if (!g || g.state !== 'in' || !g.clock || /half|end of/i.test(g.detail || '')) return null;
+  if (!g || g.state !== 'in' || betweenPeriods(g)) return null;
   const f = live.floor.get(g.id);
   return f && f.size ? f.has(p.nbaId) : null;
 }
@@ -379,12 +380,19 @@ function gameMinLeft(g) {
 }
 const liveGame = (p, d) => live.games.find(g => g.d === d && (g.home === p.team || g.away === p.team)) || null;
 const liveOn = (p, d) => { const g = liveGame(p, d); return !!g && g.state === 'in'; };
-// a game's state for its row: the clock while it's on, Final once it's over
-function liveStatus(p, d) {
+// a game's state for its row: the clock while it's on (after a pulsing green dot), Final once it's over. With floor (the
+// Matchup tab's), the dot says where he is: solid and pulsing while he's on the floor, a light dot while he's on his team's
+// bench, and between periods (nobody's playing); just the game's, as elsewhere, when it isn't known
+function liveStatus(p, d, floor = false) {
   const g = liveGame(p, d);
   if (!g || g.state === 'pre') return '';
-  // ESPN's "4:12 - 3rd" as "Q3 4:12" (hockey: "P3 4:12", "2:00 - OT" as "OT 2:00"); Halftime, End of 3rd and the like as they are
+  if (g.state !== 'in') return 'Final';
+  // ESPN's "4:12 - 3rd" as "Q3 4:12" (hockey: "P3 4:12", "2:00 - OT" as "OT 2:00"); "Halftime" as "Half" (the room it
+  // saves, the owner's ask); End of 3rd and the like as they are
   const clock = String(g.detail || '').replace(/^([\d:.]+) - (?:(\d)(?:st|nd|rd|th)|(\d*OT))$/, (m, t, q, ot) => `${q ? `${SPORT.game.tag}${q}` : ot} ${t}`);
-  const said = clock === 'Halftime' && matchMedia('(max-width: 640px)').matches ? 'Half' : clock; // (phones: the room it saves)
-  return g.state === 'in' ? `<span class="lv-dot" aria-hidden="true"></span>${esc(said)}` : 'Final';
+  const said = clock === 'Halftime' ? 'Half' : clock;
+  const on = floor ? onFloor(p, d) : null, out = floor && (on === false || betweenPeriods(g));
+  const tip = on ? 'On the floor now' : out ? (on === false ? 'On the bench now' : 'Between periods') : '';
+  const dot = tip ? `<span class="lv-dot${out ? ' out' : ''}" title="${tip}" aria-label="${tip}"></span>` : '<span class="lv-dot" aria-hidden="true"></span>';
+  return `${dot}${esc(said)}`;
 }

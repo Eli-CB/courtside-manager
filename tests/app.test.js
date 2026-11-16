@@ -1438,7 +1438,7 @@ test("performances: today's games from ESPN's box scores, read in the browser as
       assert.equal(rows.find(r => r.raw.id === raw.id).tot.pts, line.pts);
       const html = app.topPerformancesCard();
       assert.ok(html.includes('<option value="today" selected>'), 'it opens on today once games have started');
-      assert.ok(html.includes('lv-dot') && html.includes('Halftime') && html.includes('Q4 2:08') && html.includes('updated '), 'the clock of each game still on');
+      assert.ok(html.includes('lv-dot') && /lv-dot[^>]*><\/span>Half\b/.test(html) && !html.includes('Halftime') && html.includes('Q4 2:08') && html.includes('updated '), 'the clock of each game still on ("Half", not "Halftime")');
       // a live update keeps the rows in place; anything else sorts them again
       const order = h => [...h.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(m => m[1]);
       const before = order(html);
@@ -2155,7 +2155,7 @@ test("a player's game on the Matchup tab is in a bubble, as on Fantrax: DET 144 
     assert.equal(app.dashGame(p, d), `<span class="game-pill">${s.home === p.team ? `vs ${s.away}` : `@${s.home}`} · Final</span>`, 'scores hidden: the opponent');
     ui.hideScores = false;
     // on now: the score in one piece, then the clock (on a phone only the clock goes to a second line)
-    live.games = [{ d, home: s.home, away: s.away, hs: 88, as: 80, state: 'in', detail: '4:12 - 3rd', period: 3, start: new Date() }];
+    live.games = [{ d, home: s.home, away: s.away, hs: 88, as: 80, state: 'in', detail: '4:12 - 3rd', period: 3, clock: 252, start: new Date() }];
     assert.match(app.dashGame(p, d), new RegExp(`^<span class="game-pill"><span class="gp-part">${s.away} 80 @ ${s.home} 88</span> <span class="gp-part"><span class="lv-dot"[^>]*></span>Q3 4:12</span></span>$`));
     // before it: where and when
     live.games[0].state = 'pre';
@@ -2469,7 +2469,7 @@ test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (
   assert.ok(!app.draftAwards(d).some(x => x.label === 'Trigger Finger'));
 });
 
-test("Matchup: a player on the floor right now has a green row and 'on floor' in his game's bubble; one on his team's bench in a game on now doesn't", async () => {
+test("Matchup: the dot by a game's clock is solid while he's on the floor, light while he's on the bench or between periods", async () => {
   await app.useLeague(CATS9);
   await app.loadBoxes();
   const live = app.get('live'), was = live.games, day = '2026-10-28';
@@ -2490,14 +2490,15 @@ test("Matchup: a player on the floor right now has a green row and 'on floor' in
       assert.equal(app.onFloor(mate, day), false);
       const C = { D: { all: [day] }, dates: [day], range: 'day', today: day, hasOpp: true };
       const on = app.dashCell(C, p, false, true), off = app.dashCell(C, mate, false, true);
-      assert.match(on, /class="mu-p live"/);
-      assert.match(on, /<span class="gp-part"><span class="lv-dot"[^>]*><\/span>Q2 5:00 · <span class="on-floor" title="On the floor now">on floor<\/span><\/span>/, 'after the clock, kept with it');
-      assert.match(off, /class="mu-p"/, 'on the bench: a plain row');
-      assert.ok(!off.includes('on-floor'));
+      assert.match(on, /<span class="gp-part"><span class="lv-dot" title="On the floor now" aria-label="On the floor now"><\/span>Q2 5:00<\/span>/);
+      assert.match(off, /<span class="lv-dot out" title="On the bench now"[^>]*><\/span>Q2 5:00/);
+      assert.ok(!/class="mu-p[^"]*live/.test(on + off), 'no green rows');
+      // elsewhere (the Players tab) just the game's dot
+      assert.equal(app.liveStatus(p, day), '<span class="lv-dot" aria-hidden="true"></span>Q2 5:00');
       // between periods (the five who ended one) and after the buzzer: not known
       Object.assign(g, { detail: 'Halftime', clock: 0 });
       assert.equal(app.onFloor(p, day), null);
-      assert.ok(!app.dashCell(C, p, false, true).includes('on-floor'));
+      assert.match(app.dashCell(C, p, false, true), /<span class="lv-dot out" title="Between periods"[^>]*><\/span>Half</, 'nobody plays at the half: light, and Half');
       Object.assign(g, { detail: '12:00 - 3rd', clock: 720 });
       assert.equal(app.onFloor(p, day), true, 'the third quarter under way');
       g.state = 'post';
