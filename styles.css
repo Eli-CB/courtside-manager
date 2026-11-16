@@ -361,7 +361,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 /* an NBA (NHL, NFL) team's card: its title on one row, a bigger logo, the name (giving way when long), a line, then its record a
    touch bigger; then its tiles and its players */
 .detail-title:has(> .dt-team) { flex-wrap: nowrap; align-items: center; column-gap: 0; }
-.detail-title .dt-name.dt-team { display: flex; align-items: center; white-space: normal; line-height: 1.2; } /* (a long name on two lines beside the logo, a phone's) */
+.detail-title .dt-name.dt-team { display: flex; align-items: center; white-space: normal; line-height: 1.2; overflow: visible; overflow-wrap: anywhere; } /* (visible: the logo's negative margins put it past the box, and hidden cut its top off) */ /* (a long name on two lines beside the logo, a phone's) */
 .detail-title .dt-team .tlogo { flex: none; margin: -4px 8px -4px 0; }
 .detail-title .dt-team-rec { flex: none; margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--border); font-size: .95rem; line-height: 1.3; }
 .proj-grid.tc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
