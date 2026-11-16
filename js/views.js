@@ -63,7 +63,7 @@ function teamStrengths(tid) {
     const open = ui.csOpen.has(c.key);
     // every team on one line: this card's team the big dot, your own team orange (orange is only ever your team)
     const dot = t => `<span class="sdot${t.id === tid ? ' this' : ''}${t.id === state.fxTeam ? ' me' : ''}" style="left:${pos(t.raw[c.key]).toFixed(1)}%" title="${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}: ${fmtRaw(c, t.raw[c.key])}"></span>`;
-    return { c, z, rank, html: `<tr class="cs-row" data-action="cs-toggle" data-cat="${c.key}" aria-expanded="${open}" title="Show who helped (green) and hurt (red) most">
+    return `<tr class="cs-row" data-action="cs-toggle" data-cat="${c.key}" aria-expanded="${open}" title="Show who helped (green) and hurt (red) most">
       <td><span class="cs-chev" aria-hidden="true">▸</span><b>${c.label}</b></td>
       <td class="num"><b>${fmtRaw(c, me.raw[c.key])}</b><span class="cs-avg">avg ${fmtRaw(c, mean)}</span></td>
       <td class="num muted cs-lavg">${fmtRaw(c, mean)}</td>
@@ -73,21 +73,14 @@ function teamStrengths(tid) {
     </tr>
     <tr class="cs-detail"${open ? '' : ' hidden'}><td colspan="6"><div class="cs-who">
       ${drivers.length || drag.length ? `${drivers.length ? `<div class="cs-grp">${who(drivers)}</div>` : ''}${drag.length ? `<div class="cs-grp">${who(drag)}</div>` : ''}` : '<span class="muted small">No one stands out</span>'}
-    </div></td></tr>` };
+    </div></td></tr>`;
   });
-  const strong = rows.filter(r => r.rank <= 3).sort((a, b) => (a.rank - b.rank) || (b.z - a.z));
-  const weak = rows.filter(r => r.rank > n - 3).sort((a, b) => (b.rank - a.rank) || (a.z - b.z));
-  const label = r => `<b>${r.c.label}</b> (${ordinal(r.rank)})`;
   const mine = tid === state.fxTeam;
   return `<div><h3 class="sub" style="margin-top:0">By category <span class="muted small" title="Each team's ${N} best players by their value this season (injured reserve left out), as many as a lineup starts">top ${N}, against every team</span> ${infoBtn('strengths')}</h3>
     <div class="table-wrap"><table class="cs-table">
       <thead><tr><th>Cat</th><th class="num">Per player</th><th class="num cs-lavg">League avg</th><th class="cs-bar">Below · league avg · above</th><th class="num">Rank</th><th class="cs-strip"><span class="hide-sm">Every team (${mine ? 'you in orange' : state.fxTeam ? 'this one bigger, you in orange' : 'this one bigger'})</span><span class="show-sm-inline">All ${n} teams</span></th></tr></thead>
-      <tbody>${rows.map(r => r.html).join('')}</tbody>
-    </table></div>
-    <div class="cs-summary">
-      <div><span class="muted small">Strengths</span><br>${strong.slice(0, 4).map(label).join(', ') || '—'}</div>
-      <div><span class="muted small">Weaknesses</span><br>${weak.slice(0, 4).map(label).join(', ') || '—'}</div>
-    </div></div>`;
+      <tbody>${rows.join('')}</tbody>
+    </table></div></div>`;
 }
 
 function slotBadge(slot) {
