@@ -306,7 +306,7 @@ test("a fantasy team's name opens its card: record, opponent, roster by spot, ca
   assert.doesNotMatch(html, /slot-label|>Roster<|>Starters<|>Bench</, 'no lineup spots or group labels');
   const vals = [...html.matchAll(/<td class="num pf-v">([^<]+)<\/td>/g)].map(m => +m[1].replace('−', '-'));
   assert.equal(vals.length, app.fxTeamSide(other.id).players.length);
-  assert.deepEqual(vals, [...vals].sort((a, b) => b - a), 'every player in one list, best value first');
+  assert.deepEqual(vals, [...vals].sort((a, b) => b - a), 'every player in one list, best value over the season first');
   assert.match(html, /Compare on Plan Ahead/);
   assert.match(html, /By category <span[^>]*>top \d+, against every team</, "each team's best players, as many as it starts");
   const side = app.fxTeamSide(other.id);
@@ -2155,8 +2155,11 @@ test("a team's code opens its card in the popup: its schedule, then its players 
     const ids = [...html.matchAll(/data-action="player-detail" data-nba="(\d+)"/g)].map(m => +m[1]);
     const team = app.nbaPlayers().filter(p => p.team === tri);
     assert.equal(new Set(ids).size, team.length, 'every player on the team');
-    const vals = ids.map(id => team.find(p => p.nbaId === id)).filter(p => p.gp).map(p => p.val);
-    assert.deepEqual(vals, [...vals].sort((a, b) => b - a), 'by value a game, best first');
+    const vals = ids.map(id => app.seasonTotal(app.nbaById.get(id))).filter(t => t.gp).map(t => t.v);
+    assert.deepEqual(vals, [...vals].sort((a, b) => b - a), 'by value over the season (a game or two can\'t top it), best first');
+    const one = team.find(p => p.gp);
+    assert.ok(Math.abs(app.seasonTotal(app.nbaById.get(one.nbaId)).v - app.value({ ...app.nbaStats(app.nbaById.get(one.nbaId), 'cur'), pos: one.pos }) * one.gp) < 1e-9, 'his average game this season times his games');
+    assert.match(html, /class="pt pt-\w+ pc pc-/, 'positions in their lineup-spot colors');
     assert.match(html, new RegExp(`data-action="team-players" data-team="${tri}"`), 'the whole team on the Players tab, from the foot');
     assert.equal(Object.keys(app.SPORTS.nba.teamNames).length, 30);
   } finally { doc.querySelector = realQuery; }

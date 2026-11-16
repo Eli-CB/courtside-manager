@@ -179,9 +179,11 @@ function teamCardHtml(tid) {
   if (!L || !fxPickable().some(t => t.id === tid)) return '';
   const side = fxTeamSide(tid), me = tid === state.fxTeam;
   const football = isFootball(), week = matchDates(weekStartAt(0));
-  // each player's worth: football's projection this week, points per game, or categories won per game
-  const worth = p => (football ? (gamesIn(p, week) ? `${fmt(footballPts(p, week), 1)}` : '<span class="muted">Bye</span>') : isPoints() ? fmt(fantasyPoints(p), 1) : fmtValue(value(p)));
-  const unit = football ? 'Proj' : isPoints() ? 'FP/G' : valueLabel();
+  // each player's worth: football's projection this week, else his value over the whole season (seasonTotal: a game or
+  // two can't top the list), with its games
+  const tot = new Map(side.players.map(p => [p.id, seasonTotal(nbaById.get(p.nbaId))]));
+  const worth = p => (football ? (gamesIn(p, week) ? `${fmt(footballPts(p, week), 1)}` : '<span class="muted">Bye</span>') : tot.get(p.id).gp ? fmtTotal(tot.get(p.id).v) : '—');
+  const unit = football ? 'Proj' : totalLabel();
   // each player's season a game, as the Players tab's Per game shows it (the stats chosen under Stats used): games, minutes,
   // then the league's categories (a points league: every stat it scores); football shows its projection alone
   const cols = football ? [] : scoreCats().filter(c => !c.fp);
@@ -202,19 +204,20 @@ function teamCardHtml(tid) {
   // every player in one list, best first by what the last column shows (football: this week's projection, a bye last);
   // injured reserve greyed where it falls (the owner's ask: no starters / bench split)
   const il = new Set(side.il);
-  const order = p => (football ? (gamesIn(p, week) ? footballPts(p, week) : -1) : value(p));
-  const row = p => `<tr${il.has(p.id) ? ' class="muted-row"' : ''}>${who(p)}${football ? '' : `<td class="sc">${p.gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>`}${cols.map(c => cell(p, c)).join('')}<td class="num pf-v">${worth(p)}</td></tr>`;
+  const order = p => (football ? (gamesIn(p, week) ? footballPts(p, week) : -1) : tot.get(p.id).gp ? tot.get(p.id).v : -1e9);
+  const row = p => `<tr${il.has(p.id) ? ' class="muted-row"' : ''}>${who(p)}${football ? '' : `<td class="sc">${tot.get(p.id).gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>`}${cols.map(c => cell(p, c)).join('')}<td class="num pf-v">${worth(p)}</td></tr>`;
   const rows = sortDesc(side.players, order).map(row).join('');
-  // its best players by value, as many as the league starts (injured reserve left out), against every team's best as many,
-  // ranked in each category (as Category strengths ranks them): an end-of-bench player or a one-off start doesn't move it
+  // its best players by their season's value (seasonTotal), as many as the league starts (injured reserve left out), against
+  // every team's best as many, ranked in each category (as Category strengths ranks them): an end-of-bench player, a one-off
+  // start or a game or two doesn't move it
   let cats = '';
   if (!football && !isPoints()) {
     const n = state.slots.length;
-    const top = id => { const s = fxTeamSide(id), il = new Set(s.il); return sortDesc(s.players.filter(p => !il.has(p.id)), value).slice(0, n); };
+    const top = id => { const s = fxTeamSide(id), il = new Set(s.il); return sortDesc(s.players.filter(p => !il.has(p.id)), p => seasonTotal(nbaById.get(p.nbaId)).v).slice(0, n); };
     const raws = fxPickable().map(t => ({ id: t.id, raw: teamRaw(top(t.id)) })).filter(x => Object.keys(x.raw).length);
     const mine = raws.find(x => x.id === tid);
     if (mine && raws.length > 1) {
-      cats = `<div><h3 class="sub" style="margin-top:0">By category <span class="muted small" title="Each team's ${n} best players by value (injured reserve left out), as many as a lineup starts">top ${n}, against every team</span></h3><div class="tc-cats">${scoreCats().map(c => {
+      cats = `<div><h3 class="sub" style="margin-top:0">By category <span class="muted small" title="Each team's ${n} best players by their value this season (injured reserve left out), as many as a lineup starts">top ${n}, against every team</span></h3><div class="tc-cats">${scoreCats().map(c => {
         const better = raws.filter(x => (c.neg ? x.raw[c.key] < mine.raw[c.key] : x.raw[c.key] > mine.raw[c.key]) && Math.abs(x.raw[c.key] - mine.raw[c.key]) > 1e-9).length;
         const rank = better + 1;
         return `<span class="tc-cat ${rank <= 3 ? 'pos-good' : rank > raws.length - 3 ? 'pos-bad' : ''}"><b>${c.label}</b> ${ordinal(rank)}</span>`;
@@ -225,7 +228,7 @@ function teamCardHtml(tid) {
   return `<div class="tc-body">
     ${!me && state.fxTeam ? `<div><button type="button" class="btn sm" data-action="team-compare" data-team="${esc(tid)}">Compare on Plan Ahead</button></div>` : ''}
     ${cats}
-    <div class="perf-wrap"><table class="perf-table tc-roster"><thead><tr><th class="pf-name">Player</th>${football ? '' : '<th class="sc" title="Games played">GP</th><th class="sc" title="Minutes a game">MIN</th>'}${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}<th class="num pf-v">${unit}</th></tr></thead>
+    <div class="perf-wrap"><table class="perf-table tc-roster"><thead><tr><th class="pf-name">Player</th>${football ? '' : '<th class="sc" title="Games played">GP</th><th class="sc" title="Minutes a game">MIN</th>'}${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}<th class="num pf-v"${football ? '' : ` data-tip="${esc(seasonTotalTip())}"`}>${unit}</th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
 }
 

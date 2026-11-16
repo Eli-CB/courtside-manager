@@ -190,6 +190,20 @@ function nbaPlayers() {
   return list;
 }
 
+// A player's value over this whole season: his average game this season (a past season's while one is shown, whatever
+// Stats used says) times his games. Values add up game by game, so it's what his games added in all, and one or two big
+// games can't top a list (the NBA and fantasy team cards rank by it). { gp, v }
+function seasonTotal(raw) {
+  const s = raw && nbaStats(raw, String(state.basis).startsWith('arch:') ? state.basis : 'cur');
+  const gp = s ? Math.round(s.gp || 0) : 0;
+  return { gp, v: gp ? value({ ...s, pos: raw.pos }) * gp : 0 };
+}
+// how it's shown: fantasy points, or categories won to a tenth; the column's name and what it says
+const fmtTotal = v => (isPoints() ? fmtFp(v) : signed(v, 1));
+const totalLabel = () => (isPoints() ? 'FP' : 'Total');
+const seasonTotalTip = () => (isPoints() ? 'Fantasy points this season, in your league\'s scoring: his average game times his games'
+  : "Categories won this season: what his average game adds to winning a week's categories, times his games");
+
 function ago(iso) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (!Number.isFinite(m)) return '';
