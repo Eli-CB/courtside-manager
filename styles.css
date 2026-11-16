@@ -418,12 +418,17 @@ button.dr-award-btn:hover { text-decoration: underline; color: var(--text); }
 /* a game still on: a pulsing dot by the clock */
 /* a game on now: a pulsing green dot by its clock; light and still on the Matchup tab while he's on his team's bench (or
    between periods) */
-.lv-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 4px; vertical-align: 1px; animation: lv-ring 1.6s ease-out infinite; }
-/* (the dot stays solid and a ring pulses out of it: fading it would make it look like the light one) */
-@keyframes lv-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); } 100% { box-shadow: 0 0 0 5px transparent; } }
-.lv-dot.out { background: color-mix(in srgb, var(--good) 30%, var(--surface)); animation: none; }
+/* The dot stays solid and a ring pulses out of it (fading it would make it look like the light one). The ring grows only
+   to the edge of the dot's own 13 px box, the dot drawn in its middle, so a line that cuts off what overflows it (the
+   Players tab's, for its "…") never cuts the ring */
+.lv-dot { position: relative; display: inline-block; width: 13px; height: 13px; margin-right: 1px; vertical-align: -2px; border-radius: 50%;
+  background: radial-gradient(circle, var(--good) 3.5px, transparent 4px); }
+.lv-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--good); opacity: 0; animation: lv-ring 1.6s ease-out infinite; }
+@keyframes lv-ring { 0% { transform: scale(.5); opacity: .7; } 100% { transform: scale(1); opacity: 0; } }
+.lv-dot.out { background: radial-gradient(circle, color-mix(in srgb, var(--good) 30%, var(--surface)) 3.5px, transparent 4px); }
+.lv-dot.out::after { display: none; }
 @keyframes lv-pulse { 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .lv-dot::after { display: none; } }
 .perf-rank { flex: none; min-width: 1.5em; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .perf-owner { color: var(--muted); }
 /* past the rows shown, at the bottom of the list: Show more, kept at the left while the stats scroll sideways */
