@@ -179,7 +179,6 @@ function teamCardHtml(tid) {
   if (!L || !fxPickable().some(t => t.id === tid)) return '';
   const side = fxTeamSide(tid), me = tid === state.fxTeam;
   const football = isFootball(), week = matchDates(weekStartAt(0));
-  const byId = new Map(side.players.map(p => [p.id, p]));
   // each player's worth: football's projection this week, points per game, or categories won per game
   const worth = p => (football ? (gamesIn(p, week) ? `${fmt(footballPts(p, week), 1)}` : '<span class="muted">Bye</span>') : isPoints() ? fmt(fantasyPoints(p), 1) : fmtValue(value(p)));
   const unit = football ? 'Proj' : isPoints() ? 'FP/G' : valueLabel();
@@ -200,19 +199,22 @@ function teamCardHtml(tid) {
       <div class="bname">${p.nbaId ? playerBtn(p.nbaId, p.name) : `<span class="pname">${esc(p.name)}</span>`}${rookieBadge(raw, 'by-name')}</div>
       <div class="pmeta">${rookieBadge(raw, 'in-meta')}${[posColored(p.pos), p.team && teamBtn(p.team)].filter(Boolean).join(' · ')}</div>${inj}</div></div></td>`;
   };
-  // starters in lineup order, then the bench by value, then injured reserve (greyed): no lineup spots or labels, only a
-  // heavier line where the bench and IR start
-  const on = new Set([...side.lineup, ...side.il]);
-  const groups = [side.lineup.map(id => id && byId.get(id)).filter(Boolean), sortDesc(side.players.filter(p => !on.has(p.id)), value), side.il.map(id => byId.get(id)).filter(Boolean)];
-  const row = (p, ir, split) => `<tr class="${[ir && 'muted-row', split && 'tc-split'].filter(Boolean).join(' ')}">${who(p)}${football ? '' : `<td class="sc">${p.gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>`}${cols.map(c => cell(p, c)).join('')}<td class="num pf-v">${worth(p)}</td></tr>`;
-  const rows = groups.map((g, i) => g.map((p, j) => row(p, i === 2, i > 0 && j === 0 && groups.slice(0, i).some(x => x.length))).join('')).join('');
-  // its starters' totals in each category against every team's, ranked (as Category strengths ranks them)
+  // every player in one list, best first by what the last column shows (football: this week's projection, a bye last);
+  // injured reserve greyed where it falls (the owner's ask: no starters / bench split)
+  const il = new Set(side.il);
+  const order = p => (football ? (gamesIn(p, week) ? footballPts(p, week) : -1) : value(p));
+  const row = p => `<tr${il.has(p.id) ? ' class="muted-row"' : ''}>${who(p)}${football ? '' : `<td class="sc">${p.gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>`}${cols.map(c => cell(p, c)).join('')}<td class="num pf-v">${worth(p)}</td></tr>`;
+  const rows = sortDesc(side.players, order).map(row).join('');
+  // its best players by value, as many as the league starts (injured reserve left out), against every team's best as many,
+  // ranked in each category (as Category strengths ranks them): an end-of-bench player or a one-off start doesn't move it
   let cats = '';
   if (!football && !isPoints()) {
-    const raws = fxPickable().map(t => { const s = fxTeamSide(t.id); return { id: t.id, raw: teamRaw(s.players.filter(p => s.starters.includes(p.id))) }; }).filter(x => Object.keys(x.raw).length);
+    const n = state.slots.length;
+    const top = id => { const s = fxTeamSide(id), il = new Set(s.il); return sortDesc(s.players.filter(p => !il.has(p.id)), value).slice(0, n); };
+    const raws = fxPickable().map(t => ({ id: t.id, raw: teamRaw(top(t.id)) })).filter(x => Object.keys(x.raw).length);
     const mine = raws.find(x => x.id === tid);
     if (mine && raws.length > 1) {
-      cats = `<div><h3 class="sub" style="margin-top:0">By category <span class="muted small">starters, against every team</span></h3><div class="tc-cats">${scoreCats().map(c => {
+      cats = `<div><h3 class="sub" style="margin-top:0">By category <span class="muted small" title="Each team's ${n} best players by value (injured reserve left out), as many as a lineup starts">top ${n}, against every team</span></h3><div class="tc-cats">${scoreCats().map(c => {
         const better = raws.filter(x => (c.neg ? x.raw[c.key] < mine.raw[c.key] : x.raw[c.key] > mine.raw[c.key]) && Math.abs(x.raw[c.key] - mine.raw[c.key]) > 1e-9).length;
         const rank = better + 1;
         return `<span class="tc-cat ${rank <= 3 ? 'pos-good' : rank > raws.length - 3 ? 'pos-bad' : ''}"><b>${c.label}</b> ${ordinal(rank)}</span>`;

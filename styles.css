@@ -491,9 +491,8 @@ td.player { min-width: 170px; }
 .tc-cats { display: flex; flex-wrap: wrap; gap: 6px; }
 .tc-cat { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; white-space: nowrap; }
 .tc-roster td { vertical-align: middle; }
-/* a fantasy team's card: its parts 16 px apart; the roster's starters, bench and IR with no labels, a heavier line where the bench and IR start */
+/* a fantasy team's card: its parts 16 px apart */
 .tc-body > * + * { margin-top: 16px; }
-.tc-roster tr.tc-split td { border-top: 1px solid var(--border); }
 .tc-roster td.sc { border-bottom: 1px solid var(--border); } /* (no shaded cells here: the row's line runs across) */
 .tc-roster .pf-name .pmeta.inj { white-space: nowrap; } /* an injury's note on one line, phones too (the whole note is its tip and on his card) */
 .pmeta { color: var(--muted); font-size: .8rem; }
