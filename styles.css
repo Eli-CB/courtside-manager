@@ -408,9 +408,10 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .pm-pop.pm-list .pm-all { display: flex; gap: 16px; flex: none; }
 .pm-pop .pm-all { grid-column: 1 / -1; flex: 1 0 100%; text-align: left; padding: 4px 2px 0; }
 @media (max-width: 640px) { .pp-row .perf-filters { position: relative; } .pm { position: static; } }
-.pill.pill-menu, .pill.pill-menu.on { appearance: none; -webkit-appearance: none; width: auto; height: auto; line-height: inherit; padding-right: 24px;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: right 12px center, right 8px center; background-size: 4px 4px; background-repeat: no-repeat; }
+/* (the caret is one chevron, turning over while the box is open: two gradient halves left a line between them) */
+.pill.pill-menu { display: inline-flex; align-items: center; gap: 7px; }
+.pill.pill-menu::after { content: ""; flex: none; width: 5px; height: 5px; margin-top: -3px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); opacity: .8; }
+.pill.pill-menu[aria-expanded="true"]::after { transform: rotate(-135deg); margin-top: 3px; }
 .pill.pill-menu { background-color: var(--surface); }
 .pill.pill-menu.on { background-color: var(--text); border-color: var(--text); color: var(--surface); }
 .perf-table .pf-emo { margin-right: 2px; font-size: .9em; }
