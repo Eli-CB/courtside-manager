@@ -1132,7 +1132,7 @@ tr.me-row td { background: var(--accent-soft); }
   font-size: .95rem; font-weight: 600; letter-spacing: -.01em; color: var(--text);
 }
 .lm summary:hover, .lm[open] summary { background: var(--surface-2); }
-.lm-mark { width: 22px; height: 17px; flex: none; }
+.lm-mark { width: 24px; height: 18px; flex: none; shape-rendering: geometricPrecision; }
 .lm-mark .m-a { fill: var(--text); }
 .lm-mark .m-b { fill: #7f8a9c; }
 .lm summary::-webkit-details-marker { display: none; }

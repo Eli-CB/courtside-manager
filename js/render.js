@@ -15,7 +15,9 @@ function waiverLine() {
 // Icons drawn as lines, so they match on every device (emoji differ by phone and computer)
 const lineIcon = (d, cls = 'lm-ico') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const menuIcon = d => lineIcon(d);
-const LOGO_MARK = '<svg class="lm-mark" viewBox="6 16 52 39" aria-hidden="true"><polygon class="m-a" points="36,37 56,27 46,22 36,27 18,18 8,23"/><polygon class="m-b" points="8,31 36,45 56,35 56,43 36,53 8,39"/></svg>';
+// (the box is the mark's own, 48 × 36, drawn at exactly half size, 24 × 18 px: its corners and upright edges then fall on
+// whole screen pixels. At 22 × 17 in a looser box they fell between them and the mark looked blurred and jagged)
+const LOGO_MARK = '<svg class="lm-mark" viewBox="8 18 48 36" aria-hidden="true"><polygon class="m-a" points="36,37 56,27 46,22 36,27 18,18 8,23"/><polygon class="m-b" points="8,31 36,45 56,35 56,43 36,53 8,39"/></svg>';
 const ICON_JERSEY_D = '<path d="M8.5 3 3 6l2 4.5 2.5-1V21h9V9.5l2.5 1L21 6l-5.5-3a3.5 3.5 0 0 1-7 0z"/>';
 const ICON_GEAR_D = '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>';
 // each section's icon, for the phone's bottom bar
