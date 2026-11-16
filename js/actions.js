@@ -425,6 +425,17 @@ const actions = {
     body.scrollTop = top;
     if (wrap()) wrap().scrollTop = inner;
   },
+  // a fantasy team's card: its players by a column (again: the other way), the popup kept where it was scrolled
+  'team-sort'(el) {
+    if (teamCardOpen == null) return;
+    const body = $('#detailBody'), wrap = () => (body.querySelector ? body.querySelector('.perf-wrap') : null);
+    const top = body.scrollTop, left = (wrap() || {}).scrollLeft || 0;
+    const k = el.dataset.key;
+    nextSort(ui.teamSort, /^[0-9]+$/.test(k) ? +k : k, k === 'name' ? 1 : -1);
+    showTeamCard(teamCardOpen, true);
+    body.scrollTop = top;
+    if (wrap()) wrap().scrollLeft = left;
+  },
   'perf-sort'(el) {
     nextSort(ui.perfSort, el.dataset.key, el.dataset.key === 'name' ? 1 : -1);
     render();

@@ -125,16 +125,19 @@ function viewStandings() {
 }
 
 // ----- A fantasy team's card: its record and this week's opponent (the title), its category strengths (teamStrengths), its roster -----
-function showTeamCard(tid) {
+let teamCardOpen = null; // the fantasy team whose card is showing, for its table's sort (team-sort)
+function showTeamCard(tid, sorting) {
+  if (!sorting) ui.teamSort = { key: 'v', dir: -1 }; // (a card just opened: best first by the last column)
   const html = teamCardHtml(tid);
   if (!html) return;
+  teamCardOpen = tid;
   $('#detailBody').innerHTML = html;
   $('#detailTitle').innerHTML = teamCardTitle(tid);
   cardOpen = null;
   sportCardOpen = null;
   const d = $('#detailDialog');
   if (!d.open) d.showModal();
-  $('#detailBody').scrollTop = 0;
+  if (!sorting) $('#detailBody').scrollTop = 0;
 }
 // the card's title: the team's name, (you) on your own, then its record, standing, points for and this week's opponent
 // (as an NBA team's card)
@@ -172,18 +175,28 @@ function teamCardHtml(tid) {
       <div class="bname">${p.nbaId ? playerBtn(p.nbaId, p.name) : `<span class="pname">${esc(p.name)}</span>`}${rookieBadge(raw, 'by-name')}</div>
       <div class="pmeta">${rookieBadge(raw, 'in-meta')}${[posColored(p.pos), p.team && teamBtn(p.team)].filter(Boolean).join(' · ')}</div>${inj}</div></div></td>`;
   };
-  // every player in one list, best first by what the last column shows (football: this week's projection, a bye last);
+  // every player in one list, best first by what the last column shows (football: this week's projection, a bye last),
+  // or by the column whose heading was clicked (ui.teamSort; a player with nothing in that column always last);
   // injured reserve greyed where it falls (the owner's ask: no starters / bench split)
   const il = new Set(side.il);
   const order = p => (football ? (gamesIn(p, week) ? footballPts(p, week) : -1) : tot.get(p.id).gp ? tot.get(p.id).v : -1e9);
   const row = p => `<tr${il.has(p.id) ? ' class="muted-row"' : ''}>${who(p)}${football ? '' : `<td class="sc">${tot.get(p.id).gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>`}${cols.map(c => cell(p, c)).join('')}<td class="num pf-v">${worth(p)}</td></tr>`;
-  const rows = sortDesc(side.players, order).map(row).join('');
+  const so = ui.teamSort;
+  const pctOf = (p, c) => { const a = statVal(p, c.att); return a ? statVal(p, c.made) / a : null; };
+  const sortVal = p => (so.key === 'v' ? ((football ? gamesIn(p, week) : tot.get(p.id).gp) ? order(p) : null) : so.key === 'name' ? p.name.toLowerCase() : so.key === 'gp' ? tot.get(p.id).gp || null
+    : !p.gp || (so.key !== 'min' && !cols[so.key]) ? null : so.key === 'min' ? p.min : cols[so.key].pct ? pctOf(p, cols[so.key]) : statVal(p, cols[so.key].key));
+  const vals = new Map(side.players.map(p => [p, sortVal(p)]));
+  const rows = sortDesc(side.players, order).sort((a, b) => { // (ties and empty cells stay best first)
+    const x = vals.get(a), y = vals.get(b);
+    return x == null || y == null ? (x == null) - (y == null) : (x < y ? -1 : x > y ? 1 : 0) * so.dir;
+  }).map(row).join('');
+  const th = (key, label, cls, tip, attrs) => sortTh('team-sort', key, label, so, { cls, tip, attrs, down: so.dir < 0 });
   const cats = football ? '' : teamStrengths(tid);
   // (each part 16 px below the one before: .tc-body)
   return `<div class="tc-body">
     ${!me && state.fxTeam ? `<div><button type="button" class="btn sm" data-action="team-compare" data-team="${esc(tid)}">Compare on Plan Ahead</button></div>` : ''}
     ${cats}
-    <div class="perf-wrap"><table class="perf-table tc-roster"><thead><tr><th class="pf-name">Player</th>${football ? '' : '<th class="sc" title="Games played">GP</th><th class="sc" title="Minutes a game">MIN</th>'}${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}<th class="num pf-v"${football ? '' : ` data-tip="${esc(seasonTotalTip())}"`}>${unit}</th></tr></thead>
+    <div class="perf-wrap"><table class="perf-table tc-roster"><thead><tr>${th('name', 'Player', 'pf-name')}${football ? '' : th('gp', 'GP', 'sc', 'Games played') + th('min', 'MIN', 'sc', 'Minutes a game')}${cols.map((c, i) => th(i, c.label, 'sc')).join('')}${th('v', unit, 'num pf-v', '', football ? '' : ` data-tip="${esc(seasonTotalTip())}"`)}</tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
 }
 
