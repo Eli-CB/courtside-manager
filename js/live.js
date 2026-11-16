@@ -215,7 +215,7 @@ async function fillWeekFromEspn(L) {
     // what was built on the saved box scores alone is built again (Sleeper's points for the week too, which tell which game counted)
     changed('box', L.id);
     if (L.source === 'sleeper') changed('league', L.id);
-    if (ui.tab === 'recap' || ui.tab === 'dashboard') render();
+    if (ui.tab === 'recap' || ui.tab === 'dashboard' || ui.tab === 'week') render();
   }
   return added;
 }

@@ -364,13 +364,12 @@ function statRow(p, ctx, side, starter) {
 }
 
 function statTable(ctx, side, title, rows, { bench = false, totals = '', games = 0 } = {}) {
-  const over = ctx.dates[ctx.dates.length - 1] < todayIso(); // a finished week shown with today's lineups
   const s = ui.statSort;
   const th = (key, label, cls = '') => sortTh('stat-sort', key, label, s, { cls, down: s.dir < 0, arrow: key !== 'slot' });
   return `<table class="stab">
     <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num')}${scoreCats().map(c => th(c.key, c.label, 'sc')).join('')}</tr></thead>
     <tbody>${sortStatRows(rows, ctx).map(p => statRow(p, ctx, side, !bench)).join('') || `<tr><td colspan="11" class="muted small">${bench ? 'Nobody on the bench' : side === 'them' ? 'No opponent loaded' : 'No starters'}</td></tr>`}</tbody>
-    ${totals ? `<tfoot><tr><td class="st-name"><b>${over ? "Week (today's lineup)" : 'Projected week'}</b></td><td class="num st-g"><b>${games}</b></td>${totals}</tr></tfoot>` : ''}
+    ${totals ? `<tfoot><tr><td class="st-name"><b>Projected week</b></td><td class="num st-g"><b>${games}</b></td>${totals}</tr></tfoot>` : ''}
   </table>`;
 }
 
@@ -662,8 +661,19 @@ function viewWeek() {
   const winPct = Math.round(oBest.win * 100);
   const changed = weekly ? ctx.bestIds && ([...ctx.bestIds].some(id => !ctx.setIds.has(id)) || ctx.bestIds.size !== ctx.setIds.size) : best.games !== asSet.games;
 
-  const over = dates[dates.length - 1] < today; // a finished week: nothing left to project
-  const past = over ? pastWeekCard(start) : ''; // its real result and lineups, where the league shares them
+  // A finished week: nothing left to project, so no projections at all (the owner's rule). Its real result and lineups
+  // where the league shares them, else a line saying why not: the last night's box scores aren't in yet (ESPN's finals
+  // are asked for meanwhile, as the Recap does), no matchup that week, or a league site whose past lineups aren't read.
+  const over = dates[dates.length - 1] < today;
+  if (over && BOX) fillWeekFromEspn(fxLeague());
+  const pastNote = () => {
+    const L = fxLeague(), period = L && fxPeriodFor(start);
+    const msg = !L || !hasLineupHistory(L) ? `That week is over, so there's nothing to project.${L ? ` Past weeks' results come from each week's real lineups, which the site reads from Fantrax and Sleeper only for now.` : ''}`
+      : period && !periodOver(period) ? `That week's games are over. Its result and lineups show here once the last night's box scores are in.`
+      : `That week is over, and ${ui.viewing ? 'this team' : 'you'} had no matchup in it.`;
+    return `<div class="card"><p class="muted small" style="margin:0">${msg}</p></div>`;
+  };
+  const past = over ? pastWeekCard(start) || pastNote() : '';
   const unit = isPoints() ? 'points' : 'cats';
   const when = ui.weekShift === 1 ? 'next week' : ui.weekShift ? 'that week' : 'this week';
   const real = hasOpp ? null : fxOpponentFor(start); // (no opponent loaded: who the league says you play)
@@ -675,12 +685,12 @@ function viewWeek() {
     <div class="card scoreboard">
       <div class="sb-main">
         <div class="sb-side"><div class="sb-label">${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</div><div class="sb-score">${fmt(oBest.expected, isPoints() ? 0 : 1)}</div></div>
-        <div class="sb-vs">${over ? `${unit}<br>with today's<br>lineups` : `projected<br>${unit}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}`}</div>
+        <div class="sb-vs">projected<br>${unit}${changed ? '<span class="sb-vs-extra"><br>with suggested lineup</span>' : ''}</div>
         <div class="sb-side right"><div class="sb-label">${fxLeague() && state.fxTeam ? fxOppPicker(ctx) : esc(state.opp.name || 'Opponent')}</div>${fxLeague() && state.fxTeam ? fxOppNote(ctx) : ''}<div class="sb-score">${isPoints() ? fmt(oBest.opp, 0) : fmt(oBest.n - oBest.expected, 1)}</div></div>
       </div>
-      ${over ? '' : `<div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
-      <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>`}
-      ${changed && !over ? asSetLine() : ''}
+      <div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
+      <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>
+      ${changed ? asSetLine() : ''}
     </div>` : noOpp();
 
   // Daily-lineup leagues keep the day-by-day swap list (not one-game leagues: more games don't count there)
@@ -713,7 +723,7 @@ function viewWeek() {
     ${fxNoTeam()}
     ${past || `${scoreboard}
     ${matchupBoard(ctx)}
-    ${over ? '' : weekly ? lineupSection(ctx) : dailyCards}
-    ${over || (ctx.locked && weekly) ? '' : pickupsCard(ctx)}`}
+    ${weekly ? lineupSection(ctx) : dailyCards}
+    ${ctx.locked && weekly ? '' : pickupsCard(ctx)}`}
   </div>`;
 }

@@ -184,6 +184,19 @@ test('a finished week: its real result, and the bench swaps that would have chan
   assert.equal(app.pastWeekCard(app.weekStart()), '', 'not for a week still being played');
 });
 
+test("a finished week never shows projections, even where its lineups can't be read", async () => {
+  const L = await app.useLeague(ESPN);
+  useTeam(L.teams[0].id);
+  const ui = app.get('ui');
+  assert.ok(!app.hasLineupHistory(L));
+  ui.weekShift = -1;
+  try {
+    const page = app.viewWeek();
+    assert.ok(page.includes('That week is over') && !/projected|today's|to win the week|class="sb-score"|class="stab"/i.test(page), page.slice(-600));
+  } finally { ui.weekShift = 0; }
+  assert.ok(!app.viewWeek().includes('That week is over'), 'only a finished week');
+});
+
 test('points matchups project fantasy points with sensible odds', async () => {
   await app.useLeague(POINTS);
   const [a, b] = app.fxPickable();
