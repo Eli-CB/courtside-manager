@@ -88,6 +88,37 @@ def archive_games(season):
     print(f'{season} games: {len(rows)} lines, {os.path.getsize(path) // 1024} KB')
 
 
+SHOOTING = ['tpm', 'fgm', 'fga', 'ftm', 'fta', 'tpa']
+
+
+def fine_shooting(season):
+    """Average makes and attempts to three decimals, from the season's game lines: the site divides them for
+    FG%, FT% and 3P%, and NBA.com's one-decimal averages put half the regulars' FT% off by a point or more.
+    A player whose game lines don't add up to his games keeps NBA.com's numbers. Safe to run again."""
+    path = os.path.join(OUT, f'{season}.json')
+    with open(path, encoding='utf-8') as f:
+        data = json.load(f)
+    with open(os.path.join(OUT, f'{season}-games.json'), encoding='utf-8') as f:
+        games = json.load(f)
+    col = {k: games['keys'].index(k) + 2 for k in SHOOTING}  # (a line starts with its day and team)
+    at = {k: data['statKeys'].index(k) for k in SHOOTING}
+    changed = 0
+    for pid, p in data['players'].items():
+        rows, s = games['players'].get(pid) or [], p['s']
+        if not rows or len(rows) != s[0]:
+            continue
+        new = list(s)
+        for k in SHOOTING:
+            new[at[k]] = round(sum(r[col[k]] for r in rows) / len(rows), 3)
+        if new != s:
+            p['s'], changed = new, changed + 1
+    if changed:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, separators=(',', ':'), ensure_ascii=False)
+    print(f'{season} shooting: {changed} players sharpened')
+    return changed
+
+
 
 
 def main():
@@ -98,6 +129,7 @@ def main():
     for y in range(first, last + 1):
         archive(season_str(y))
         archive_games(season_str(y))
+        fine_shooting(season_str(y))
     print('index:', ', '.join(write_season_index(OUT)))
 
 
