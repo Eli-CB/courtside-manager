@@ -996,9 +996,6 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .cs-who { font-size: .85rem; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; margin-left: 1.3em; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .cs-detail:hover { background: none; } /* the panel isn't a row: hovering it, or its category's row, doesn't run one into the other */
 .cs-grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
-.cs-tag { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-.cs-tag.up { color: var(--good); }
-.cs-tag.down { color: var(--bad); }
 .cs-p { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; } /* photo, name and number on one line */
 .cs-name { display: inline-flex; align-items: center; font-weight: 600; color: var(--text); } /* a player: black, as everywhere; orange is for your team */
 .cs-name:hover { text-decoration: underline; }

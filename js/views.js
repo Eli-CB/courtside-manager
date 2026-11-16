@@ -72,7 +72,7 @@ function teamStrengths(tid) {
       <td class="cs-strip"><div class="strip">${teams.map(dot).join('')}</div></td>
     </tr>
     <tr class="cs-detail"${open ? '' : ' hidden'}><td colspan="6"><div class="cs-who">
-      ${drivers.length || drag.length ? `${drivers.length ? `<div class="cs-grp"><span class="cs-tag up">Helped</span>${who(drivers)}</div>` : ''}${drag.length ? `<div class="cs-grp"><span class="cs-tag down">Hurt</span>${who(drag)}</div>` : ''}` : '<span class="muted small">No one stands out</span>'}
+      ${drivers.length || drag.length ? `${drivers.length ? `<div class="cs-grp">${who(drivers)}</div>` : ''}${drag.length ? `<div class="cs-grp">${who(drag)}</div>` : ''}` : '<span class="muted small">No one stands out</span>'}
     </div></td></tr>` };
   });
   const strong = rows.filter(r => r.rank <= 3).sort((a, b) => (a.rank - b.rank) || (b.z - a.z));
