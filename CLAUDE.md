@@ -2,9 +2,9 @@
 
 Fantasy basketball (Fantrax, public ESPN leagues, Sleeper), hockey (Fantrax) and football (Sleeper, part of the site so far) weekly matchup site. Static GitHub Pages site, no build step, no backend.
 Live: https://leaguelayer.com (domain on Cloudflare, DNS only, set in the repo's Pages settings; the old
-eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/courtside-manager:
-the site was Courtside Manager until Oct 2026; the repo and every `courtside-*` storage key keep the old name so nobody's
-saved leagues are lost). Owner's league:
+eli-cb.github.io/courtside-manager/ link redirects there) (repo Eli-CB/league-layer, renamed from courtside-manager Nov 16, 2026:
+GitHub redirects the old name as long as no new repo takes it. The site was Courtside Manager until Oct 2026; every `courtside-*`
+storage key keeps the old name so nobody's saved leagues are lost). Owner's league:
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
 8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26).
 
@@ -226,7 +226,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
   Commit messages end with the Co-Authored-By line.
 - The repo must stay public on GitHub's free plan: making it private deletes the Pages site at once (leaguelayer.com answered 404, Nov 16, 2026), and
-  making it public again doesn't bring it back. To restore: `gh api -X POST repos/Eli-CB/courtside-manager/pages -f build_type=workflow`, then
+  making it public again doesn't bring it back. To restore: `gh api -X POST repos/Eli-CB/league-layer/pages -f build_type=workflow`, then
   `gh api -X PUT .../pages -f cname=leaguelayer.com`, then `gh workflow run site.yml`. Private needs GitHub Pro, and Actions minutes then count.
 - `__BUILD__` in index.html and js/core.js is replaced at deploy with the hash of the last commit that changed `index.html`, `styles.css` or `js/` (cache busting; not the latest commit: the daily data commits mustn't make visitors download the code again).
 - ESPN load (Nov 15, 2026, the owner's ask: thousands of visitors without ESPN blocking the site): every visitor's browser
