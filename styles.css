@@ -277,7 +277,7 @@ a { color: var(--accent); }
   .mu-pace { flex-direction: column; gap: 3px; align-items: flex-start; } /* phones: stacked beside the score */
   .mu-team.right .mu-pace { flex-direction: column; align-items: flex-end; }
   .mu-row { grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); }
-  .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; } /* (room either side of the middle) */
+  .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; } /* (8 px: room for a game's bubble on one line) */
   /* phones: initial and last name (K. Towns), as Plan Ahead's lineups */
   .mu-p .n-full { display: none; }
   .mu-p .n-short { display: inline; }
@@ -429,7 +429,14 @@ button.dr-award-btn:hover { text-decoration: underline; color: var(--text); }
 /* where it starts a line, flush with the lines above: the Players tab's, and a phone's bubble, which puts the clock on a
    line of its own */
 .pmeta > .lv-dot:first-child { margin-left: 0; }
-@media (max-width: 640px) { .game-pill .lv-dot { margin-left: 0; } }
+/* phones: a game's score and clock on one line where they fit (in a 375 px phone's column, even "DAL 112 @ BOS 108 ● Q4
+   11:58"): smaller, letters a touch closer and digits their own width (spaces kept whole: "Q1 37.7" squeezed reads
+   "Q137.7"), the dot 7 px; one that doesn't fit (a narrower phone) puts its clock on a line of its own, the dot flush
+   with the score above */
+@media (max-width: 640px) {
+  .game-pill { font-size: 11px; padding: 1px 4px; letter-spacing: -.02em; font-variant-numeric: proportional-nums; }
+  .game-pill .lv-dot { width: 7px; height: 7px; margin-left: 0; margin-right: 4px; vertical-align: calc(.36em - 3.5px); }
+}
 @keyframes lv-pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
 .perf-rank { flex: none; min-width: 1.5em; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
