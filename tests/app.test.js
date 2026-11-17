@@ -1036,7 +1036,8 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const mine = state.players.filter(p => p.nbaId), theirs = app.fxTeamSide(t2).players.filter(p => p.nbaId);
     ui.tradeTeam = t2; ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeSeen = null;
     ui.tradeGive.add(mine[0].id);
-    assert.ok(!app.viewTrade().includes('Trade proposal'), 'a proposal needs players on both sides');
+    const oneSide = app.viewTrade();
+    assert.ok(oneSide.includes('Trade proposal') && oneSide.includes('For your team') && !oneSide.includes('trade-share'), 'one side: what it does for you, nothing to share yet');
     theirs.slice(0, 2).forEach(p => ui.tradeGet.add(String(p.nbaId)));
     const T = app.tradeDeal();
     assert.deepEqual(JSON.parse(JSON.stringify(T)), { from: t1, to: t2, give: [String(mine[0].nbaId)], get: theirs.slice(0, 2).map(p => String(p.nbaId)) });
@@ -1069,6 +1070,19 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const to = M.rows.find(r => r.key === 'to');
     if (to.sa !== to.sb) assert.equal(to.lead, +to.sa < +to.sb ? 1 : -1, 'fewer turnovers is better');
     assert.match(card, /tp-lead pos-good/, 'your side: its better numbers green');
+    // one table: each player with his ranks this season (by value per game and added up, as his card's), each side's
+    // total (value added up, and over a waiver player, which is what's marked), then what it does for your team
+    const R = app.valueRanks(), rowOf = p => card.slice(card.indexOf(`data-nba="${p.nbaId}"`)).split('</tr>')[0];
+    for (const p of [...M.A.players, ...M.B.players]) {
+      assert.match(rowOf(p), new RegExp(`>${R.per.get(p.nbaId) ? `#${R.per.get(p.nbaId)}` : '—'}</td>[\\s\\S]*?>${R.tot.get(p.nbaId) ? `#${R.tot.get(p.nbaId)}` : '—'}</td>`), p.name);
+      assert.ok(rowOf(p).includes(`<b>${app.fmtValue(app.value(p))}</b>`));
+    }
+    assert.equal((card.match(/class="tp-tot"/g) || []).length, 2);
+    for (const S of [M.A, M.B]) assert.ok(card.includes(`<b>${app.fmtValue(S.sum)}</b><div class="tp-vol">${app.fmtValue(S.value)} over waiver</div>`), S.name);
+    const you = card.slice(card.indexOf('For your team')).split('</tr>')[0], Y = app.tradeForYou([mine[0]], theirs.slice(0, 2));
+    assert.equal(you.match(/<td class="num/g).length, L.cats.length + 1, 'a change for each category, then the net value');
+    assert.ok(you.includes(`<b>${app.fmtValue(Y.diff)}</b>`) && html.includes(Y.verdict[0]));
+    assert.ok(html.indexOf('Trade proposal') < html.indexOf(Y.verdict[0]) && html.indexOf(Y.verdict[0]) < html.indexOf('tp-table'), 'the verdict at the top of the one card');
     // FG% and FT% count volume: makes-attempts a game under each side's %, and the better side adds more makes over the
     // league average on its attempts, so a few shots at a high % lose to many at a good one
     const avg = app.get('BASE').fgPct[0], madeOver = p => (p.fgPct - avg) * p.fga;

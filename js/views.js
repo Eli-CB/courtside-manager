@@ -374,45 +374,32 @@ function viewTrade() {
 
   const give = [...ui.tradeGive].map(byId).filter(Boolean);
   const get = theirs.filter(p => ui.tradeGet.has(String(p.nbaId)));
-  let result = `<div class="empty"><strong>Pick players on both sides</strong>See how the deal changes your team's per-game production.</div>`;
-
-  if (give.length || get.length) {
-    const active = state.players.filter(p => !state.il.includes(p.id));
-    const before = totals(active);
-    const after = totals([...active.filter(p => !ui.tradeGive.has(p.id)), ...get]);
-    // over a waiver player: each player in a deal takes a roster spot someone off waivers could fill
-    const wv = waiverValue(), over = p => gameWorth(p) - wv; // (a goalie for his share of his team's games, as the waiver player's)
-    const vGive = sum(give.map(over)), vGet = sum(get.map(over));
-    const diff = vGet - vGive;
-    const tradeCats = scoreCats();
-    const rows = tradeCats.map(c => {
-      const d = after[c.key] - before[c.key];
-      const good = c.neg ? d < 0 : d > 0;
-      const shown = c.pct ? signed(d * 100, 1) + '%' : signed(d, 1);
-      return `<tr><td><b>${c.label}</b></td><td class="num">${c.pct ? fmtPct(before[c.key]) : fmt(before[c.key])}</td><td class="num">${c.pct ? fmtPct(after[c.key]) : fmt(after[c.key])}</td><td class="num ${Math.abs(d) < 1e-9 ? 'muted' : good ? 'pos-good' : 'pos-bad'}">${shown}</td></tr>`;
-    }).join('');
-    const rosterAfter = activeCount() - give.length + get.length;
-    const verdict = Math.abs(diff) < (isPoints() ? 2 : 0.04) ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'];
-    const won = tradeCats.filter(c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; }).length;
-    result = `
-      <div class="card-head"><div><div class="verdict ${verdict[1]}">${verdict[0]}</div><div class="muted small">${valueLabel()} over a waiver player ${infoBtn('tradeValue')}: give ${fmtValue(vGive)} · get ${fmtValue(vGet)} · net <b>${fmtValue(diff)}</b>${isPoints() ? '' : ` · improves ${won} of ${tradeCats.length} cats`}</div></div></div>
-      ${rosterAfter > rosterLimit() ? `<p class="alert warn small" style="margin:0 0 12px">This puts you at ${rosterAfter}/${rosterLimit()} — you'd need to drop ${rosterAfter - rosterLimit()}.</p>` : ''}
-      <div class="table-wrap"><table class="delta-table">
-        <thead><tr><th>Category</th><th class="num">Now</th><th class="num">After</th><th class="num">Change</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div>
-      <p class="small muted" style="margin:10px 0 0">Totals are per game across your active (non-IL) roster.</p>`;
-  }
-
-  // the deal for both sides, to share: under the pickers, or above them when a league mate's link brought someone else's
-  const deal = tradeDeal(), proposal = deal ? tradeCard(deal) : '';
-  return `${ui.tradeSeen ? proposal : ''}
+  // the deal in one card: both sides, how they compare, and what it does for your team. Under the lists; a league mate's
+  // shared deal above them instead
+  const card = ui.tradeSeen ? tradeCard(ui.tradeSeen)
+    : give.length || get.length ? tradeCard({ from: state.fxTeam, to: ui.tradeTeam, give: give.filter(p => p.nbaId != null).map(p => String(p.nbaId)), get: [...ui.tradeGet] }, tradeForYou(give, get))
+    : `<div class="card"><div class="empty"><strong>Pick players on both sides</strong>See how the deal changes your team's per-game production, and share it with the other team.</div></div>`;
+  return `${ui.tradeSeen ? card : ''}
   <div class="trade-grid">
     <div class="card"><div class="card-head"><h2>You give</h2><span class="muted small">${give.length} selected</span></div>${pick(state.players, ui.tradeGive, 'give', p => p.id)}</div>
     <div class="card"><div class="card-head"><h2>You get</h2>${others.length ? `<select class="trade-team" data-change="trade-team" aria-label="Team to trade with">${others.map(t => `<option value="${esc(t.id)}" ${t.id === ui.tradeTeam ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}<span class="muted small">${get.length} selected</span></div>${pick(theirs, ui.tradeGet, 'get', p => String(p.nbaId))}</div>
   </div>
-  ${ui.tradeSeen ? '' : proposal}
-  <div class="card" style="margin-top:16px">${result}</div>`;
+  ${ui.tradeSeen ? '' : card}`;
+}
+
+// What a deal does for your team: value over a waiver player each way (each player in a deal takes a roster spot someone
+// off waivers could fill; a goalie for his share of his team's games, as the waiver player's), and each category's
+// per-game total across your active (non-IR) roster now and after
+function tradeForYou(give, get) {
+  const active = state.players.filter(p => !state.il.includes(p.id)), out = new Set(give.map(p => p.id));
+  const before = totals(active), after = totals([...active.filter(p => !out.has(p.id)), ...get]);
+  const wv = waiverValue(), over = p => gameWorth(p) - wv;
+  const vGive = sum(give.map(over)), vGet = sum(get.map(over)), diff = vGet - vGive, cats = scoreCats();
+  const better = c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; };
+  return {
+    before, after, vGive, vGet, diff, won: cats.filter(better).length, n: cats.length, rosterAfter: activeCount() - give.length + get.length,
+    verdict: Math.abs(diff) < (isPoints() ? 2 : 0.04) ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'],
+  };
 }
 
 /* ---------- Trade proposal: both sides of a deal, with photos and per-game numbers, to share with the other team ---------- */
@@ -462,7 +449,8 @@ function dealLine(p) {
 }
 
 // Both sides of a deal, for the card, the picture and the text: what each team gets (players as the Players tab has
-// them, best first), its value over a waiver player (as the verdict counts it) and its per-game totals, then the
+// them, best first), their value added up (sum) and over a waiver player (value, as the verdict counts it), and their
+// per-game totals, then the
 // comparison's rows: { key, label, sa, sb (as shown), lead: 1 (the first side's is better), -1, or 0 (even, or no number),
 // and for a shooting percentage va, vb (makes-attempts a game) and ta, tb (what the volume adds, for a tip) }
 function tradeModel(T) {
@@ -470,7 +458,7 @@ function tradeModel(T) {
   const wv = waiverValue(), over = p => gameWorth(p) - wv;
   const side = (tid, ids) => {
     const players = sortDesc(ids.map(rawOf).filter(Boolean).map(raw => playerFromRaw(raw)), value);
-    return { tid, name: fxTeamName(tid) || 'Team', players, value: sum(players.map(over)), tot: totals(players) };
+    return { tid, name: fxTeamName(tid) || 'Team', players, sum: sum(players.map(value)), value: sum(players.map(over)), tot: totals(players) };
   };
   const A = side(T.from, T.get), B = side(T.to, T.give);
   const row = (key, label, a, b, show, neg) => {
@@ -494,31 +482,57 @@ function tradeModel(T) {
   return { A, B, rows };
 }
 
-// The proposal on the Trades tab: each side's players with their photos and lines, then the sides compared per game.
-// In your own deal your side's better numbers are green and the other side's red; a league mate's deal stays neutral.
-function tradeCard(T) {
-  const M = tradeModel(T), seen = ui.tradeSeen === T, me = myTeamId();
+// The proposal on the Trades tab, all in one table: for each side, what it gets (each player's photo, his ranks this
+// season by value per game and added up, his average game in the league's categories, his value), then that side's
+// total, the better side's numbers marked; last, with Y (your own deal: tradeForYou), what it does for your team, with
+// the verdict above. In your own deal your side's better numbers are green and the other side's red; a league mate's
+// deal (no Y) stays neutral. A points league's FP is the Value column.
+function tradeCard(T, Y) {
+  const M = tradeModel(T), seen = !Y, me = myTeamId(), R = valueRanks();
   const mineAt = M.A.tid === me ? 1 : M.B.tid === me ? -1 : 0;
-  const sideHtml = S => `<section class="tp-side"><h3 class="tp-who">${teamLink(S.tid)} gets</h3>
-    <ul class="tp-list">${S.players.map(p => `<li>
-      <div class="bplayer">${headshot(p, hsPx(40, 36))}<div class="bmain"><div>${playerBtn(p.nbaId, p.name)}${p.inj ? ` ${injBadge(p.inj)}` : ''}</div>
-        <div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)} · ${p.gp} GP</div></div><span class="val" title="${valueLabel()} per game">${fmtValue(value(p))}</span></div>
-      <div class="rc-stats tp-line">${dealLine(p).map(x => `<span>${x}</span>`).join(' · ')}</div></li>`).join('')}</ul></section>`;
-  const cls = (r, col) => (r.lead !== col ? '' : ` tp-lead${mineAt ? (col === mineAt ? ' pos-good' : ' pos-bad') : ''}`);
-  const cell = (r, col, v, vol, tip) => `<td class="num${cls(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol ? `<div class="tp-vol">${vol}</div>` : ''}</td>`;
-  const rows = M.rows.map(r => `<tr${r.key === 'value' ? ' class="tp-val"' : ''}><td><b>${r.label}</b>${r.key === 'value' ? ` ${infoBtn('tradeValue')}<div class="muted small">over a waiver player</div>` : ''}</td>
-    ${cell(r, 1, r.sa, r.va, r.ta)}${cell(r, -1, r.sb, r.vb, r.tb)}</tr>`).join('');
-  const shots = M.rows.some(r => r.va || r.vb);
+  const sides = [[M.A, 1], [M.B, -1]].filter(([S]) => S.players.length), both = sides.length === 2;
+  const cats = dealCats().filter(c => !c.fp), rowOf = new Map(M.rows.map(r => [r.key, r])), ncol = 6 + cats.length;
+  const mark = (r, col) => (both && r && r.lead === col ? ` tp-lead${mineAt ? (col === mineAt ? ' pos-good' : ' pos-bad') : ''}` : '');
+  const vol = v => (v ? `<div class="tp-vol">${v}</div>` : '');
+  // a player: who, his ranks, games, his average game, his value
+  const gameCell = (p, c) => {
+    if (isHockey() && SPORT.goalieCats.includes(c.key) !== isGoalie(p)) return '<td class="num"></td>'; // (a skater has no saves)
+    const m = c.pct && statVal(p, c.made), a = c.pct && statVal(p, c.att);
+    if (c.pct && !c.rate) return `<td class="num">${a ? fmtPct(m / a) : '—'}${a ? vol(dealVol(m, a)) : ''}</td>`;
+    return `<td class="num">${dealShow(c, c.pct ? (a ? pctOf(p, c) : null) : statOf(p, c))}</td>`;
+  };
+  const rank = (n, tip) => `<td class="num tp-rank" title="${esc(tip)}">${n ? `#${n}` : '—'}</td>`;
+  const playerRow = p => `<tr><td class="tp-pl"><div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain"><div class="bname">${playerBtn(p.nbaId, p.name)}${p.inj ? ` ${injBadge(p.inj)}` : ''}</div>
+      <div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)}</div></div></div></td>
+    ${rank(R.per.get(p.nbaId), R.per.get(p.nbaId) ? `${p.name}: #${R.per.get(p.nbaId)} of ${R.perN} by ${valueLabel().toLowerCase()} per game this season` : `Ranked with ${R.minGp}+ games this season`)}
+    ${rank(R.tot.get(p.nbaId), `${p.name}: #${R.tot.get(p.nbaId) || '—'} of ${R.totN} by ${valueLabel().toLowerCase()} added up this season`)}
+    <td class="num">${p.gp}</td><td class="num">${fmt(p.min || 0, 1)}</td>${cats.map(c => gameCell(p, c)).join('')}<td class="num tp-v"><b>${fmtValue(value(p))}</b></td></tr>`;
+  // a side's total: each category added up (a percentage from its makes and attempts), its value added up and over a
+  // waiver player for each roster spot (what's marked)
+  const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl">Total</td><td></td><td></td><td></td><td></td>
+    ${cats.map(c => { const r = rowOf.get(c.key), [v, vl, tip] = col === 1 ? [r.sa, r.va, r.ta] : [r.sb, r.vb, r.tb]; return `<td class="num${mark(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol(vl)}</td>`; }).join('')}
+    <td class="num tp-v${mark(M.rows[0], col)}" title="${esc(`${valueLabel()} added up; ${fmtValue(S.value)} over a waiver player for each roster spot, which is what's compared`)}"><b>${fmtValue(S.sum)}</b>${vol(`${fmtValue(S.value)} over waiver`)}</td></tr>`;
+  const sideRows = ([S, col]) => `<tr class="tp-grp"><th colspan="${ncol}" scope="rowgroup"><span class="tp-grp-name">${teamLink(S.tid)} gets</span></th></tr>${S.players.map(playerRow).join('')}${totalRow(S, col)}`;
+  // your own deal: what it does to your active roster's per-game totals (now and after on hover), and the net value
+  const change = (c, d) => (c.rate ? signed(d, 2) : c.pct ? `${signed(d * 100, 1)}%` : signed(d, 1));
+  const zero = shown => !+String(shown).replace(/[^\d.]/g, ''); // (a change that rounds to nothing is gray, not green)
+  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b><div class="muted small">change per game</div></td><td></td><td></td><td></td><td></td>
+    ${cats.map(c => { const b = Y.before[c.key], a = Y.after[c.key], d = a - b, shown = change(c, d); return `<td class="num ${zero(shown) ? 'muted' : (c.neg ? d < 0 : d > 0) ? 'pos-good' : 'pos-bad'}" title="${c.label}: ${dealShow(c, b)} now, ${dealShow(c, a)} after">${shown}</td>`; }).join('')}
+    <td class="num tp-v ${zero(fmtValue(Y.diff)) ? 'muted' : Y.diff > 0 ? 'pos-good' : 'pos-bad'}" title="Net ${valueLabel().toLowerCase()} over a waiver player"><b>${fmtValue(Y.diff)}</b></td></tr>` : '';
+  const shots = cats.some(c => c.pct && !c.rate), spanH = (label, n, tip = '') => `<th class="tp-span" colspan="${n}"${tip ? ` title="${esc(tip)}"` : ''}>${label}</th>`;
   return `<div class="card tp">
-    <div class="card-head"><h2>Trade proposal</h2><div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}<button type="button" class="btn sm primary" data-action="trade-share">Share</button></div></div>
+    <div class="card-head"><div class="tp-head"><h2>Trade proposal</h2>${Y ? `<span class="verdict ${Y.verdict[1]}">${Y.verdict[0]}</span>` : ''}</div>
+      <div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}${both ? '<button type="button" class="btn sm primary" data-action="trade-share">Share</button>' : ''}</div></div>
     ${seen ? `<p class="muted small tp-note">A trade a league mate shared, between ${teamLink(M.A.tid)} and ${teamLink(M.B.tid)}.</p>` : ''}
-    <div class="tp-sides">${sideHtml(M.A)}${sideHtml(M.B)}</div>
-    <h3 class="sub tp-sub">Per game, side by side</h3>
-    <div class="table-wrap"><table class="tp-cmp">
-      <thead><tr><th></th><th class="num">${esc(M.A.name)} gets</th><th class="num">${esc(M.B.name)} gets</th></tr></thead>
-      <tbody>${rows}</tbody>
+    <p class="muted small tp-sum">${valueLabel()} over a waiver player ${infoBtn('tradeValue')}: ${Y ? `give ${fmtValue(Y.vGive)} · get ${fmtValue(Y.vGet)} · net <b>${fmtValue(Y.diff)}</b>${isPoints() ? '' : ` · improves ${Y.won} of ${Y.n} cats`}`
+      : `${esc(M.A.name)} gets ${fmtValue(M.A.value)} · ${esc(M.B.name)} gets ${fmtValue(M.B.value)}`}</p>
+    ${Y && Y.rosterAfter > rosterLimit() ? `<p class="alert warn small tp-warn">This puts you at ${Y.rosterAfter}/${rosterLimit()}: you'd need to drop ${Y.rosterAfter - rosterLimit()}.</p>` : ''}
+    <div class="tp-wrap"><table class="tp-table">
+      <thead><tr><th class="tp-pl" rowspan="2">Player</th>${spanH('Rank', 2, `This season, among every ${SPORT.name} player`)}<th class="num" rowspan="2">GP</th>${spanH('Per game', 1 + cats.length)}<th class="num tp-v" rowspan="2">${valueLabel()}</th></tr>
+        <tr><th class="num" title="By ${valueLabel().toLowerCase()} per game (players with ${R.minGp}+ games)">Per G</th><th class="num" title="By ${valueLabel().toLowerCase()} added up this season">Total</th><th class="num">MIN</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}</tr></thead>
+      <tbody>${sides.map(sideRows).join('')}${youRow}</tbody>
     </table></div>
-    <p class="small muted tp-foot">Each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}</p>
+    <p class="small muted tp-foot">Ranks: this season, among every ${SPORT.name} player. Numbers: each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}${Y ? ' For your team: your active roster\'s per-game totals, after the trade against now.' : ''}</p>
   </div>`;
 }
 // what a percentage row says about volume (the card's and the picture's)
@@ -538,13 +552,13 @@ function tradeShare(L, T) {
   };
 }
 
-// The picture: each side in a card (what it gets: photos, positions, each player's average game), a swap mark between
-// them, then the comparison with each row's better number picked out, and what Value means
+// The picture: each side in a card (what it gets: photos, positions, ranks, each player's average game), a swap mark
+// between them, then the comparison with each row's better number picked out, and what Value means
 async function tradeCanvas(L, M) {
   const n = M.A.players.length + M.B.players.length;
   const K = await sharePad(Math.max(5000, 1400 + n * 300 + M.rows.length * 64)), { C, W, inner, ctx, font, text, round, photo } = K;
   let y = K.top({ kicker: 'TRADE PROPOSAL', title: L.name, sub: `${fmtDay(todayIso())} · per game, ${basisLabel().toLowerCase()}` });
-  const d = 104, x0 = C.pad + 32, right = W - C.pad - 32, tx = x0 + d + 28;
+  const d = 104, x0 = C.pad + 32, right = W - C.pad - 32, tx = x0 + d + 28, R = valueRanks();
   let swapY = 0;
   for (const S of [M.A, M.B]) {
     // measured first: each player's stats wrap to the width beside his photo
@@ -564,9 +578,12 @@ async function tradeCanvas(L, M) {
       font(30, 800); const pv = fmtValue(value(p)), pvW = ctx.measureText(pv).width;
       text(pv, right, ty + 6, C.text, 'right');
       font(38, 800); text(fitText(ctx, p.name, right - tx - pvW - 20), tx, ty);
-      // his team, his positions in their colors (as on the site: slotInk), games, and an injury in red
+      // his team, his positions in their colors (as on the site: slotInk), games, his ranks this season (by value per
+      // game and added up, as the card's), and an injury in red
+      const per = R.per.get(p.nbaId), tot = R.tot.get(p.nbaId);
       const runs = [[`${p.team || 'FA'} · `, C.muted], ...p.pos.flatMap((x, j) => [...(j ? [[',', C.muted]] : []), [x, slotInk(x) || C.muted, 700]]),
-        [` · ${p.gp} GP`, C.muted], ...(p.inj ? [[` · ${p.status.toUpperCase()}`, '#f87171']] : [])];
+        [` · ${p.gp} GP`, C.muted], ...(per ? [[` · #${per} per game`, '#d5d9e0', 700]] : []), ...(tot ? [[` · #${tot} total`, '#d5d9e0', 700]] : []),
+        ...(p.inj ? [[` · ${p.status.toUpperCase()}`, '#f87171']] : [])];
       let rx = tx;
       for (const [t, color, weight] of runs) { font(26, weight || 400); text(t, rx, ty + 48, color); rx += ctx.measureText(t).width; }
       font(27); r.stats.forEach((l, j) => text(l, tx, ty + 88 + j * 37, '#d5d9e0'));
