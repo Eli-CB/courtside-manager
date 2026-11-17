@@ -785,6 +785,19 @@ async function onDay(iso, fn) {
   try { return await fn(); } finally { app.Date = RealDate; }
 }
 
+// The saved box scores as they are now, and a function that puts them back (for a test that adds ESPN's finals to them)
+function saveBox() {
+  const BOX = app.get('BOX');
+  const keep = { finals: [...BOX.finals], scores: new Map(BOX.scores), byPlayer: new Map([...BOX.byPlayer].map(([id, g]) => [id, [...g]])) };
+  return () => {
+    BOX.finals.clear(); keep.finals.forEach(x => BOX.finals.add(x));
+    BOX.scores.clear(); keep.scores.forEach((v, k) => BOX.scores.set(k, v));
+    BOX.byPlayer.clear(); keep.byPlayer.forEach((v, k) => BOX.byPlayer.set(k, v));
+    BOX.day.clear(); for (const [id, games] of BOX.byPlayer) BOX.day.set(id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }])));
+    delete app.get('gameLogs').cur;
+  };
+}
+
 test('performances: today, the last game day before it, this period once it has two game days, and the last period all week', async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
@@ -1690,6 +1703,8 @@ test('live box scores: one game ESPN fails on is asked for again, the others sti
   const realGet = app.getJson;
   const sm = JSON.parse(readFixture('espn/live/summary-401909882.json'));
   await app.useLeague(CATS9);
+  await app.loadBoxes();
+  const restore = saveBox(); // (a finished game goes in with the saved box scores)
   app.getJson = async url => { if (url.includes('event=bad')) throw new Error('ESPN 500'); return sm; };
   try {
     const failed = await app.readBoxes([{ id: 'bad', d: '2026-10-28', state: 'post' }, { id: 'good', d: '2026-10-28', state: 'post' }]);
@@ -1697,7 +1712,7 @@ test('live box scores: one game ESPN fails on is asked for again, the others sti
     assert.ok(live.lines.get('2026-10-28').size > 5, "the game that answered is read");
     assert.ok(live.done.has('good') && !live.done.has('bad'), 'the failed one is tried again next time');
     await assert.rejects(app.readBoxes([{ id: 'bad', d: '2026-10-28', state: 'post' }]), /ESPN 500/, 'all of them failing is an error');
-  } finally { app.getJson = realGet; live.lines.clear(); live.done.clear(); }
+  } finally { app.getJson = realGet; live.lines.clear(); live.done.clear(); restore(); }
 });
 
 test('weekly recap: every final of a finished week, the standouts, and a message to share', async () => {
@@ -2069,6 +2084,45 @@ test("the morning: ESPN's scoreboard still on last night's games, today's tip-of
     app.get('liveFeed').off = keep.off;
     delete keep.off;
     Object.assign(live, keep);
+  }
+});
+
+test("a game ESPN has over goes in with the saved box scores that night: Plan Ahead's schedule fills its dot", async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const live = app.get('live'), BOX = app.get('BOX'), d = '2026-10-28';
+  const keepLive = { games: live.games, day: live.day, lines: live.lines, done: live.done, read: live.read, at: live.at, tried: live.tried, error: live.error };
+  const restore = saveBox();
+  // the saved evening, IND at PHI over
+  const sb = JSON.parse(readFixture('espn/live/scoreboard.json'));
+  sb.events.find(e => e.id === '401909884').status.type.state = 'post';
+  const realFetch = app.fetch;
+  app.fetch = url => (String(url).endsWith('/scoreboard') ? Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(sb) }) : realFetch(url));
+  try {
+    Object.assign(live, { games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, tried: 0, error: '' });
+    app.ui.tab = 'week'; app.ui.weekShift = 0;
+    app.get('gameLogs').cur = {};
+    await onDay(d, () => app.pollLive());
+    assert.equal(live.error, '');
+    assert.ok(BOX.finals.has(`${d} PHI`) && BOX.finals.has(`${d} IND`), 'the final is saved');
+    assert.ok(!BOX.finals.has(`${d} ATL`), 'a game still on is not');
+    assert.ok(!('cur' in app.get('gameLogs')), 'what was built on the saved box scores is built again');
+    const [id, line] = [...app.liveLines(d)].find(([pid]) => app.nbaById.get(pid) && app.nbaById.get(pid).team === 'PHI');
+    const p = { ...app.nbaById.get(id), nbaId: id };
+    assert.equal(app.actualLine(p, d).pts, line.pts);
+    const dots = await onDay(d, () => app.dayDots(p, { dates: [d] }, true));
+    assert.ok(/class="done/.test(dots), dots);
+    // the next update doesn't read it, or save it, again
+    const n = BOX.byPlayer.get(id).length;
+    live.at = 0; live.tried = 0;
+    await onDay(d, () => app.pollLive());
+    assert.equal(BOX.byPlayer.get(id).length, n);
+  } finally {
+    app.fetch = realFetch;
+    clearTimeout(live.timer); live.timer = null;
+    Object.assign(live, keepLive);
+    app.ui.tab = 'dashboard';
+    restore();
   }
 });
 

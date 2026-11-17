@@ -144,19 +144,26 @@ const liveWanted = () => !document.hidden && (weekTabLive() || (ui.tab === 'dash
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error.
 // With the live feed (feed: liveFeedGet's answer), a game's box score comes from it when it has one under LIVE_FEED_OLD
 // old (a finished game's once it was read after the buzzer), no request; one it lacks, or has too old (few people
-// watching: the Worker builds it rarely, a few box scores at a time), is asked of ESPN, if due (boxDue), as without it
+// watching: the Worker builds it rarely, a few box scores at a time), is asked of ESPN, if due (boxDue), as without it.
+// A finished basketball game goes in with the saved box scores at once (addBoxGame), as the job's copy would, so Plan
+// Ahead's schedule and projection and every other tab count it that night, not once the daily job has run (GitHub starts
+// that job hours late: 14:54-18:12 UTC, Nov 11-16, 2026). Hockey's ESPN lines lack stats leagues count: those wait for the job.
 async function readBoxes(games, feed, pooled = false) {
+  let added = 0;
   const res = await Promise.allSettled(games.map(async g => {
     const fb = feed && feed.boxes && feed.boxes[g.id];
     const use = fb && feed.at - fb.at < LIVE_FEED_OLD && (g.state !== 'post' || fb.final);
     if (!use && feed && !boxDue(g)) return;
-    const sm = use ? fb.box : await espnSite(`summary?event=${g.id}`, 3, pooled), lines = espnLines(sm); // (pooled: finished days')
+    const sm = use ? fb.box : await espnSite(`summary?event=${g.id}`, 3, pooled), teamOf = new Map(), lines = espnLines(sm, teamOf); // (pooled: finished days')
     live.floor.set(g.id, espnFloor(sm)); // (who's on the floor: the Matchup tab's)
     if (!live.lines.has(g.d)) live.lines.set(g.d, new Map());
     for (const [id, line] of lines) live.lines.get(g.d).set(id, line);
     live.read.set(g.id, { sc: liveScore(g), at: Date.now() });
-    if (g.state === 'post') live.done.add(g.id);
+    if (g.state !== 'post') return;
+    live.done.add(g.id);
+    if (BOX && !isHockey() && !isFootball() && lines.size && !savedFinal(g)) { addBoxGame(g, lines, teamOf); added++; }
   }));
+  if (added) boxAdded();
   dropPlayedInjuries(); // someone listed questionable who's played tonight
   const failed = res.filter(r => r.status === 'rejected');
   if (failed.length && failed.length === res.length) throw failed[0].reason;
@@ -212,12 +219,17 @@ async function fillWeekFromEspn(L) {
     noteLiveOk(FINALS);
   } catch (e) { feedFails[FINALS] = (feedFails[FINALS] || 0) + 1; /* ESPN didn't answer: the saved box scores will have them by morning */ } finally { boxFill.busy = false; }
   if (added) {
-    // what was built on the saved box scores alone is built again (Sleeper's points for the week too, which tell which game counted)
-    changed('box', L.id);
-    if (L.source === 'sleeper') changed('league', L.id);
+    boxAdded();
     if (ui.tab === 'recap' || ui.tab === 'dashboard' || ui.tab === 'week') render();
   }
   return added;
+}
+// ESPN's finals went in with the saved box scores: what was built on those alone is built again (Sleeper's points for the
+// week too, which tell which game counted)
+function boxAdded() {
+  const L = fxLeague();
+  changed('box'); // (every league's: the box scores are everyone's)
+  if (L && L.source === 'sleeper') changed('league', L.id);
 }
 
 // ----- The injury report, through the day -----

@@ -92,7 +92,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   - A week is over (`periodOver`) at its end or once its last game day's box scores are all in (that day included): Fantrax ends a weekly
     period Monday evening when the next locks, a day after its last games. Recap, awards, past-week cards use it. So the Recap shows the
     night a week ends, not after the daily job, ESPN's finals of the week's unsaved days go into `BOX` (`fillWeekFromEspn`, live.js;
-    from the Recap tab, once a minute at most; basketball only: ESPN's hockey lines lack stats).
+    from the Recap tab, once a minute at most; basketball only: ESPN's hockey lines lack stats). Every basketball final the live update
+    reads goes into `BOX` the same way (`readBoxes` -> `addBoxGame`, `boxAdded`), so Plan Ahead's dots and projection count a night as it ends.
   - recap: Recap tab: a finished week across the league (Player/Game of the week, Worst week (worst per game, 2+ G), Worst game, Street clothes (most games missed while starting), with full lines in the league's cats,
     bench regret, best all-play week (categories only); points leagues add Carried (biggest share of a team's points, 20%+), Tough luck / Lucky win (best losing / worst winning score, on the wrong side of the middle) and Nail-biter (closest final under 5% of the winner, not a game already told as luck); hockey Goalie of the week and Hat trick, football Defense of the week; then every final, the week's top team 👑 and bottom 💩 marked, in the picture too (`X.rank`, `recapMark`/`recapMarkTip`: most/fewest points in points leagues, best/worst all-play record in category leagues; a tie marks each)) from `benchSwaps` on the shared `pastWeeksOf` data; Share (`shareWith`/`sharePopup`/`shareText` in recap.js, also the Draft Retrospective's: `recapShare`, `draftShare`; the picture `shareCanvas`) opens a popup with the
     recap as a picture (`recapCanvas`: 1080 px PNG on a canvas, headshots from the sheet `IMG.sheet`; Share image / Copy image / Save
@@ -125,7 +126,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     league stays loaded for the demo), `clearLeaguePlayers()` drops its rosters/positions from the players, the tabs are
     Players and Trends (`TABS_BROWSE`; Trends there: one All players list by value instead of Rostered/Waivers; `browseNote` heads both; the owner's ask), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
     any league ends it. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
-- `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
+- `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter; GitHub actually starts it hours late,
+  14:54-18:12 UTC on Nov 11-16, 2026, so the page must not wait on it for last night's games) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 - NFL (Sleeper leagues only; stages 1-3 of 5 done: data; Standings, Dashboard scores, Recap, Awards, past weeks; then projections on Matchups, Roster and
