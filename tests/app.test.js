@@ -1069,14 +1069,21 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const to = M.rows.find(r => r.key === 'to');
     if (to.sa !== to.sb) assert.equal(to.lead, +to.sa < +to.sb ? 1 : -1, 'fewer turnovers is better');
     assert.match(card, /tp-lead pos-good/, 'your side: its better numbers green');
-    // one table: each player with his ranks this season (by value per game and added up, as his card's), each side's
-    // total (value added up, and over a waiver player, which is what's marked), then what it does for your team
-    const R = app.valueRanks(), rowOf = p => card.slice(card.indexOf(`data-nba="${p.nbaId}"`)).split('</tr>')[0];
+    // one table: each player with his games and games missed this season, each side's total (value added up, and over a
+    // waiver player, which is what's marked), then what it does for your team. No ranks (the owner's ask)
+    const rowOf = p => card.slice(card.indexOf(`data-nba="${p.nbaId}"`)).split('</tr>')[0];
+    const asOf = app.isoDay(new Date(app.get('NBA').updated));
     for (const p of [...M.A.players, ...M.B.players]) {
-      assert.match(rowOf(p), new RegExp(`>${R.per.get(p.nbaId) ? `#${R.per.get(p.nbaId)}` : '—'}</td>[\\s\\S]*?>${R.tot.get(p.nbaId) ? `#${R.tot.get(p.nbaId)}` : '—'}</td>`), p.name);
+      const gp = Math.round(app.statObj(app.nbaById.get(p.nbaId).cur).gp), missed = Math.max(0, app.get('NBA').teams[p.team].dates.filter(d => d < asOf).length - gp);
+      assert.equal(app.gamesMissed(p), missed, p.name);
+      assert.ok(rowOf(p).includes(`<td class="num">${gp}</td><td class="num${missed ? '' : ' muted'}">${missed}</td>`), p.name);
       assert.ok(rowOf(p).includes(`<b>${app.fmtValue(app.value(p))}</b>`));
     }
-    assert.equal((card.match(/class="tp-tot"/g) || []).length, 2);
+    assert.ok(!/>(Rank|Season)</.test(card.slice(card.indexOf('<thead>'), card.indexOf('</thead>'))) && !/>#\d+</.test(card), 'no ranks');
+    // a side getting two players has a total row under them; one getting one player doesn't repeat his line: his row is its total
+    assert.equal((card.match(/class="tp-tot"/g) || []).length, 1);
+    assert.equal((card.match(/class="tp-one"/g) || []).length, 1);
+    assert.ok(rowOf(M.B.players[0]).includes(`<div class="tp-vol">${app.fmtValue(M.B.value)} over waiver</div>`), 'the lone player carries his side\'s value over waiver');
     for (const S of [M.A, M.B]) assert.ok(card.includes(`<b>${app.fmtValue(S.sum)}</b><div class="tp-vol">${app.fmtValue(S.value)} over waiver</div>`), S.name);
     const you = card.slice(card.indexOf('For your team')).split('</tr>')[0], Y = app.tradeForYou([mine[0]], theirs.slice(0, 2));
     assert.equal(you.match(/<td class="num/g).length, L.cats.length + 2, 'the net playoff games, a change for each category, then the net value');
@@ -1091,7 +1098,7 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     assert.equal((head.match(/<tr>/g) || []).length, 1, 'one header row');
     assert.ok(!/>(Player|Per game|Total)</.test(head) && !card.includes('>Total<') && !card.includes('change per game'));
     assert.ok(!/class="[^"]*\b(tp-sum|tp-foot)\b/.test(card) && !card.includes('give +') && !card.includes('Ranks: this season'), 'no value line, no notes under the table');
-    for (const said of ['Rank</b> and <b>Season', 'Playoff G', 'FG% and FT% count volume', 'over a waiver player', 'For your team', "Draft picks</b> aren't in the numbers"]) assert.ok(infoText.includes(said), said);
+    for (const said of ['GP</b> and <b>Missed', 'Playoff G', 'FG% and FT% count volume', 'over a waiver player', 'For your team', "Draft picks</b> aren't in the numbers"]) assert.ok(infoText.includes(said), said);
     // playoff games: each player's NBA team's games in the league's playoff periods (from L.playoffPeriod to the last),
     // each side's added up and the side with more marked, and your net
     const P = app.playoffDays(), poDays = L.periods.filter(q => q.n >= L.playoffPeriod).flatMap(q => app.periodDates(q));
@@ -1100,7 +1107,7 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const teamGames = p => app.get('NBA').teams[p.team].dates.filter(d => poDays.includes(d)).length;
     for (const p of [...M.A.players, ...M.B.players]) {
       assert.equal(app.playoffGames(p, P), teamGames(p), p.name);
-      assert.ok(rowOf(p).includes(`<td class="num tp-po">${teamGames(p)}</td>`), p.name);
+      assert.match(rowOf(p), new RegExp(`<td class="num tp-po[^"]*">${teamGames(p)}</td>`), p.name);
     }
     const poOf = S => S.players.reduce((t, p) => t + teamGames(p), 0), po = M.rows.find(r => r.key === 'po');
     assert.deepEqual([po.sa, po.sb], [String(poOf(M.A)), String(poOf(M.B))]);

@@ -361,6 +361,16 @@ function playoffGames(p, P = playoffDays()) {
 }
 // games as a count: whole when they are (a goalie's expected starts keep their tenth)
 const fmtGames = n => (n == null ? '—' : Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : fmt(n, 1));
+// A player's games this season, whatever Stats used is (the data's own count)
+function seasonGp(p) { const raw = p && p.nbaId != null ? nbaById.get(p.nbaId) : null, s = raw && statObj(raw.cur); return s ? Math.round(s.gp || 0) : 0; }
+// The games his NBA team has played this season without him (injured, resting, out of the rotation, or not on it yet): its
+// schedule's days before the data's own day (its stats count games through the night before the daily job), less his.
+// None for a goalie (a healthy backup sits most games) or a player without a team.
+function gamesMissed(p) {
+  if (!NBA || !p || !p.team || isGoalie(p)) return null;
+  const asOf = NBA.updated ? isoDay(new Date(NBA.updated)) : todayIso();
+  return Math.max(0, [...(teamDates.get(p.team) || [])].filter(d => d < asOf).length - seasonGp(p));
+}
 // A matchup period whose games are all played: its end has passed, or every game of its last game day is in the
 // saved box scores (the daily job's, or ESPN's finals put in with them that night: fillWeekFromEspn). Fantrax ends a
 // weekly period when the next one locks (Monday evening), though its last games were the night before. p: a league period ({ start, endAt }) or a weekly roster period ({ start, end }).

@@ -514,62 +514,68 @@ function tradeModel(T) {
 // The playoffs in words, for tips and notes: "weeks 19–23 (Mar 1 – Apr 11)"
 const playoffWeeks = P => `week${P.ps.length > 1 ? `s ${P.ps[0].n}–${P.ps[P.ps.length - 1].n}` : ` ${P.ps[0].n}`} (${fmtMonthDay(P.from)} – ${fmtMonthDay(P.to)})`;
 
-// The proposal on the Trades tab, all in one table: for each side, what it gets (each player's photo, his ranks this
-// season by value per game and added up, his average game in the league's categories, his value), then that side's
-// total, the better side's numbers marked; last, with Y (your own deal: tradeForYou), what it does for your team, with
-// the value line above. In your own deal your side's better numbers are green and the other side's red; a league mate's
-// deal (no Y) stays neutral. A points league's FP is the Value column.
+// The proposal on the Trades tab, all in one table: for each side, what it gets (each player's photo, his games and games
+// missed this season, his average game in the league's categories, his value), then that side's total with the better
+// side's numbers marked (a side getting one player: his row is its total, not a copy of it under him); last, with Y (your
+// own deal: tradeForYou), what it does for your team. In your own deal your side's better numbers are green and the other
+// side's red; a league mate's deal (no Y) stays neutral. A points league's FP is the Value column. What it all means is
+// in the title's (i) (INFO.trade): the table carries no notes.
 function tradeCard(T, Y) {
-  const M = tradeModel(T), seen = !Y, me = myTeamId(), R = valueRanks(), P = M.P;
+  const M = tradeModel(T), seen = !Y, me = myTeamId(), P = M.P;
   const mineAt = M.A.tid === me ? 1 : M.B.tid === me ? -1 : 0;
   // the sides with something in the deal (Share once both have); totals compared only when both have players
   const sides = [[M.A, 1], [M.B, -1]].filter(([S]) => S.players.length || S.picks.length), shareable = sides.length === 2;
   const both = !!(M.A.players.length && M.B.players.length);
-  const cats = dealCats().filter(c => !c.fp), rowOf = new Map(M.rows.map(r => [r.key, r])), ncol = 6 + cats.length + (P ? 1 : 0);
+  const cats = dealCats().filter(c => !c.fp), rowOf = new Map(M.rows.map(r => [r.key, r])), ncol = 5 + cats.length + (P ? 1 : 0);
   // the playoffs' column (a league with playoffs to come): his games in them, each side's added up, your net
   const poTip = P ? `Games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}${isOneGame() ? ': the playoff weeks he plays in, as one game a week counts' : isHockey() ? ': a goalie\'s expected starts' : ''}` : '';
-  const poCell = (v, cls = '', b = false) => (P ? `<td class="num tp-po${cls}">${b ? `<b>${v}</b>` : v}</td>` : '');
+  const poCell = (v, cls = '') => (P ? `<td class="num tp-po${cls}">${v}</td>` : '');
   const mark = (r, col) => (both && r && r.lead === col ? ` tp-lead${mineAt ? (col === mineAt ? ' pos-good' : ' pos-bad') : ''}` : '');
   const vol = v => (v ? `<div class="tp-vol">${v}</div>` : '');
-  // a player: who, his ranks, games, his average game, his value
+  const skip = (p, c) => isHockey() && SPORT.goalieCats.includes(c.key) !== isGoalie(p); // (a skater has no saves)
+  // a category's cell: a player's average game, or a side's total (marked when it's the better side's)
   const gameCell = (p, c) => {
-    if (isHockey() && SPORT.goalieCats.includes(c.key) !== isGoalie(p)) return '<td class="num"></td>'; // (a skater has no saves)
+    if (skip(p, c)) return '<td class="num"></td>';
     const m = c.pct && statVal(p, c.made), a = c.pct && statVal(p, c.att);
     if (c.pct && !c.rate) return `<td class="num">${a ? fmtPct(m / a) : '—'}${a ? vol(dealVol(m, a)) : ''}</td>`;
     return `<td class="num">${dealShow(c, c.pct ? (a ? pctOf(p, c) : null) : statOf(p, c))}</td>`;
   };
-  const rank = (n, tip) => `<td class="num tp-rank" title="${esc(tip)}">${n ? `#${n}` : '—'}</td>`;
-  const playerRow = p => `<tr><td class="tp-pl"><div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain"><div class="bname">${playerBtn(p.nbaId, p.name)}${p.inj ? ` ${injBadge(p.inj)}` : ''}</div>
-      <div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)}</div></div></div></td>
-    ${rank(R.per.get(p.nbaId), R.per.get(p.nbaId) ? `${p.name}: #${R.per.get(p.nbaId)} of ${R.perN} by ${valueLabel().toLowerCase()} per game this season` : `Ranked with ${R.minGp}+ games this season`)}
-    ${rank(R.tot.get(p.nbaId), `${p.name}: #${R.tot.get(p.nbaId) || '—'} of ${R.totN} by ${valueLabel().toLowerCase()} added up this season`)}
-    <td class="num">${p.gp}</td>${poCell(fmtGames(playoffGames(p, P)))}<td class="num">${fmt(p.min || 0, 1)}</td>${cats.map(c => gameCell(p, c)).join('')}<td class="num tp-v"><b>${fmtValue(value(p))}</b></td></tr>`;
-  // a side's total: its playoff games and each category added up (a percentage from its makes and attempts), its value
-  // added up and over a waiver player for each roster spot (what's marked)
-  const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl"></td><td></td><td></td><td></td>${poCell(fmtGames(S.po), mark(rowOf.get('po'), col))}<td></td>
-    ${cats.map(c => { const r = rowOf.get(c.key), [v, vl, tip] = col === 1 ? [r.sa, r.va, r.ta] : [r.sb, r.vb, r.tb]; return `<td class="num${mark(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol(vl)}</td>`; }).join('')}
-    <td class="num tp-v${mark(M.rows[0], col)}" title="${esc(`${valueLabel()} added up; ${fmtValue(S.value)} over a waiver player for each roster spot, which is what's compared`)}"><b>${fmtValue(S.sum)}</b>${vol(`${fmtValue(S.value)} over waiver`)}</td></tr>`;
+  const totalCell = (c, col) => { const r = rowOf.get(c.key), [v, vl, tip] = col === 1 ? [r.sa, r.va, r.ta] : [r.sb, r.vb, r.tb]; return `<td class="num${mark(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol(vl)}</td>`; };
+  // a side's value: added up, its value over a waiver player for each roster spot under it (what's compared)
+  const valueCell = (S, col, shown) => `<td class="num tp-v${mark(M.rows[0], col)}" title="${esc(`${valueLabel()} ${S.players.length > 1 ? 'added up' : 'per game'}; ${fmtValue(S.value)} over a waiver player for each roster spot, which is what's compared`)}"><b>${shown}</b>${vol(`${fmtValue(S.value)} over waiver`)}</td>`;
+  const who = p => `<td class="tp-pl"><div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain"><div class="bname">${playerBtn(p.nbaId, p.name)}${p.inj ? ` ${injBadge(p.inj)}` : ''}</div>
+      <div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)}</div></div></div></td>`;
+  const games = p => { const n = gamesMissed(p); return `<td class="num">${seasonGp(p)}</td><td class="num${n ? '' : ' muted'}">${n == null ? '' : n}</td>`; };
+  // a player; one alone on his side is its total too (S, col): its marks and its value over waiver on his row
+  const playerRow = (p, S, col) => (S ? `<tr class="tp-one">${who(p)}${games(p)}${poCell(fmtGames(S.po), mark(rowOf.get('po'), col))}<td class="num">${fmt(p.min || 0, 1)}</td>
+      ${cats.map(c => (skip(p, c) ? '<td class="num"></td>' : totalCell(c, col))).join('')}${valueCell(S, col, fmtValue(value(p)))}</tr>`
+    : `<tr>${who(p)}${games(p)}${poCell(fmtGames(playoffGames(p, P)))}<td class="num">${fmt(p.min || 0, 1)}</td>${cats.map(c => gameCell(p, c)).join('')}<td class="num tp-v"><b>${fmtValue(value(p))}</b></td></tr>`);
+  // a side's total (two players or more): its playoff games and each category added up (a percentage from its makes and attempts), its value
+  const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl"></td><td></td><td></td>${poCell(fmtGames(S.po), mark(rowOf.get('po'), col))}<td></td>
+    ${cats.map(c => totalCell(c, col)).join('')}${valueCell(S, col, fmtValue(S.sum))}</tr>`;
   // a draft pick: its round in the photo's place, the year and round, and whose it was when that's not the sender's own (no
   // numbers: next season's order isn't known)
   const pickRow = (p, sender) => `<tr class="tp-pick"><td class="tp-pl"><div class="bplayer"><span class="hs hs-none pk-ico" style="width:${hsPx(36, 32)}px;height:${hsPx(36, 32)}px" aria-hidden="true">R${p.round}</span>
       <div class="bmain"><div class="bname"><b>${pickName(p)}</b></div><div class="pmeta">Draft pick${p.from !== sender ? ` · originally ${teamLink(p.from)}` : ''}</div></div></div></td><td colspan="${ncol - 1}"></td></tr>`;
-  const sideRows = ([S, col]) => `<tr class="tp-grp"><th colspan="${ncol}" scope="rowgroup"><span class="tp-grp-name">${teamLink(S.tid)} gets</span></th></tr>${S.players.map(playerRow).join('')}${S.picks.map(p => pickRow(p, S.sender)).join('')}${S.players.length ? totalRow(S, col) : ''}`;
+  const sideRows = ([S, col]) => {
+    const one = S.players.length === 1;
+    return `<tr class="tp-grp"><th colspan="${ncol}" scope="rowgroup"><span class="tp-grp-name">${teamLink(S.tid)} gets</span></th></tr>`
+      + `${S.players.map(p => playerRow(p, one ? S : null, col)).join('')}${S.picks.map(p => pickRow(p, S.sender)).join('')}${S.players.length > 1 ? totalRow(S, col) : ''}`;
+  };
   // your own deal: what it does to your active roster's per-game totals (now and after on hover), and the net value
   const change = (c, d) => (c.rate ? signed(d, 2) : c.pct ? `${signed(d * 100, 1)}%` : signed(d, 1));
   const zero = shown => !+String(shown).replace(/[^\d.]/g, ''); // (a change that rounds to nothing is gray, not green)
   const poNet = P && M.A.po - M.B.po, poShown = P ? `${poNet > 0.05 ? '+' : poNet < -0.05 ? '−' : ''}${fmtGames(Math.abs(poNet))}` : '';
-  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b></td><td></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
+  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
     ${cats.map(c => { const b = Y.before[c.key], a = Y.after[c.key], d = a - b, shown = change(c, d); return `<td class="num ${zero(shown) ? 'muted' : (c.neg ? d < 0 : d > 0) ? 'pos-good' : 'pos-bad'}" title="${c.label}: ${dealShow(c, b)} now, ${dealShow(c, a)} after">${shown}</td>`; }).join('')}
     <td class="num tp-v ${zero(fmtValue(Y.diff)) ? 'muted' : Y.diff > 0 ? 'pos-good' : 'pos-bad'}" title="Net ${valueLabel().toLowerCase()} over a waiver player"><b>${fmtValue(Y.diff)}</b></td></tr>` : '';
-  // the ranks' and playoff column's tips (what they mean in full is in the card's (i): INFO.trade)
-  const rankTip = `This season, among every ${SPORT.name} player with ${R.minGp}+ games, by ${valueLabel().toLowerCase()} per game`, seasonTip = `This season, among every ${SPORT.name} player, by ${valueLabel().toLowerCase()} added up`;
   return `<div class="card tp">
     <div class="card-head"><div class="tp-head"><h2>Trade proposal ${infoBtn('trade')}</h2></div>
       <div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}${shareable ? '<button type="button" class="btn sm primary" data-action="trade-share">Share</button>' : ''}</div></div>
     ${seen ? `<p class="muted small tp-note">A trade a league mate shared, between ${teamLink(M.A.tid)} and ${teamLink(M.B.tid)}.</p>` : ''}
     ${Y && Y.rosterAfter > rosterLimit() ? `<p class="alert warn small tp-warn">This puts you at ${Y.rosterAfter}/${rosterLimit()}: you'd need to drop ${Y.rosterAfter - rosterLimit()}.</p>` : ''}
     <div class="tp-wrap"><table class="tp-table">
-      <thead><tr><th class="tp-pl"></th><th class="num" title="${esc(rankTip)}">Rank</th><th class="num" title="${esc(seasonTip)}">Season</th><th class="num" title="Games played this season">GP</th>${P ? `<th class="num tp-po" title="${esc(poTip)}">Playoff G</th>` : ''}<th class="num">MIN</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}<th class="num tp-v">${valueLabel()}</th></tr></thead>
+      <thead><tr><th class="tp-pl"></th><th class="num" title="Games played this season">GP</th><th class="num" title="Games his team has played this season without him${isHockey() ? ' (none for a goalie: a healthy backup sits most games)' : ''}">Missed</th>${P ? `<th class="num tp-po" title="${esc(poTip)}">Playoff G</th>` : ''}<th class="num">MIN</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}<th class="num tp-v">${valueLabel()}</th></tr></thead>
       <tbody>${sides.map(sideRows).join('')}${youRow}</tbody>
     </table></div>
   </div>`;
@@ -592,14 +598,14 @@ function tradeShare(L, T) {
   };
 }
 
-// The picture: each side in a card (what it gets: photos, positions, ranks, each player's average game; its draft picks),
+// The picture: each side in a card (what it gets: photos, positions, games missed, each player's average game; its draft picks),
 // a swap mark between them, then (both sides with players) the comparison with each row's better number picked out, and
 // what its numbers mean
 async function tradeCanvas(L, M) {
   const n = M.A.players.length + M.B.players.length, picks = M.A.picks.length + M.B.picks.length, compare = !!(M.A.players.length && M.B.players.length);
   const K = await sharePad(Math.max(5000, 1400 + n * 300 + picks * 130 + M.rows.length * 64)), { C, W, inner, ctx, font, text, round, photo } = K;
   let y = K.top({ kicker: 'TRADE PROPOSAL', title: L.name, sub: `${fmtDay(todayIso())} · per game, ${basisLabel().toLowerCase()}` });
-  const d = 104, x0 = C.pad + 32, right = W - C.pad - 32, tx = x0 + d + 28, R = valueRanks();
+  const d = 104, x0 = C.pad + 32, right = W - C.pad - 32, tx = x0 + d + 28;
   let swapY = 0;
   for (const S of [M.A, M.B]) {
     // measured first: each player's stats wrap to the width beside his photo; a pick is one or two lines
@@ -629,11 +635,11 @@ async function tradeCanvas(L, M) {
       font(30, 800); const pv = fmtValue(value(p)), pvW = ctx.measureText(pv).width;
       text(pv, right, ty + 6, C.text, 'right');
       font(38, 800); text(fitText(ctx, p.name, right - tx - pvW - 20), tx, ty);
-      // his team, his positions in their colors (as on the site: slotInk), games, his ranks this season (by value per
-      // game and added up, as the card's), and an injury in red
-      const per = R.per.get(p.nbaId), tot = R.tot.get(p.nbaId);
+      // his team, his positions in their colors (as on the site: slotInk), his games and games missed this season, and an
+      // injury in red
+      const missed = gamesMissed(p);
       const runs = [[`${p.team || 'FA'} · `, C.muted], ...p.pos.flatMap((x, j) => [...(j ? [[',', C.muted]] : []), [x, slotInk(x) || C.muted, 700]]),
-        [` · ${p.gp} GP`, C.muted], ...(per ? [[` · #${per} per game`, '#d5d9e0', 700]] : []), ...(tot ? [[` · #${tot} total`, '#d5d9e0', 700]] : []),
+        [` · ${seasonGp(p)} GP`, C.muted], ...(missed ? [[` · ${missed} missed`, '#d5d9e0', 700]] : []),
         ...(p.inj ? [[` · ${p.status.toUpperCase()}`, '#f87171']] : [])];
       let rx = tx;
       for (const [t, color, weight] of runs) { font(26, weight || 400); text(t, rx, ty + 48, color); rx += ctx.measureText(t).width; }

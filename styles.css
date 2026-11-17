@@ -688,8 +688,8 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .tp-table tr.tp-grp th { padding: 14px 0 6px; font-size: .9rem; font-weight: 600; color: var(--text); white-space: normal; overflow-wrap: anywhere; }
 .tp-table tbody tr.tp-grp:hover, .tp-table tbody tr.tp-tot:hover { background: none; }
 .tp-table tr.tp-tot td { font-weight: 600; border-bottom: 2px solid var(--border); }
+.tp-table tr.tp-one td { border-bottom: 2px solid var(--border); } /* a side's lone player: his row is its total */
 .tp-table tr.tp-you td { padding-top: 10px; font-weight: 600; }
-.tp-table td.tp-rank { color: var(--muted); }
 .tp-table td.tp-v { padding-left: 12px; }
 .tp-table td.tp-lead { font-weight: 800; background: var(--surface-2); } /* the better side's total */
 .tp-table td.tp-lead.pos-good { background: var(--good-soft); }
