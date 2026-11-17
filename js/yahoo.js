@@ -13,10 +13,10 @@
 const yahoo = { proxy: 'https://api.leaguelayer.com', leagues: null, beta: true };
 const YAHOO_KEY = 'league-layer-yahoo'; // { access, refresh, until } on this device
 const YAHOO_BETA_KEY = 'league-layer-yahoo-beta';
-try { if (/[?&]yahoo=1(&|$)/.test(location.search)) localStorage.setItem(YAHOO_BETA_KEY, '1'); } catch (e) { /* blocked */ }
-const yahooTokens = () => { try { return JSON.parse(localStorage.getItem(YAHOO_KEY)); } catch (e) { return null; } };
-const yahooSave = t => { try { if (t) localStorage.setItem(YAHOO_KEY, JSON.stringify(t)); else localStorage.removeItem(YAHOO_KEY); } catch (e) { /* blocked */ } };
-const yahooOn = () => !!yahoo.proxy && (!yahoo.beta || yahooSignedIn() || (() => { try { return localStorage.getItem(YAHOO_BETA_KEY) === '1'; } catch (e) { return false; } })());
+if (/[?&]yahoo=1(&|$)/.test(location.search)) store.set(YAHOO_BETA_KEY, '1');
+const yahooTokens = () => store.json(YAHOO_KEY);
+const yahooSave = t => (t ? store.setJson(YAHOO_KEY, t) : store.drop(YAHOO_KEY));
+const yahooOn = () => !!yahoo.proxy && (!yahoo.beta || yahooSignedIn() || store.get(YAHOO_BETA_KEY) === '1');
 const yahooSignedIn = () => !!(yahooTokens() || {}).refresh;
 
 // Back from Yahoo's sign-in: the helper puts the tokens after #yahoo= (never sent to any server); keep them and

@@ -28,7 +28,7 @@ const recapOn = el => { const L = fxLeague(); return { L, X: L && recaps.get(`${
 const actions = {
   'nav-toggle'(el) { setNav(!document.body.classList.contains('nav-open')); },
   'clear-saved'() {
-    for (const k of SAVED_LEAGUE_DATA) { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } }
+    for (const k of SAVED_LEAGUE_DATA) store.drop(k);
     fxShared = null; espnShared = null;
     changed('league'); // every league's weekly rosters are asked for again
     gearMenu();
@@ -36,20 +36,19 @@ const actions = {
   },
   'toggle-theme'() {
     const root = document.documentElement;
-    const cur = root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    const next = cur === 'dark' ? 'light' : 'dark';
+    const next = themeNow() === 'dark' ? 'light' : 'dark';
     root.dataset.theme = next;
-    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+    store.set(THEME_KEY, next);
     gearMenu();
   },
   'toggle-scores'() {
     ui.hideScores = !ui.hideScores;
-    try { localStorage.setItem(SCORES_KEY, ui.hideScores ? '1' : '0'); } catch (e) { /* ignore */ }
+    store.set(SCORES_KEY, ui.hideScores ? '1' : '0');
     render();
   },
   'toggle-clock'() {
     ui.clock24 = !ui.clock24;
-    try { localStorage.setItem(CLOCK_KEY, ui.clock24 ? '24' : '12'); } catch (e) { /* ignore */ }
+    store.set(CLOCK_KEY, ui.clock24 ? '24' : '12');
     render();
   },
   'fx-load-opp'() {
@@ -226,7 +225,7 @@ const actions = {
   },
   'draft-mode'(el) {
     ui.draftMode = el.dataset.mode;
-    try { localStorage.setItem(DRAFT_MODE_KEY, ui.draftMode); } catch (e) { /* ignore */ }
+    store.set(DRAFT_MODE_KEY, ui.draftMode);
     render();
   },
   'land-team'(el) {
@@ -328,7 +327,7 @@ const actions = {
   },
   'board-mode'(el) {
     ui.boardMode = el.dataset.mode;
-    try { localStorage.setItem(BOARD_KEY, ui.boardMode); } catch (e) { /* ignore */ }
+    store.set(BOARD_KEY, ui.boardMode);
     render();
   },
   // the next or previous week in the picker (a two-week matchup is one step)
@@ -749,10 +748,8 @@ window.addEventListener('hashchange', route);
 window.addEventListener('resize', fitPerfLists);
 
 (function init() {
-  try {
-    const t = localStorage.getItem(THEME_KEY);
-    if (t) document.documentElement.dataset.theme = t;
-  } catch (e) { /* ignore */ }
+  const t = store.get(THEME_KEY);
+  if (t) document.documentElement.dataset.theme = t;
   state = load();
   validateLineup();
   const back = yahooFromAddress(); // just signed in with Yahoo: show the leagues to pick from

@@ -34,12 +34,12 @@ const espnSeason = () => (NBA && NBA.season ? +NBA.season.slice(0, 4) + 1 : new 
 const ESPN_SHARED_KEY = 'league-layer-espn-shared-v1';
 let espnShared = null;
 async function espnPlayerList(season) {
-  if (!espnShared) { try { espnShared = JSON.parse(localStorage.getItem(ESPN_SHARED_KEY)); } catch (e) { espnShared = null; } }
+  if (!espnShared) espnShared = store.json(ESPN_SHARED_KEY);
   if (espnShared && espnShared.season === season && Date.now() - espnShared.at < 864e5) return espnShared.p;
   const list = await espnGet(`${season}/players?scoringPeriodId=0&view=players_wl`, { filterActive: { value: true } });
   const p = Object.fromEntries((Array.isArray(list) ? list : []).map(x => [x.id, [x.fullName || '', ESPN_TEAMS[x.proTeamId] || '', x.eligibleSlots || []]]));
   espnShared = { at: Date.now(), season, p };
-  try { localStorage.setItem(ESPN_SHARED_KEY, JSON.stringify(espnShared)); } catch (e) { /* storage full or blocked */ }
+  store.setJson(ESPN_SHARED_KEY, espnShared);
   return p;
 }
 
@@ -280,8 +280,7 @@ async function fetchEspnDays(L, period) {
   const num = d => Math.round((Date.parse(d) - Date.parse(dayOne)) / 864e5) + 1;
   const dates = [];
   for (let d = period.start.slice(0, 10); d <= period.end.slice(0, 10) && d <= today; d = addDays(d, 1)) dates.push(d);
-  let all = {};
-  try { all = JSON.parse(localStorage.getItem(ESPN_DAYS_KEY)) || {}; } catch (e) { all = {}; }
+  const all = store.json(ESPN_DAYS_KEY, {});
   const have = { ...((all[L.id] && all[L.id].s === season && all[L.id].d) || {}) };
   const path = `${espnLeaguePath(season, L.id)}view=mRoster&scoringPeriodId=`;
   try {
@@ -294,7 +293,7 @@ async function fetchEspnDays(L, period) {
     const last = num(today);
     all[L.id] = { at: Date.now(), s: season, d: Object.fromEntries(Object.entries(have).filter(([n]) => +n < last)) };
     const kept = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, ESPN_DAYS_KEEP);
-    try { localStorage.setItem(ESPN_DAYS_KEY, JSON.stringify(Object.fromEntries(kept))); } catch (e) { /* storage full or blocked */ }
+    store.setJson(ESPN_DAYS_KEY, Object.fromEntries(kept));
   }
   const days = dates.filter(d => have[num(d)]).map(d => {
     const owner = new Map();

@@ -88,6 +88,20 @@ function dropKept(memo, id) {
   }
 }
 
+// This device's storage (localStorage), which a browser can block or find full: then a read gives the fallback and a
+// write or removal does nothing, so the setting or copy lasts this visit only. json: a missing or unreadable value is the fallback
+const store = {
+  get: (key, fallback = null) => { try { return localStorage.getItem(key) ?? fallback; } catch (e) { return fallback; } },
+  json: (key, fallback = null) => { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch (e) { return fallback; } },
+  set: (key, text) => { try { localStorage.setItem(key, text); } catch (e) { /* blocked or full */ } },
+  setJson: (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* blocked or full */ } },
+  drop: key => { try { localStorage.removeItem(key); } catch (e) { /* blocked */ } },
+};
+// A phone's screen: as wide as styles.css lays out for phones (max-width: 640px)
+const isPhone = () => typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+// The site's look now: 'dark' or 'light', as picked in the settings menu, else as the device is set
+const themeNow = () => document.documentElement.dataset.theme || (typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
 /* =========================================================
    State + persistence
    ========================================================= */
@@ -95,10 +109,11 @@ let state = null;
 const ui = { weekShift: 0, weekChosen: false, tab: 'dashboard', recapWeek: null, afterPick: null, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, totSort: { key: null, dir: 1 }, csOpen: new Set(),
   dashRange: null, dashBench: false, trendDir: 'up', cardSort: { key: 'date', dir: -1 }, teamSort: { key: 'v', dir: -1 }, perfRange: null, perfPer: false, perfMore: { sig: '', n: 0 }, rollOpen: new Set(), perfQ: '', perfPos: [], perfTeam: [], perfMenu: null, perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
   perfWhose: { me: true, opp: true, other: true, fa: true }, perfOthers: [], perfSpot: 'all', perfFiltOpen: false };
-ui.hideScores = (() => { try { return localStorage.getItem(SCORES_KEY) === '1'; } catch (e) { return false; } })();
+ui.hideScores = store.get(SCORES_KEY) === '1';
 // 24-hour clock: as chosen in the settings menu, else as the device shows times
 ui.clock24 = (() => {
-  try { const c = localStorage.getItem(CLOCK_KEY); if (c) return c === '24'; } catch (e) { /* storage blocked */ }
+  const c = store.get(CLOCK_KEY);
+  if (c) return c === '24';
   try { return !/h1[12]/.test(new Intl.DateTimeFormat([], { hour: 'numeric' }).resolvedOptions().hourCycle || 'h12'); } catch (e) { return false; }
 })();
 // What was last picked on the Matchup and Players tabs' When menus (Today, Yesterday, This period...) and Plan Ahead's
@@ -107,10 +122,10 @@ ui.clock24 = (() => {
 // another league. Each pick is kept on the device with that day or week (`at`); one from an earlier day or week is
 // dropped, there and then (`dropOldPicks`, render.js; `planAheadWeek`), and the tab opens on its default again.
 // (k: 'dash' { v: ui.dashRange }, 'perf' { v: ui.perfRange, per: ui.perfPer }, 'week' { v: ui.weekShift }; no pick = forget it)
-const picks = (() => { try { const p = JSON.parse(localStorage.getItem(PICKS_KEY)); return p && typeof p === 'object' ? p : {}; } catch (e) { return {}; } })();
+const picks = (p => (typeof p === 'object' ? p : {}))(store.json(PICKS_KEY, {}));
 function savePick(k, pick) {
   if (pick) picks[k] = pick; else delete picks[k];
-  try { localStorage.setItem(PICKS_KEY, JSON.stringify(picks)); } catch (e) { /* storage blocked: this visit only */ }
+  store.setJson(PICKS_KEY, picks);
 }
 if (picks.dash && typeof picks.dash.v === 'string') ui.dashRange = picks.dash.v;
 if (picks.perf) Object.assign(ui, { perfRange: typeof picks.perf.v === 'string' ? picks.perf.v : null, perfPer: !!picks.perf.per });
@@ -118,11 +133,7 @@ if (picks.perf) Object.assign(ui, { perfRange: typeof picks.perf.v === 'string' 
 const fmtTime = (t, more) => new Date(t).toLocaleString([], { ...more, hour: ui.clock24 ? '2-digit' : 'numeric', minute: '2-digit', hourCycle: ui.clock24 ? 'h23' : 'h12' });
 
 function load() {
-  let s = null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) s = JSON.parse(raw);
-  } catch (e) { /* storage unavailable or corrupt */ }
+  const s = store.json(STORAGE_KEY); // (null when unavailable or corrupt)
   setSport(s && s.sport); // the saved league's sport: its positions and slots, and which data set loads
   return normalize(s && Array.isArray(s.players) ? s : emptyState());
 }
@@ -165,7 +176,7 @@ function normalizePlayer(p) {
 
 function save() {
   if (standIn) { reportError('a save during a stand-in draw (withState)', 'js/core.js'); return; } // it would keep the stand-in as your own team
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  store.setJson(STORAGE_KEY, state);
 }
 
 // A draw as another team, or with another week's lineups: the page's state stands in for it while fn runs and is back
@@ -443,7 +454,7 @@ function headshot(p, px = 28) {
 }
 
 // a photo's size: bigger where there's room (desktop), the phone's otherwise (the sheet's 80 px stay sharp up to 40)
-const hsPx = (desk, phone = desk) => (matchMedia('(max-width: 640px)').matches ? phone : desk);
+const hsPx = (desk, phone = desk) => (isPhone() ? phone : desk);
 
 // A player's full photo (a cutout), for the player card: NBA.com's for basketball, ESPN's (by ESPN id) for the others.
 // [1x, 2x] or null (a team defense; no ESPN id)

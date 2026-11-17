@@ -219,7 +219,7 @@ window.addEventListener('scroll', hideTip, { passive: true });
 
 // ----- Lineups board views: schedule dots, or category stats shaded by contribution -----
 const BOARD_KEY = 'league-layer-board';
-ui.boardMode = (() => { try { return localStorage.getItem(BOARD_KEY) || 'sched'; } catch (e) { return 'sched'; } })();
+ui.boardMode = store.get(BOARD_KEY) || 'sched';
 
 // Smooth shading: strength grows with the size of the contribution, so close values look alike (base: an opaque
 // background for sticky cells)
@@ -631,7 +631,7 @@ function pastWeekCard(start) {
 function weekPicker() {
   const shifts = weekShifts();
   // (phones: just the week, so the picker fits beside the heading, which already says this period or next)
-  const phone = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+  const phone = isPhone();
   const opts = shifts.map(s => {
     const p = fxLeague() && fxLeague().periods ? fxPeriodFor(weekStartAt(s)) : null;
     const playoffs = p && fxLeague().playoffPeriod && p.n >= fxLeague().playoffPeriod;
@@ -658,7 +658,7 @@ function viewWeek() {
   const staleOpp = hasOpp && state.opp.week && state.opp.week !== start;
   // the week's days (phones: Nov 9 – 15, short enough for the week picker beside it)
   const first = dates[0], last = dates[dates.length - 1];
-  const range = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches
+  const range = isPhone()
     ? `${fmtMonthDay(first)} – ${first.slice(0, 7) === last.slice(0, 7) ? +last.slice(8) : fmtMonthDay(last)}` : `${fmtDay(first)} – ${fmtDay(last)}`;
   const winPct = Math.round(oBest.win * 100);
   const changed = weekly ? ctx.bestIds && ([...ctx.bestIds].some(id => !ctx.setIds.has(id)) || ctx.bestIds.size !== ctx.setIds.size) : best.games !== asSet.games;

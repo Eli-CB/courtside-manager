@@ -3,7 +3,7 @@
 'use strict';
 
 const DRAFT_MODE_KEY = 'league-layer-draft-mode';
-ui.draftMode = (() => { try { return localStorage.getItem(DRAFT_MODE_KEY) || 'game'; } catch (e) { return 'game'; } })();
+ui.draftMode = store.get(DRAFT_MODE_KEY) || 'game';
 
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 

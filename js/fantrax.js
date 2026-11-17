@@ -264,13 +264,13 @@ const fxSharedKey = sport => (sport === 'nba' ? FX_SHARED_KEY : `${FX_SHARED_KEY
 let fxShared = null, fxSharedOther = {};
 async function fxPlayerLists(sport = 'nba') {
   let kept = sport === 'nba' ? fxShared : fxSharedOther[sport];
-  if (!kept) { try { kept = JSON.parse(localStorage.getItem(fxSharedKey(sport))); } catch (e) { kept = null; } }
+  if (!kept) kept = store.json(fxSharedKey(sport));
   if (!(kept && Date.now() - kept.at < 864e5 && kept.ids)) {
     const [all, adp] = await Promise.all([fxGet(`getPlayerIds?sport=${SPORTS[sport].fantrax}`), fxGet(`getAdp?sport=${SPORTS[sport].fantrax}`).catch(() => [])]);
     const ids = sport === 'nba' ? all : Object.fromEntries(Object.entries(all).filter(([, v]) => v.team && v.team !== '(N/A)')
       .map(([k, v]) => [k, { name: v.name, team: v.team, position: v.position }]));
     kept = { at: Date.now(), ids, adp };
-    try { localStorage.setItem(fxSharedKey(sport), JSON.stringify(kept)); } catch (e) { /* storage full or blocked */ }
+    store.setJson(fxSharedKey(sport), kept);
   }
   if (sport === 'nba') fxShared = kept; else fxSharedOther[sport] = kept;
   return kept;
@@ -506,8 +506,7 @@ function syncLeagueRules() {
 // league uses it until the daily data file is newer; any other league for 6 hours, or until ↻ Reload.
 const FX_CACHE_KEY = 'league-layer-fantrax-v2';
 const LEAGUE_FRESH_MS = 6 * 36e5;
-try { localStorage.removeItem('league-layer-fantrax-v1'); } catch (e) { /* the old one-league copy */ }
-const readLeagueCache = () => { try { return JSON.parse(localStorage.getItem(FX_CACHE_KEY)) || {}; } catch (e) { return {}; } };
+const readLeagueCache = () => store.json(FX_CACHE_KEY, {});
 function cachedLeague(id) {
   const c = readLeagueCache()[id];
   if (!c) return null;
@@ -518,7 +517,7 @@ function saveLeague(id, res) {
   const all = readLeagueCache();
   all[id] = { at: Date.now(), res: { league: res.league, fxPlayers: res.fxPlayers } };
   const keep = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, 5);
-  try { localStorage.setItem(FX_CACHE_KEY, JSON.stringify(Object.fromEntries(keep))); } catch (e) { /* storage full or blocked */ }
+  store.setJson(FX_CACHE_KEY, Object.fromEntries(keep));
 }
 // A league from this device if it's fresh enough, else from its site (force: always from its site)
 async function getLeague(id, force) {
@@ -598,7 +597,7 @@ function fxOppPicker(ctx) {
   const cur = state.opp.fxId;
   const when = ['last period', 'this period', 'next period'][ui.weekShift + 1] || 'that period';
   // (phones: the menu's too narrow for it, so the real opponent goes unmarked there)
-  const phone = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+  const phone = isPhone();
   return `<select class="ctx-team sb-opp" data-change="fx-opp" aria-label="Opponent">${cur ? '' : '<option value="">Pick a team</option>'}${fxPickable().filter(t => t.id !== leftId)
     .map(t => `<option value="${esc(t.id)}" ${t.id === cur ? 'selected' : ''}>${esc(t.name)}${opp && t.id === opp.id && !phone ? ` (${when})` : ''}</option>`).join('')}</select>`;
 }

@@ -15,9 +15,7 @@ const awardAmount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
 // Kept per league with when it was last used; only the 8 most recently used leagues and seasons stay
 const ROSTER_WEEKS_KEY = 'league-layer-roster-weeks-v2';
 const ROSTER_WEEKS_KEEP = 8;
-function readRosterWeeks() {
-  try { return JSON.parse(localStorage.getItem(ROSTER_WEEKS_KEY)) || {}; } catch (e) { return {}; }
-}
+const readRosterWeeks = () => store.json(ROSTER_WEEKS_KEY, {});
 // one load per league at a time, shared by Season totals and Awards
 const rosterWeeksLoad = {};
 keep('league', id => dropKept(rosterWeeksLoad, id));
@@ -57,7 +55,7 @@ async function fetchRosterWeeks(L) {
     const now = Date.now();
     all[L.id] = { at: now, p: Object.fromEntries(Object.entries(have).filter(([n]) => { const p = periods.find(x => String(x.n) === n); return p && fxTime(p.end) < now; })) };
     const keep = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, ROSTER_WEEKS_KEEP);
-    try { localStorage.setItem(ROSTER_WEEKS_KEY, JSON.stringify(Object.fromEntries(keep))); } catch (e) { /* storage full or blocked */ }
+    store.setJson(ROSTER_WEEKS_KEY, Object.fromEntries(keep));
   }
   const weeks = periods.filter(p => have[p.n]).map(p => {
     const owner = new Map();

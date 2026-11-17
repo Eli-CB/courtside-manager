@@ -295,7 +295,7 @@ const feedWait = (feed, base) => Math.min(base * 2 ** Math.min(feedFails[feed] |
 const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
 const ESPN_SWITCH = 2, ESPN_ROUTE_HOURS = 6, ESPN_ROUTE_KEY = 'league-layer-espn-route';
 const espnRoute = { misses: 0 };
-const espnViaWorker = () => { try { return +localStorage.getItem(ESPN_ROUTE_KEY) > Date.now(); } catch (e) { return false; } };
+const espnViaWorker = () => +store.get(ESPN_ROUTE_KEY) > Date.now();
 // pooled: a feed that's the same for everyone and changes slowly (the injury report, finished days), asked of the Worker
 // first, so ESPN gets one request where it would get one from each visitor; ESPN directly if the Worker can't answer
 async function espnSite(path, tries = 3, pooled = false) {
@@ -313,7 +313,7 @@ async function espnSite(path, tries = 3, pooled = false) {
     if (!here || !here.ok) throw e; // the visitor's own connection
     let j;
     try { j = await viaWorker(); } catch (e2) { throw e; } // the Worker can't either: ESPN itself is down, say so as before
-    try { localStorage.setItem(ESPN_ROUTE_KEY, String(Date.now() + ESPN_ROUTE_HOURS * 36e5)); } catch (x) { /* storage blocked: this visit only */ }
+    store.set(ESPN_ROUTE_KEY, String(Date.now() + ESPN_ROUTE_HOURS * 36e5));
     espnRoute.misses = 0;
     reportError(`ESPN not answering the site directly (${e.message}): its feeds come through the Worker for ${ESPN_ROUTE_HOURS} hours`, 'js/live.js');
     return j;

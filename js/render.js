@@ -238,9 +238,8 @@ function gearMenu() {
   const wasOpen = isOpen(el);
   const advOpen = isOpen(el, '.gear-adv');
   // the phone's status bar follows the site's theme, as chosen here, not only the device's
-  const colorNow = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = colorNow === 'dark' ? '#141416' : '#ffffff'; });
-  const dark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+  const dark = themeNow() === 'dark';
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = dark ? '#141416' : '#ffffff'; });
   const hasLeague = fxLeague() && !needsLanding(), league = hasLeague && !state.demo;
   // every row the same shape: icon, label (a line of small print under it), and a switch at the right where there is one
   const row = (attrs, icon, label, sub, tail = '', tag = 'button') => `<${tag} class="lm-item gear-item${tail ? ' gear-toggle' : ''}" ${tag === 'button' ? 'type="button" ' : ''}${attrs}>${icon}<span class="gear-text">${label}${sub ? `<span class="gear-sub">${sub}</span>` : ''}</span>${tail}</${tag}>`;
@@ -345,9 +344,8 @@ function render() {
 
 // Phones: the sections after a tab's first one with a heading roll up to that heading, opened by a tap (which ones are
 // open is kept for the visit: ui.rollOpen, by tab and heading). Trades keeps both sides open; award cards don't roll.
-const flatPhone = () => typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
 function rollCards() {
-  if (!flatPhone() || ui.tab === 'trade') return;
+  if (!isPhone() || ui.tab === 'trade') return;
   let first = true;
   document.querySelectorAll('#view .card').forEach(card => {
     const h = card.querySelector(':scope > .card-head > h2');
