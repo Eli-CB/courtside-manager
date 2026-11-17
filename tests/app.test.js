@@ -3724,6 +3724,44 @@ test("the Worker's ESPN route: only the site's feeds, only for its pages, kept f
   } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; }
 });
 
+test("the Worker starts the daily data job at 08:00 UTC through GitHub's API, and logs a run it can't start", async () => {
+  const worker = (await import('../worker/yahoo.js')).default;
+  const realFetch = globalThis.fetch, realTimeout = globalThis.setTimeout;
+  const asked = [], kv = new Map();
+  let answers = [];
+  globalThis.fetch = async (u, o) => { asked.push({ u: String(u), o }); const [status, body] = answers.shift(); return new Response(body ? JSON.stringify(body) : null, { status }); };
+  globalThis.setTimeout = f => realTimeout(f, 0); // (its minute between tries)
+  const env = { GITHUB_TOKEN: 'tok', ERRORS: { put: async (k, v) => { kv.set(k, JSON.parse(v)); } } };
+  const run = async e => { const waits = []; await worker.scheduled({ cron: '0 8 * * *' }, e, { waitUntil: p => waits.push(p) }); await Promise.all(waits); };
+  try {
+    answers = [[204]];
+    await run(env);
+    assert.equal(asked.length, 1);
+    assert.equal(asked[0].u, 'https://api.github.com/repos/Eli-CB/league-layer/actions/workflows/site.yml/dispatches');
+    assert.equal(asked[0].o.method, 'POST');
+    assert.deepEqual(JSON.parse(asked[0].o.body), { ref: 'main' });
+    assert.equal(asked[0].o.headers.Authorization, 'Bearer tok');
+    assert.ok(asked[0].o.headers['User-Agent'], 'GitHub refuses requests without one');
+    assert.equal(kv.size, 0, 'started: nothing logged');
+    // an expired token: asked once, and the error log says so
+    asked.length = 0;
+    answers = [[401, { message: 'Bad credentials' }]];
+    await run(env);
+    assert.equal(asked.length, 1, "asking again won't help");
+    assert.deepEqual([...kv.values()].map(r => r.msg), ['Daily data job not started: GitHub answered 401 (Bad credentials)']);
+    // GitHub down for a moment: asked again
+    asked.length = 0; kv.clear();
+    answers = [[503], [204]];
+    await run(env);
+    assert.equal(asked.length, 2);
+    assert.equal(kv.size, 0);
+    // not set up (no token): nothing asked
+    asked.length = 0;
+    await run({ ERRORS: env.ERRORS });
+    assert.equal(asked.length, 0);
+  } finally { globalThis.fetch = realFetch; globalThis.setTimeout = realTimeout; }
+});
+
 test("the Worker's live feed: today's scoreboard and box scores cut to what the page reads, built once for everyone", async () => {
   const worker = (await import('../worker/yahoo.js')).default;
   const store = new Map(), upstream = [];

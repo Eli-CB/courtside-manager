@@ -94,6 +94,40 @@ visitor-hours a day. Past that, the $5 Workers Paid plan (10 million a month; th
 thousand people watching three hours a night all season. If the free plan's CPU limit ever trips a build (an error in
 Cloudflare's dashboard for this Worker), the page just asks ESPN directly for that update.
 
+## Daily data job
+
+The site's data (box scores, players, leagues) comes from the GitHub workflow `.github/workflows/site.yml`. GitHub runs
+a workflow's own schedule late when it's busy: the job set for 08:00 UTC started between 14:54 and 18:12 UTC on Nov
+11-16, 2026, so last night's games reached the site around midday. A run asked for through GitHub's API starts at once,
+so this Worker asks for one every day at 08:00 UTC (a Cron Trigger, in `wrangler.toml`). The workflow keeps a schedule
+of its own at 09:23 UTC as the backstop; when both come, the data is just refreshed twice.
+
+One-time setup:
+
+1. **A GitHub token** that can start the workflow and nothing else: on GitHub, Settings, Developer settings, Personal
+   access tokens, **Fine-grained tokens**, Generate new token.
+   - Token name: League Layer data job
+   - Expiration: the longest offered (GitHub emails before it ends; once it has, the error log says
+     "Daily data job not started: GitHub answered 401", and the workflow's own schedule still runs)
+   - Repository access: Only select repositories, `league-layer`
+   - Permissions, Repository permissions: **Actions: Read and write** (nothing else)
+
+   Generate it and copy it.
+
+2. From this folder:
+
+   ```
+   npx wrangler secret put GITHUB_TOKEN
+   npx wrangler deploy
+   ```
+
+   (paste the token when asked). `wrangler deploy` also sets up the 08:00 UTC trigger.
+
+Check: in Cloudflare's dashboard, this Worker's Settings list the cron trigger `0 8 * * *`. The next morning, the
+repository's Actions tab shows a run of "Refresh data and publish site" started by `workflow_dispatch` a minute or two
+after 08:00 UTC. A run it couldn't start is in the error log (Error log above) as "Daily data job not started", with why.
+To renew the token: make a new one the same way, then `npx wrangler secret put GITHUB_TOKEN` again (no deploy needed).
+
 ## Checking it
 
 `https://api.leaguelayer.com/yahoo/login?return=https://leaguelayer.com/` should open Yahoo's sign-in. After

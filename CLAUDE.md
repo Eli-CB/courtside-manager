@@ -126,8 +126,10 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     league stays loaded for the demo), `clearLeaguePlayers()` drops its rosters/positions from the players, the tabs are
     Players and Trends (`TABS_BROWSE`; Trends there: one All players list by value instead of Rostered/Waivers; `browseNote` heads both; the owner's ask), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
     any league ends it. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
-- `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter; GitHub actually starts it hours late,
-  14:54-18:12 UTC on Nov 11-16, 2026, so the page must not wait on it for last night's games) builds `data/players.json` and
+- `scripts/update_data.py`: daily data job (GitHub Actions, started at 08:00 UTC = 4 a.m. ET, 3 a.m. in winter, by the Worker's Cron Trigger through
+  GitHub's API, `startDataJob` in worker/yahoo.js: GitHub ran the workflow's own schedule hours late, 14:54-18:12 UTC on Nov 11-16, 2026;
+  the workflow's 09:23 UTC schedule is the backstop. Needs the owner's `GITHUB_TOKEN` secret and deploy, worker/README.md "Daily data job".
+  The page still mustn't wait on the job for last night's games) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 - NFL (Sleeper leagues only; stages 1-3 of 5 done: data; Standings, Dashboard scores, Recap, Awards, past weeks; then projections on Matchups, Roster and

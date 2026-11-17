@@ -26,6 +26,10 @@
 // the floor: about 1 KB a game where ESPN's box score is 400), one small answer kept at the edge for LIVE_TTL seconds.
 // ESPN is asked a few times a minute per Cloudflare data center however many people are watching, and each visitor's
 // update is one request instead of one per game.
+//
+// And the daily data job's start: at 08:00 UTC (a Cron Trigger, wrangler.toml) it asks GitHub to run the site workflow
+// (.github/workflows/site.yml), whose own schedule GitHub starts hours late. GITHUB_TOKEN is a secret (README.md);
+// without it nothing happens. A run it can't start goes to the error log.
 
 const AUTH = 'https://api.login.yahoo.com/oauth2/';
 const API = 'https://fantasysports.yahooapis.com/fantasy/v2/';
@@ -113,9 +117,42 @@ async function liveBuild(league, origin, ctx) {
   return { v: 1, at: now, scoreboard, boxes };
 }
 
+// ----- The daily data job, started on time -----
+// GitHub starts the workflow's own schedule hours late (14:54-18:12 UTC for its 08:00, Nov 11-16, 2026), so last night's
+// games reached the site around midday; a run asked for through GitHub's API starts at once. Three tries a minute apart
+// while GitHub itself fails; a bad or expired token (401) isn't tried again. The workflow keeps a schedule of its own,
+// later in the morning, in case this doesn't run.
+const DATA_JOB = 'https://api.github.com/repos/Eli-CB/league-layer/actions/workflows/site.yml/dispatches';
+const DATA_JOB_TRIES = 3, DATA_JOB_WAIT = 60e3;
+async function startDataJob(env) {
+  if (!env.GITHUB_TOKEN) return 'not set up';
+  let why = '';
+  for (let i = 0; i < DATA_JOB_TRIES; i++) {
+    if (i) await new Promise(r => setTimeout(r, DATA_JOB_WAIT));
+    try {
+      const r = await fetch(DATA_JOB, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'League Layer Worker' },
+        body: JSON.stringify({ ref: 'main' }),
+      });
+      if (r.status === 204) return 'started';
+      const m = await r.json().catch(() => ({}));
+      why = `GitHub answered ${r.status}${m.message ? ` (${m.message})` : ''}`;
+      if (r.status < 500 && r.status !== 429) break; // (the token or the address: asking again won't help)
+    } catch (e) { why = e.message || 'GitHub not reached'; }
+  }
+  if (env.ERRORS) await putError(env, { t: Date.now(), country: '', msg: `Daily data job not started: ${why}`, at: 'worker/yahoo.js startDataJob', stack: '', page: '', source: 'worker', league: '', build: '', ua: '' });
+  return why;
+}
+
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-// One error from the site, cut to size; the newest sort first in KV's listing (keys count down)
+// One error in the log; the newest sort first in KV's listing (keys count down)
+async function putError(env, rec) {
+  const key = `${String(1e13 - rec.t).padStart(13, '0')}-${Math.random().toString(36).slice(2, 8)}`;
+  await env.ERRORS.put(key, JSON.stringify(rec), { expirationTtl: ERROR_DAYS * 86400 });
+}
+// One error from the site, cut to size
 async function saveError(req, env, origins) {
   if (!origins.includes(req.headers.get('Origin') || '') || !env.ERRORS) return;
   const text = await req.text();
@@ -125,8 +162,7 @@ async function saveError(req, env, origins) {
   if (!e || typeof e.msg !== 'string' || !e.msg) return;
   const rec = { t: Date.now(), country: (req.cf && req.cf.country) || '' };
   for (const [k, n] of Object.entries(ERROR_FIELDS)) rec[k] = String(e[k] == null ? '' : e[k]).slice(0, n);
-  const key = `${String(1e13 - rec.t).padStart(13, '0')}-${Math.random().toString(36).slice(2, 8)}`;
-  await env.ERRORS.put(key, JSON.stringify(rec), { expirationTtl: ERROR_DAYS * 86400 });
+  await putError(env, rec);
 }
 
 // The log as a page: each distinct error once (how many times, when last, which leagues and pages), newest first
@@ -265,5 +301,10 @@ export default {
     }
 
     return json({ error: 'not found' }, 404);
+  },
+
+  // the Cron Trigger (wrangler.toml): 08:00 UTC, the daily data job
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(startDataJob(env));
   },
 };

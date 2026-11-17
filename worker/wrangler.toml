@@ -17,3 +17,8 @@ SITE_ORIGINS = "https://leaguelayer.com,http://localhost:5173"
 [[kv_namespaces]]
 binding = "ERRORS"
 id = "6237323107d847fa897250456b62c0df"
+
+# The daily data job, started on time (yahoo.js, startDataJob; README.md "Daily data job"): 08:00 UTC every day.
+# Its GitHub token is a secret:  npx wrangler secret put GITHUB_TOKEN
+[triggers]
+crons = ["0 8 * * *"]
