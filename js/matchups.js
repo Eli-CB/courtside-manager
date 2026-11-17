@@ -143,7 +143,7 @@ function catChips(ex) {
 }
 
 function swapBlock(ex, ctx, kind) {
-  const g = p => `<span class="muted small">${posColored(p.pos)} · ${SPORT.oneNumber ? `${fmt(footballPts(p, ctx.dates), 1)} proj` : `${weekGames(p, ctx.dates)} G`}</span>`;
+  const g = p => `<span class="muted small">${posTags(p.pos)} · ${SPORT.oneNumber ? `${fmt(footballPts(p, ctx.dates), 1)} proj` : `${weekGames(p, ctx.dates)} G`}</span>`;
   const net = ctx.hasOpp
     ? `<span class="swap-net ${ex.score >= 0 ? 'pos-good' : 'pos-bad'}">${isPoints() || matchupScoring() === 'most' ? `${signed(ex.dWin * 100, 1)}% win · ${goalDelta(ex.dExp)}` : `${signed(ex.dExp, 2)} cats · ${signed(ex.dWin * 100, 1)}% win`}</span>`
     : `<span class="swap-net ${ex.dGames >= 0 ? 'pos-good' : 'pos-bad'}">${SPORT.oneNumber ? goalDelta(ex.dExp) : `${signed(ex.dGames, 0)} games`}</span>`;
@@ -301,7 +301,7 @@ function boardCell(p, ctx, side, starter) {
   const tags = rowTags(p, ctx, side, starter);
   if (SPORT.oneNumber) return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, hsPx(36, 22))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>${footballMeta(p, ctx)}</div></div></td>`;
   return `<td class="bcell${starter ? '' : ' bench'}"><div class="bplayer">${headshot(p, hsPx(36, 22))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tags ? ' ' + tags : ''}</div>
-    <div class="bmeta"><span class="bmeta-info">${posColored(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g" data-tip="${esc(gamesLeftTip(p, ctx.dates))}">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
+    <div class="bmeta"><span class="bmeta-info">${posTags(p.pos)}</span>${dayDots(p, ctx, starter)}<b class="bmeta-g" data-tip="${esc(gamesLeftTip(p, ctx.dates))}">${weekGames(p, ctx.dates)}G</b></div></div></div></td>`;
 }
 
 // ----- Per game / Week total: two sortable stat tables side by side -----
@@ -524,7 +524,7 @@ function pickupsCard(ctx) { // (ctx: the week as the page has just worked it out
       <div class="card-head"><h2>Pickup ideas</h2><span class="muted small">vs ${esc(state.opp.name || 'your opponent')} · ${fxLeague() ? 'free agents and waivers in your league' : 'if available in your league'}</span></div>
       ${ideas.length ? `<ul class="alerts">${ideas.map(x => {
         const better = SPORT.oneNumber ? [] : x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
-        return `<li class="alert">${headshot(x.p, 32)}<span class="grow">${playerBtn(x.p.nbaId, x.p.name)} <span class="muted small">${teamBtn(x.p.team)} · ${posColored(x.p.pos)} · ${isFootball() ? `${fmt(footballPts(x.p, ctx.dates), 1)} proj` : `${x.games} games`}</span><br>
+        return `<li class="alert">${headshot(x.p, 32)}<span class="grow">${playerBtn(x.p.nbaId, x.p.name)} <span class="muted small">${teamBtn(x.p.team)} · ${posTags(x.p.pos)} · ${isFootball() ? `${fmt(footballPts(x.p, ctx.dates), 1)} proj` : `${x.games} games`}</span><br>
           <span class="small">For ${esc(x.drop.name)}: <b class="pos-good">${goalDelta(x.gain)}</b>, ${Math.round(x.win * 100)}% to win${better.length ? ` · helps ${better.join(', ')}` : ''}</span></span></li>`;
       }).join('')}</ul>` : '<p class="muted small" style="margin:0">No free agent clearly improves this matchup.</p>'}
     </div>`;

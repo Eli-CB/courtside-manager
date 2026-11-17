@@ -556,7 +556,7 @@ function showSportTeamCard(tri) {
     const raw = nbaById.get(p.nbaId), { gp, v } = tot.get(p);
     return `<tr><td class="num muted">${i + 1}</td>
       <td><div class="bplayer">${headshot(p, 28)}<div class="bmain"><div class="bname">${playerBtn(p.nbaId, p.name)}${raw ? injBadge(raw.inj) : ''}</div>
-        <div class="pmeta">${posColored(p.pos)}<span class="show-sm"> · ${whose(p) || 'no team'}</span></div></div></div></td>
+        <div class="pmeta">${posTags(p.pos)}<span class="show-sm"> · ${whose(p) || 'no team'}</span></div></div></div></td>
       <td class="hide-sm">${whose(p)}</td>
       <td class="num hide-sm">${gp || '—'}</td>
       <td class="num"><b class="${gp && v < 0 && !isPoints() ? 'pos-bad' : ''}">${gp ? fmtTotal(v) : '—'}</b></td></tr>`;
@@ -660,6 +660,6 @@ function showPlayerDetail(nbaId) {
   sportCardOpen = null;
   // his name, and who he is: team, number, positions, age, country, years in the league (his injury, if any, is the note
   // under the photo, its word first)
-  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posColored(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</span>`;
+  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</span>`;
   if (!d.open) d.showModal();
 }

@@ -478,10 +478,22 @@ function teamLogo(team, px = 16) {
   return src ? `<img class="tlogo" src="${src}" alt="${esc(team)}" title="${esc(team)}" width="${px}" height="${px}">` : esc(team || 'FA');
 }
 
-// Position labels in Fantrax's colors
-const posTags = pos => pos.map(x => `<span class="pt pt-${esc(x)}">${esc(x)}</span>`).join(',');
-// The same in their lineup-spot colors, as Fantrax shows them (the player card's title; a position without a color stays plain)
-const posColored = pos => pos.map(x => { const c = (SPORT.slotColors || {})[x]; return `<span class="pt pt-${esc(x)}${c ? ` pc pc-${c}` : ''}">${esc(x)}</span>`; }).join(',');
+// A position's or lineup spot's color, as Fantrax shows it: a pc-* class in styles.css, from the sport's slotColors ('' for
+// one without a color: hockey's C, LW, RW until seen, football's). The one place a position's color comes from.
+const slotColor = x => (SPORT.slotColors || {})[x] || '';
+// A player's positions, each in its color: the only way the site draws positions (a test holds every tab and popup to it)
+const posTags = pos => pos.map(x => { const c = slotColor(x); return `<span class="pt pt-${esc(x)}${c ? ` pc pc-${c}` : ''}">${esc(x)}</span>`; }).join(',');
+// The same color on a canvas (the share pictures, drawn dark: --pc-dark), read from styles.css so it's kept in one place
+function slotInk(x) {
+  const c = slotColor(x);
+  if (!c || typeof getComputedStyle !== 'function') return '';
+  const el = document.createElement('span');
+  el.className = `pc-${c}`;
+  document.body.appendChild(el);
+  const ink = getComputedStyle(el).getPropertyValue('--pc-dark').trim();
+  el.remove();
+  return ink;
+}
 
 // a player's name and team line, with their photo unless the list is too long for them (the Players tab)
 // A fantasy team's name that opens its card (this season's teams; names in a past season stay plain)

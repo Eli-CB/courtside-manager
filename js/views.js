@@ -83,7 +83,7 @@ function teamStrengths(tid) {
 }
 
 function slotBadge(slot) {
-  const pc = slot !== 'IL' && SPORT.slotColors && SPORT.slotColors[slot];
+  const pc = slot !== 'IL' && slotColor(slot);
   const cls = slot === 'IL' ? 'il' : `slot-${slot}${pc ? ` pc pc-${pc}` : ''}`;
   return `<span class="slot-label ${cls}">${slot === 'FLX' ? 'Flx' : slot === 'BN' ? 'Res' : slot === 'IL' ? 'IR' : slot}</span>`;
 }
@@ -172,7 +172,7 @@ function teamCardHtml(tid) {
     const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note) : ''}</div>` : '';
     return `<td class="pf-name"><div class="bplayer">${headshot(p, 34)}<div class="bmain">
       <div class="bname">${p.nbaId ? playerBtn(p.nbaId, p.name) : `<span class="pname">${esc(p.name)}</span>`}${rookieBadge(raw, 'by-name')}</div>
-      <div class="pmeta">${rookieBadge(raw, 'in-meta')}${[posColored(p.pos), p.team && teamBtn(p.team)].filter(Boolean).join(' · ')}</div>${inj}</div></div></td>`;
+      <div class="pmeta">${rookieBadge(raw, 'in-meta')}${[posTags(p.pos), p.team && teamBtn(p.team)].filter(Boolean).join(' · ')}</div>${inj}</div></div></td>`;
   };
   // every player in one list, best first by what the last column shows (football: this week's projection, a bye last),
   // or by the column whose heading was clicked (ui.teamSort; a player with nothing in that column always last);
@@ -564,9 +564,11 @@ async function tradeCanvas(L, M) {
       font(30, 800); const pv = fmtValue(value(p)), pvW = ctx.measureText(pv).width;
       text(pv, right, ty + 6, C.text, 'right');
       font(38, 800); text(fitText(ctx, p.name, right - tx - pvW - 20), tx, ty);
-      font(26); const meta = `${p.team || 'FA'} · ${p.pos.join(', ')} · ${p.gp} GP`;
-      text(meta, tx, ty + 48, C.muted);
-      if (p.inj) text(` · ${p.status.toUpperCase()}`, tx + ctx.measureText(meta).width, ty + 48, '#f87171');
+      // his team, his positions in their colors (as on the site: slotInk), games, and an injury in red
+      const runs = [[`${p.team || 'FA'} · `, C.muted], ...p.pos.flatMap((x, j) => [...(j ? [[',', C.muted]] : []), [x, slotInk(x) || C.muted, 700]]),
+        [` · ${p.gp} GP`, C.muted], ...(p.inj ? [[` · ${p.status.toUpperCase()}`, '#f87171']] : [])];
+      let rx = tx;
+      for (const [t, color, weight] of runs) { font(26, weight || 400); text(t, rx, ty + 48, color); rx += ctx.measureText(t).width; }
       font(27); r.stats.forEach((l, j) => text(l, tx, ty + 88 + j * 37, '#d5d9e0'));
       ty += r.h;
     });

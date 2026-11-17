@@ -4806,9 +4806,10 @@ async function xssPass(a, id, label) {
   return shown;
 }
 
-test("a league's own name and its teams' names are shown as text on every tab and popup, never as HTML", async () => {
+test("a league's own name and its teams' names are shown as text on every tab and popup, never as HTML; positions always in their colors", async () => {
   const runs = [['Fantrax categories', CATS9], ['Fantrax points', POINTS], ['Fantrax daily, not drafted', DAILY], ['ESPN', ESPN], ['Sleeper', SLEEPER], ['Yahoo', YAHOO], ['hockey', HOCKEY], ['football', FOOTBALL], ['ESPN football', ESPN_FOOTBALL]];
-  const problems = [];
+  const problems = [], plain = new Set();
+  let drawn = 0;
   for (const [label, id] of runs) {
     const a = loadApp();
     await a.ready();
@@ -4818,6 +4819,30 @@ test("a league's own name and its teams' names are shown as text on every tab an
     assert.ok(shown.some(([w, h]) => w.includes(' feedback ') && h.includes(XSS_ESCAPED)), `${label}: and the feedback popup, with the league's name`);
     if (id === CATS9) assert.ok(shown.some(([w, h]) => w.endsWith(' trade #view') && h.includes('A trade a league mate shared')), 'and a trade proposal');
     for (const [where, h] of shown) problems.push(...unescapedNames(h, where));
+    // a position the sport has a color for is never drawn plain, wherever it shows (posTags, core.js)
+    const colors = a.get('SPORT').slotColors || {};
+    for (const [where, h] of shown) {
+      for (const m of h.matchAll(/<span class="pt pt-([^" ]+)([^"]*)"/g)) {
+        if (!colors[m[1]]) continue;
+        drawn++;
+        if (!m[2].includes(` pc pc-${colors[m[1]]}`)) plain.add(`${where}: ${m[1]}`);
+      }
+    }
   }
   assert.deepEqual([...new Set(problems)].slice(0, 40), []);
+  assert.ok(drawn > 1000, `${drawn} positions drawn`);
+  assert.deepEqual([...plain].slice(0, 20), [], 'positions drawn without their colors');
+});
+
+test('positions are drawn by one helper, always in their colors (the page and the share pictures)', () => {
+  const fs = require('fs'), path = require('path'), dir = path.join(__dirname, '..', 'js');
+  assert.equal(app.posTags(['PG', 'C']), '<span class="pt pt-PG pc pc-orange-2">PG</span>,<span class="pt pt-C pc pc-emerald-1">C</span>');
+  assert.equal(app.slotColor('SF'), 'blue-2');
+  assert.equal(app.slotColor('XX'), '', 'a position without one stays plain');
+  // no other file makes its own: a position's markup or its color comes from posTags / slotColor / slotInk
+  for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.js'))) {
+    let src = fs.readFileSync(path.join(dir, f), 'utf8');
+    if (f === 'core.js') src = src.replace(/^const (slotColor|posTags) = .*$/gm, '');
+    assert.ok(!/class="pt\b|\bpos\.join\(|slotColors\[/.test(src), `${f} draws positions or their colors itself: use posTags (or slotColor / slotInk)`);
+  }
 });
