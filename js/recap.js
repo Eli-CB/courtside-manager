@@ -4,7 +4,7 @@
 
 // ----- Weekly recap -----
 // A finished week across the whole league, counted from the week's real lineups and box scores as How week N ended
-// counts one matchup: every final, then the standouts. Fantrax and Sleeper leagues (the others don't share past lineups);
+// counts one matchup: every final, then the standouts. Fantrax, Sleeper and ESPN basketball leagues (hasWeekLineups);
 // in Sleeper's one-game weeks a starter's week is the game that counted, so Player of the week is the best such game.
 const recaps = new Map(); // "league|period" -> recap, or null when the week's lineups aren't there
 keep('box league', id => dropKept(recaps, id));
@@ -222,14 +222,14 @@ function viewRecap() {
   const L = fxLeague();
   if (!L || !NBA) return '';
   const empty = (t, m) => `<div class="card"><div class="empty"><strong>${t}</strong>${m}</div></div>`;
-  if (!hasLineupHistory(L)) return empty(`No recaps for ${esc(sourceName(L))} leagues yet`, "Recaps come from each week's real lineups, which the site reads from Fantrax and Sleeper only for now.");
+  if (!hasWeekLineups(L)) return empty(`No recaps for ${esc(sourceName(L))}${isFootball() ? ' football' : ''} leagues yet`, "Recaps come from each week's real lineups, which the site doesn't read from those yet.");
   // the last game day's box scores tell whether a week is over before Fantrax says so
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'recap') render(); }).catch(() => {});
   else fillWeekFromEspn(L); // (the night a week ends, its last games from ESPN before the daily job saves them)
   const done = finishedPeriods(L);
   if (!done.length) return empty('No finished weeks yet', 'The first recap appears once week 1 is over.');
   const period = done.find(p => p.n === ui.recapWeek) || done[done.length - 1];
-  const P = pastWeeksOf(L);
+  const P = pastWeeksOf(L, period);
   if (P.state === 'loading') return loadingCard(`Week ${period.n} recap`, `Loading the week's lineups from ${sourceName(L)}…`);
   if (P.state === 'error') return empty(`Week ${period.n} recap`, `Couldn't load the week's lineups (${esc(P.msg)}).`);
   const key = `${L.id}|${period.n}`;

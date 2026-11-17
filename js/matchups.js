@@ -536,27 +536,29 @@ const pastWeeks = {}; // league id -> { state, weeks, G } ; replays: "league|per
 const pastReplays = new Map();
 keep('box league', id => { dropKept(pastWeeks, id); dropKept(pastReplays, id); });
 // The league's weekly rosters and this season's box scores, loading the first time (Matchups and Recap redraw when in)
-function pastWeeksOf(L) {
-  let P = pastWeeks[L.id];
+// (ESPN: only the days of the week asked about, espnWeekLineups, so they're kept per week)
+function pastWeeksOf(L, period) {
+  const days = espnDaysRead(L), key = days ? `${L.id}|${period.n}` : L.id;
+  let P = pastWeeks[key];
   if (!P) {
-    const mine = P = pastWeeks[L.id] = { state: 'loading' };
-    const still = () => pastWeeks[L.id] === mine; // (dropped while loading, by changed('box' or 'league'): the next ask loads again)
-    Promise.all([loadRosterWeeks(L), loadGameLog('cur')])
-      .then(([weeks, G]) => { if (still()) pastWeeks[L.id] = { state: 'ready', weeks, G }; })
-      .catch(e => { if (still()) pastWeeks[L.id] = { state: 'error', msg: e.message }; })
+    const mine = P = pastWeeks[key] = { state: 'loading' };
+    const still = () => pastWeeks[key] === mine; // (dropped while loading, by changed('box' or 'league'): the next ask loads again)
+    Promise.all([days ? espnWeekLineups(L, period) : loadRosterWeeks(L), loadGameLog('cur')])
+      .then(([weeks, G]) => { if (still()) pastWeeks[key] = { state: 'ready', weeks, G }; })
+      .catch(e => { if (still()) pastWeeks[key] = { state: 'error', msg: e.message }; })
       .finally(() => { if (ui.tab === 'week' || ui.tab === 'recap') render(); });
   }
   return P;
 }
 function pastWeekCard(start) {
   const L = fxLeague(), period = fxPeriodFor(start);
-  if (!L || !period || !hasLineupHistory(L) || !periodOver(period)) return '';
+  if (!L || !period || !hasWeekLineups(L) || !periodOver(period)) return '';
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const pair = (L.matchups[String(period.n)] || []).find(m => m.includes(leftId));
   if (!pair) return '';
   const head = ''; // (no heading: the week's name is at the top of the page)
   const note = msg => `<div class="card">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
-  const P = pastWeeksOf(L);
+  const P = pastWeeksOf(L, period);
   if (P.state === 'loading') return note(`${loaderMark('sm')}Loading the week's lineups from ${sourceName(L)}…`);
   if (P.state === 'error') return note(`Couldn't load the week's lineups (${esc(P.msg)}).`);
   const key = `${L.id}|${period.n}|${leftId}`;
@@ -668,7 +670,7 @@ function viewWeek() {
   if (over && BOX) fillWeekFromEspn(fxLeague());
   const pastNote = () => {
     const L = fxLeague(), period = L && fxPeriodFor(start);
-    const msg = !L || !hasLineupHistory(L) ? `That week is over, so there's nothing to project.${L ? ` Past weeks' results come from each week's real lineups, which the site reads from Fantrax and Sleeper only for now.` : ''}`
+    const msg = !L || !hasWeekLineups(L) ? `That week is over, so there's nothing to project.${L ? ` Past weeks' results come from each week's real lineups, which the site doesn't read from ${esc(sourceName(L))}${isFootball() ? ' football' : ''} leagues yet.` : ''}`
       : period && !periodOver(period) ? `That week's games are over. Its result and lineups show here once the last night's box scores are in.`
       : `That week is over, and ${ui.viewing ? 'this team' : 'you'} had no matchup in it.`;
     return `<div class="card"><p class="muted small" style="margin:0">${msg}</p></div>`;

@@ -233,6 +233,57 @@ function espnDraft(j, toNba, names, draftAt) {
   };
 }
 
+// ----- Past days' lineups (the Recap, a finished week on Plan Ahead) -----
+// ESPN keeps every day's lineups: the league's rosters asked for with a past day's number (its scoring period) come back
+// as they stood that day. A day is 1.5 MB (270 KB compressed), nearly all stat lines the site doesn't read, and ESPN's
+// filter header doesn't trim a roster's, so only the days of the week being shown are asked for, two at a time, once:
+// a finished day is kept on the device, small: { league: { at, s: season, d: { day: { team: [[ESPN id, 1 if starting]] } } } }.
+// Basketball only so far; Awards and Season totals would need every day of the season.
+const ESPN_DAYS_KEY = 'league-layer-espn-days-v1', ESPN_DAYS_KEEP = 4;
+const espnDaysRead = L => !!L && L.source === 'espn' && L.sport !== 'nfl';
+// a finished week's lineups can be shown: every period's are read (Fantrax, Sleeper), or that week's days (ESPN)
+const hasWeekLineups = L => hasLineupHistory(L) || espnDaysRead(L);
+const espnDayLineups = j => Object.fromEntries(j.teams.map(t => [String(t.id), ((t.roster && t.roster.entries) || []).map(e => [String(e.playerId), ESPN_SLOTS[e.lineupSlotId] ? 1 : 0])]));
+const espnDays = {}; // "league|matchup" -> the load of that week's days
+keep('league', id => dropKept(espnDays, id));
+// A matchup's days as lineup periods, the shape loadRosterWeeks gives: [{ n: ESPN's day, start, end, owner }], or null
+function espnWeekLineups(L, period) {
+  const key = `${L.id}|${period.n}`;
+  if (!espnDays[key]) {
+    const P = espnDays[key] = fetchEspnDays(L, period).catch(e => { if (espnDays[key] === P) delete espnDays[key]; throw e; });
+  }
+  return espnDays[key];
+}
+async function fetchEspnDays(L, period) {
+  const dayOne = nbaGameDays()[0], today = todayIso(), season = espnSeason();
+  if (!dayOne) return null;
+  const num = d => Math.round((Date.parse(d) - Date.parse(dayOne)) / 864e5) + 1;
+  const dates = [];
+  for (let d = period.start.slice(0, 10); d <= period.end.slice(0, 10) && d <= today; d = addDays(d, 1)) dates.push(d);
+  let all = {};
+  try { all = JSON.parse(localStorage.getItem(ESPN_DAYS_KEY)) || {}; } catch (e) { all = {}; }
+  const have = { ...((all[L.id] && all[L.id].s === season && all[L.id].d) || {}) };
+  const path = `${season}/segments/0/leagues/${encodeURIComponent(L.id)}?view=mRoster&scoringPeriodId=`;
+  try {
+    await fxGetAll(dates.filter(d => !have[num(d)]).map(d => path + num(d)), (p, j) => {
+      if (!j || !Array.isArray(j.teams) || !j.teams.some(t => t.roster)) throw new Error("ESPN didn't send that day's lineups");
+      have[+p.split('=').pop()] = espnDayLineups(j);
+    }, 2, espnGet);
+  } finally {
+    // (today's can still change: not kept)
+    const last = num(today);
+    all[L.id] = { at: Date.now(), s: season, d: Object.fromEntries(Object.entries(have).filter(([n]) => +n < last)) };
+    const kept = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, ESPN_DAYS_KEEP);
+    try { localStorage.setItem(ESPN_DAYS_KEY, JSON.stringify(Object.fromEntries(kept))); } catch (e) { /* storage full or blocked */ }
+  }
+  const days = dates.filter(d => have[num(d)]).map(d => {
+    const owner = new Map();
+    for (const [tid, items] of Object.entries(have[num(d)])) for (const [f, on] of items) owner.set(f, { tid, on: !!on, pts: null });
+    return { n: num(d), start: `${d}T00:00:00`, end: `${d}T23:59:00`, owner };
+  });
+  return days.length ? days : null;
+}
+
 // ----- ESPN football -----
 // A football league's ID looks like a basketball one: an ID ESPN doesn't know as basketball is asked for as football. Its
 // weeks are the NFL's (the daily file's, as Sleeper's are), its players the daily file's by ESPN id (Sleeper's player list

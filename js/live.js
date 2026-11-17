@@ -171,7 +171,7 @@ async function readBoxes(games, feed, pooled = false) {
 const boxFill = { at: 0, busy: false };
 const FINALS = 'ESPN finals'; // (its misses, for feedWait)
 function weekDaysToFill(L) {
-  if (!L || !BOX || isFootball() || isHockey() || !hasLineupHistory(L)) return [];
+  if (!L || !BOX || isFootball() || isHockey() || !hasWeekLineups(L)) return [];
   const today = todayIso();
   // the week not over yet whose last game day has come (on a Monday morning, the next one has started already)
   const days = (L.periods || []).filter(x => String(x.start).slice(0, 10) <= today && !periodOver(x))

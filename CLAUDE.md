@@ -50,7 +50,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     D/ST points; a TE/RB/WR reception premium as Sleeper's bonus_rec_*). The job adds ESPN's own points-allowed brackets (14-17, 18-21, 22-27, 35-45, 46+)
     and `def_fum_rec` (special teams' included) to a defense's lines (`espn_defense`). Checked on a real league: 1,169 of 1,170 player-weeks matched ESPN's
     points (the one: a sack counted differently). Live points: ESPN's per week, in `L.slpWeek` like Sleeper's (`espnWeekFresh`, `leagueWeekFresh`, every 30 s).
-    Category football isn't read. No Recap, Awards or Season totals (as ESPN basketball).
+    Category football isn't read. No Recap, Awards or Season totals.
   - sleeper: `fetchSleeperLeague` (api.sleeper.app, CORS-open, no sign-in; IDs are 15-20 digits, `source: 'sleeper'`).
     Sleeper basketball is points only and counts ONE game a week per lineup slot (Lock-In: the game locked in after it's
     played, else the last of the week; Game Pick: the one picked): `L.oneGame`, `isOneGame()`. Projections (`oneGameSide`
@@ -88,7 +88,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     search, then one Filters button (`ui.perfFiltOpen`) opening a panel: Show toggles (`ui.perfWhose`: me, opp, other, fa, any together, never none; Other teams is also a menu of those teams to pick any number of, the owner's ask: `perfOtherMenu`, `ui.perfOthers`, none picked = all), Lineup All / Active / Bench (`ui.perfSpot`, rostered players only: waivers have no lineup), position and NBA team (each a menu to pick any number from, the owner's ask: `perfMenu`, lists `ui.perfPos` / `ui.perfTeam`, empty = all; a player at any picked position), Rookies, Injured. Player card: under his fantasy team, how he got there (`cardHow`: Keeper / Drafted round, pick / Pickup / Traded from, with the week, from the weekly rosters; ESPN: the draft only)
   - matchups: the Plan Ahead tab (`#week`, was Matchups; opens on next week until a week is picked: `planAheadWeek`, `ui.weekChosen`), schedule dots (a game on now: `.dots i.live`; the week underway follows tonight's games, `weekTabLive` in live.js), stat tables, tooltips. The opponent's injured reserve (`state.opp.il`, `oppIlIds`/`oppActive` in nba.js) sits in the board's IR row (tag "IR"; `IL` inside the code), never on their bench or in their projection. A finished week (its last day before today) never shows a projection, the owner's rule: its real
     result and lineups, plus bench swaps that would have changed it (`pastWeekCard`; `benchSwaps`/`weekScore` in history),
-    else one line saying why not (`pastNote` in `viewWeek`: the last night's box scores not in yet, with `fillWeekFromEspn` asked meanwhile; no matchup; a league whose past lineups aren't read, ESPN)
+    else one line saying why not (`pastNote` in `viewWeek`: the last night's box scores not in yet, with `fillWeekFromEspn` asked meanwhile; no matchup; a league whose past lineups aren't read: ESPN football, Yahoo)
   - A week is over (`periodOver`) at its end or once its last game day's box scores are all in (that day included): Fantrax ends a weekly
     period Monday evening when the next locks, a day after its last games. Recap, awards, past-week cards use it. So the Recap shows the
     night a week ends, not after the daily job, ESPN's finals of the week's unsaved days go into `BOX` (`fillWeekFromEspn`, live.js;
@@ -97,7 +97,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     bench regret, best all-play week (categories only); points leagues add Carried (biggest share of a team's points, 20%+), Tough luck / Lucky win (best losing / worst winning score, on the wrong side of the middle) and Nail-biter (closest final under 5% of the winner, not a game already told as luck); hockey Goalie of the week and Hat trick, football Defense of the week; then every final, the week's top team 👑 and bottom 💩 marked, in the picture too (`X.rank`, `recapMark`/`recapMarkTip`: most/fewest points in points leagues, best/worst all-play record in category leagues; a tie marks each)) from `benchSwaps` on the shared `pastWeeksOf` data; Share (`shareWith`/`sharePopup`/`shareText` in recap.js, also the Draft Retrospective's: `recapShare`, `draftShare`; the picture `shareCanvas`) opens a popup with the
     recap as a picture (`recapCanvas`: 1080 px PNG on a canvas, headshots from the sheet `IMG.sheet`; Share image / Copy image / Save
     image) or the text: the standouts + a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
-    Fantrax and Sleeper (the Matchup tab doesn't point to it, Nov 2026). Under it, Trends (`trendsCard`, recap.js; not football): Heating up / Cooling off (`ui.trendDir`), each player's last 5 games
+    Fantrax, Sleeper and ESPN basketball (`hasWeekLineups`; the Matchup tab doesn't point to it, Nov 2026). Under it, Trends (`trendsCard`, recap.js; not football): Heating up / Cooling off (`ui.trendDir`), each player's last 5 games
     through the week's last game day against his median game before them (5+ earlier games; a regular: 15+ minutes, hockey 10), one top-5 list per
     counting category (points leagues: fantasy points), shooting % with volume, Minutes and Shot attempts, ranked by the change per game; first by Value
     (`lineValue` now and its change): Rostered and Waivers (unowned). Notes from the box scores only (`teammateOut`: a 24+ minute teammate missing most of those games;
@@ -210,9 +210,13 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   player list (daily, needs the `X-Fantasy-Filter` header). ESPN sends no dates: day 1 = NBA opening night; weeks
   Monday-Sunday with the All-Star week joined to the next (verified on ESPN's schedule page: 2027 Matchup 18 =
   Feb 15-28), checked against `status.finalScoringPeriod`. Matchup numbers are ESPN's week numbers; weeks before
-  `status.firstScoringPeriod` aren't the league's. Season totals, Awards and past seasons are Fantrax/Sleeper-only
-  (`hasLineupHistory`); doing ESPN means one roster request per day (`mRoster&scoringPeriodId=N`) or its
-  transactions (`mTransactions2`). ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
+  `status.firstScoringPeriod` aren't the league's. Past lineups: `mRoster&scoringPeriodId=N` answers with
+  the rosters and slots as they stood on day N, so the Recap and Plan Ahead's finished week read ESPN basketball too
+  (`hasWeekLineups`, `espnWeekLineups` in espn.js: each day a lineup period, as a Fantrax daily league's; `pastWeeksOf(L, period)`
+  keeps them per week). A day is 1.5 MB (270 KB compressed) and the filter header doesn't trim it, so only the shown week's
+  days are asked for, once (`league-layer-espn-days-v1`). Checked on a real points league: 18 of 20 team-weeks matched
+  ESPN's finals exactly, the other two within 4 points. Season totals, Awards and past seasons stay Fantrax/Sleeper-only
+  (`hasLineupHistory`): they'd need every day of the season (40 MB by spring). A category league and ESPN football aren't checked. ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
 - `python serve.py` (preview config "site", port 5173) refreshes `data/` locally: never commit
   `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
 - cdn.nba.com answers GitHub runners 403: `get_json` falls back to the same files on NBA's S3 storage (`CDN_MIRROR`), so box

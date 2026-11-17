@@ -1759,10 +1759,65 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     // the Matchup tab doesn't point to it (the Recap tab is one tap away)
     assert.ok(!app.viewDashboard().includes('Week 1 recap'));
   } finally { ui.tab = 'dashboard'; }
-  // leagues that don't share past lineups say so
-  await app.useLeague(ESPN);
-  assert.match(app.viewRecap(), /No recaps for ESPN leagues/);
-  await app.useLeague(CATS9);
+  // leagues whose past lineups aren't read say so: ESPN football, Yahoo
+  assert.ok(app.hasWeekLineups(L) && app.hasWeekLineups({ source: 'espn' }));
+  assert.ok(!app.hasWeekLineups({ source: 'espn', sport: 'nfl' }) && !app.hasWeekLineups({ source: 'yahoo' }));
+});
+
+test("ESPN recap: a finished week from each of its days' lineups, asked for once and kept on the device", async () => {
+  const L = await app.useLeague(ESPN);
+  const ui = app.get('ui');
+  // the fixtures' box scores end Oct 25, before this league's first week: its first matchup moved onto those days
+  const n = L.periods[0].n, saved = L.periods[0];
+  L.periods[0] = { n, start: '2026-10-20', end: '2026-10-25', lock: '2026-10-20T00:00:00', endAt: '2026-10-25T23:59:00' };
+  const league = JSON.parse(readFixture(`espn/${ESPN}/league.json`));
+  const asked = [];
+  const realFetch = app.fetch;
+  // ESPN's answer for a past day: the league's rosters as they stood (here: the same every day)
+  app.fetch = (url, init) => {
+    const day = String(url).match(/view=mRoster&scoringPeriodId=(\d+)$/);
+    if (!day) return realFetch(url, init);
+    asked.push(+day[1]);
+    const body = JSON.stringify({ scoringPeriodId: +day[1], teams: league.teams.map(t => ({ id: t.id, roster: t.roster })) });
+    return Promise.resolve({ ok: true, status: 200, text: async () => body, json: async () => JSON.parse(body) });
+  };
+  const players = app.NBA.players.map(r => [r, r.fx, r.pos]);
+  app.applyFantraxLeague(await app.getLeague(ESPN, true)); // the players under their ESPN ids, as on the page
+  L.periods[0] = app.fxLeague().periods[0] = { ...L.periods[0] };
+  useTeam(L.teams[0].id);
+  ui.tab = 'recap';
+  try {
+    assert.match(app.viewRecap(), /Loading the week's lineups from ESPN/);
+    await new Promise(r => setTimeout(r, 30));
+    const html = app.viewRecap();
+    assert.match(html, new RegExp(`Week ${n} standouts`));
+    assert.deepEqual(asked.sort((a, b) => a - b), [1, 2, 3, 4, 5, 6], 'one request a day, ESPN numbering days from opening night');
+    const X = app.get('recaps').get(`${L.id}|${n}`);
+    assert.equal(X.games.length, L.matchups[n].length, 'every matchup');
+    assert.ok(X.games.every(g => g.sc.me > 0 && g.sc.opp > 0 && g.sc.me >= g.sc.opp), 'scored from the box scores, winner first');
+    assert.ok(X.mvp && X.game && X.mvp.line.gp1 >= 1);
+    // a starter is anyone in a lineup slot: the bench and IR don't count
+    const days = await app.espnWeekLineups(L, L.periods[0]);
+    const t = league.teams[0], on = t.roster.entries.filter(e => ![12, 13].includes(e.lineupSlotId)).map(e => String(e.playerId)).sort();
+    assert.deepEqual([...days[0].owner].filter(([, o]) => o.tid === String(t.id) && o.on).map(([f]) => f).sort(), on);
+    assert.equal(days.length, 6);
+    // finished days are kept: a later visit asks ESPN for nothing
+    app.changed('league', L.id);
+    app.get('recaps').clear();
+    app.viewRecap();
+    await new Promise(r => setTimeout(r, 30));
+    assert.match(app.viewRecap(), new RegExp(`Week ${n} standouts`));
+    assert.equal(asked.length, 6);
+    // only the week's days are read
+    assert.ok(app.hasWeekLineups(L) && !app.hasLineupHistory(L), 'Awards and Season totals stay off: they need every day');
+  } finally {
+    app.fetch = realFetch; L.periods[0] = saved; ui.tab = 'dashboard';
+    for (const [r, fx, pos] of players) { if (fx) r.fx = fx; else delete r.fx; r.pos = pos; }
+    app.set('nbaCache', null);
+    app.localStorage.removeItem('league-layer-espn-days-v1');
+    app.changed('league', L.id);
+    await app.useLeague(CATS9);
+  }
 });
 
 test('a shared recap link: connects the league, asks for the team, then shows the recap', async () => {
