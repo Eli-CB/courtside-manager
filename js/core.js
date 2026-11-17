@@ -495,7 +495,6 @@ function slotInk(x) {
   return ink;
 }
 
-// a player's name and team line, with their photo unless the list is too long for them (the Players tab)
 // A fantasy team's name that opens its card (this season's teams; names in a past season stay plain)
 function teamLink(tid, label) {
   const name = label ?? esc(fxTeamName(tid));
@@ -504,13 +503,12 @@ function teamLink(tid, label) {
   return `<button type="button" class="link-btn team-link${mine ? ' mine' : ''}" data-action="team-card" data-team="${esc(tid)}">${name}</button>`;
 }
 
-function playerCell(p, link = true, photo = true) {
-  const name = link && p.nbaId ? `${playerBtn(p.nbaId, p.name)}` : `<span class="pname">${esc(p.name)}</span>`;
-  const next = p.next ? ` · ${linkTeams(nextGame(p.next))}` : '';
+// A player in the Trades lists: his photo, his name (his card), his NBA team and positions, as the trade proposal shows
+// them (not his next game: a trade isn't about this week's schedule, the owner's ask), and any injury
+function playerCell(p) {
+  const name = p.nbaId ? playerBtn(p.nbaId, p.name) : `<span class="pname">${esc(p.name)}</span>`;
   const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note.length > 60 ? p.inj.note.slice(0, 60) + '…' : p.inj.note) : ''}</div>` : '';
-  // the photo's ring shows the team; without a photo the logo does
-  const body = `<div>${name}</div><div class="pmeta">${photo ? '' : teamLogo(p.team, 14) + ' '}${posTags(p.pos)}${next}</div>${inj}`;
-  return photo ? `<div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain">${body}</div></div>` : body;
+  return `<div class="bplayer">${headshot(p, hsPx(36, 32))}<div class="bmain"><div>${name}</div><div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)}</div>${inj}</div></div>`;
 }
 
 // A team's code (UTA, CLE) as a link to its card: its schedule and players by value, in the player card's popup ('sport-team')

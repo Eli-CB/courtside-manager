@@ -1043,6 +1043,10 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const html = app.viewTrade();
     // under the pickers: who gets whom, each with his photo, his card and his average game in the league's categories
     assert.ok(html.indexOf('trade-grid') < html.indexOf('Trade proposal'));
+    // the lists: each player's NBA team and positions, not his next game
+    const lists = html.slice(0, html.indexOf('Trade proposal'));
+    for (const p of [mine[0], theirs[0]]) assert.ok(lists.includes(`<div class="pmeta">${app.teamBtn(p.team)} · ${app.posTags(p.pos)}</div>`), p.name);
+    assert.ok(mine[0].next && !/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (vs|@) /.test(lists.replace(/<[^>]*>/g, '')), 'no games');
     const card = html.slice(html.indexOf('Trade proposal'));
     for (const p of [mine[0], ...theirs.slice(0, 2)]) assert.ok(card.includes(`data-photo="${p.nbaId}"`) && card.includes(`data-nba="${p.nbaId}"`), p.name);
     assert.ok(card.includes(`${app.teamLink(t1)} gets`) && card.includes(`${app.teamLink(t2)} gets`));
