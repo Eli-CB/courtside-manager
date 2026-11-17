@@ -274,13 +274,25 @@ function gearMenu() {
   </details>`;
 }
 
-// Plan Ahead opens on next week (the lineup still to set), until a week is picked there; a new league starts over
+// Plan Ahead opens on next week (the lineup still to set; after the last week, that one), or on the week last picked
+// there, over a refresh too, until a new matchup week or another league (core.js, picks): then next week again
+const weekPickAt = () => `${fxLeague().id}|${weekStartAt(0)}`;
+function planAheadShift() {
+  const shifts = weekShifts(), kept = picks.week && picks.week.at === weekPickAt() ? picks.week.v : null;
+  return shifts.includes(kept) ? kept : shifts.includes(1) ? 1 : 0;
+}
 function planAheadWeek() {
-  if (ui.tab !== 'week' || ui.weekChosen || ui.season || !fxLeague() || !NBA) return;
-  ui.weekChosen = true;
-  const shifts = weekShifts();
-  const next = shifts.includes(1) ? 1 : 0; // (after the last week: that one)
+  if (ui.tab !== 'week' || ui.season || !fxLeague() || !NBA) return;
+  if (ui.weekChosen && (!ui.weekAt || ui.weekAt === weekPickAt())) return; // (a week picked, and still this week's)
+  const next = planAheadShift();
+  ui.weekChosen = true; ui.weekAt = weekPickAt();
   if (ui.weekShift !== next) goWeek(next);
+}
+// The Matchup and Players tabs' When picks hold for the day they were made in (core.js, picks): a new day, their default again
+function dropOldPicks() {
+  const today = todayIso();
+  if (picks.dash && picks.dash.at !== today) { ui.dashRange = null; savePick('dash'); }
+  if (picks.perf && picks.perf.at !== today) { Object.assign(ui, { perfRange: null, perfPer: false }); savePick('perf'); }
 }
 
 function render() {
@@ -290,6 +302,7 @@ function render() {
   const busy = document.activeElement;
   if (live.hold && busy && busy.closest && busy.closest('#view') && /^(SELECT|INPUT|TEXTAREA)$/.test(busy.tagName)) return;
   planAheadWeek();
+  dropOldPicks();
   const landing = needsLanding();
   document.body.classList.toggle('landing', landing);
   leagueMenu();

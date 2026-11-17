@@ -5,11 +5,12 @@
 /* =========================================================
    Actions
    ========================================================= */
-// Show another week on Plan Ahead (one of weekShifts)
+// Show another week on Plan Ahead (one of weekShifts), kept for a refresh until this matchup week is over (planAheadWeek)
 function goWeek(shift) {
   ui.weekChosen = true;
   const shifts = weekShifts();
   ui.weekShift = Math.max(shifts[0], Math.min(shifts[shifts.length - 1], shift));
+  if (fxLeague()) { ui.weekAt = weekPickAt(); savePick('week', { v: ui.weekShift, at: ui.weekAt }); }
   // a new week brings its real opponent: a hypothetical belongs to the week it was set up in
   if (viewingOther()) { ui.viewB = null; render(); return; }
   const opp = fxOpponentFor(weekStart());
@@ -17,6 +18,9 @@ function goWeek(shift) {
   else if (opp.id !== state.opp.fxId) loadFxTeam(opp.id);
   else { state.opp.week = weekStart(); commit(); }
 }
+
+// The Players tab's When pick and Totals / Per game, kept for a refresh until the day is over (core.js, picks)
+const pickPerf = () => savePick('perf', { v: ui.perfRange, per: ui.perfPer, at: todayIso() });
 
 // The league and the recap a button's week is for
 const recapOn = el => { const L = fxLeague(); return { L, X: L && recaps.get(`${L.id}|${+el.dataset.week}`) }; };
@@ -339,7 +343,7 @@ const actions = {
   // a team from its card as Plan Ahead's opponent: the week Plan Ahead opens on, this team in place of the real one
   'team-compare'(el) {
     $('#detailDialog').close();
-    if (!ui.weekChosen) { const s = weekShifts(); ui.weekShift = s.includes(1) ? 1 : 0; ui.weekChosen = true; }
+    if (!ui.weekChosen) Object.assign(ui, { weekShift: planAheadShift(), weekChosen: true, weekAt: weekPickAt() });
     location.hash = '#week';
     loadFxTeam(el.dataset.team);
   },
@@ -355,6 +359,7 @@ const actions = {
   },
   'dash-range'(el) {
     ui.dashRange = el.dataset.range;
+    savePick('dash', { v: ui.dashRange, at: todayIso() });
     render();
   },
   'dash-bench'() {
@@ -365,6 +370,7 @@ const actions = {
   'perf-per'(el) {
     ui.perfPer = el.dataset.per === '1';
     if (ui.perfRange === 'avg') ui.perfRange = 'year';
+    pickPerf();
     render();
   },
   'perf-only'(el) {
@@ -407,7 +413,7 @@ const actions = {
     const d = $('#detailDialog');
     if (d && d.open) d.close();
     Object.assign(ui, { perfWhose: { ...PERF_WHOSE }, perfOthers: [], perfSpot: 'all', perfPos: [], perfTeam: [el.dataset.team], perfMenu: null, perfQ: '', perfFiltOpen: true });
-    if (!isFootball()) Object.assign(ui, { perfRange: 'year', perfMore: { sig: '', n: 0 } });
+    if (!isFootball()) { Object.assign(ui, { perfRange: 'year', perfMore: { sig: '', n: 0 } }); pickPerf(); }
     Object.assign(ui.perfOnly, { rookie: false, inj: false });
     if (location.hash === '#players') render(); else location.hash = '#players';
     window.scrollTo(0, 0);
@@ -653,6 +659,7 @@ document.addEventListener('change', e => {
     goWeek(+el.value);
   } else if (el.dataset.change === 'perf-range') {
     ui.perfRange = el.value;
+    pickPerf();
     render();
   } else if (el.dataset.change === 'fx-opp') {
     if (!el.value) return;

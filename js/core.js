@@ -10,6 +10,7 @@ const STORAGE_KEY = 'league-layer-v1';
 const THEME_KEY = 'league-layer-theme';
 const SCORES_KEY = 'league-layer-hide-scores'; // this device hides game scores (no spoilers)
 const CLOCK_KEY = 'league-layer-clock'; // '24' or '12': this device's choice of clock; unset = the device's own
+const PICKS_KEY = 'league-layer-picks'; // what was last picked on the Matchup and Players tabs' When menus and Plan Ahead's week (picks)
 const STATUSES = ['Healthy', 'DTD', 'Out'];
 // this deploy's version (the commit), stamped in by the publish workflow; '__BUILD__' when run locally
 const BUILD = '__BUILD__';
@@ -100,6 +101,19 @@ ui.clock24 = (() => {
   try { const c = localStorage.getItem(CLOCK_KEY); if (c) return c === '24'; } catch (e) { /* storage blocked */ }
   try { return !/h1[12]/.test(new Intl.DateTimeFormat([], { hour: 'numeric' }).resolvedOptions().hourCycle || 'h12'); } catch (e) { return false; }
 })();
+// What was last picked on the Matchup and Players tabs' When menus (Today, Yesterday, This period...) and Plan Ahead's
+// week holds over a refresh until what the tab opens on by itself is new (the owner's ask, Nov 2026): Matchup and Players
+// at a new day (Yesterday is another night, This period may be another period), Plan Ahead at a new matchup week or in
+// another league. Each pick is kept on the device with that day or week (`at`); one from an earlier day or week is
+// dropped, there and then (`dropOldPicks`, render.js; `planAheadWeek`), and the tab opens on its default again.
+// (k: 'dash' { v: ui.dashRange }, 'perf' { v: ui.perfRange, per: ui.perfPer }, 'week' { v: ui.weekShift }; no pick = forget it)
+const picks = (() => { try { const p = JSON.parse(localStorage.getItem(PICKS_KEY)); return p && typeof p === 'object' ? p : {}; } catch (e) { return {}; } })();
+function savePick(k, pick) {
+  if (pick) picks[k] = pick; else delete picks[k];
+  try { localStorage.setItem(PICKS_KEY, JSON.stringify(picks)); } catch (e) { /* storage blocked: this visit only */ }
+}
+if (picks.dash && typeof picks.dash.v === 'string') ui.dashRange = picks.dash.v;
+if (picks.perf) Object.assign(ui, { perfRange: typeof picks.perf.v === 'string' ? picks.perf.v : null, perfPer: !!picks.perf.per });
 // A time of day ("7:30 PM" or "19:30"); more = other parts to show with it (weekday)
 const fmtTime = (t, more) => new Date(t).toLocaleString([], { ...more, hour: ui.clock24 ? '2-digit' : 'numeric', minute: '2-digit', hourCycle: ui.clock24 ? 'h23' : 'h12' });
 

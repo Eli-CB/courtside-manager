@@ -139,7 +139,9 @@ const espnDate = d => d.replace(/-/g, '');
 // Plan Ahead on the week underway (any sport): its games as they're played, a game on now marked in its schedule bubble
 const weekTabLive = () => ui.tab === 'week' && !ui.weekShift;
 const liveTab = () => ui.tab === 'dashboard' || ui.tab === 'players' || weekTabLive();
-const liveWanted = () => !document.hidden && (weekTabLive() || (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && !['day', 'last', 'avg', 'proj'].includes(ui.perfRange) && !(ui.perfRange === 'year' && ui.perfPer)));
+// (Matchup and Players: the first update of a visit whatever's picked, as it also reads last night's games the saved box
+// scores lack, which a page opening on a kept pick (core.js, picks), Yesterday or This season, would go without)
+const liveWanted = () => !document.hidden && (weekTabLive() || (!live.tried && liveTab()) || (ui.tab === 'dashboard' ? ui.dashRange !== 'day' : ui.tab === 'players' && !['day', 'last', 'avg', 'proj'].includes(ui.perfRange) && !(ui.perfRange === 'year' && ui.perfPer)));
 
 // each game on its own: one that fails is asked for again next time; only all of them failing counts as an error.
 // With the live feed (feed: liveFeedGet's answer), a game's box score comes from it when it has one under LIVE_FEED_OLD

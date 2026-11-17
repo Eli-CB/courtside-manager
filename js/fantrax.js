@@ -596,7 +596,7 @@ function fxOppPicker(ctx) {
   const leftId = ui.viewing ? ui.viewA : state.fxTeam;
   const opp = fxOpponentFor(ctx.start, leftId); // the left team's real opponent that week
   const cur = state.opp.fxId;
-  const when = ['last week', 'this week', 'next week'][ui.weekShift + 1] || 'that week';
+  const when = ['last period', 'this period', 'next period'][ui.weekShift + 1] || 'that period';
   // (phones: the menu's too narrow for it, so the real opponent goes unmarked there)
   const phone = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
   return `<select class="ctx-team sb-opp" data-change="fx-opp" aria-label="Opponent">${cur ? '' : '<option value="">Pick a team</option>'}${fxPickable().filter(t => t.id !== leftId)

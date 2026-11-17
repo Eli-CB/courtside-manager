@@ -66,8 +66,9 @@ function fakeFetch(url) {
   return Promise.resolve({ ok, status: ok ? 200 : 404, text: async () => body, json: async () => JSON.parse(body) });
 }
 
-function loadApp() {
-  const store = new Map();
+// saved: what's on the device before the page loads (localStorage key -> text), as for a refresh
+function loadApp(saved = {}) {
+  const store = new Map(Object.entries(saved));
   let clock = NOW;
   const RealDate = Date;
   class FixedDate extends RealDate {

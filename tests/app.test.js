@@ -230,12 +230,12 @@ test("Matchups steps through the league's matchup weeks and its teams", async ()
     const nav = app.weekPicker();
     assert.equal((nav.match(/<option /g) || []).length, L.periods.length, 'every matchup week');
     assert.ok(nav.includes(`>Week ${L.periods.length} (playoffs)<`), nav);
-    assert.ok(nav.includes('>Week 2 (this week)<') && nav.includes('selected>Week 1<'), nav);
+    assert.ok(nav.includes('>Week 2 (this period)<') && nav.includes('selected>Week 1<'), nav);
     assert.ok(/data-step="-1"[^>]*disabled/.test(nav) && !/data-step="1"[^>]*disabled/.test(nav), 'the first week: only forward');
   } finally { ui.weekShift = 0; }
   // the opponent is picked where their name is on the scoreboard: the week's real one marked
   const pick = app.fxOppPicker(app.weekContext());
-  assert.ok(pick.includes('data-change="fx-opp"') && / \(this week\)<\/option>/.test(pick), pick);
+  assert.ok(pick.includes('data-change="fx-opp"') && / \(this period\)<\/option>/.test(pick), pick);
 });
 
 test('short names never collide', () => {
@@ -280,9 +280,62 @@ test('the tabs: Matchup is this week, Plan Ahead opens on next week until a week
   ui.weekChosen = true;
   app.planAheadWeek();
   assert.equal(ui.weekShift, 0, 'a week picked stays');
+  app.savePick('week');
   Object.assign(ui, { tab: 'dashboard', weekShift: 0, weekChosen: false });
   // Matchup's and Players' (i) sit in the page, not on the tab bar
   assert.ok(!app.tabList().some(([, l]) => /info/.test(l)));
+});
+
+test("a pick on Matchup's or Players' When menu and Plan Ahead's week hold over a refresh, until a new day or matchup week brings the defaults back", async () => {
+  const L = await app.useLeague(CATS9);
+  useTeam(L.standings[0].id);
+  const ui = app.get('ui');
+  for (const k of ['dash', 'perf', 'week']) app.savePick(k); // (the weeks earlier tests picked)
+  ui.tab = 'standings'; // (each pick draws the page again: no live scores read meanwhile)
+  try {
+    // picked: Matchup's Today, Players' This season per game, Plan Ahead's this period (it opened on next period)
+    app.actions['dash-range']({ dataset: { range: 'today' } });
+    ui.perfRange = 'year'; app.pickPerf(); // (the menu's change handler)
+    app.actions['perf-per']({ dataset: { per: '1' } });
+    Object.assign(ui, { tab: 'week', weekShift: 0, weekChosen: false });
+    app.planAheadWeek();
+    assert.equal(ui.weekShift, 1, 'Plan Ahead opens on next period');
+    app.goWeek(0);
+    // the page loaded again on this device
+    const b = loadApp({ 'league-layer-picks': app.localStorage.getItem('league-layer-picks') });
+    await b.ready();
+    await b.useLeague(CATS9);
+    const bu = b.get('ui');
+    b.render(); clearTimeout(b.get('live').timer);
+    assert.equal(bu.dashRange, 'today', "Matchup: Today, not the default");
+    assert.deepEqual([bu.perfRange, bu.perfPer], ['year', true], 'Players: This season, per game');
+    bu.tab = 'week';
+    b.planAheadWeek();
+    assert.equal(bu.weekShift, 0, 'Plan Ahead: this period, not next');
+    // the next day: Matchup and Players back to their defaults; the same matchup week keeps Plan Ahead's
+    b.setClock('2026-10-28T01:00:00Z');
+    b.render(); clearTimeout(b.get('live').timer);
+    assert.deepEqual([bu.dashRange, bu.perfRange, bu.perfPer], [null, null, false], 'a new day: the defaults');
+    assert.equal(bu.weekShift, 0, 'still this matchup week');
+    // and a pick that day holds for that day
+    b.actions['dash-range']({ dataset: { range: 'week' } });
+    b.render(); clearTimeout(b.get('live').timer);
+    assert.equal(bu.dashRange, 'week');
+    // the next matchup week: Plan Ahead opens on next period again, even on the page left open
+    b.setClock('2026-11-03T01:00:00Z');
+    b.planAheadWeek();
+    assert.equal(bu.weekShift, 1, 'a new matchup week: next period');
+    const c = loadApp({ 'league-layer-picks': JSON.stringify({ week: { v: 0, at: `${L.id}|2026-10-19` } }) });
+    await c.ready();
+    await c.useLeague(CATS9);
+    Object.assign(c.get('ui'), { tab: 'week' });
+    c.planAheadWeek();
+    assert.equal(c.get('ui').weekShift, 1, 'a week picked in an earlier matchup week: next period');
+    for (const x of [b, c]) { x.setClock(); clearTimeout(x.get('live').timer); }
+  } finally {
+    for (const k of ['dash', 'perf', 'week']) app.savePick(k);
+    Object.assign(ui, { tab: 'dashboard', dashRange: null, perfRange: null, perfPer: false, weekShift: 0, weekChosen: false, weekAt: null });
+  }
 });
 
 test('a player out or day-to-day says so in a few letters on the Players table', () => {

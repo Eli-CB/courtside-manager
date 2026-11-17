@@ -630,12 +630,12 @@ function pastWeekCard(start) {
 // opponent picker marks this week's opponent
 function weekPicker() {
   const shifts = weekShifts();
-  // (phones: just the week, so the picker fits beside the heading, which already says this week or next)
+  // (phones: just the week, so the picker fits beside the heading, which already says this period or next)
   const phone = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
   const opts = shifts.map(s => {
     const p = fxLeague() && fxLeague().periods ? fxPeriodFor(weekStartAt(s)) : null;
     const playoffs = p && fxLeague().playoffPeriod && p.n >= fxLeague().playoffPeriod;
-    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${phone ? '' : s === 0 ? ' (this week)' : playoffs ? ' (playoffs)' : ''}</option>`;
+    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${phone ? '' : s === 0 ? ' (this period)' : playoffs ? ' (playoffs)' : ''}</option>`;
   });
   return stepper('week-shift', 'week', `<select class="ctx-team" data-change="week-pick" aria-label="Week">${opts.join('')}</select>`,
     { first: ui.weekShift <= shifts[0], last: ui.weekShift >= shifts[shifts.length - 1] });
@@ -715,7 +715,7 @@ function viewWeek() {
   return `
   <div class="page-head">
     <div>
-      <h1>${ui.weekShift === 0 ? 'This week' : ui.weekShift === 1 ? 'Next week' : ui.weekShift === -1 ? 'Last week' : 'Week of ' + fmtDay(start)}</h1>
+      <h1>${ui.weekShift === 0 ? 'This period' : ui.weekShift === 1 ? 'Next period' : ui.weekShift === -1 ? 'Last period' : 'Week of ' + fmtDay(start)}</h1>
       <p>${range}${fxWeekNotes(ctx)}</p>
     </div>
     <div class="week-nav">${weekPicker()}</div>
