@@ -411,17 +411,15 @@ const pickName = p => `${p.year} Round ${p.round}`;
 
 // What a deal does for your team: value over a waiver player each way (each player in a deal takes a roster spot someone
 // off waivers could fill; a goalie for his share of his team's games, as the waiver player's), and each category's
-// per-game total across your active (non-IR) roster now and after
+// per-game total across your active (non-IR) roster now and after. Numbers only: the site never says who wins a trade or
+// whether it's fair, that's for the people trading to judge (the owner's rule)
 function tradeForYou(give, get) {
   const active = state.players.filter(p => !state.il.includes(p.id)), out = new Set(give.map(p => p.id));
   const before = totals(active), after = totals([...active.filter(p => !out.has(p.id)), ...get]);
   const wv = waiverValue(), over = p => gameWorth(p) - wv;
   const vGive = sum(give.map(over)), vGet = sum(get.map(over)), diff = vGet - vGive, cats = scoreCats();
   const better = c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; };
-  return {
-    before, after, vGive, vGet, diff, won: cats.filter(better).length, n: cats.length, rosterAfter: activeCount() - give.length + get.length,
-    verdict: Math.abs(diff) < (isPoints() ? 2 : 0.04) ? ['Roughly even', 'muted'] : diff > 0 ? ['You win this trade', 'pos-good'] : ['You lose this trade', 'pos-bad'],
-  };
+  return { before, after, vGive, vGet, diff, won: cats.filter(better).length, n: cats.length, rosterAfter: activeCount() - give.length + get.length };
 }
 
 /* ---------- Trade proposal: both sides of a deal, with photos and per-game numbers, to share with the other team ---------- */
@@ -476,7 +474,7 @@ function dealLine(p) {
 }
 
 // Both sides of a deal, for the card, the picture and the text: what each team gets (players as the Players tab has
-// them, best first), their value added up (sum) and over a waiver player (value, as the verdict counts it), and their
+// them, best first), their value added up (sum) and over a waiver player (value, as the value line above the table counts it), and their
 // per-game totals, then the
 // comparison's rows: { key, label, sa, sb (as shown), lead: 1 (the first side's is better), -1, or 0 (even, or no number),
 // and for a shooting percentage va, vb (makes-attempts a game) and ta, tb (what the volume adds, for a tip) }
@@ -519,7 +517,7 @@ const playoffWeeks = P => `week${P.ps.length > 1 ? `s ${P.ps[0].n}–${P.ps[P.ps
 // The proposal on the Trades tab, all in one table: for each side, what it gets (each player's photo, his ranks this
 // season by value per game and added up, his average game in the league's categories, his value), then that side's
 // total, the better side's numbers marked; last, with Y (your own deal: tradeForYou), what it does for your team, with
-// the verdict above. In your own deal your side's better numbers are green and the other side's red; a league mate's
+// the value line above. In your own deal your side's better numbers are green and the other side's red; a league mate's
 // deal (no Y) stays neutral. A points league's FP is the Value column.
 function tradeCard(T, Y) {
   const M = tradeModel(T), seen = !Y, me = myTeamId(), R = valueRanks(), P = M.P;
@@ -565,7 +563,7 @@ function tradeCard(T, Y) {
     <td class="num tp-v ${zero(fmtValue(Y.diff)) ? 'muted' : Y.diff > 0 ? 'pos-good' : 'pos-bad'}" title="Net ${valueLabel().toLowerCase()} over a waiver player"><b>${fmtValue(Y.diff)}</b></td></tr>` : '';
   const shots = cats.some(c => c.pct && !c.rate), spanH = (label, n, tip = '') => `<th class="tp-span" colspan="${n}"${tip ? ` title="${esc(tip)}"` : ''}>${label}</th>`;
   return `<div class="card tp">
-    <div class="card-head"><div class="tp-head"><h2>Trade proposal</h2>${Y ? `<span class="verdict ${Y.verdict[1]}">${Y.verdict[0]}</span>` : ''}</div>
+    <div class="card-head"><div class="tp-head"><h2>Trade proposal</h2></div>
       <div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}${shareable ? '<button type="button" class="btn sm primary" data-action="trade-share">Share</button>' : ''}</div></div>
     ${seen ? `<p class="muted small tp-note">A trade a league mate shared, between ${teamLink(M.A.tid)} and ${teamLink(M.B.tid)}.</p>` : ''}
     <p class="muted small tp-sum">${valueLabel()} over a waiver player ${infoBtn('tradeValue')}: ${Y ? `give ${fmtValue(Y.vGive)} · get ${fmtValue(Y.vGet)} · net <b>${fmtValue(Y.diff)}</b>${isPoints() ? '' : ` · improves ${Y.won} of ${Y.n} cats`}`

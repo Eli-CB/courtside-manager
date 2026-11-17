@@ -100,8 +100,8 @@ const INFO = {
     <li><b>Missed:</b> games his NBA team played in those weeks without him (injury, rest or a coach's decision).</li>
     <li><b>Value:</b> each game valued like a single game on the Players tab: categories won against not playing (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
   tradeValue: ['Value over a waiver player', `
-    <p>Each player's value per game (see Player value) minus the best player your league leaves on waivers, since every player in a deal takes a roster spot someone off waivers could fill. So two good players for one star only wins if they're worth more than the star plus the waiver player you'd otherwise have.</p>
-    <p>Within about 0.04 (2 fantasy points in points leagues) it's called roughly even. The table shows what happens to each category.</p>`],
+    <p>Each player's value per game (see Player value) minus the best player your league leaves on waivers, since every player in a deal takes a roster spot someone off waivers could fill. So two good players for one star add more only if they're worth more than the star plus the waiver player you'd otherwise have.</p>
+    <p>The table shows what happens to each category. Whether the deal is worth it is yours to judge.</p>`],
   storage: ['Saved on this device', `
     <p>To keep requests to Fantrax and ESPN low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), each site's player list (and Fantrax's ADP, refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
     <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved league data</b> removes only what came from Fantrax and ESPN; it's fetched again the next time it's needed.</p>`],

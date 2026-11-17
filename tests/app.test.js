@@ -1059,10 +1059,10 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     assert.deepEqual([...M.B.players.map(p => p.nbaId)], [mine[0].nbaId]);
     // (shooting with its makes and attempts a game, as the Recap's lines)
     assert.match(app.dealLine(M.B.players[0]).join(' · '), /^[\d.]+ MIN · [\d.]+-[\d.]+ FG \((\.\d{3}|—)\) · [\d.]+-[\d.]+ FT \((\.\d{3}|—)\) · [\d.]+ 3PM · [\d.]+ PTS · /);
-    // side by side: value over a waiver player as the verdict counts it, then each category's per-game total, the better marked
+    // side by side: value over a waiver player as the value line counts it, then each category's per-game total, the better marked
     const wv = app.waiverValue(), over = ps => ps.reduce((t, p) => t + app.gameWorth(p) - wv, 0);
     assert.deepEqual([M.rows[0].sa, M.rows[0].sb], [app.fmtValue(over(M.A.players)), app.fmtValue(over(M.B.players))]);
-    assert.ok(html.includes(`give ${M.rows[0].sb} · get ${M.rows[0].sa}`), "the verdict's numbers");
+    assert.ok(html.includes(`give ${M.rows[0].sb} · get ${M.rows[0].sa}`), "the value line's numbers");
     assert.deepEqual([...M.rows.slice(1).map(r => r.key)], ['po', ...L.cats], 'playoff games, then the categories');
     const pts = M.rows.find(r => r.key === 'pts'), ptsOf = ps => ps.reduce((t, p) => t + p.pts, 0);
     assert.equal(pts.sa, app.fmt(ptsOf(M.A.players), 1));
@@ -1081,8 +1081,11 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     for (const S of [M.A, M.B]) assert.ok(card.includes(`<b>${app.fmtValue(S.sum)}</b><div class="tp-vol">${app.fmtValue(S.value)} over waiver</div>`), S.name);
     const you = card.slice(card.indexOf('For your team')).split('</tr>')[0], Y = app.tradeForYou([mine[0]], theirs.slice(0, 2));
     assert.equal(you.match(/<td class="num/g).length, L.cats.length + 2, 'the net playoff games, a change for each category, then the net value');
-    assert.ok(you.includes(`<b>${app.fmtValue(Y.diff)}</b>`) && html.includes(Y.verdict[0]));
-    assert.ok(html.indexOf('Trade proposal') < html.indexOf(Y.verdict[0]) && html.indexOf(Y.verdict[0]) < html.indexOf('tp-table'), 'the verdict at the top of the one card');
+    assert.ok(you.includes(`<b>${app.fmtValue(Y.diff)}</b>`));
+    // numbers only: never who wins or whether it's fair (the owner's rule), in the card, its (i) or the share
+    const said = [html, app.get('INFO').tradeValue.join(' '), app.tradeShare(L, T).text].join(' ');
+    assert.ok(!/\b(win|wins|lose|loses|won|lost|fair|unfair|even|verdict|steal|ripoff|rip-off)\b/i.test(said.replace(/<[^>]*>/g, ' ').replace(/improves \d+ of \d+ cats/, '')), 'no verdict');
+    assert.ok(html.indexOf('Trade proposal') < html.indexOf(`give ${M.rows[0].sb}`) && html.indexOf(`give ${M.rows[0].sb}`) < html.indexOf('tp-table'), 'the value line at the top of the one card');
     // playoff games: each player's NBA team's games in the league's playoff periods (from L.playoffPeriod to the last),
     // each side's added up and the side with more marked, and your net
     const P = app.playoffDays(), poDays = L.periods.filter(q => q.n >= L.playoffPeriod).flatMap(q => app.periodDates(q));

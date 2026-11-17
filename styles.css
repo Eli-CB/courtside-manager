@@ -672,7 +672,6 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .pp-from { font-weight: 400; color: var(--muted); font-size: .74rem; }
 .pp-note { margin: 10px 0 0; }
 .tp-table .pk-ico { font-size: .7rem; font-weight: 800; color: var(--muted); }
-.verdict { font-size: 1.15rem; font-weight: 700; }
 .delta-table td.num { font-weight: 600; }
 /* the trade proposal (tradeCard, views.js): what each side gets, then the two sides per game */
 .trade-grid + .card, .tp + .trade-grid { margin-top: 16px; }
