@@ -361,6 +361,7 @@ const actions = {
     ui.dashBench = !ui.dashBench;
     render();
   },
+  'dash-full'() { dashFull(!ui.dashFull); },
   'perf-per'(el) {
     ui.perfPer = el.dataset.per === '1';
     if (ui.perfRange === 'avg') ui.perfRange = 'year';

@@ -249,6 +249,14 @@ a { color: var(--accent); }
 .df-body { padding: 0 16px 16px; }
 .df-body > p:first-child { margin-top: 0; }
 .waiver-line { margin: 12px 0 0; }
+/* its full-screen button (top right, as tall as the toggle's line), and full screen: the card alone, the page's head, tabs,
+   notes, folds and footer hidden (dashFull) */
+.mu-full-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; margin: -4px -6px -4px 6px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; flex: none; }
+.mu-full-btn:hover { background: var(--surface-2); color: var(--text); }
+.mu-full-ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+body:has(.mu-card.full) :is(.head, .topbar, #ctxBar, .site-foot, .dash-folds) { display: none; }
+body:has(.mu-card.full) { padding-bottom: env(safe-area-inset-bottom, 0px); } /* (phones: no tab bar to make room for) */
+body:has(.mu-card.full) .container { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
 /* the Dashboard's matchup: a scoreboard, who leads each category, then both lineups slot by slot (you on the left) */
 .mu-board { margin-bottom: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 10px; }
 .mu-team { min-width: 0; }

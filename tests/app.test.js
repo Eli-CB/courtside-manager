@@ -873,6 +873,26 @@ test("the Dashboard's matchup: this matchup's days only", async () => {
   assert.ok(app.tabList().some(([k, l]) => k === 'players' && l === 'Players'));
 });
 
+test("the Matchup card's full-screen button, in place of its (i)", async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  useTeam(app.fxLeague().teams[0].id);
+  const ui = app.get('ui');
+  try {
+    await onDay('2026-10-28', () => {
+      const m = app.dashMatchupCard();
+      assert.ok(m.includes('data-action="dash-full" aria-pressed="false"') && !m.includes('class="info-btn"'));
+      assert.ok(!m.includes('mu-card full'));
+      for (const r of ['today', 'day', 'week']) {
+        ui.dashRange = r;
+        ui.dashFull = true;
+        const f = app.dashMatchupCard();
+        assert.ok(f.includes('class="card mu-card full"') && f.includes('aria-pressed="true"'), `full screen on ${r}`);
+      }
+    });
+  } finally { ui.dashRange = null; ui.dashFull = false; }
+});
+
 test("performances: this week adds up each player's games", async () => {
   await app.loadBoxes();
   await app.useLeague(CATS9);
