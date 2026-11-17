@@ -128,7 +128,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     any league ends it. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
 - `scripts/update_data.py`: daily data job (GitHub Actions, started at 08:00 UTC = 4 a.m. ET, 3 a.m. in winter, by the Worker's Cron Trigger through
   GitHub's API, `startDataJob` in worker/yahoo.js: GitHub ran the workflow's own schedule hours late, 14:54-18:12 UTC on Nov 11-16, 2026;
-  the workflow's 09:23 UTC schedule is the backstop. Needs the owner's `GITHUB_TOKEN` secret and deploy, worker/README.md "Daily data job".
+  the workflow's 09:23 UTC schedule is the backstop. Set up Nov 17, 2026 (the owner's fine-grained `GITHUB_TOKEN`, Actions read/write on
+  this repo only; renewing it: worker/README.md "Daily data job"; an expired one shows in the error log as "Daily data job not started").
   The page still mustn't wait on the job for last night's games) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
