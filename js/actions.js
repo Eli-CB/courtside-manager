@@ -171,7 +171,7 @@ const actions = {
   // the league's ID, to send to a friend in the league: pasted into the league form, it connects the same league
   async 'copy-league-id'() {
     const id = fxLeague().id;
-    try { await navigator.clipboard.writeText(id); toast('League ID copied'); } catch (e) { toast(`Couldn't copy. The league ID is ${id}`); }
+    try { await navigator.clipboard.writeText(id); toast('League ID copied: a friend connects the league with it'); } catch (e) { toast(`Couldn't copy. The league ID is ${id}`); }
   },
   'yahoo-signin'() { yahooSignIn(); },
   'yahoo-signout'() { yahooSignOut(); render(); },

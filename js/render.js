@@ -196,8 +196,15 @@ const TIP_URL = 'https://ko-fi.com/leaguelayerdev'; // tips (also in index.html'
 const ICON_RELOAD = menuIcon('<path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 3.5v5h-5"/>');
 const ICON_MAIL = menuIcon('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>');
 const ICON_PHONE = menuIcon('<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>');
-const ICON_COPY = menuIcon('<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>');
+const GEAR_COPY = menuIcon('<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>');
 const ICON_COFFEE = menuIcon('<path d="M4 10h12v4.5a4.5 4.5 0 0 1-4.5 4.5h-3A4.5 4.5 0 0 1 4 14.5z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c-.8 1 .8 2-.1 3M12 3.5c-.8 1 .8 2-.1 3"/>');
+const GEAR_STATS = menuIcon('<path d="M5 20v-8M12 20V5M19 20v-5"/>');
+const GEAR_MOON = menuIcon('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>');
+const GEAR_EYE_OFF = menuIcon('<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/><path d="m4 4 16 16"/>');
+const GEAR_CLOCK = menuIcon('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>');
+const GEAR_TRASH = menuIcon('<path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/>');
+const GEAR_BACKUP = menuIcon('<path d="M12 4v11m0 0-4-4m4 4 4-4"/><path d="M4.5 16.5v2A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-2"/>');
+const GEAR_RESET = menuIcon('<path d="M4 12a8 8 0 1 0 2.34-5.66L4 8.5"/><path d="M4 3.5v5h5"/>');
 const FEEDBACK_EMAIL = 'feedback@leaguelayer.com', FEEDBACK_SUBJECT = 'League Layer feedback';
 function feedbackDetails() {
   const L = fxLeague();
@@ -235,28 +242,33 @@ function gearMenu() {
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = colorNow === 'dark' ? '#141416' : '#ffffff'; });
   const dark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
   const hasLeague = fxLeague() && !needsLanding(), league = hasLeague && !state.demo;
+  // every row the same shape: icon, label (a line of small print under it), and a switch at the right where there is one
+  const row = (attrs, icon, label, sub, tail = '', tag = 'button') => `<${tag} class="lm-item gear-item${tail ? ' gear-toggle' : ''}" ${tag === 'button' ? 'type="button" ' : ''}${attrs}>${icon}<span class="gear-text">${label}${sub ? `<span class="gear-sub">${sub}</span>` : ''}</span>${tail}</${tag}>`;
+  const toggle = (action, icon, label, sub, on) => row(`data-action="${action}" role="switch" aria-checked="${!!on}"`, icon, label, sub, `<span class="gear-switch${on ? ' on' : ''}" aria-hidden="true"></span>`);
   el.innerHTML = `<details class="gear"${wasOpen ? ' open' : ''}>
     <summary class="icon-btn" aria-label="Settings" title="Settings">${lineIcon(ICON_GEAR_D, 'hd-ico')}</summary>
     <div class="gear-pop">
       ${hasLeague ? `<div class="lm-sec">League</div>
-      ${league ? `<button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">${reloadWait() > 0 ? 'read just now' : 'rosters, lineups, matchups and standings'}</span></button>` : ''}
-      <div class="gear-row gear-pick"><span>Stats used ${infoBtn('projection')}</span><select class="ctx-team" data-change="set-basis" aria-label="Stats used">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-      ${league ? `<button type="button" class="lm-item" data-action="copy-league-id" title="Copy the league ID">${ICON_COPY}Copy league ID<span class="gear-sub">${esc(fxLeague().id)} · send it to a friend to connect the league</span></button>` : ''}` : ''}
+      ${league ? row('data-action="league-reload"', ICON_RELOAD, `Reload from ${sourceName()}`, reloadWait() > 0 ? 'read just now' : 'rosters, lineups and standings') : ''}
+      <div class="gear-row gear-pick">${GEAR_STATS}<span class="gear-text">Stats used ${infoBtn('projection')}</span><select class="ctx-team" data-change="set-basis" aria-label="Stats used">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      ${league ? row('data-action="copy-league-id" title="Copy it, to send to a friend who connects the same league"', GEAR_COPY, 'Copy league ID', esc(fxLeague().id)) : ''}` : ''}
       <div class="lm-sec">Appearance</div>
-      <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
-      <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers on the Matchup tab</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>
-      <button type="button" class="lm-item gear-toggle" data-action="toggle-clock" role="switch" aria-checked="${ui.clock24}"><span>24-hour time<span class="gear-sub">tip-offs and update times as ${fmtTime('2026-11-02T19:30:00')}</span></span><span class="gear-switch${ui.clock24 ? ' on' : ''}" aria-hidden="true"></span></button>
+      ${toggle('toggle-theme', GEAR_MOON, 'Dark mode', '', dark)}
+      ${toggle('toggle-scores', GEAR_EYE_OFF, 'Hide game scores', 'no spoilers on the Matchup tab', ui.hideScores)}
+      ${toggle('toggle-clock', GEAR_CLOCK, '24-hour time', `tip-offs as ${fmtTime('2026-11-02T19:30:00')}`, ui.clock24)}
       <div class="lm-sec">Help</div>
-      <button type="button" class="lm-item" data-action="feedback">${ICON_MAIL}Send feedback<span class="gear-sub">a problem, an idea, a league that doesn't look right</span></button>
-      ${canInstall() ? `<button type="button" class="lm-item" data-action="install-app">${ICON_PHONE}Install the app<span class="gear-sub">on your home screen, full screen with no browser bars</span></button>` : ''}
-      <a class="lm-item" href="${TIP_URL}" target="_blank" rel="noopener">${ICON_COFFEE}Buy me a coffee<span class="gear-sub">tips keep League Layer free, on Ko-fi</span></a>
+      ${row('data-action="feedback"', ICON_MAIL, 'Send feedback', 'a problem, an idea, a wrong number')}
+      ${canInstall() ? row('data-action="install-app"', ICON_PHONE, 'Install the app', 'full screen, on your home screen') : ''}
+      ${row(`href="${TIP_URL}" target="_blank" rel="noopener"`, ICON_COFFEE, 'Buy me a coffee', 'tips keep League Layer free', '', 'a')}
       <details class="gear-adv"${advOpen ? ' open' : ''}><summary class="lm-sec">Advanced</summary>
-        <div class="gear-row">${NBA ? `${SPORT.name} stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : `${SPORT.name} data unavailable`}</div>
-        <div class="gear-row">Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
-        <button type="button" class="lm-item" data-action="clear-saved">Clear saved league data<span class="gear-sub">leagues, weekly lineups and player lists; fetched again when needed</span></button>
-        <button type="button" class="lm-item" data-action="export">Backup &amp; restore</button>
-        <button type="button" class="lm-item danger" data-action="start-fresh">Reset and start over</button>
-        <div class="gear-row">Version ${BUILD.startsWith('__') ? 'local' : esc(BUILD)}</div>
+        ${row('data-action="clear-saved"', GEAR_TRASH, 'Clear saved league data', 'fetched again when needed')}
+        ${row('data-action="export"', GEAR_BACKUP, 'Backup &amp; restore', '')}
+        ${row('data-action="start-fresh"', GEAR_RESET, 'Reset and start over', '').replace('lm-item ', 'lm-item danger ')}
+        <div class="gear-info">
+          <div>${NBA ? `${SPORT.name} stats updated ${ago(NBA.updated)} ${infoBtn('data')}` : `${SPORT.name} data unavailable`}</div>
+          <div>Saved on this device: ${savedSize()} ${infoBtn('storage')}</div>
+          <div>Version ${BUILD.startsWith('__') ? 'local' : esc(BUILD)}</div>
+        </div>
       </details>
     </div>
   </details>`;
