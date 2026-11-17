@@ -524,7 +524,7 @@ function tradeCard(T, Y) {
   const mineAt = M.A.tid === me ? 1 : M.B.tid === me ? -1 : 0;
   // the sides with something in the deal (Share once both have); totals compared only when both have players
   const sides = [[M.A, 1], [M.B, -1]].filter(([S]) => S.players.length || S.picks.length), shareable = sides.length === 2;
-  const both = !!(M.A.players.length && M.B.players.length), anyPicks = sides.some(([S]) => S.picks.length);
+  const both = !!(M.A.players.length && M.B.players.length);
   const cats = dealCats().filter(c => !c.fp), rowOf = new Map(M.rows.map(r => [r.key, r])), ncol = 6 + cats.length + (P ? 1 : 0);
   // the playoffs' column (a league with playoffs to come): his games in them, each side's added up, your net
   const poTip = P ? `Games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}${isOneGame() ? ': the playoff weeks he plays in, as one game a week counts' : isHockey() ? ': a goalie\'s expected starts' : ''}` : '';
@@ -546,7 +546,7 @@ function tradeCard(T, Y) {
     <td class="num">${p.gp}</td>${poCell(fmtGames(playoffGames(p, P)))}<td class="num">${fmt(p.min || 0, 1)}</td>${cats.map(c => gameCell(p, c)).join('')}<td class="num tp-v"><b>${fmtValue(value(p))}</b></td></tr>`;
   // a side's total: its playoff games and each category added up (a percentage from its makes and attempts), its value
   // added up and over a waiver player for each roster spot (what's marked)
-  const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl">Total</td><td></td><td></td><td></td>${poCell(fmtGames(S.po), mark(rowOf.get('po'), col))}<td></td>
+  const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl"></td><td></td><td></td><td></td>${poCell(fmtGames(S.po), mark(rowOf.get('po'), col))}<td></td>
     ${cats.map(c => { const r = rowOf.get(c.key), [v, vl, tip] = col === 1 ? [r.sa, r.va, r.ta] : [r.sb, r.vb, r.tb]; return `<td class="num${mark(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol(vl)}</td>`; }).join('')}
     <td class="num tp-v${mark(M.rows[0], col)}" title="${esc(`${valueLabel()} added up; ${fmtValue(S.value)} over a waiver player for each roster spot, which is what's compared`)}"><b>${fmtValue(S.sum)}</b>${vol(`${fmtValue(S.value)} over waiver`)}</td></tr>`;
   // a draft pick: its round in the photo's place, the year and round, and whose it was when that's not the sender's own (no
@@ -558,27 +558,22 @@ function tradeCard(T, Y) {
   const change = (c, d) => (c.rate ? signed(d, 2) : c.pct ? `${signed(d * 100, 1)}%` : signed(d, 1));
   const zero = shown => !+String(shown).replace(/[^\d.]/g, ''); // (a change that rounds to nothing is gray, not green)
   const poNet = P && M.A.po - M.B.po, poShown = P ? `${poNet > 0.05 ? '+' : poNet < -0.05 ? '−' : ''}${fmtGames(Math.abs(poNet))}` : '';
-  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b><div class="muted small">change per game</div></td><td></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
+  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b></td><td></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
     ${cats.map(c => { const b = Y.before[c.key], a = Y.after[c.key], d = a - b, shown = change(c, d); return `<td class="num ${zero(shown) ? 'muted' : (c.neg ? d < 0 : d > 0) ? 'pos-good' : 'pos-bad'}" title="${c.label}: ${dealShow(c, b)} now, ${dealShow(c, a)} after">${shown}</td>`; }).join('')}
     <td class="num tp-v ${zero(fmtValue(Y.diff)) ? 'muted' : Y.diff > 0 ? 'pos-good' : 'pos-bad'}" title="Net ${valueLabel().toLowerCase()} over a waiver player"><b>${fmtValue(Y.diff)}</b></td></tr>` : '';
-  const shots = cats.some(c => c.pct && !c.rate), spanH = (label, n, tip = '') => `<th class="tp-span" colspan="${n}"${tip ? ` title="${esc(tip)}"` : ''}>${label}</th>`;
+  // the ranks' and playoff column's tips (what they mean in full is in the card's (i): INFO.trade)
+  const rankTip = `This season, among every ${SPORT.name} player with ${R.minGp}+ games, by ${valueLabel().toLowerCase()} per game`, seasonTip = `This season, among every ${SPORT.name} player, by ${valueLabel().toLowerCase()} added up`;
   return `<div class="card tp">
-    <div class="card-head"><div class="tp-head"><h2>Trade proposal</h2></div>
+    <div class="card-head"><div class="tp-head"><h2>Trade proposal ${infoBtn('trade')}</h2></div>
       <div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}${shareable ? '<button type="button" class="btn sm primary" data-action="trade-share">Share</button>' : ''}</div></div>
     ${seen ? `<p class="muted small tp-note">A trade a league mate shared, between ${teamLink(M.A.tid)} and ${teamLink(M.B.tid)}.</p>` : ''}
-    <p class="muted small tp-sum">${valueLabel()} over a waiver player ${infoBtn('tradeValue')}: ${Y ? `give ${fmtValue(Y.vGive)} · get ${fmtValue(Y.vGet)} · net <b>${fmtValue(Y.diff)}</b>${isPoints() ? '' : ` · improves ${Y.won} of ${Y.n} cats`}`
-      : `${esc(M.A.name)} gets ${fmtValue(M.A.value)} · ${esc(M.B.name)} gets ${fmtValue(M.B.value)}`}</p>
     ${Y && Y.rosterAfter > rosterLimit() ? `<p class="alert warn small tp-warn">This puts you at ${Y.rosterAfter}/${rosterLimit()}: you'd need to drop ${Y.rosterAfter - rosterLimit()}.</p>` : ''}
     <div class="tp-wrap"><table class="tp-table">
-      <thead><tr><th class="tp-pl" rowspan="2">Player</th>${spanH('Rank', 2, `This season, among every ${SPORT.name} player`)}<th class="num" rowspan="2" title="Games played this season">GP</th>${P ? `<th class="num tp-po" rowspan="2" title="${esc(poTip)}">Playoff G</th>` : ''}${spanH('Per game', 1 + cats.length)}<th class="num tp-v" rowspan="2">${valueLabel()}</th></tr>
-        <tr><th class="num" title="By ${valueLabel().toLowerCase()} per game (players with ${R.minGp}+ games)">Per G</th><th class="num" title="By ${valueLabel().toLowerCase()} added up this season">Total</th><th class="num">MIN</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}</tr></thead>
+      <thead><tr><th class="tp-pl"></th><th class="num" title="${esc(rankTip)}">Rank</th><th class="num" title="${esc(seasonTip)}">Season</th><th class="num" title="Games played this season">GP</th>${P ? `<th class="num tp-po" title="${esc(poTip)}">Playoff G</th>` : ''}<th class="num">MIN</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}<th class="num tp-v">${valueLabel()}</th></tr></thead>
       <tbody>${sides.map(sideRows).join('')}${youRow}</tbody>
     </table></div>
-    <p class="small muted tp-foot">Ranks: this season, among every ${SPORT.name} player.${P ? ` Playoff G: his team's games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}.` : ''} Numbers: each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}${Y ? ' For your team: your active roster\'s per-game totals, after the trade against now.' : ''}${anyPicks ? ' Draft picks aren\'t in the numbers: next season\'s draft order isn\'t known yet.' : ''}</p>
   </div>`;
 }
-// what a percentage row says about volume (the card's and the picture's)
-const TRADE_SHOTS = 'Percentages count volume: makes-attempts a game under each, and the better side is the one with more makes over the league average on its attempts.';
 
 // Sharing it (shareWith, recap.js): a picture, or the text and a link that opens the deal on the Trades tab
 const tradeUrl = (L, T) => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}&from=${encodeURIComponent(T.from)}&to=${encodeURIComponent(T.to)}`
@@ -682,13 +677,15 @@ async function tradeCanvas(L, M) {
       ty += rowH(r);
     }
     y += h;
-    notes.push(`${valueLabel()}: what each side's players add per game${isPoints() ? ' in fantasy points' : ' to winning categories'}, less a waiver player for each roster spot they take.`);
-    if (M.P) notes.push(`Playoff games: each team's games in the league's playoffs, ${playoffWeeks(M.P)}${M.P.started ? ', still to play' : ''}.`);
-    if (M.rows.some(r => r.va || r.vb)) notes.push(TRADE_SHOTS);
+    // (short: the picture has no (i), and the site's own card says the rest)
+    notes.push(`${valueLabel()}: per game, over a waiver player for each roster spot`);
+    if (M.P) notes.push(`playoff games: ${playoffWeeks(M.P)}${M.P.started ? ', still to play' : ''}`);
+    if (M.rows.some(r => r.va || r.vb)) notes.push('FG% and FT% marked by makes over the league average');
   }
-  if (picks) notes.push("Draft picks aren't in the numbers: next season's draft order isn't known yet.");
+  if (picks) notes.push("draft picks aren't valued");
   y += 22;
   font(24);
-  for (const note of notes) { for (const l of wrapText(ctx, note, inner)) { text(l, C.pad, y, C.muted); y += 34; } y += 8; }
+  const said = notes.join(' · ');
+  if (said) for (const l of wrapText(ctx, `${said[0].toUpperCase()}${said.slice(1)}.`, inner)) { text(l, C.pad, y, C.muted); y += 34; }
   return K.done(y);
 }

@@ -99,9 +99,15 @@ const INFO = {
     <li><b>GP:</b> games played in those weeks; every stat comes from just these games.</li>
     <li><b>Missed:</b> games his NBA team played in those weeks without him (injury, rest or a coach's decision).</li>
     <li><b>Value:</b> each game valued like a single game on the Players tab: categories won against not playing (fantasy points in points leagues), added up for Totals or averaged for Per game.</li></ul>`],
-  tradeValue: ['Value over a waiver player', `
-    <p>Each player's value per game (see Player value) minus the best player your league leaves on waivers, since every player in a deal takes a roster spot someone off waivers could fill. So two good players for one star add more only if they're worth more than the star plus the waiver player you'd otherwise have.</p>
-    <p>The table shows what happens to each category. Whether the deal is worth it is yours to judge.</p>`],
+  // the Trades tab's proposal (tradeCard, views.js): everything its table shows, so the table itself carries no notes
+  trade: ['Trade proposal', () => { const P = fxLeague() ? playoffDays() : null; return `
+    <p><b>Rank</b> and <b>Season.</b> Where each player stands this season among every ${SPORT.name} player: by ${valueLabel() === 'Value' ? 'value' : 'fantasy points'} per game (players with enough games to count), and by the same added up over the season. They're his player card's ranks.</p>
+    <p><b>Playoff G.</b> His team's games in your league's playoffs${P ? `, ${playoffWeeks(P)}` : ''}, only those still to play once they've started. A goalie's are his expected starts; in a Sleeper league, where one game a week counts, it's the playoff weeks he plays in.</p>
+    <p><b>The stats</b> are each player's average game (the settings menu's Stats used), and each side's row under its players adds them up. FG% and FT% count volume: each side's makes and attempts a game are under its percentage, and the side marked is the one with more makes over the league average on its attempts, so a few shots at a high percentage don't outweigh many at a good one.</p>
+    <p><b>Value</b> is each player's value per game (see Player value). Under a side's total is its value over a waiver player, which is what's compared: every player in a deal takes a roster spot someone off waivers could fill, so two good players for one star add more only if they're worth more than the star plus the waiver player you'd otherwise have.</p>
+    <p><b>For your team</b>: what the trade does to your active (non-IR) roster's per-game totals in each category, your playoff games, and the net value over a waiver player. Hover a category for now and after.</p>
+    <p><b>Draft picks</b> aren't in the numbers: next season's draft order isn't known yet.</p>
+    <p>Whether a deal is worth it is yours to judge.</p>`; }],
   storage: ['Saved on this device', `
     <p>To keep requests to Fantrax and ESPN low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), each site's player list (and Fantrax's ADP, refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
     <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved league data</b> removes only what came from Fantrax and ESPN; it's fetched again the next time it's needed.</p>`],

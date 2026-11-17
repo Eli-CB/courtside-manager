@@ -678,20 +678,16 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .tp-btns { display: flex; gap: 8px; margin-left: auto; }
 .tp-note { margin: -6px 0 12px; }
 .tp-head { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; min-width: 0; }
-.tp-sum { margin: -6px 0 10px; }
 .tp-warn { margin: 0 0 12px; }
 /* one table: each side's players, its total, then what it does for your team */
 .tp-wrap { overflow-x: auto; } /* no padding: the pinned player column sticks to its edge (as the Players tab's) */
 .tp-table { font-size: .86rem; font-variant-numeric: tabular-nums; }
 .tp-table th, .tp-table td { padding: 6px 5px; }
 .tp-table thead th { font-size: .72rem; }
-.tp-table th.tp-span { text-align: center; padding-bottom: 2px; border-bottom: 0; }
-.tp-table th.tp-po { white-space: normal; width: 3.6em; } /* "Playoff G" on two lines */
-.tp-table td.tp-pl, .tp-table th.tp-pl { min-width: 190px; padding-left: 0; }
+.tp-table td.tp-pl, .tp-table th.tp-pl { min-width: 170px; padding-left: 0; }
 .tp-table tr.tp-grp th { padding: 14px 0 6px; font-size: .9rem; font-weight: 600; color: var(--text); white-space: normal; overflow-wrap: anywhere; }
 .tp-table tbody tr.tp-grp:hover, .tp-table tbody tr.tp-tot:hover { background: none; }
 .tp-table tr.tp-tot td { font-weight: 600; border-bottom: 2px solid var(--border); }
-.tp-table tr.tp-tot td.tp-pl { color: var(--muted); }
 .tp-table tr.tp-you td { padding-top: 10px; font-weight: 600; }
 .tp-table td.tp-rank { color: var(--muted); }
 .tp-table td.tp-v { padding-left: 12px; }
@@ -699,7 +695,6 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .tp-table td.tp-lead.pos-good { background: var(--good-soft); }
 .tp-table td.tp-lead.pos-bad { background: var(--bad-soft); }
 .tp-vol { font-size: .72rem; font-weight: 400; color: var(--muted); white-space: nowrap; } /* a percentage's makes-attempts a game */
-.tp-foot { margin: 10px 0 0; }
 
 /* ---------- Lineup editor (Roster tab) ---------- */
 

@@ -1017,8 +1017,7 @@ test('player value everywhere is the Dashboard\'s: categories won per game; trad
     ui.tradeGive.add(give.id); get.forEach(x => ui.tradeGet.add(String(x.nbaId)));
     const html = app.viewTrade();
     const net = get.reduce((t, x) => t + app.value(x) - wv, 0) - (app.value(give) - wv);
-    assert.ok(html.includes(`net <b>${app.fmtValue(net)}</b>`), 'net over a waiver player');
-    assert.ok(html.includes('over a waiver player'));
+    assert.ok(html.includes(`over a waiver player"><b>${app.fmtValue(net)}</b>`), 'net over a waiver player, in For your team');
   } finally { ui.tradeGive.clear(); ui.tradeGet.clear(); }
 });
 
@@ -1059,10 +1058,10 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     assert.deepEqual([...M.B.players.map(p => p.nbaId)], [mine[0].nbaId]);
     // (shooting with its makes and attempts a game, as the Recap's lines)
     assert.match(app.dealLine(M.B.players[0]).join(' · '), /^[\d.]+ MIN · [\d.]+-[\d.]+ FG \((\.\d{3}|—)\) · [\d.]+-[\d.]+ FT \((\.\d{3}|—)\) · [\d.]+ 3PM · [\d.]+ PTS · /);
-    // side by side: value over a waiver player as the value line counts it, then each category's per-game total, the better marked
+    // side by side: value over a waiver player (under each side's total), then each category's per-game total, the better marked
     const wv = app.waiverValue(), over = ps => ps.reduce((t, p) => t + app.gameWorth(p) - wv, 0);
     assert.deepEqual([M.rows[0].sa, M.rows[0].sb], [app.fmtValue(over(M.A.players)), app.fmtValue(over(M.B.players))]);
-    assert.ok(html.includes(`give ${M.rows[0].sb} · get ${M.rows[0].sa}`), "the value line's numbers");
+    assert.ok(card.includes(`${M.rows[0].sa} over waiver`) && card.includes(`${M.rows[0].sb} over waiver`));
     assert.deepEqual([...M.rows.slice(1).map(r => r.key)], ['po', ...L.cats], 'playoff games, then the categories');
     const pts = M.rows.find(r => r.key === 'pts'), ptsOf = ps => ps.reduce((t, p) => t + p.pts, 0);
     assert.equal(pts.sa, app.fmt(ptsOf(M.A.players), 1));
@@ -1083,9 +1082,16 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     assert.equal(you.match(/<td class="num/g).length, L.cats.length + 2, 'the net playoff games, a change for each category, then the net value');
     assert.ok(you.includes(`<b>${app.fmtValue(Y.diff)}</b>`));
     // numbers only: never who wins or whether it's fair (the owner's rule), in the card, its (i) or the share
-    const said = [html, app.get('INFO').tradeValue.join(' '), app.tradeShare(L, T).text].join(' ');
-    assert.ok(!/\b(win|wins|lose|loses|won|lost|fair|unfair|even|verdict|steal|ripoff|rip-off)\b/i.test(said.replace(/<[^>]*>/g, ' ').replace(/improves \d+ of \d+ cats/, '')), 'no verdict');
-    assert.ok(html.indexOf('Trade proposal') < html.indexOf(`give ${M.rows[0].sb}`) && html.indexOf(`give ${M.rows[0].sb}`) < html.indexOf('tp-table'), 'the value line at the top of the one card');
+    const info = app.get('INFO').trade, infoText = `${info[0]} ${info[1]()}`;
+    const said = [html, infoText, app.tradeShare(L, T).text].join(' ');
+    assert.ok(!/\b(win|wins|lose|loses|won|lost|fair|unfair|even|verdict|steal|ripoff|rip-off)\b/i.test(said.replace(/<[^>]*>/g, ' ')), 'no verdict');
+    // the table carries no notes or labels it doesn't need (the owner's ask): what it all means is in the title's (i)
+    assert.ok(html.includes(`<h2>Trade proposal ${app.infoBtn('trade')}</h2>`));
+    const head = card.slice(card.indexOf('<thead>'), card.indexOf('</thead>'));
+    assert.equal((head.match(/<tr>/g) || []).length, 1, 'one header row');
+    assert.ok(!/>(Player|Per game|Total)</.test(head) && !card.includes('>Total<') && !card.includes('change per game'));
+    assert.ok(!/class="[^"]*\b(tp-sum|tp-foot)\b/.test(card) && !card.includes('give +') && !card.includes('Ranks: this season'), 'no value line, no notes under the table');
+    for (const said of ['Rank</b> and <b>Season', 'Playoff G', 'FG% and FT% count volume', 'over a waiver player', 'For your team', "Draft picks</b> aren't in the numbers"]) assert.ok(infoText.includes(said), said);
     // playoff games: each player's NBA team's games in the league's playoff periods (from L.playoffPeriod to the last),
     // each side's added up and the side with more marked, and your net
     const P = app.playoffDays(), poDays = L.periods.filter(q => q.n >= L.playoffPeriod).flatMap(q => app.periodDates(q));
@@ -1120,7 +1126,7 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const avg = app.get('BASE').fgPct[0], madeOver = p => (p.fgPct - avg) * p.fga;
     const fgRow = M.rows.find(r => r.key === 'fgPct');
     assert.equal(fgRow.va, `${app.fmt(M.A.tot.fgm, 1)}-${app.fmt(M.A.tot.fga, 1)}`);
-    assert.ok(card.includes(`<div class="tp-vol">${fgRow.va}</div>`) && card.includes('Percentages count volume'));
+    assert.ok(card.includes(`<div class="tp-vol">${fgRow.va}</div>`));
     const all = app.nbaPlayers().filter(p => p.gp >= 3);
     const few = all.find(p => p.fga > 0.5 && p.fga < 2 && p.fgPct > avg + 0.05);
     const many = [...all].filter(p => p.fgPct < few.fgPct - 0.01).sort((a, b) => madeOver(b) - madeOver(a))[0];
@@ -1235,7 +1241,7 @@ test("draft picks in trades: each team's future picks (read once, with the leagu
     const card = html.slice(html.indexOf('Trade proposal'));
     assert.ok(card.includes('<b>2027 Round 2</b>') && card.includes('<b>2027 Round 3</b>') && card.includes(`originally ${app.teamLink(t3)}`));
     assert.ok(card.indexOf('<b>2027 Round 2</b>') > card.indexOf(`${app.teamLink(t2)} gets`), "on the side that gets them");
-    assert.ok(card.includes("Draft picks aren't in the numbers"));
+    assert.ok(!card.includes('Draft picks aren') && app.get('INFO').trade[1]().includes("Draft picks</b> aren't in the numbers"), 'said in the (i), not under the table');
     const S = app.tradeShare(L, T);
     assert.ok(S.text.endsWith(`, 2027 Round 2 pick, 2027 Round 3 pick (originally ${app.fxTeamName(t3)})`), S.text);
     assert.ok(S.url.includes(`&givepicks=${encodeURIComponent(`2027:2:${t1}`)},${encodeURIComponent(`2027:3:${t3}`)}#trade`), S.url);
