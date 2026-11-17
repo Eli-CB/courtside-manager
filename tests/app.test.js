@@ -1022,6 +1022,110 @@ test('player value everywhere is the Dashboard\'s: categories won per game; trad
   } finally { ui.tradeGive.clear(); ui.tradeGet.clear(); }
 });
 
+test('a trade proposal: both sides with photos and lines, compared per game, shared as a picture and a link that opens it for either team', async () => {
+  const L = await app.useLeague(CATS9);
+  const state = app.get('state'), ui = app.get('ui');
+  const was = { fxTeam: state.fxTeam, players: state.players, il: state.il, lineup: state.lineup, teamName: state.teamName, leagueChosen: state.leagueChosen };
+  const [t1, t2, t3] = app.fxPickable().map(t => t.id);
+  const realToast = app.toast, toasts = [];
+  app.toast = msg => toasts.push(msg);
+  const loc = { search: app.location.search, hash: app.location.hash }, realHistory = app.history;
+  app.history = { replaceState() { app.location.search = ''; } };
+  try {
+    useTeam(t1);
+    const mine = state.players.filter(p => p.nbaId), theirs = app.fxTeamSide(t2).players.filter(p => p.nbaId);
+    ui.tradeTeam = t2; ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeSeen = null;
+    ui.tradeGive.add(mine[0].id);
+    assert.ok(!app.viewTrade().includes('Trade proposal'), 'a proposal needs players on both sides');
+    theirs.slice(0, 2).forEach(p => ui.tradeGet.add(String(p.nbaId)));
+    const T = app.tradeDeal();
+    assert.deepEqual(JSON.parse(JSON.stringify(T)), { from: t1, to: t2, give: [String(mine[0].nbaId)], get: theirs.slice(0, 2).map(p => String(p.nbaId)) });
+    const html = app.viewTrade();
+    // under the pickers: who gets whom, each with his photo, his card and his average game in the league's categories
+    assert.ok(html.indexOf('trade-grid') < html.indexOf('Trade proposal'));
+    const card = html.slice(html.indexOf('Trade proposal'));
+    for (const p of [mine[0], ...theirs.slice(0, 2)]) assert.ok(card.includes(`data-photo="${p.nbaId}"`) && card.includes(`data-nba="${p.nbaId}"`), p.name);
+    assert.ok(card.includes(`${app.teamLink(t1)} gets`) && card.includes(`${app.teamLink(t2)} gets`));
+    const M = app.tradeModel(T);
+    assert.deepEqual([...M.A.players.map(p => p.nbaId)].sort(), theirs.slice(0, 2).map(p => p.nbaId).sort());
+    assert.deepEqual([...M.B.players.map(p => p.nbaId)], [mine[0].nbaId]);
+    assert.match(app.dealLine(M.B.players[0]).join(' · '), /^[\d.]+ MIN · (\.\d{3}|—) FG% · (\.\d{3}|—) FT% · [\d.]+ 3PM · [\d.]+ PTS · /);
+    // side by side: value over a waiver player as the verdict counts it, then each category's per-game total, the better marked
+    const wv = app.waiverValue(), over = ps => ps.reduce((t, p) => t + app.gameWorth(p) - wv, 0);
+    assert.deepEqual([M.rows[0].sa, M.rows[0].sb], [app.fmtValue(over(M.A.players)), app.fmtValue(over(M.B.players))]);
+    assert.ok(html.includes(`give ${M.rows[0].sb} · get ${M.rows[0].sa}`), "the verdict's numbers");
+    assert.deepEqual([...M.rows.slice(1).map(r => r.key)], [...L.cats]);
+    const pts = M.rows.find(r => r.key === 'pts'), ptsOf = ps => ps.reduce((t, p) => t + p.pts, 0);
+    assert.equal(pts.sa, app.fmt(ptsOf(M.A.players), 1));
+    assert.equal(pts.lead, ptsOf(M.A.players) > ptsOf(M.B.players) ? 1 : -1);
+    const to = M.rows.find(r => r.key === 'to');
+    if (to.sa !== to.sb) assert.equal(to.lead, +to.sa < +to.sb ? 1 : -1, 'fewer turnovers is better');
+    assert.match(card, /tp-lead pos-good/, 'your side: its better numbers green');
+    // shared: a picture (the same numbers), the text and a link
+    const S = app.tradeShare(L, T);
+    assert.ok(S.url.endsWith(`?league=${L.id}&from=${t1}&to=${t2}&give=${T.give.join(',')}&get=${T.get.join(',')}#trade`), S.url);
+    assert.deepEqual([...S.text.split('\n\n')], [`🏀 ${L.name} · Trade proposal`, ...[[t1, M.A], [t2, M.B]].map(([t, X]) => `${app.fxTeamName(t)} gets: ${X.players.map(p => `${p.name} (${p.team})`).join(', ')}`)]);
+    assert.match(S.file, /-trade\.png$/);
+    const link = url => { app.location.search = url.slice(url.indexOf('?'), url.indexOf('#')); app.location.hash = '#trade'; };
+    // before a team is picked, the landing page says what's waiting
+    Object.assign(state, { fxTeam: null, leagueChosen: true });
+    ui.afterPick = '#trade'; ui.tradeLink = T;
+    assert.match(app.viewLanding(), /Pick your team to see the trade a league mate shared/);
+    ui.afterPick = null; ui.tradeLink = null;
+    // the team it was sent to: the deal in its own pickers, from its side
+    useTeam(t2); ui.tradeGive.clear(); ui.tradeGet.clear();
+    link(S.url); await app.openSharedLink();
+    app.viewTrade();
+    assert.equal(app.location.search, '', 'the link is tidied away');
+    assert.equal(ui.tradeTeam, t1);
+    assert.deepEqual([...ui.tradeGive].map(id => String(app.byId(id).nbaId)).sort(), [...T.get].sort());
+    assert.deepEqual([...ui.tradeGet], [...T.give]);
+    assert.ok(!ui.tradeSeen && !ui.tradeLink && !toasts.length);
+    // anyone else in the league: the deal as it was sent, above their own pickers and neutral, until they close it
+    useTeam(t3); ui.tradeGive.add(state.players[0].id);
+    link(S.url); await app.openSharedLink();
+    const seen = app.viewTrade();
+    assert.ok(seen.indexOf('Trade proposal') < seen.indexOf('trade-grid') && seen.includes('A trade a league mate shared'));
+    assert.ok(seen.includes('tp-lead') && !/tp-lead pos-/.test(seen), 'neither side is theirs');
+    assert.equal(ui.tradeGive.size + ui.tradeGet.size, 0);
+    assert.equal(app.tradeShare(L, app.tradeDeal()).url, S.url, 'shared on as it came');
+    app.get('actions')['trade-seen-close']();
+    assert.ok(!app.viewTrade().includes('Trade proposal'));
+    // the sender, after one of its players has moved: the rest of the deal, and a toast says so
+    useTeam(t1);
+    const moved = theirs[theirs.length - 1].nbaId; // (on the other team, not the sender's)
+    link(app.tradeUrl(L, { ...T, give: [...T.give, String(moved)] })); await app.openSharedLink();
+    app.viewTrade();
+    assert.deepEqual([[...ui.tradeGive].map(id => String(app.byId(id).nbaId)), [...ui.tradeGet]], [[...T.give], [...T.get]]);
+    assert.deepEqual(toasts, ['A player in the shared trade is on another team now']);
+    // a link whose teams aren't the league's is let go
+    ui.tradeGive.clear(); ui.tradeGet.clear();
+    link(app.tradeUrl(L, { ...T, to: 'nobody' })); await app.openSharedLink();
+    app.viewTrade();
+    assert.ok(!ui.tradeLink && !ui.tradeSeen && ui.tradeGive.size === 0);
+  } finally {
+    Object.assign(state, was);
+    Object.assign(app.location, loc);
+    app.history = realHistory; app.toast = realToast;
+    ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeSeen = null; ui.tradeLink = null; ui.afterPick = null; ui.tab = 'dashboard';
+    quiet(app);
+  }
+});
+
+test('a points trade proposal compares fantasy points first', async () => {
+  const L = await app.useLeague(POINTS);
+  const [t1, t2] = app.fxPickable().map(t => t.id);
+  const ids = t => app.fxTeamSide(t).players.filter(p => p.nbaId).slice(0, 2).map(p => String(p.nbaId));
+  const M = app.tradeModel({ from: t1, to: t2, give: ids(t1), get: ids(t2) });
+  assert.deepEqual([...M.rows.slice(0, 2).map(r => r.key)], ['value', 'fp']);
+  assert.equal(M.rows[0].label, 'FP/G');
+  const p = M.A.players[0];
+  assert.equal(app.dealLine(p)[1], `${app.fmt(app.fantasyPoints(p), 1)} FP`);
+  assert.equal(M.rows[1].sa, app.fmt(M.A.players.reduce((t, x) => t + app.fantasyPoints(x), 0), 1));
+  assert.deepEqual([...M.rows.slice(2).map(r => r.key)].sort(), Object.keys(L.points).sort());
+  await app.useLeague(CATS9);
+});
+
 test("player profile: value per game (each game, each season's averages) and this season's games added up", async () => {
   await app.useLeague(CATS9);
   const raw = app.NBA.players.find(r => r.log && r.log.length && app.statObj(r.cur) && app.statObj(r.cur).gp >= 2);
@@ -3639,6 +3743,15 @@ test('hockey trades and waivers weigh a goalie by the games he plays; past seaso
   assert.equal(a.gameWorth(P).toFixed(4), (a.value(P) * backup.st).toFixed(4));
   const skater = a.playerFromRaw(players.find(p => p.pos.includes('C') && p.cur));
   assert.equal(a.gameWorth(skater), a.value(skater));
+  // a trade proposal: a goalie's line is a goalie's, a skater's a skater's; the side with no goalie has no goalie rates
+  const goalieKeys = new Set(a.get('SPORT').goalieCats), cats = a.dealCats();
+  const labels = keep => new Set(cats.filter(c => !c.fp && keep(goalieKeys.has(c.key))).map(c => ` ${c.label}`));
+  const has = (line, set) => line.some(x => [...set].some(l => x.endsWith(l)));
+  assert.ok(!has(a.dealLine(P), labels(g => !g)) && !has(a.dealLine(skater), labels(g => g)));
+  const [t1, t2] = a.fxPickable().map(t => t.id);
+  const M = a.tradeModel({ from: t1, to: t2, give: [String(skater.nbaId)], get: [String(backup.id)] });
+  for (const r of M.rows.filter(r => cats.some(c => c.key === r.key && (c.pct || c.rate) && goalieKeys.has(c.key)))) assert.ok(r.sb === '—' && r.lead === 0, r.key);
+  assert.ok(!M.rows.some(r => /NaN|undefined/.test(r.sa + r.sb)));
   // a retired player from a past season's archive plays his own position, not every one
   const A = { players: new Map([[99, { n: 'Old Goalie', p: 'G' }], [98, { n: 'Old Winger', p: 'L' }]]) };
   const find = a.matchInactive({ rosters: {} }, A);
@@ -4634,6 +4747,9 @@ async function xssPass(a, id, label) {
   a.adoptTeam(a.fxLeague().teams[0].id);
   quiet(a);
   const ui = a.get('ui'), actions = a.get('actions'), done = new Set();
+  // a trade between two other teams, as a league mate's link shows it, so the Trades tab draws a proposal with their names
+  const [, tA, tB] = a.fxPickable().map(t => t.id), onTeam = t => (t ? a.fxTeamSide(t).players.filter(p => p.nbaId).slice(0, 1).map(p => String(p.nbaId)) : []);
+  if (onTeam(tA).length && onTeam(tB).length) ui.tradeSeen = { from: tA, to: tB, give: onTeam(tA), get: onTeam(tB) };
   const popups = async (html, what) => {
     let players = 0, teams = 0;
     for (const m of html.matchAll(/<[a-z]+\b[^>]*\bdata-action="([^"]+)"[^>]*>/g)) {
@@ -4685,6 +4801,7 @@ test("a league's own name and its teams' names are shown as text on every tab an
     const shown = await xssPass(a, id, label);
     assert.ok(shown.some(([, h]) => h.includes(XSS_ESCAPED)), `${label}: the names reached the page`);
     assert.ok(shown.some(([w, h]) => w.includes(' feedback ') && h.includes(XSS_ESCAPED)), `${label}: and the feedback popup, with the league's name`);
+    if (id === CATS9) assert.ok(shown.some(([w, h]) => w.endsWith(' trade #view') && h.includes('A trade a league mate shared')), 'and a trade proposal');
     for (const [where, h] of shown) problems.push(...unescapedNames(h, where));
   }
   assert.deepEqual([...new Set(problems)].slice(0, 40), []);

@@ -133,6 +133,12 @@ const actions = {
     const L = fxLeague(), d = draftData(), items = d && !d.loading ? draftAwards(d) : [];
     if (L && items.length) await shareWith(el, draftShare(L, d, items));
   },
+  // the Trades tab's deal (or the one a league mate's link brought), the same way: the picture opens on both sides
+  async 'trade-share'(el) {
+    const L = fxLeague(), T = tradeDeal();
+    if (L && T) await shareWith(el, tradeShare(L, T));
+  },
+  'trade-seen-close'() { ui.tradeSeen = null; render(); },
   // the popup's buttons: the picture to the share sheet, copied, or the text and link
   async 'share-img'() {
     const S = ui.share;
@@ -665,11 +671,12 @@ document.addEventListener('change', e => {
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
   } else if (el.dataset.change === 'trade-team') {
     ui.tradeTeam = el.value;
-    ui.tradeGet.clear();
+    ui.tradeGet.clear(); ui.tradeSeen = null; // (a league mate's deal gives way to your own)
     render();
   } else if (el.dataset.change === 'trade') {
     const set = el.dataset.side === 'give' ? ui.tradeGive : ui.tradeGet;
     if (el.checked) set.add(el.value); else set.delete(el.value);
+    ui.tradeSeen = null;
     render();
   }
 });
@@ -705,13 +712,16 @@ $('#importFile').addEventListener('change', async e => {
   }
 });
 
-// A link someone shared (?league=<id>&week=<n>#recap): open that league, or connect it and ask for the team first
+// A link someone shared (?league=<id>&week=<n>#recap, or a trade: &from=<team>&to=<team>&give=<ids>&get=<ids>#trade, kept
+// until your team is known: applyTradeLink): open that league, or connect it and ask for the team first
 async function openSharedLink() {
   if (!location.search) return;
   const q = new URLSearchParams(location.search), id = q.get('league');
   if (!id) return;
   history.replaceState(null, '', location.pathname + location.hash);
   if (+q.get('week')) ui.recapWeek = +q.get('week');
+  const ids = k => (q.get(k) || '').split(',').filter(Boolean);
+  if (q.get('from') && q.get('to')) { ui.tradeLink = { from: q.get('from'), to: q.get('to'), give: ids('give'), get: ids('get') }; ui.tradeSeen = null; }
   ui.afterPick = location.hash || '#recap';
   if (currentLeagueId() === id && state.fxTeam) { ui.afterPick = null; route(); return; }
   try {

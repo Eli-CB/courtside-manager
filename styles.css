@@ -661,6 +661,24 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .pick-list .val { font-variant-numeric: tabular-nums; font-weight: 700; }
 .verdict { font-size: 1.15rem; font-weight: 700; }
 .delta-table td.num { font-weight: 600; }
+/* the trade proposal (tradeCard, views.js): what each side gets, then the two sides per game */
+.trade-grid + .card, .tp + .trade-grid { margin-top: 16px; }
+.tp-btns { display: flex; gap: 8px; margin-left: auto; }
+.tp-note { margin: -6px 0 12px; }
+.tp-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 28px; }
+.tp-who { margin: 0 0 8px; font-size: .95rem; font-weight: 600; overflow-wrap: anywhere; }
+.tp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.tp-list .val { font-variant-numeric: tabular-nums; font-weight: 700; }
+.tp-line { margin: 4px 0 0 48px; color: var(--muted); } /* under the name, past the photo */
+.tp-sub { margin: 20px 0 4px; }
+.tp-cmp { max-width: 640px; }
+.tp-cmp td { padding-block: 8px; }
+.tp-cmp th.num, .tp-cmp td.num { width: 34%; font-variant-numeric: tabular-nums; }
+.tp-cmp thead th.num { color: var(--text); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.tp-cmp td.tp-lead { font-weight: 800; background: var(--surface-2); } /* the better side of a row */
+.tp-cmp td.tp-lead.pos-good { background: var(--good-soft); }
+.tp-cmp td.tp-lead.pos-bad { background: var(--bad-soft); }
+.tp-foot { margin: 10px 0 0; }
 
 /* ---------- Lineup editor (Roster tab) ---------- */
 
@@ -1034,7 +1052,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 
 }
 @media (max-width: 640px) {
-  .trade-grid { grid-template-columns: minmax(0, 1fr); }
+  .trade-grid, .tp-sides { grid-template-columns: minmax(0, 1fr); }
+  .tp-line { margin-left: 44px; }
+  #view .trade-grid + .card, #view .tp + .trade-grid { margin-top: 0; }
   h1 { font-size: 1.3rem; }
   .hide-sm { display: none; }
 }

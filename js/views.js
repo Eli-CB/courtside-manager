@@ -357,6 +357,8 @@ function seasonTotalsCard(L, standings) {
 
 /* ---------- Trade ---------- */
 function viewTrade() {
+  if (ui.tradeLink && state.fxTeam && NBA) applyTradeLink(); // (a shared trade, once your team is known)
+  if (ui.tradeSeen && !fxPickable().some(t => t.id === ui.tradeSeen.from)) ui.tradeSeen = null; // (another league's)
   // the other side of the deal is another team's Fantrax roster
   const others = fxPickable().filter(t => t.id !== state.fxTeam);
   if (!others.some(t => t.id === ui.tradeTeam)) { ui.tradeTeam = others.length ? others[0].id : null; ui.tradeGet.clear(); }
@@ -402,10 +404,185 @@ function viewTrade() {
       <p class="small muted" style="margin:10px 0 0">Totals are per game across your active (non-IL) roster.</p>`;
   }
 
-  return `
+  // the deal for both sides, to share: under the pickers, or above them when a league mate's link brought someone else's
+  const deal = tradeDeal(), proposal = deal ? tradeCard(deal) : '';
+  return `${ui.tradeSeen ? proposal : ''}
   <div class="trade-grid">
     <div class="card"><div class="card-head"><h2>You give</h2><span class="muted small">${give.length} selected</span></div>${pick(state.players, ui.tradeGive, 'give', p => p.id)}</div>
     <div class="card"><div class="card-head"><h2>You get</h2>${others.length ? `<select class="trade-team" data-change="trade-team" aria-label="Team to trade with">${others.map(t => `<option value="${esc(t.id)}" ${t.id === ui.tradeTeam ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}<span class="muted small">${get.length} selected</span></div>${pick(theirs, ui.tradeGet, 'get', p => String(p.nbaId))}</div>
   </div>
+  ${ui.tradeSeen ? '' : proposal}
   <div class="card" style="margin-top:16px">${result}</div>`;
+}
+
+/* ---------- Trade proposal: both sides of a deal, with photos and per-game numbers, to share with the other team ---------- */
+// A deal: { from, to, give, get }: team `from` sends `give` and receives `get` (players by data id, as text). The pickers
+// make one (you are `from`, with players picked on both sides); a shared link carries one (tradeUrl, openSharedLink).
+function tradeDeal() {
+  if (ui.tradeSeen) return ui.tradeSeen;
+  const give = [...ui.tradeGive].map(byId).filter(p => p && p.nbaId != null).map(p => String(p.nbaId)), get = [...ui.tradeGet];
+  return state.fxTeam && ui.tradeTeam && give.length && get.length ? { from: state.fxTeam, to: ui.tradeTeam, give, get } : null;
+}
+
+// A shared trade, once your team is known: either of its teams gets it in the pickers, from their side (what they'd send
+// on the left); anyone else sees it as it was sent, above the pickers (ui.tradeSeen, until they pick or close it)
+function applyTradeLink() {
+  const T = ui.tradeLink, me = state.fxTeam, teams = fxPickable().map(t => t.id);
+  ui.tradeLink = null;
+  if (!teams.includes(T.from) || !teams.includes(T.to) || T.from === T.to) return;
+  ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeSeen = null;
+  if (me !== T.from && me !== T.to) { ui.tradeSeen = T; return; }
+  const [mine, theirs] = me === T.from ? [T.give, T.get] : [T.get, T.give];
+  ui.tradeTeam = me === T.from ? T.to : T.from;
+  for (const p of state.players) if (mine.includes(String(p.nbaId))) ui.tradeGive.add(p.id);
+  const onTheirs = new Set(fxTeamSide(ui.tradeTeam).players.map(p => String(p.nbaId)));
+  for (const id of theirs) if (onTheirs.has(id)) ui.tradeGet.add(id);
+  // a player who has changed teams since the link was made drops out of the deal: say so
+  const gone = mine.length + theirs.length - ui.tradeGive.size - ui.tradeGet.size;
+  if (gone) toast(`${gone === 1 ? 'A player' : `${gone} players`} in the shared trade ${gone === 1 ? 'is' : 'are'} on another team now`);
+}
+
+// The league's categories, fantasy points first in a points league
+const dealCats = () => { const cs = scoreCats(); return [...cs.filter(c => c.fp), ...cs.filter(c => !c.fp)]; };
+// a category's number as the site shows it; null (no attempts: a side without a goalie has no GAA) is a dash
+const dealShow = (c, v) => (v == null ? '—' : c.rate ? fmt(v, 2) : c.pct ? fmtPct(v) : fmt(v, c.dec || 1));
+// One player's average game in the league's categories (a goalie's in the goalie ones), minutes first
+function dealLine(p) {
+  const goalie = isGoalie(p), parts = p.min ? [`${fmt(p.min, 1)} MIN`] : [];
+  for (const c of dealCats()) {
+    if (isHockey() && SPORT.goalieCats.includes(c.key) !== goalie) continue;
+    parts.push(`${dealShow(c, c.pct ? (statVal(p, c.att) ? pctOf(p, c) : null) : statOf(p, c))} ${c.label}`);
+  }
+  return parts;
+}
+
+// Both sides of a deal, for the card, the picture and the text: what each team gets (players as the Players tab has
+// them, best first), its value over a waiver player (as the verdict counts it) and its per-game totals, then the
+// comparison's rows: { key, label, sa, sb (as shown), lead: 1 (the first side's is better), -1, or 0 (even, or no number) }
+function tradeModel(T) {
+  const rawOf = id => nbaById.get(+id) || nbaById.get(id);
+  const wv = waiverValue(), over = p => gameWorth(p) - wv;
+  const side = (tid, ids) => {
+    const players = sortDesc(ids.map(rawOf).filter(Boolean).map(raw => playerFromRaw(raw)), value);
+    return { tid, name: fxTeamName(tid) || 'Team', players, value: sum(players.map(over)), tot: totals(players) };
+  };
+  const A = side(T.from, T.get), B = side(T.to, T.give);
+  const row = (key, label, a, b, show, neg) => {
+    const sa = show(a), sb = show(b);
+    return { key, label, sa, sb, lead: a == null || b == null || sa === sb ? 0 : (neg ? a < b : a > b) ? 1 : -1 };
+  };
+  const catOf = (t, c) => (c.fp ? t.fp : c.pct ? (t[c.att] ? t[c.made] / t[c.att] : null) : lineStat(t, c.key));
+  const rows = [row('value', valueLabel(), A.value, B.value, v => fmtValue(v)),
+    ...dealCats().map(c => row(c.key, c.label, catOf(A.tot, c), catOf(B.tot, c), v => dealShow(c, v), c.neg))];
+  return { A, B, rows };
+}
+
+// The proposal on the Trades tab: each side's players with their photos and lines, then the sides compared per game.
+// In your own deal your side's better numbers are green and the other side's red; a league mate's deal stays neutral.
+function tradeCard(T) {
+  const M = tradeModel(T), seen = ui.tradeSeen === T, me = myTeamId();
+  const mineAt = M.A.tid === me ? 1 : M.B.tid === me ? -1 : 0;
+  const sideHtml = S => `<section class="tp-side"><h3 class="tp-who">${teamLink(S.tid)} gets</h3>
+    <ul class="tp-list">${S.players.map(p => `<li>
+      <div class="bplayer">${headshot(p, hsPx(40, 36))}<div class="bmain"><div>${playerBtn(p.nbaId, p.name)}${p.inj ? ` ${injBadge(p.inj)}` : ''}</div>
+        <div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)} · ${p.gp} GP</div></div><span class="val" title="${valueLabel()} per game">${fmtValue(value(p))}</span></div>
+      <div class="rc-stats tp-line">${dealLine(p).map(x => `<span>${x}</span>`).join(' · ')}</div></li>`).join('')}</ul></section>`;
+  const cls = (r, col) => (r.lead !== col ? '' : ` tp-lead${mineAt ? (col === mineAt ? ' pos-good' : ' pos-bad') : ''}`);
+  const rows = M.rows.map(r => `<tr${r.key === 'value' ? ' class="tp-val"' : ''}><td><b>${r.label}</b>${r.key === 'value' ? ` ${infoBtn('tradeValue')}<div class="muted small">over a waiver player</div>` : ''}</td>
+    <td class="num${cls(r, 1)}">${r.sa}</td><td class="num${cls(r, -1)}">${r.sb}</td></tr>`).join('');
+  return `<div class="card tp">
+    <div class="card-head"><h2>Trade proposal</h2><div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}<button type="button" class="btn sm primary" data-action="trade-share">Share</button></div></div>
+    ${seen ? `<p class="muted small tp-note">A trade a league mate shared, between ${teamLink(M.A.tid)} and ${teamLink(M.B.tid)}.</p>` : ''}
+    <div class="tp-sides">${sideHtml(M.A)}${sideHtml(M.B)}</div>
+    <h3 class="sub tp-sub">Per game, side by side</h3>
+    <div class="table-wrap"><table class="tp-cmp">
+      <thead><tr><th></th><th class="num">${esc(M.A.name)} gets</th><th class="num">${esc(M.B.name)} gets</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <p class="small muted tp-foot">Each player's average game (${basisLabel().toLowerCase()}), each side's added up.</p>
+  </div>`;
+}
+
+// Sharing it (shareWith, recap.js): a picture, or the text and a link that opens the deal on the Trades tab
+const tradeUrl = (L, T) => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}&from=${encodeURIComponent(T.from)}&to=${encodeURIComponent(T.to)}`
+  + `&give=${T.give.map(encodeURIComponent).join(',')}&get=${T.get.map(encodeURIComponent).join(',')}#trade`;
+const tradeText = (L, M) => [`${SPORT.emoji} ${L.name} · Trade proposal`,
+  ...[M.A, M.B].map(S => `${S.name} gets: ${S.players.map(p => `${p.name} (${p.team || 'FA'})`).join(', ')}`)].join('\n\n');
+function tradeShare(L, T) {
+  const M = tradeModel(T);
+  return {
+    title: 'Trade proposal', name: `${L.name} · Trade proposal`, what: 'Trade proposal', link: 'Side by side', text: tradeText(L, M), url: tradeUrl(L, T),
+    file: `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-trade.png`, alt: `Trade proposal between ${M.A.name} and ${M.B.name}`,
+    draw: () => tradeCanvas(L, M),
+  };
+}
+
+// The picture: each side in a card (what it gets: photos, positions, each player's average game), a swap mark between
+// them, then the comparison with each row's better number picked out, and what Value means
+async function tradeCanvas(L, M) {
+  const n = M.A.players.length + M.B.players.length;
+  const K = await sharePad(Math.max(5000, 1400 + n * 300 + M.rows.length * 64)), { C, W, inner, ctx, font, text, round, photo } = K;
+  let y = K.top({ kicker: 'TRADE PROPOSAL', title: L.name, sub: `${fmtDay(todayIso())} · per game, ${basisLabel().toLowerCase()}` });
+  const d = 104, x0 = C.pad + 32, right = W - C.pad - 32, tx = x0 + d + 28;
+  let swapY = 0;
+  for (const S of [M.A, M.B]) {
+    // measured first: each player's stats wrap to the width beside his photo
+    const rows = S.players.map(p => {
+      font(27); const stats = wrapText(ctx, dealLine(p).join(' · '), right - tx, ' · ');
+      return { p, stats, h: Math.max(d, 88 + stats.length * 37) };
+    });
+    const h = 28 + 52 + sum(rows.map(r => r.h)) + (rows.length - 1) * 36 + 30;
+    round(C.pad, y, inner, h, 24, C.card);
+    let ty = y + 28;
+    font(26, 800); text(fitText(ctx, `${S.name} gets`.toUpperCase(), right - x0), x0, ty, C.accent);
+    ty += 52;
+    rows.forEach((r, i) => {
+      if (i) { ctx.fillStyle = C.line; ctx.fillRect(x0, ty + 16, right - x0, 2); ty += 36; }
+      const p = r.p;
+      photo(p, x0, ty, d);
+      font(30, 800); const pv = fmtValue(value(p)), pvW = ctx.measureText(pv).width;
+      text(pv, right, ty + 6, C.text, 'right');
+      font(38, 800); text(fitText(ctx, p.name, right - tx - pvW - 20), tx, ty);
+      font(26); const meta = `${p.team || 'FA'} · ${p.pos.join(', ')} · ${p.gp} GP`;
+      text(meta, tx, ty + 48, C.muted);
+      if (p.inj) text(` · ${p.status.toUpperCase()}`, tx + ctx.measureText(meta).width, ty + 48, '#f87171');
+      font(27); r.stats.forEach((l, j) => text(l, tx, ty + 88 + j * 37, '#d5d9e0'));
+      ty += r.h;
+    });
+    y += h;
+    if (!swapY) { swapY = y + 22; y += 44; }
+  }
+  // the swap mark: an up and a down arrow in a circle, over the gap between the sides
+  ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(W / 2, swapY, 34, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = C.bg; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const [x, dir] of [[W / 2 - 9, -1], [W / 2 + 9, 1]]) {
+    ctx.beginPath(); ctx.moveTo(x, swapY - 14 * dir); ctx.lineTo(x, swapY + 14 * dir);
+    ctx.moveTo(x - 7, swapY + 7 * dir); ctx.lineTo(x, swapY + 14 * dir); ctx.lineTo(x + 7, swapY + 7 * dir); ctx.stroke();
+  }
+
+  // side by side: the row's name, then each side's number, the better one on an orange pill
+  y += 48;
+  font(28, 800); text('SIDE BY SIDE · PER GAME', C.pad, y, C.accent); y += 52;
+  const labW = 230, colW = (right - x0 - labW) / 2, mid = [x0 + labW + colW / 2, x0 + labW + colW * 1.5], rowH = 60;
+  const h = 28 + 48 + M.rows.length * rowH + 16;
+  round(C.pad, y, inner, h, 24, C.card);
+  let ty = y + 28;
+  font(26, 800);
+  [M.A, M.B].forEach((S, i) => text(fitText(ctx, S.name, colW - 16), mid[i], ty, C.text, 'center'));
+  ty += 48;
+  for (const r of M.rows) {
+    ctx.fillStyle = C.line; ctx.fillRect(x0, ty, right - x0, 2);
+    font(28, 700); text(r.label, x0, ty + 16, '#d5d9e0');
+    [r.sa, r.sb].forEach((v, i) => {
+      const lead = r.lead === (i ? -1 : 1);
+      font(31, lead ? 800 : 500);
+      if (lead) { const w = ctx.measureText(v).width + 32; ctx.globalAlpha = 0.2; round(mid[i] - w / 2, ty + 8, w, 46, 23, C.accent); ctx.globalAlpha = 1; }
+      text(v, mid[i], ty + 15, lead ? C.accent : r.lead ? C.muted : C.text, 'center');
+    });
+    ty += rowH;
+  }
+  y += h + 22;
+  font(24);
+  for (const l of wrapText(ctx, `${valueLabel()}: what each side's players add per game${isPoints() ? ' in fantasy points' : ' to winning categories'}, less a waiver player for each roster spot they take.`, inner)) { text(l, C.pad, y, C.muted); y += 34; }
+  return K.done(y);
 }

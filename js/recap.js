@@ -470,12 +470,13 @@ const recapCanvas = (L, X) => shareCanvas({
   sub: `${fmtDay(X.period.start)} – ${fmtDay(matchDates(X.period.start).slice(-1)[0] || X.period.end)}`,
 });
 
-// A picture to share in a league chat (1080 px wide): a kicker, the league's name and a line under it, then each standout
-// in a card (a player's with his photo), then any finals. H: { kicker, title, sub, items, games, mark: tid -> its emoji }
-async function shareCanvas(H) {
-  const C = RC_IMG, W = C.w, inner = W - C.pad * 2, sheet = await loadSheet();
+// What every share picture is drawn with (the recap's, the draft's, a trade's): a canvas `tall` px high in the share
+// colors, and its tools (K): fonts, text, rounded cards, a player's photo, the top (a kicker, a title, a line under it),
+// then done(y): the site's name at the bottom and the canvas cut to what was drawn
+async function sharePad(tall = 5000) {
+  const C = RC_IMG, W = C.w, sheet = await loadSheet();
   const cv = document.createElement('canvas');
-  cv.width = W; cv.height = 5000;
+  cv.width = W; cv.height = tall;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, cv.height);
   ctx.textBaseline = 'top';
@@ -498,13 +499,36 @@ async function shareCanvas(H) {
       }
     }
   };
+  const inner = W - C.pad * 2;
+  // the top: what it is, the league, when; the y below it
+  const top = H => {
+    let y = C.pad;
+    font(28, 800); text(H.kicker, C.pad, y, C.accent); y += 44;
+    font(58, 800);
+    for (const l of wrapText(ctx, H.title, inner).slice(0, 2)) { text(l, C.pad, y); y += 70; }
+    font(30); text(H.sub, C.pad, y, C.muted); y += 64;
+    return y;
+  };
+  // the bottom: where it came from
+  const done = y => {
+    y += 32;
+    ctx.fillStyle = C.line; ctx.fillRect(C.pad, y, inner, 2); y += 30;
+    font(30, 800); text('League Layer', C.pad, y, C.text);
+    font(28); text('leaguelayer.com', W - C.pad, y + 2, C.muted, 'right');
+    y += 40 + C.pad - 10;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = Math.ceil(y);
+    out.getContext('2d').drawImage(cv, 0, 0);
+    return out;
+  };
+  return { C, W, inner, ctx, font, text, round, photo, top, done };
+}
 
-  let y = C.pad;
-  // the top: what it is, the league, when
-  font(28, 800); text(H.kicker, C.pad, y, C.accent); y += 44;
-  font(58, 800);
-  for (const l of wrapText(ctx, H.title, inner).slice(0, 2)) { text(l, C.pad, y); y += 70; }
-  font(30); text(H.sub, C.pad, y, C.muted); y += 64;
+// A picture to share in a league chat (1080 px wide): a kicker, the league's name and a line under it, then each standout
+// in a card (a player's with his photo), then any finals. H: { kicker, title, sub, items, games, mark: tid -> its emoji }
+async function shareCanvas(H) {
+  const K = await sharePad(), { C, W, inner, ctx, font, text, round, photo } = K;
+  let y = K.top(H);
 
   // the standouts, each in a card
   for (const it of H.items) {
@@ -550,17 +574,7 @@ async function shareCanvas(H) {
     y += 88;
   }
 
-  // the bottom: where it came from
-  y += 32;
-  ctx.fillStyle = C.line; ctx.fillRect(C.pad, y, inner, 2); y += 30;
-  font(30, 800); text('League Layer', C.pad, y, C.text);
-  font(28); text('leaguelayer.com', W - C.pad, y + 2, C.muted, 'right');
-  y += 40 + C.pad - 10;
-
-  const out = document.createElement('canvas');
-  out.width = W; out.height = Math.ceil(y);
-  out.getContext('2d').drawImage(cv, 0, 0);
-  return out;
+  return K.done(y);
 }
 
 const recapBlob = cv => new Promise(res => cv.toBlob(res, 'image/png'));
