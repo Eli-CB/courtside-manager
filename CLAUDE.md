@@ -43,7 +43,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     player list/ADP (daily), scoring (`fxScoring`: points or categories), keepers (`keepersOf`), name matching
     (`matchPlayers`), which site an ID is on (`leagueSourceOf`, `parseLeagueId`, `sourceName`), `getJson` (shared retries)
   - espn: `fetchEspnLeague` turns a public ESPN league into the same league shape (`source: 'espn'`), so every
-    tab works unchanged. "fx" names (`fxLeague`, `raw.fx`, `fxTeamSide`) mean "the league's site", either one.
+    tab works unchanged; what basketball and football leagues share (fetch, matchups, slots, rosters, standings, draft) is `espnLeagueShape`/`espnLeagueJson`. "fx" names (`fxLeague`, `raw.fx`, `fxTeamSide`) mean "the league's site", either one.
     ESPN football (`fetchEspnFootball`, `sport: 'nfl'`): an ID ESPN answers 404 as basketball is asked for as football (one extra request). Weeks are NFL weeks from
     the file's `weeks` (ESPN's scoring periods), players the file's by `espn` id (the job matches ESPN's player list by name and team: Sleeper's has a quarter of
     them; a D/ST is -16000 less its team's number, `espnFootballId`), scoring `ESPN_FFL_STATS` (ESPN stat id -> the data's names; D/ST-only stats at ESPN's

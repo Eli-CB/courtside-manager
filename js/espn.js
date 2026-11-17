@@ -22,6 +22,10 @@ const ESPN_STATS = { 0: 'pts', 1: 'blk', 2: 'stl', 3: 'ast', 4: 'oreb', 5: 'dreb
   16: 'fta', 17: 'tpm', 18: 'tpa', 19: 'fgPct', 20: 'ftPct', 21: 'tpPct', 23: 'fgmi', 24: 'ftmi', 25: 'tpmi', 37: 'dd', 38: 'td', 40: 'min', 42: 'gp1' };
 
 const espnGet = (path, filter, game) => getJson(espnApi(game) + path, 'ESPN', filter ? { headers: { 'X-Fantasy-Filter': JSON.stringify(filter) } } : undefined);
+// a league's address under espnApi, its views or day to follow
+const espnLeaguePath = (season, id) => `${season}/segments/0/leagues/${encodeURIComponent(id)}?`;
+// a team's roster as ESPN sends it: one entry per player
+const espnEntries = t => (t.roster && t.roster.entries) || [];
 // ESPN names a season by the year it ends: 2026-27 is 2027
 const espnSeason = () => (NBA && NBA.season ? +NBA.season.slice(0, 4) + 1 : new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0));
 
@@ -124,28 +128,82 @@ function espnWaivers(j) {
 const espnTeamName = t => String(t.name || [t.location, t.nickname].filter(Boolean).join(' ') || `Team ${t.id}`).trim();
 const espnPositions = slots => POSITIONS.filter(x => slots.some(n => ESPN_SLOTS[n] === x));
 
-async function fetchEspnLeague(id) {
-  const season = espnSeason();
+// A league with the views every tab reads, or null when ESPN doesn't know the ID in this sport (game: 'fba' or 'ffl')
+async function espnLeagueJson(season, id, game) {
   let j;
-  const players = espnPlayerList(season); // alongside the league; awaited once the league is in
-  players.catch(() => {});
   try {
-    j = await espnGet(`${season}/segments/0/leagues/${encodeURIComponent(id)}?${ESPN_LEAGUE_VIEWS.map(v => 'view=' + v).join('&')}`);
+    j = await espnGet(espnLeaguePath(season, id) + ESPN_LEAGUE_VIEWS.map(v => 'view=' + v).join('&'), null, game);
   } catch (e) {
     if (/\b40[13]\b/.test(e.message)) throw new Error('private league');
-    if (/\b404\b/.test(e.message)) return fetchEspnFootball(id); // not a basketball league: its ID doesn't say which sport
+    if (/\b404\b/.test(e.message)) return null;
     throw e;
   }
   if (!j || !j.settings || !Array.isArray(j.teams)) throw new Error('League not found');
-  const list = await players;
+  return j;
+}
+
+// What a basketball and a football league share, in the shape fetchFantraxLeague returns: teams, matchups, lineup slots,
+// rosters, standings, waivers and the draft. Each sport's loader adds its scoring, season and lineup locks.
+// lineup: ESPN's slot numbers -> the sport's slot names, and its bench's and IR's numbers
+function espnLeagueShape(j, { id, periods, toNba, names, lineup: { slots, bench, ir }, points }) {
   const s = j.settings, sched = s.scheduleSettings || {}, rs = s.rosterSettings || {};
+  const inLeague = new Set(periods.map(p => p.n));
+  const matchups = {};
+  for (const m of j.schedule || []) {
+    if (!inLeague.has(m.matchupPeriodId) || !m.home || !m.away) continue; // a team without an opponent has a bye
+    (matchups[m.matchupPeriodId] = matchups[m.matchupPeriodId] || []).push([String(m.away.teamId), String(m.home.teamId)]);
+  }
+
+  // lineup slots, bench and IR in the shape slotsFromLeague reads (football's slots can share a name: they add up)
+  const counts = Object.entries(rs.lineupSlotCounts || {}).map(([k, n]) => [+k, +n]).filter(([, n]) => n > 0);
+  const starters = counts.filter(([k]) => slots[k]);
+  const count = slot => (counts.find(([k]) => k === slot) || [0, 0])[1];
+  const active = sum(starters.map(([, n]) => n));
+  const constraints = {};
+  for (const [k, n] of starters) constraints[slots[k]] = { maxActive: ((constraints[slots[k]] || {}).maxActive || 0) + n };
+  const rosterInfo = {
+    positionConstraints: constraints, maxTotalActivePlayers: active,
+    maxTotalReservePlayers: count(bench), maxTotalPlayers: active + count(bench) + count(ir),
+  };
+  // (a slot that isn't a starting one is the bench's, as espnDayLineups reads it)
+  const statusOf = slot => (slot === ir ? 'INJURED_RESERVE' : slots[slot] ? 'ACTIVE' : 'RESERVE');
+  const rosters = Object.fromEntries(j.teams.map(t => [String(t.id), espnEntries(t).map(e => {
+    const pid = String(e.playerId);
+    return { fid: pid, nba: toNba[pid] || null, name: names[pid] || '', slot: slots[e.lineupSlotId] || '', st: statusOf(e.lineupSlotId) };
+  })]));
+
+  const ds = s.draftSettings || {};
+  const draftAt = ds.date ? new Date(ds.date).toISOString() : null;
+  return {
+    id, source: 'espn', name: String(s.name || '').trim(), scoring: (s.scoringSettings || {}).scoringType || '',
+    historyId: null,
+    teams: j.teams.map(t => ({ id: String(t.id), name: espnTeamName(t) })),
+    periods,
+    playoffPeriod: sched.playoffTeamCount ? sched.matchupPeriodCount + 1 : null,
+    matchups,
+    rosterPeriod: null, rosterPeriods: [],
+    rosters, openingRosters: null, rosterInfo,
+    draft: espnDraft(j, toNba, names, draftAt), draftAt,
+    standings: espnStandings(j, points),
+    waivers: espnWaivers(j),
+  };
+}
+
+async function fetchEspnLeague(id) {
+  const season = espnSeason();
+  const players = espnPlayerList(season); // alongside the league; awaited once the league is in
+  players.catch(() => {});
+  const j = await espnLeagueJson(season, id, 'fba');
+  if (!j) return fetchEspnFootball(id); // not a basketball league: its ID doesn't say which sport
+  const list = await players;
+  const s = j.settings, rs = s.rosterSettings || {};
 
   // every player ESPN listed or a team rosters, matched to NBA.com players
   const info = {};
   for (const [pid, [name, team, slots]] of Object.entries(list)) info[pid] = { name, team, slots };
   const rostered = new Set();
   for (const t of j.teams) {
-    for (const e of (t.roster && t.roster.entries) || []) {
+    for (const e of espnEntries(t)) {
       const pl = (e.playerPoolEntry && e.playerPoolEntry.player) || {};
       rostered.add(String(e.playerId));
       info[e.playerId] = info[e.playerId] || { name: pl.fullName || '', team: ESPN_TEAMS[pl.proTeamId] || '', slots: pl.eligibleSlots || [] };
@@ -159,54 +217,16 @@ async function fetchEspnLeague(id) {
   }
 
   const dayOne = nbaGameDays()[0] || addDays(todayIso(), 1 - (j.scoringPeriodId || 1));
-  const periods = espnPeriods(j, dayOne);
-  const inLeague = new Set(periods.map(p => p.n));
-  const matchups = {};
-  for (const m of j.schedule || []) {
-    if (!inLeague.has(m.matchupPeriodId) || !m.home || !m.away) continue; // a team without an opponent has a bye
-    (matchups[m.matchupPeriodId] = matchups[m.matchupPeriodId] || []).push([String(m.away.teamId), String(m.home.teamId)]);
-  }
-
-  // lineup slots, bench and IR in the shape slotsFromLeague reads
-  const counts = Object.entries(rs.lineupSlotCounts || {}).map(([k, n]) => [+k, +n]).filter(([, n]) => n > 0);
-  const starters = counts.filter(([k]) => ESPN_SLOTS[k]);
-  const count = slot => (counts.find(([k]) => k === slot) || [0, 0])[1];
-  const active = sum(starters.map(([, n]) => n));
-  const rosterInfo = {
-    positionConstraints: Object.fromEntries(starters.map(([k, n]) => [ESPN_SLOTS[k], { maxActive: n }])),
-    maxTotalActivePlayers: active, maxTotalReservePlayers: count(ESPN_BENCH), maxTotalPlayers: active + count(ESPN_BENCH) + count(ESPN_IR),
-  };
-  const statusOf = slot => (slot === ESPN_BENCH ? 'RESERVE' : slot === ESPN_IR ? 'INJURED_RESERVE' : 'ACTIVE');
-  const rosters = Object.fromEntries(j.teams.map(t => [String(t.id), ((t.roster && t.roster.entries) || []).map(e => {
-    const pid = String(e.playerId);
-    return { fid: pid, nba: toNba[pid] || null, name: names[pid] || '', slot: ESPN_SLOTS[e.lineupSlotId] || '', st: statusOf(e.lineupSlotId) };
-  })]));
-
-  const points = /POINTS/.test((s.scoringSettings || {}).scoringType || '');
-  const standings = espnStandings(j, points);
-
-  const ds = s.draftSettings || {};
-  const draftAt = ds.date ? new Date(ds.date).toISOString() : null;
+  const ss = s.scoringSettings || {};
   const league = {
-    id, source: 'espn', name: String(s.name || '').trim(), scoring: (s.scoringSettings || {}).scoringType || '',
-    historyId: null, year: j.seasonId ? j.seasonId - 1 : null,
-    ...espnScoring(s.scoringSettings || {}),
-    teams: j.teams.map(t => ({ id: String(t.id), name: espnTeamName(t) })),
-    periods,
+    ...espnLeagueShape(j, {
+      id, periods: espnPeriods(j, dayOne), toNba, names, lineup: { slots: ESPN_SLOTS, bench: ESPN_BENCH, ir: ESPN_IR },
+      points: /POINTS/.test(ss.scoringType || ''),
+    }),
+    year: j.seasonId ? j.seasonId - 1 : null,
+    ...espnScoring(ss),
     lockDays: /WEEK/i.test(rs.lineupLocktimeType || '') ? 7 : 1, // lineups lock game by game: daily
-    playoffPeriod: sched.playoffTeamCount ? sched.matchupPeriodCount + 1 : null,
-    matchups,
-    rosterPeriod: null,
-    rosterPeriods: [],
-    rosters,
-    openingRosters: null,
-    rosterInfo,
-    draft: null,
-    draftAt,
-    standings,
-    waivers: espnWaivers(j),
   };
-  league.draft = espnDraft(j, toNba, names, draftAt);
   return { league, fxPlayers, idMap: { toNba, names } };
 }
 
@@ -243,7 +263,7 @@ const ESPN_DAYS_KEY = 'league-layer-espn-days-v1', ESPN_DAYS_KEEP = 4;
 const espnDaysRead = L => !!L && L.source === 'espn' && L.sport !== 'nfl';
 // a finished week's lineups can be shown: every period's are read (Fantrax, Sleeper), or that week's days (ESPN)
 const hasWeekLineups = L => hasLineupHistory(L) || espnDaysRead(L);
-const espnDayLineups = j => Object.fromEntries(j.teams.map(t => [String(t.id), ((t.roster && t.roster.entries) || []).map(e => [String(e.playerId), ESPN_SLOTS[e.lineupSlotId] ? 1 : 0])]));
+const espnDayLineups = j => Object.fromEntries(j.teams.map(t => [String(t.id), espnEntries(t).map(e => [String(e.playerId), ESPN_SLOTS[e.lineupSlotId] ? 1 : 0])]));
 const espnDays = {}; // "league|matchup" -> the load of that week's days
 keep('league', id => dropKept(espnDays, id));
 // A matchup's days as lineup periods, the shape loadRosterWeeks gives: [{ n: ESPN's day, start, end, owner }], or null
@@ -263,7 +283,7 @@ async function fetchEspnDays(L, period) {
   let all = {};
   try { all = JSON.parse(localStorage.getItem(ESPN_DAYS_KEY)) || {}; } catch (e) { all = {}; }
   const have = { ...((all[L.id] && all[L.id].s === season && all[L.id].d) || {}) };
-  const path = `${season}/segments/0/leagues/${encodeURIComponent(L.id)}?view=mRoster&scoringPeriodId=`;
+  const path = `${espnLeaguePath(season, L.id)}view=mRoster&scoringPeriodId=`;
   try {
     await fxGetAll(dates.filter(d => !have[num(d)]).map(d => path + num(d)), (p, j) => {
       if (!j || !Array.isArray(j.teams) || !j.teams.some(t => t.roster)) throw new Error("ESPN didn't send that day's lineups");
@@ -347,7 +367,7 @@ const espnFootballId = raw => (raw.pos[0] === 'DEF' ? (ESPN_NFL_TEAM_NUM[raw.tea
 function espnWeekPoints(j, n) {
   const pts = {};
   for (const t of j.teams || []) {
-    for (const e of (t.roster && t.roster.entries) || []) {
+    for (const e of espnEntries(t)) {
       const s = (((e.playerPoolEntry || {}).player || {}).stats || []).find(x => x.scoringPeriodId === n && x.statSourceId === 0 && x.statSplitTypeId === 1);
       if (s && s.appliedTotal != null) pts[e.playerId] = +s.appliedTotal;
     }
@@ -358,16 +378,9 @@ function espnWeekPoints(j, n) {
 async function fetchEspnFootball(id) {
   const D = SPORT.key === 'nfl' && NBA ? NBA : await fetchSport('nfl');
   const season = +D.season;
-  let j;
-  try {
-    j = await espnGet(`${season}/segments/0/leagues/${encodeURIComponent(id)}?${ESPN_LEAGUE_VIEWS.map(v => 'view=' + v).join('&')}`, null, 'ffl');
-  } catch (e) {
-    if (/\b40[13]\b/.test(e.message)) throw new Error('private league');
-    if (/\b404\b/.test(e.message)) throw new Error('League not found');
-    throw e;
-  }
-  if (!j || !j.settings || !Array.isArray(j.teams)) throw new Error('League not found');
-  const s = j.settings, sched = s.scheduleSettings || {}, rs = s.rosterSettings || {}, ss = s.scoringSettings || {};
+  const j = await espnLeagueJson(season, id, 'ffl');
+  if (!j) throw new Error('League not found');
+  const s = j.settings, sched = s.scheduleSettings || {}, ss = s.scoringSettings || {};
   if (!/POINTS/.test(ss.scoringType || '')) throw new Error("ESPN football leagues scored by categories aren't supported yet: points leagues are");
 
   // the data's players by ESPN id; anyone rostered who isn't there keeps ESPN's name
@@ -375,7 +388,7 @@ async function fetchEspnFootball(id) {
   for (const raw of D.players) { const fid = espnFootballId(raw); if (fid != null) { toNba[fid] = raw.id; names[fid] = raw.name; } }
   const rostered = new Set();
   for (const t of j.teams) {
-    for (const e of (t.roster && t.roster.entries) || []) {
+    for (const e of espnEntries(t)) {
       rostered.add(String(e.playerId));
       if (!names[e.playerId]) names[e.playerId] = (((e.playerPoolEntry || {}).player || {}).fullName) || `Player ${e.playerId}`;
     }
@@ -392,51 +405,16 @@ async function fetchEspnFootball(id) {
     const a = (D.weeks || {})[Math.min(...ws)], b = (D.weeks || {})[Math.max(...ws)];
     return a && b && Math.max(...ws) >= first ? { n: +n, start: a[0], end: b[1], lock: `${a[0]}T00:00:00`, endAt: `${b[1]}T23:59:00` } : null;
   }).filter(Boolean).sort((x, y) => x.n - y.n);
-  const inLeague = new Set(periods.map(p => p.n));
-  const matchups = {};
-  for (const m of j.schedule || []) {
-    if (!inLeague.has(m.matchupPeriodId) || !m.home || !m.away) continue;
-    (matchups[m.matchupPeriodId] = matchups[m.matchupPeriodId] || []).push([String(m.away.teamId), String(m.home.teamId)]);
-  }
-
-  // lineup slots, bench and IR in the shape slotsFromLeague reads
-  const counts = Object.entries(rs.lineupSlotCounts || {}).map(([k, n]) => [+k, +n]).filter(([, n]) => n > 0);
-  const starters = counts.filter(([k]) => ESPN_FFL_SLOTS[k]);
-  const count = slot => (counts.find(([k]) => k === slot) || [0, 0])[1];
-  const active = sum(starters.map(([, n]) => n));
-  const constraints = {};
-  for (const [k, n] of starters) constraints[ESPN_FFL_SLOTS[k]] = { maxActive: ((constraints[ESPN_FFL_SLOTS[k]] || {}).maxActive || 0) + n };
-  const rosterInfo = {
-    positionConstraints: constraints, maxTotalActivePlayers: active,
-    maxTotalReservePlayers: count(ESPN_FFL_BENCH), maxTotalPlayers: active + count(ESPN_FFL_BENCH) + count(ESPN_FFL_IR),
-  };
-  const statusOf = slot => (slot === ESPN_FFL_IR ? 'INJURED_RESERVE' : ESPN_FFL_SLOTS[slot] ? 'ACTIVE' : 'RESERVE');
-  const rosters = Object.fromEntries(j.teams.map(t => [String(t.id), ((t.roster && t.roster.entries) || []).map(e => {
-    const pid = String(e.playerId);
-    return { fid: pid, nba: toNba[pid] || null, name: names[pid] || '', slot: ESPN_FFL_SLOTS[e.lineupSlotId] || '', st: statusOf(e.lineupSlotId) };
-  })]));
 
   const cur = sleeperWeekNow(periods);
-  const ds = s.draftSettings || {};
-  const draftAt = ds.date ? new Date(ds.date).toISOString() : null;
   const league = {
-    id, source: 'espn', sport: 'nfl', name: String(s.name || '').trim(), scoring: ss.scoringType || '',
-    historyId: null, year: j.seasonId || season, espnSeason: season,
+    ...espnLeagueShape(j, { id, periods, toNba, names, lineup: { slots: ESPN_FFL_SLOTS, bench: ESPN_FFL_BENCH, ir: ESPN_FFL_IR }, points: true }),
+    sport: 'nfl', year: j.seasonId || season, espnSeason: season,
     ...espnFootballScoring(ss),
     oneGame: true,
-    teams: j.teams.map(t => ({ id: String(t.id), name: espnTeamName(t) })),
-    periods,
     lockDays: 1, // each player locks as his game starts
-    playoffPeriod: sched.playoffTeamCount ? sched.matchupPeriodCount + 1 : null,
-    matchups,
-    rosterPeriod: null, rosterPeriods: [],
-    rosters, openingRosters: null, rosterInfo,
-    draft: null, draftAt,
-    standings: espnStandings(j, true),
-    waivers: espnWaivers(j),
     slpWeek: { n: cur, pts: espnWeekPoints(j, cur), at: Date.now() }, // this week's points, ESPN's (named for Sleeper's, which came first)
   };
-  league.draft = espnDraft(j, toNba, names, draftAt);
   return { league, fxPlayers, idMap: { toNba, names } };
 }
 
@@ -445,7 +423,7 @@ let espnWeekLoad = null;
 function espnWeekFresh(L) {
   if (!L || L.source !== 'espn' || !isFootball() || espnWeekLoad || (L.slpWeek && Date.now() - L.slpWeek.at < feedWait('ESPN live points', 30000))) return;
   const n = sleeperWeekNow(L.periods);
-  espnWeekLoad = espnGet(`${L.espnSeason}/segments/0/leagues/${encodeURIComponent(L.id)}?view=mRoster&scoringPeriodId=${n}`, null, 'ffl').then(j => {
+  espnWeekLoad = espnGet(`${espnLeaguePath(L.espnSeason, L.id)}view=mRoster&scoringPeriodId=${n}`, null, 'ffl').then(j => {
     L.slpWeek = { n, pts: espnWeekPoints(j, n), at: Date.now() };
     noteLiveOk('ESPN live points');
     if (ui.tab === 'dashboard' || ui.tab === 'week') { live.hold = true; try { render(); } finally { live.hold = false; } }
