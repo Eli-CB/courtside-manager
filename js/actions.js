@@ -168,6 +168,11 @@ const actions = {
   async 'feedback-copy'() {
     try { await navigator.clipboard.writeText(`To: ${FEEDBACK_EMAIL}\nSubject: ${FEEDBACK_SUBJECT}\n\n${feedbackBody()}`); toast(`Copied: paste it into an email to ${FEEDBACK_EMAIL}`); } catch (e) { toast(`Couldn't copy. The address is ${FEEDBACK_EMAIL}`); }
   },
+  // the league's ID, to send to a friend in the league: pasted into the league form, it connects the same league
+  async 'copy-league-id'() {
+    const id = fxLeague().id;
+    try { await navigator.clipboard.writeText(id); toast('League ID copied'); } catch (e) { toast(`Couldn't copy. The league ID is ${id}`); }
+  },
   'yahoo-signin'() { yahooSignIn(); },
   'yahoo-signout'() { yahooSignOut(); render(); },
   async 'yahoo-pick'(el) {

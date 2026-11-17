@@ -196,6 +196,7 @@ const TIP_URL = 'https://ko-fi.com/leaguelayerdev'; // tips (also in index.html'
 const ICON_RELOAD = menuIcon('<path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 3.5v5h-5"/>');
 const ICON_MAIL = menuIcon('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>');
 const ICON_PHONE = menuIcon('<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>');
+const ICON_COPY = menuIcon('<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>');
 const ICON_COFFEE = menuIcon('<path d="M4 10h12v4.5a4.5 4.5 0 0 1-4.5 4.5h-3A4.5 4.5 0 0 1 4 14.5z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c-.8 1 .8 2-.1 3M12 3.5c-.8 1 .8 2-.1 3"/>');
 const FEEDBACK_EMAIL = 'feedback@leaguelayer.com', FEEDBACK_SUBJECT = 'League Layer feedback';
 function feedbackDetails() {
@@ -239,7 +240,8 @@ function gearMenu() {
     <div class="gear-pop">
       ${hasLeague ? `<div class="lm-sec">League</div>
       ${league ? `<button type="button" class="lm-item" data-action="league-reload">${ICON_RELOAD}Reload from ${sourceName()}<span class="gear-sub">${reloadWait() > 0 ? 'read just now' : 'rosters, lineups, matchups and standings'}</span></button>` : ''}
-      <div class="gear-row gear-pick"><span>Stats used ${infoBtn('projection')}</span><select class="ctx-team" data-change="set-basis" aria-label="Stats used">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
+      <div class="gear-row gear-pick"><span>Stats used ${infoBtn('projection')}</span><select class="ctx-team" data-change="set-basis" aria-label="Stats used">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      ${league ? `<button type="button" class="lm-item" data-action="copy-league-id" title="Copy the league ID">${ICON_COPY}Copy league ID<span class="gear-sub">${esc(fxLeague().id)} · send it to a friend to connect the league</span></button>` : ''}` : ''}
       <div class="lm-sec">Appearance</div>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-theme" role="switch" aria-checked="${dark}">Dark mode<span class="gear-switch${dark ? ' on' : ''}" aria-hidden="true"></span></button>
       <button type="button" class="lm-item gear-toggle" data-action="toggle-scores" role="switch" aria-checked="${ui.hideScores}"><span>Hide game scores<span class="gear-sub">no spoilers on the Matchup tab</span></span><span class="gear-switch${ui.hideScores ? ' on' : ''}" aria-hidden="true"></span></button>

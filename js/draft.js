@@ -111,7 +111,7 @@ function draftData() {
 }
 
 // ----- Draft Retrospective (was Draft awards): this season's draft, for the league to share -----
-// The ADP ones (The Reacher, The Fall, Value Meal) go against consensus ADP (Fantrax's average draft position over its
+// The ADP ones (The Reach, The Fall, Value Meal) go against consensus ADP (Fantrax's average draft position over its
 // drafts): a pick is compared with where consensus would take its player in this draft. The league's keepers come off the
 // board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
 // ADP order among the players not kept. Trigger Finger and Clock Milker come from how long each pick took (Fantrax's pick
@@ -194,11 +194,11 @@ function draftAwards(d) {
     const pickWho = x => `${headshot({ nbaId: x.p.nbaId, name: x.p.name }, hsPx(32, 28))}<div class="bmain">${playerBtn(x.p.nbaId, x.p.name)}`;
     const spotsLine = x => `${esc(fxTeamName(x.p.teamId))} · taken #${x.p.pick} · consensus #${x.cons} (ADP ${fmt(x.adp, 1)})`;
     const said = (x, n, way) => `Taken #${x.p.pick}, ${plural(n, 'pick')} ${way}: consensus #${x.cons} (ADP ${fmt(x.adp, 1)})`;
-    // The Reacher: taken furthest ahead of consensus; The Fall, its inverse: taken furthest past it. Each breakdown, the 10 furthest
+    // The Reach: taken furthest ahead of consensus; The Fall, its inverse: taken furthest past it. Each breakdown, the 10 furthest
     const reaches = sortDesc(rated, x => x.early).filter(x => x.early > 0);
     if (reaches.length) {
-      award('🦒', 'The Reacher', reaches[0], said(reaches[0], reaches[0].early, 'early'));
-      out[out.length - 1].detail = breakdown('🦒', 'The Reacher', `The ${Math.min(10, reaches.length)} picks taken furthest ahead of consensus`,
+      award('🦒', 'The Reach', reaches[0], said(reaches[0], reaches[0].early, 'early'));
+      out[out.length - 1].detail = breakdown('🦒', 'The Reach', `The ${Math.min(10, reaches.length)} picks taken furthest ahead of consensus`,
         reaches.slice(0, 10).map(x => row(pickWho(x), spotsLine(x), `${x.early} early`)).join(''));
     }
     const falls = sortDesc(rated, x => -x.early).filter(x => x.early < 0);
@@ -217,7 +217,7 @@ function draftAwards(d) {
     if (auto.length && auto[0].med > 0) {
       const num = v => fmt(Math.abs(v), v % 1 ? 1 : 0); // (a median is whole, or a half)
       // the breakdown: every team, the latest typical pick first (then the average), in words rather than signs: "late"
-      // after a player's consensus spot (he fell to them: value), "early" before it (a reach), as The Reacher's "86 picks
+      // after a player's consensus spot (he fell to them: value), "early" before it (a reach), as The Reach's "86 picks
       // early"; under it the pick that fell furthest (how far) and its biggest reach (just who), each only when it has one
       const way = v => (v === 0 ? 'even' : `${num(v)} ${v > 0 ? 'late' : 'early'}`);
       const rows = sortDesc(teams, t => t.med * 1e4 + t.avg).map(t => {
