@@ -1063,7 +1063,7 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const wv = app.waiverValue(), over = ps => ps.reduce((t, p) => t + app.gameWorth(p) - wv, 0);
     assert.deepEqual([M.rows[0].sa, M.rows[0].sb], [app.fmtValue(over(M.A.players)), app.fmtValue(over(M.B.players))]);
     assert.ok(html.includes(`give ${M.rows[0].sb} · get ${M.rows[0].sa}`), "the verdict's numbers");
-    assert.deepEqual([...M.rows.slice(1).map(r => r.key)], [...L.cats]);
+    assert.deepEqual([...M.rows.slice(1).map(r => r.key)], ['po', ...L.cats], 'playoff games, then the categories');
     const pts = M.rows.find(r => r.key === 'pts'), ptsOf = ps => ps.reduce((t, p) => t + p.pts, 0);
     assert.equal(pts.sa, app.fmt(ptsOf(M.A.players), 1));
     assert.equal(pts.lead, ptsOf(M.A.players) > ptsOf(M.B.players) ? 1 : -1);
@@ -1080,9 +1080,38 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     assert.equal((card.match(/class="tp-tot"/g) || []).length, 2);
     for (const S of [M.A, M.B]) assert.ok(card.includes(`<b>${app.fmtValue(S.sum)}</b><div class="tp-vol">${app.fmtValue(S.value)} over waiver</div>`), S.name);
     const you = card.slice(card.indexOf('For your team')).split('</tr>')[0], Y = app.tradeForYou([mine[0]], theirs.slice(0, 2));
-    assert.equal(you.match(/<td class="num/g).length, L.cats.length + 1, 'a change for each category, then the net value');
+    assert.equal(you.match(/<td class="num/g).length, L.cats.length + 2, 'the net playoff games, a change for each category, then the net value');
     assert.ok(you.includes(`<b>${app.fmtValue(Y.diff)}</b>`) && html.includes(Y.verdict[0]));
     assert.ok(html.indexOf('Trade proposal') < html.indexOf(Y.verdict[0]) && html.indexOf(Y.verdict[0]) < html.indexOf('tp-table'), 'the verdict at the top of the one card');
+    // playoff games: each player's NBA team's games in the league's playoff periods (from L.playoffPeriod to the last),
+    // each side's added up and the side with more marked, and your net
+    const P = app.playoffDays(), poDays = L.periods.filter(q => q.n >= L.playoffPeriod).flatMap(q => app.periodDates(q));
+    assert.ok(P && !P.started && L.playoffPeriod > 1 && [...P.days].join() === poDays.join(), 'the playoffs are all to come');
+    assert.ok(P.from >= L.periods.find(q => q.n === L.playoffPeriod).start && P.to <= L.periods[L.periods.length - 1].end);
+    const teamGames = p => app.get('NBA').teams[p.team].dates.filter(d => poDays.includes(d)).length;
+    for (const p of [...M.A.players, ...M.B.players]) {
+      assert.equal(app.playoffGames(p, P), teamGames(p), p.name);
+      assert.ok(rowOf(p).includes(`<td class="num tp-po">${teamGames(p)}</td>`), p.name);
+    }
+    const poOf = S => S.players.reduce((t, p) => t + teamGames(p), 0), po = M.rows.find(r => r.key === 'po');
+    assert.deepEqual([po.sa, po.sb], [String(poOf(M.A)), String(poOf(M.B))]);
+    assert.equal(po.lead, poOf(M.A) === poOf(M.B) ? 0 : poOf(M.A) > poOf(M.B) ? 1 : -1);
+    const net = poOf(M.A) - poOf(M.B);
+    assert.ok(you.includes(`>${net > 0 ? '+' : net < 0 ? '−' : ''}${Math.abs(net)}</td>`), `net ${net}`);
+    assert.ok(card.includes('Playoff G') && card.includes(`weeks ${L.playoffPeriod}–${L.periods[L.periods.length - 1].n}`));
+    // once the playoffs are on, only the games left count; a league without playoffs has no column
+    const savedPo = L.playoffPeriod;
+    try {
+      L.playoffPeriod = null;
+      assert.equal(app.playoffDays(), null);
+      assert.ok(!app.viewTrade().includes('Playoff G') && !app.tradeModel(T).rows.some(r => r.key === 'po'));
+    } finally { L.playoffPeriod = savedPo; }
+    const mid = app.addDays(L.periods.find(q => q.n === L.playoffPeriod).start, 3);
+    await onDay(mid, () => {
+      const Q = app.playoffDays();
+      assert.ok(Q.started && Q.from === mid && [...Q.days].join() === poDays.filter(d => d >= mid).join(), 'the games still to play');
+      assert.equal(app.playoffGames(M.A.players[0], Q), app.get('NBA').teams[M.A.players[0].team].dates.filter(d => d >= mid && poDays.includes(d)).length);
+    });
     // FG% and FT% count volume: makes-attempts a game under each side's %, and the better side adds more makes over the
     // league average on its attempts, so a few shots at a high % lose to many at a good one
     const avg = app.get('BASE').fgPct[0], madeOver = p => (p.fgPct - avg) * p.fga;
@@ -1153,12 +1182,12 @@ test('a points trade proposal compares fantasy points first', async () => {
   const [t1, t2] = app.fxPickable().map(t => t.id);
   const ids = t => app.fxTeamSide(t).players.filter(p => p.nbaId).slice(0, 2).map(p => String(p.nbaId));
   const M = app.tradeModel({ from: t1, to: t2, give: ids(t1), get: ids(t2) });
-  assert.deepEqual([...M.rows.slice(0, 2).map(r => r.key)], ['value', 'fp']);
+  assert.deepEqual([...M.rows.filter(r => r.key !== 'po').slice(0, 2).map(r => r.key)], ['value', 'fp']);
   assert.equal(M.rows[0].label, 'FP/G');
   const p = M.A.players[0];
   assert.equal(app.dealLine(p)[1], `${app.fmt(app.fantasyPoints(p), 1)} FP`);
-  assert.equal(M.rows[1].sa, app.fmt(M.A.players.reduce((t, x) => t + app.fantasyPoints(x), 0), 1));
-  assert.deepEqual([...M.rows.slice(2).map(r => r.key)].sort(), Object.keys(L.points).sort());
+  assert.equal(M.rows.find(r => r.key === 'fp').sa, app.fmt(M.A.players.reduce((t, x) => t + app.fantasyPoints(x), 0), 1));
+  assert.deepEqual([...M.rows.filter(r => r.key !== 'po').slice(2).map(r => r.key)].sort(), Object.keys(L.points).sort());
   await app.useLeague(CATS9);
 });
 
@@ -4853,6 +4882,16 @@ test("a league's own name and its teams' names are shown as text on every tab an
   assert.deepEqual([...new Set(problems)].slice(0, 40), []);
   assert.ok(drawn > 1000, `${drawn} positions drawn`);
   assert.deepEqual([...plain].slice(0, 20), [], 'positions drawn without their colors');
+});
+
+test('the js files share one scope: no two declare the same function (a later file\'s would silently replace the earlier)', () => {
+  const fs = require('fs'), path = require('path'), dir = path.join(__dirname, '..', 'js'), seen = new Map(), twice = [];
+  for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.js'))) {
+    for (const m of fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/^(?:async )?function\s+(\w+)/gm)) {
+      if (seen.has(m[1])) twice.push(`${m[1]}: ${seen.get(m[1])} and ${f}`); else seen.set(m[1], f);
+    }
+  }
+  assert.deepEqual(twice, []);
 });
 
 test('positions are drawn by one helper, always in their colors (the page and the share pictures)', () => {

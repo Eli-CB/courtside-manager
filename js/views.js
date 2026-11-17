@@ -477,10 +477,15 @@ function tradeModel(T) {
     return { ...r, va: A.tot[c.att] ? dealVol(A.tot[c.made], A.tot[c.att]) : '', vb: B.tot[c.att] ? dealVol(B.tot[c.made], B.tot[c.att]) : '', ta: tip(A.tot), tb: tip(B.tot),
       lead: oa == null || ob == null ? r.lead : Math.abs(oa - ob) < 0.05 ? 0 : oa > ob ? 1 : -1 };
   };
-  const rows = [row('value', valueLabel(), A.value, B.value, v => fmtValue(v)),
+  // a league with playoffs to come: each side's games in them (more is better: they decide the title)
+  const P = playoffDays();
+  if (P) for (const S of [A, B]) S.po = sum(S.players.map(p => playoffGames(p, P)));
+  const rows = [row('value', valueLabel(), A.value, B.value, v => fmtValue(v)), ...(P ? [row('po', 'Playoff games', A.po, B.po, fmtGames)] : []),
     ...dealCats().map(c => (c.pct && !c.rate ? shotRow(c) : row(c.key, c.label, catOf(A.tot, c), catOf(B.tot, c), v => dealShow(c, v), c.neg)))];
-  return { A, B, rows };
+  return { A, B, rows, P };
 }
+// The playoffs in words, for tips and notes: "weeks 19–23 (Mar 1 – Apr 11)"
+const playoffWeeks = P => `week${P.ps.length > 1 ? `s ${P.ps[0].n}–${P.ps[P.ps.length - 1].n}` : ` ${P.ps[0].n}`} (${fmtMonthDay(P.from)} – ${fmtMonthDay(P.to)})`;
 
 // The proposal on the Trades tab, all in one table: for each side, what it gets (each player's photo, his ranks this
 // season by value per game and added up, his average game in the league's categories, his value), then that side's
@@ -488,10 +493,13 @@ function tradeModel(T) {
 // the verdict above. In your own deal your side's better numbers are green and the other side's red; a league mate's
 // deal (no Y) stays neutral. A points league's FP is the Value column.
 function tradeCard(T, Y) {
-  const M = tradeModel(T), seen = !Y, me = myTeamId(), R = valueRanks();
+  const M = tradeModel(T), seen = !Y, me = myTeamId(), R = valueRanks(), P = M.P;
   const mineAt = M.A.tid === me ? 1 : M.B.tid === me ? -1 : 0;
   const sides = [[M.A, 1], [M.B, -1]].filter(([S]) => S.players.length), both = sides.length === 2;
-  const cats = dealCats().filter(c => !c.fp), rowOf = new Map(M.rows.map(r => [r.key, r])), ncol = 6 + cats.length;
+  const cats = dealCats().filter(c => !c.fp), rowOf = new Map(M.rows.map(r => [r.key, r])), ncol = 6 + cats.length + (P ? 1 : 0);
+  // the playoffs' column (a league with playoffs to come): his games in them, each side's added up, your net
+  const poTip = P ? `Games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}${isOneGame() ? ': the playoff weeks he plays in, as one game a week counts' : isHockey() ? ': a goalie\'s expected starts' : ''}` : '';
+  const poCell = (v, cls = '', b = false) => (P ? `<td class="num tp-po${cls}">${b ? `<b>${v}</b>` : v}</td>` : '');
   const mark = (r, col) => (both && r && r.lead === col ? ` tp-lead${mineAt ? (col === mineAt ? ' pos-good' : ' pos-bad') : ''}` : '');
   const vol = v => (v ? `<div class="tp-vol">${v}</div>` : '');
   // a player: who, his ranks, games, his average game, his value
@@ -506,17 +514,18 @@ function tradeCard(T, Y) {
       <div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)}</div></div></div></td>
     ${rank(R.per.get(p.nbaId), R.per.get(p.nbaId) ? `${p.name}: #${R.per.get(p.nbaId)} of ${R.perN} by ${valueLabel().toLowerCase()} per game this season` : `Ranked with ${R.minGp}+ games this season`)}
     ${rank(R.tot.get(p.nbaId), `${p.name}: #${R.tot.get(p.nbaId) || '—'} of ${R.totN} by ${valueLabel().toLowerCase()} added up this season`)}
-    <td class="num">${p.gp}</td><td class="num">${fmt(p.min || 0, 1)}</td>${cats.map(c => gameCell(p, c)).join('')}<td class="num tp-v"><b>${fmtValue(value(p))}</b></td></tr>`;
-  // a side's total: each category added up (a percentage from its makes and attempts), its value added up and over a
-  // waiver player for each roster spot (what's marked)
-  const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl">Total</td><td></td><td></td><td></td><td></td>
+    <td class="num">${p.gp}</td>${poCell(fmtGames(playoffGames(p, P)))}<td class="num">${fmt(p.min || 0, 1)}</td>${cats.map(c => gameCell(p, c)).join('')}<td class="num tp-v"><b>${fmtValue(value(p))}</b></td></tr>`;
+  // a side's total: its playoff games and each category added up (a percentage from its makes and attempts), its value
+  // added up and over a waiver player for each roster spot (what's marked)
+  const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl">Total</td><td></td><td></td><td></td>${poCell(fmtGames(S.po), mark(rowOf.get('po'), col))}<td></td>
     ${cats.map(c => { const r = rowOf.get(c.key), [v, vl, tip] = col === 1 ? [r.sa, r.va, r.ta] : [r.sb, r.vb, r.tb]; return `<td class="num${mark(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol(vl)}</td>`; }).join('')}
     <td class="num tp-v${mark(M.rows[0], col)}" title="${esc(`${valueLabel()} added up; ${fmtValue(S.value)} over a waiver player for each roster spot, which is what's compared`)}"><b>${fmtValue(S.sum)}</b>${vol(`${fmtValue(S.value)} over waiver`)}</td></tr>`;
   const sideRows = ([S, col]) => `<tr class="tp-grp"><th colspan="${ncol}" scope="rowgroup"><span class="tp-grp-name">${teamLink(S.tid)} gets</span></th></tr>${S.players.map(playerRow).join('')}${totalRow(S, col)}`;
   // your own deal: what it does to your active roster's per-game totals (now and after on hover), and the net value
   const change = (c, d) => (c.rate ? signed(d, 2) : c.pct ? `${signed(d * 100, 1)}%` : signed(d, 1));
   const zero = shown => !+String(shown).replace(/[^\d.]/g, ''); // (a change that rounds to nothing is gray, not green)
-  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b><div class="muted small">change per game</div></td><td></td><td></td><td></td><td></td>
+  const poNet = P && M.A.po - M.B.po, poShown = P ? `${poNet > 0.05 ? '+' : poNet < -0.05 ? '−' : ''}${fmtGames(Math.abs(poNet))}` : '';
+  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b><div class="muted small">change per game</div></td><td></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
     ${cats.map(c => { const b = Y.before[c.key], a = Y.after[c.key], d = a - b, shown = change(c, d); return `<td class="num ${zero(shown) ? 'muted' : (c.neg ? d < 0 : d > 0) ? 'pos-good' : 'pos-bad'}" title="${c.label}: ${dealShow(c, b)} now, ${dealShow(c, a)} after">${shown}</td>`; }).join('')}
     <td class="num tp-v ${zero(fmtValue(Y.diff)) ? 'muted' : Y.diff > 0 ? 'pos-good' : 'pos-bad'}" title="Net ${valueLabel().toLowerCase()} over a waiver player"><b>${fmtValue(Y.diff)}</b></td></tr>` : '';
   const shots = cats.some(c => c.pct && !c.rate), spanH = (label, n, tip = '') => `<th class="tp-span" colspan="${n}"${tip ? ` title="${esc(tip)}"` : ''}>${label}</th>`;
@@ -528,11 +537,11 @@ function tradeCard(T, Y) {
       : `${esc(M.A.name)} gets ${fmtValue(M.A.value)} · ${esc(M.B.name)} gets ${fmtValue(M.B.value)}`}</p>
     ${Y && Y.rosterAfter > rosterLimit() ? `<p class="alert warn small tp-warn">This puts you at ${Y.rosterAfter}/${rosterLimit()}: you'd need to drop ${Y.rosterAfter - rosterLimit()}.</p>` : ''}
     <div class="tp-wrap"><table class="tp-table">
-      <thead><tr><th class="tp-pl" rowspan="2">Player</th>${spanH('Rank', 2, `This season, among every ${SPORT.name} player`)}<th class="num" rowspan="2">GP</th>${spanH('Per game', 1 + cats.length)}<th class="num tp-v" rowspan="2">${valueLabel()}</th></tr>
+      <thead><tr><th class="tp-pl" rowspan="2">Player</th>${spanH('Rank', 2, `This season, among every ${SPORT.name} player`)}<th class="num" rowspan="2" title="Games played this season">GP</th>${P ? `<th class="num tp-po" rowspan="2" title="${esc(poTip)}">Playoff G</th>` : ''}${spanH('Per game', 1 + cats.length)}<th class="num tp-v" rowspan="2">${valueLabel()}</th></tr>
         <tr><th class="num" title="By ${valueLabel().toLowerCase()} per game (players with ${R.minGp}+ games)">Per G</th><th class="num" title="By ${valueLabel().toLowerCase()} added up this season">Total</th><th class="num">MIN</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}</tr></thead>
       <tbody>${sides.map(sideRows).join('')}${youRow}</tbody>
     </table></div>
-    <p class="small muted tp-foot">Ranks: this season, among every ${SPORT.name} player. Numbers: each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}${Y ? ' For your team: your active roster\'s per-game totals, after the trade against now.' : ''}</p>
+    <p class="small muted tp-foot">Ranks: this season, among every ${SPORT.name} player.${P ? ` Playoff G: his team's games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}.` : ''} Numbers: each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}${Y ? ' For your team: your active roster\'s per-game totals, after the trade against now.' : ''}</p>
   </div>`;
 }
 // what a percentage row says about volume (the card's and the picture's)
@@ -563,7 +572,7 @@ async function tradeCanvas(L, M) {
   for (const S of [M.A, M.B]) {
     // measured first: each player's stats wrap to the width beside his photo
     const rows = S.players.map(p => {
-      font(27); const stats = wrapText(ctx, dealLine(p).join(' · '), right - tx, ' · ');
+      font(27); const stats = wrapText(ctx, [...(M.P ? [`${fmtGames(playoffGames(p, M.P))} playoff G`] : []), ...dealLine(p)].join(' · '), right - tx, ' · ');
       return { p, stats, h: Math.max(d, 88 + stats.length * 37) };
     });
     const h = 28 + 52 + sum(rows.map(r => r.h)) + (rows.length - 1) * 36 + 30;
@@ -626,6 +635,7 @@ async function tradeCanvas(L, M) {
   y += h + 22;
   font(24);
   const notes = [`${valueLabel()}: what each side's players add per game${isPoints() ? ' in fantasy points' : ' to winning categories'}, less a waiver player for each roster spot they take.`];
+  if (M.P) notes.push(`Playoff games: each team's games in the league's playoffs, ${playoffWeeks(M.P)}${M.P.started ? ', still to play' : ''}.`);
   if (M.rows.some(r => r.va || r.vb)) notes.push(TRADE_SHOTS);
   for (const note of notes) { for (const l of wrapText(ctx, note, inner)) { text(l, C.pad, y, C.muted); y += 34; } y += 8; }
   return K.done(y);

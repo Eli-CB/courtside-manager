@@ -332,15 +332,35 @@ function weekShifts() {
 }
 function matchDates(start = weekStart()) {
   const p = fxLeague() && fxLeague().periods ? fxPeriodFor(start) : null;
-  if (p) {
-    // a period ending in the evening (Fantrax's usual 6:59 PM) leaves that day's games to the next one
-    const endHour = +(String(p.endAt || '').match(/T(\d\d)/) || [0, 23])[1];
-    const out = [];
-    for (let d = p.start; d < p.end || (d === p.end && endHour >= 21); d = addDays(d, 1)) out.push(d);
-    if (out.length) return out;
-  }
-  return [...state.matchDays].sort((a, b) => a - b).map(o => addDays(start, o));
+  const out = p ? periodDates(p) : [];
+  return out.length ? out : [...state.matchDays].sort((a, b) => a - b).map(o => addDays(start, o));
 }
+// A league period's days, start to end: one ending in the evening (Fantrax's usual 6:59 PM) leaves that day's games to the next
+function periodDates(p) {
+  const endHour = +(String(p.endAt || '').match(/T(\d\d)/) || [0, 23])[1];
+  const out = [];
+  for (let d = p.start; d < p.end || (d === p.end && endHour >= 21); d = addDays(d, 1)) out.push(d);
+  return out;
+}
+
+// The league's fantasy playoffs: its playoff periods (from L.playoffPeriod on) and their game days still to come (all of
+// them before the playoffs start); null for a league without playoffs, or once they're over
+function playoffDays() {
+  const L = fxLeague();
+  if (!L || !L.playoffPeriod || !(L.periods || []).length) return null;
+  const ps = L.periods.filter(p => p.n >= L.playoffPeriod), today = todayIso();
+  const days = ps.flatMap(periodDates).filter(d => d >= today);
+  return days.length ? { ps, days, from: days[0], to: days[days.length - 1], started: periodDates(ps[0])[0] < today } : null;
+}
+// A player's games in them: his NBA team's (a goalie's expected starts, to a tenth); in a one-game league (Sleeper's), the
+// playoff weeks he plays in at all, since one game a week counts. null without playoffs to come.
+function playoffGames(p, P = playoffDays()) {
+  if (!P) return null;
+  if (isOneGame()) return P.ps.filter(q => periodDates(q).some(d => P.days.includes(d) && playsOn(p, d))).length;
+  return expectedGames(p, P.days);
+}
+// games as a count: whole when they are (a goalie's expected starts keep their tenth)
+const fmtGames = n => (n == null ? '—' : Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : fmt(n, 1));
 // A matchup period whose games are all played: its end has passed, or every game of its last game day is in the
 // saved box scores (the daily job's, or ESPN's finals put in with them that night: fillWeekFromEspn). Fantrax ends a
 // weekly period when the next one locks (Monday evening), though its last games were the night before. p: a league period ({ start, endAt }) or a weekly roster period ({ start, end }).

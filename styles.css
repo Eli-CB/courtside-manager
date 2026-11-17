@@ -674,6 +674,7 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .tp-table th, .tp-table td { padding: 6px 5px; }
 .tp-table thead th { font-size: .72rem; }
 .tp-table th.tp-span { text-align: center; padding-bottom: 2px; border-bottom: 0; }
+.tp-table th.tp-po { white-space: normal; width: 3.6em; } /* "Playoff G" on two lines */
 .tp-table td.tp-pl, .tp-table th.tp-pl { min-width: 190px; padding-left: 0; }
 .tp-table tr.tp-grp th { padding: 14px 0 6px; font-size: .9rem; font-weight: 600; color: var(--text); white-space: normal; overflow-wrap: anywhere; }
 .tp-table tbody tr.tp-grp:hover, .tp-table tbody tr.tp-tot:hover { background: none; }
