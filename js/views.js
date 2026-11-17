@@ -366,26 +366,48 @@ function viewTrade() {
   // prune selections that no longer exist (their players are picked by NBA id: they're rebuilt every render)
   for (const id of ui.tradeGive) if (!state.players.some(p => p.id === id)) ui.tradeGive.delete(id);
   for (const id of ui.tradeGet) if (!theirs.some(p => String(p.nbaId) === id)) ui.tradeGet.delete(id);
+  // the league's future draft picks (read the first time they're needed: leaguePicks); a pick no longer theirs drops out
+  const PK = leaguePicks(), owned = tid => (PK.list || []).filter(p => p.owner === tid).sort((a, b) => a.year - b.year || a.round - b.round);
+  if (PK.list) {
+    for (const k of ui.tradeGivePicks) if (!owned(state.fxTeam).some(p => pickKey(p) === k)) ui.tradeGivePicks.delete(k);
+    for (const k of ui.tradeGetPicks) if (!owned(ui.tradeTeam).some(p => pickKey(p) === k)) ui.tradeGetPicks.delete(k);
+  }
 
   const pick = (list, set, side, key) => list.length ? `<ul class="pick-list">${sortDesc(list, value).map(p => `
     <li><label><input type="checkbox" data-change="trade" data-side="${side}" value="${key(p)}" ${set.has(key(p)) ? 'checked' : ''}>
       <span class="grow">${playerCell(p)}</span>${p.status !== 'Healthy' ? statusBadge(p) : ''}<span class="val">${fmtValue(value(p))}</span></label></li>`).join('')}</ul>`
     : `<p class="muted small">${side === 'get' ? (others.length ? 'This team has no players yet.' : 'Connect a league to trade with its teams.') : 'Your roster is empty.'}</p>`;
+  // under a team's players, its draft picks to tick ("2027 R1"; one it traded for says whose it was)
+  const picksOf = (tid, set, side) => {
+    if (!tid) return '';
+    if (PK.loading) return '<p class="muted small pp-note">Loading draft picks…</p>';
+    if (PK.error) return `<p class="muted small pp-note">Couldn't read the draft picks (${esc(PK.error)}). <button type="button" class="link-btn" data-action="trade-picks-retry">Try again</button></p>`;
+    const list = owned(tid);
+    return list.length ? `<div class="pp"><div class="pp-head">Draft picks</div><div class="pp-list">${list.map(p => { const k = pickKey(p), on = set.has(k); return `<label class="pp-chip${on ? ' on' : ''}">
+      <input type="checkbox" data-change="trade-pick" data-side="${side}" value="${esc(k)}"${on ? ' checked' : ''}><span>${p.year} R${p.round}</span>${p.from !== tid ? `<span class="pp-from">${esc(fxTeamName(p.from))}</span>` : ''}</label>`; }).join('')}</div></div>` : '';
+  };
 
   const give = [...ui.tradeGive].map(byId).filter(Boolean);
   const get = theirs.filter(p => ui.tradeGet.has(String(p.nbaId)));
+  const givePicks = [...ui.tradeGivePicks], getPicks = [...ui.tradeGetPicks];
   // the deal in one card: both sides, how they compare, and what it does for your team. Under the lists; a league mate's
   // shared deal above them instead
   const card = ui.tradeSeen ? tradeCard(ui.tradeSeen)
-    : give.length || get.length ? tradeCard({ from: state.fxTeam, to: ui.tradeTeam, give: give.filter(p => p.nbaId != null).map(p => String(p.nbaId)), get: [...ui.tradeGet] }, tradeForYou(give, get))
-    : `<div class="card"><div class="empty"><strong>Pick players on both sides</strong>See how the deal changes your team's per-game production, and share it with the other team.</div></div>`;
+    : give.length || get.length || givePicks.length || getPicks.length
+      ? tradeCard({ from: state.fxTeam, to: ui.tradeTeam, give: give.filter(p => p.nbaId != null).map(p => String(p.nbaId)), get: [...ui.tradeGet], givePicks, getPicks }, tradeForYou(give, get))
+      : `<div class="card"><div class="empty"><strong>Pick players on both sides</strong>See how the deal changes your team's per-game production, and share it with the other team.</div></div>`;
   return `${ui.tradeSeen ? card : ''}
   <div class="trade-grid">
-    <div class="card"><div class="card-head"><h2>You give</h2><span class="muted small">${give.length} selected</span></div>${pick(state.players, ui.tradeGive, 'give', p => p.id)}</div>
-    <div class="card"><div class="card-head"><h2>You get</h2>${others.length ? `<select class="trade-team" data-change="trade-team" aria-label="Team to trade with">${others.map(t => `<option value="${esc(t.id)}" ${t.id === ui.tradeTeam ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}<span class="muted small">${get.length} selected</span></div>${pick(theirs, ui.tradeGet, 'get', p => String(p.nbaId))}</div>
+    <div class="card"><div class="card-head"><h2>You give</h2><span class="muted small">${give.length + givePicks.length} selected</span></div>${pick(state.players, ui.tradeGive, 'give', p => p.id)}${picksOf(state.fxTeam, ui.tradeGivePicks, 'give')}</div>
+    <div class="card"><div class="card-head"><h2>You get</h2>${others.length ? `<select class="trade-team" data-change="trade-team" aria-label="Team to trade with">${others.map(t => `<option value="${esc(t.id)}" ${t.id === ui.tradeTeam ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}<span class="muted small">${get.length + getPicks.length} selected</span></div>${pick(theirs, ui.tradeGet, 'get', p => String(p.nbaId))}${picksOf(ui.tradeTeam, ui.tradeGetPicks, 'get')}</div>
   </div>
   ${ui.tradeSeen ? '' : card}`;
 }
+
+// A draft pick in a deal and its link: "year:round:team whose pick it was"; and in words
+const pickKey = p => `${p.year}:${p.round}:${p.from}`;
+const pickOf = k => { const [year, round, ...from] = String(k).split(':'); return { year: +year, round: +round, from: from.join(':') }; };
+const pickName = p => `${p.year} Round ${p.round}`;
 
 // What a deal does for your team: value over a waiver player each way (each player in a deal takes a roster spot someone
 // off waivers could fill; a goalie for his share of his team's games, as the waiver player's), and each category's
@@ -403,12 +425,14 @@ function tradeForYou(give, get) {
 }
 
 /* ---------- Trade proposal: both sides of a deal, with photos and per-game numbers, to share with the other team ---------- */
-// A deal: { from, to, give, get }: team `from` sends `give` and receives `get` (players by data id, as text). The pickers
-// make one (you are `from`, with players picked on both sides); a shared link carries one (tradeUrl, openSharedLink).
+// A deal: { from, to, give, get, givePicks, getPicks }: team `from` sends `give` and `givePicks`, and receives `get` and
+// `getPicks` (players by data id, as text; draft picks by pickKey). The pickers make one (you are `from`, with something
+// picked on both sides); a shared link carries one (tradeUrl, openSharedLink).
 function tradeDeal() {
   if (ui.tradeSeen) return ui.tradeSeen;
   const give = [...ui.tradeGive].map(byId).filter(p => p && p.nbaId != null).map(p => String(p.nbaId)), get = [...ui.tradeGet];
-  return state.fxTeam && ui.tradeTeam && give.length && get.length ? { from: state.fxTeam, to: ui.tradeTeam, give, get } : null;
+  const givePicks = [...ui.tradeGivePicks], getPicks = [...ui.tradeGetPicks];
+  return state.fxTeam && ui.tradeTeam && (give.length || givePicks.length) && (get.length || getPicks.length) ? { from: state.fxTeam, to: ui.tradeTeam, give, get, givePicks, getPicks } : null;
 }
 
 // A shared trade, once your team is known: either of its teams gets it in the pickers, from their side (what they'd send
@@ -417,10 +441,13 @@ function applyTradeLink() {
   const T = ui.tradeLink, me = state.fxTeam, teams = fxPickable().map(t => t.id);
   ui.tradeLink = null;
   if (!teams.includes(T.from) || !teams.includes(T.to) || T.from === T.to) return;
-  ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeSeen = null;
+  ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeGivePicks.clear(); ui.tradeGetPicks.clear(); ui.tradeSeen = null;
   if (me !== T.from && me !== T.to) { ui.tradeSeen = T; return; }
   const [mine, theirs] = me === T.from ? [T.give, T.get] : [T.get, T.give];
   ui.tradeTeam = me === T.from ? T.to : T.from;
+  // its draft picks (one no longer theirs drops out once the league's picks are in: viewTrade)
+  for (const k of (me === T.from ? T.givePicks : T.getPicks) || []) ui.tradeGivePicks.add(k);
+  for (const k of (me === T.from ? T.getPicks : T.givePicks) || []) ui.tradeGetPicks.add(k);
   for (const p of state.players) if (mine.includes(String(p.nbaId))) ui.tradeGive.add(p.id);
   const onTheirs = new Set(fxTeamSide(ui.tradeTeam).players.map(p => String(p.nbaId)));
   for (const id of theirs) if (onTheirs.has(id)) ui.tradeGet.add(id);
@@ -456,11 +483,13 @@ function dealLine(p) {
 function tradeModel(T) {
   const rawOf = id => nbaById.get(+id) || nbaById.get(id);
   const wv = waiverValue(), over = p => gameWorth(p) - wv;
-  const side = (tid, ids) => {
+  // (and its draft picks, first year and round first; sender: the team sending them, so a pick that was someone else's says so)
+  const side = (tid, ids, keys, sender) => {
     const players = sortDesc(ids.map(rawOf).filter(Boolean).map(raw => playerFromRaw(raw)), value);
-    return { tid, name: fxTeamName(tid) || 'Team', players, sum: sum(players.map(value)), value: sum(players.map(over)), tot: totals(players) };
+    const picks = (keys || []).map(pickOf).sort((a, b) => a.year - b.year || a.round - b.round);
+    return { tid, sender, name: fxTeamName(tid) || 'Team', players, picks, sum: sum(players.map(value)), value: sum(players.map(over)), tot: totals(players) };
   };
-  const A = side(T.from, T.get), B = side(T.to, T.give);
+  const A = side(T.from, T.get, T.getPicks, T.to), B = side(T.to, T.give, T.givePicks, T.from);
   const row = (key, label, a, b, show, neg) => {
     const sa = show(a), sb = show(b);
     return { key, label, sa, sb, lead: a == null || b == null || sa === sb ? 0 : (neg ? a < b : a > b) ? 1 : -1 };
@@ -495,7 +524,9 @@ const playoffWeeks = P => `week${P.ps.length > 1 ? `s ${P.ps[0].n}–${P.ps[P.ps
 function tradeCard(T, Y) {
   const M = tradeModel(T), seen = !Y, me = myTeamId(), R = valueRanks(), P = M.P;
   const mineAt = M.A.tid === me ? 1 : M.B.tid === me ? -1 : 0;
-  const sides = [[M.A, 1], [M.B, -1]].filter(([S]) => S.players.length), both = sides.length === 2;
+  // the sides with something in the deal (Share once both have); totals compared only when both have players
+  const sides = [[M.A, 1], [M.B, -1]].filter(([S]) => S.players.length || S.picks.length), shareable = sides.length === 2;
+  const both = !!(M.A.players.length && M.B.players.length), anyPicks = sides.some(([S]) => S.picks.length);
   const cats = dealCats().filter(c => !c.fp), rowOf = new Map(M.rows.map(r => [r.key, r])), ncol = 6 + cats.length + (P ? 1 : 0);
   // the playoffs' column (a league with playoffs to come): his games in them, each side's added up, your net
   const poTip = P ? `Games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}${isOneGame() ? ': the playoff weeks he plays in, as one game a week counts' : isHockey() ? ': a goalie\'s expected starts' : ''}` : '';
@@ -520,7 +551,11 @@ function tradeCard(T, Y) {
   const totalRow = (S, col) => `<tr class="tp-tot"><td class="tp-pl">Total</td><td></td><td></td><td></td>${poCell(fmtGames(S.po), mark(rowOf.get('po'), col))}<td></td>
     ${cats.map(c => { const r = rowOf.get(c.key), [v, vl, tip] = col === 1 ? [r.sa, r.va, r.ta] : [r.sb, r.vb, r.tb]; return `<td class="num${mark(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol(vl)}</td>`; }).join('')}
     <td class="num tp-v${mark(M.rows[0], col)}" title="${esc(`${valueLabel()} added up; ${fmtValue(S.value)} over a waiver player for each roster spot, which is what's compared`)}"><b>${fmtValue(S.sum)}</b>${vol(`${fmtValue(S.value)} over waiver`)}</td></tr>`;
-  const sideRows = ([S, col]) => `<tr class="tp-grp"><th colspan="${ncol}" scope="rowgroup"><span class="tp-grp-name">${teamLink(S.tid)} gets</span></th></tr>${S.players.map(playerRow).join('')}${totalRow(S, col)}`;
+  // a draft pick: its round in the photo's place, the year and round, and whose it was when that's not the sender's own (no
+  // numbers: next season's order isn't known)
+  const pickRow = (p, sender) => `<tr class="tp-pick"><td class="tp-pl"><div class="bplayer"><span class="hs hs-none pk-ico" style="width:${hsPx(36, 32)}px;height:${hsPx(36, 32)}px" aria-hidden="true">R${p.round}</span>
+      <div class="bmain"><div class="bname"><b>${pickName(p)}</b></div><div class="pmeta">Draft pick${p.from !== sender ? ` · originally ${teamLink(p.from)}` : ''}</div></div></div></td><td colspan="${ncol - 1}"></td></tr>`;
+  const sideRows = ([S, col]) => `<tr class="tp-grp"><th colspan="${ncol}" scope="rowgroup"><span class="tp-grp-name">${teamLink(S.tid)} gets</span></th></tr>${S.players.map(playerRow).join('')}${S.picks.map(p => pickRow(p, S.sender)).join('')}${S.players.length ? totalRow(S, col) : ''}`;
   // your own deal: what it does to your active roster's per-game totals (now and after on hover), and the net value
   const change = (c, d) => (c.rate ? signed(d, 2) : c.pct ? `${signed(d * 100, 1)}%` : signed(d, 1));
   const zero = shown => !+String(shown).replace(/[^\d.]/g, ''); // (a change that rounds to nothing is gray, not green)
@@ -531,7 +566,7 @@ function tradeCard(T, Y) {
   const shots = cats.some(c => c.pct && !c.rate), spanH = (label, n, tip = '') => `<th class="tp-span" colspan="${n}"${tip ? ` title="${esc(tip)}"` : ''}>${label}</th>`;
   return `<div class="card tp">
     <div class="card-head"><div class="tp-head"><h2>Trade proposal</h2>${Y ? `<span class="verdict ${Y.verdict[1]}">${Y.verdict[0]}</span>` : ''}</div>
-      <div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}${both ? '<button type="button" class="btn sm primary" data-action="trade-share">Share</button>' : ''}</div></div>
+      <div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}${shareable ? '<button type="button" class="btn sm primary" data-action="trade-share">Share</button>' : ''}</div></div>
     ${seen ? `<p class="muted small tp-note">A trade a league mate shared, between ${teamLink(M.A.tid)} and ${teamLink(M.B.tid)}.</p>` : ''}
     <p class="muted small tp-sum">${valueLabel()} over a waiver player ${infoBtn('tradeValue')}: ${Y ? `give ${fmtValue(Y.vGive)} · get ${fmtValue(Y.vGet)} · net <b>${fmtValue(Y.diff)}</b>${isPoints() ? '' : ` · improves ${Y.won} of ${Y.n} cats`}`
       : `${esc(M.A.name)} gets ${fmtValue(M.A.value)} · ${esc(M.B.name)} gets ${fmtValue(M.B.value)}`}</p>
@@ -541,7 +576,7 @@ function tradeCard(T, Y) {
         <tr><th class="num" title="By ${valueLabel().toLowerCase()} per game (players with ${R.minGp}+ games)">Per G</th><th class="num" title="By ${valueLabel().toLowerCase()} added up this season">Total</th><th class="num">MIN</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}</tr></thead>
       <tbody>${sides.map(sideRows).join('')}${youRow}</tbody>
     </table></div>
-    <p class="small muted tp-foot">Ranks: this season, among every ${SPORT.name} player.${P ? ` Playoff G: his team's games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}.` : ''} Numbers: each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}${Y ? ' For your team: your active roster\'s per-game totals, after the trade against now.' : ''}</p>
+    <p class="small muted tp-foot">Ranks: this season, among every ${SPORT.name} player.${P ? ` Playoff G: his team's games in the league's playoffs, ${playoffWeeks(P)}${P.started ? ', still to play' : ''}.` : ''} Numbers: each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}${Y ? ' For your team: your active roster\'s per-game totals, after the trade against now.' : ''}${anyPicks ? ' Draft picks aren\'t in the numbers: next season\'s draft order isn\'t known yet.' : ''}</p>
   </div>`;
 }
 // what a percentage row says about volume (the card's and the picture's)
@@ -549,9 +584,12 @@ const TRADE_SHOTS = 'Percentages count volume: makes-attempts a game under each,
 
 // Sharing it (shareWith, recap.js): a picture, or the text and a link that opens the deal on the Trades tab
 const tradeUrl = (L, T) => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}&from=${encodeURIComponent(T.from)}&to=${encodeURIComponent(T.to)}`
-  + `&give=${T.give.map(encodeURIComponent).join(',')}&get=${T.get.map(encodeURIComponent).join(',')}#trade`;
+  + `&give=${T.give.map(encodeURIComponent).join(',')}&get=${T.get.map(encodeURIComponent).join(',')}`
+  + `${(T.givePicks || []).length ? `&givepicks=${T.givePicks.map(encodeURIComponent).join(',')}` : ''}${(T.getPicks || []).length ? `&getpicks=${T.getPicks.map(encodeURIComponent).join(',')}` : ''}#trade`;
+// a pick in words, with whose it was when that's not the sender's own ("2027 Round 2 pick (originally Tatum Tots)")
+const pickWords = (p, sender) => `${pickName(p)} pick${p.from !== sender ? ` (originally ${fxTeamName(p.from)})` : ''}`;
 const tradeText = (L, M) => [`${SPORT.emoji} ${L.name} · Trade proposal`,
-  ...[M.A, M.B].map(S => `${S.name} gets: ${S.players.map(p => `${p.name} (${p.team || 'FA'})`).join(', ')}`)].join('\n\n');
+  ...[M.A, M.B].map(S => `${S.name} gets: ${[...S.players.map(p => `${p.name} (${p.team || 'FA'})`), ...S.picks.map(p => pickWords(p, S.sender))].join(', ')}`)].join('\n\n');
 function tradeShare(L, T) {
   const M = tradeModel(T);
   return {
@@ -561,20 +599,21 @@ function tradeShare(L, T) {
   };
 }
 
-// The picture: each side in a card (what it gets: photos, positions, ranks, each player's average game), a swap mark
-// between them, then the comparison with each row's better number picked out, and what Value means
+// The picture: each side in a card (what it gets: photos, positions, ranks, each player's average game; its draft picks),
+// a swap mark between them, then (both sides with players) the comparison with each row's better number picked out, and
+// what its numbers mean
 async function tradeCanvas(L, M) {
-  const n = M.A.players.length + M.B.players.length;
-  const K = await sharePad(Math.max(5000, 1400 + n * 300 + M.rows.length * 64)), { C, W, inner, ctx, font, text, round, photo } = K;
+  const n = M.A.players.length + M.B.players.length, picks = M.A.picks.length + M.B.picks.length, compare = !!(M.A.players.length && M.B.players.length);
+  const K = await sharePad(Math.max(5000, 1400 + n * 300 + picks * 130 + M.rows.length * 64)), { C, W, inner, ctx, font, text, round, photo } = K;
   let y = K.top({ kicker: 'TRADE PROPOSAL', title: L.name, sub: `${fmtDay(todayIso())} · per game, ${basisLabel().toLowerCase()}` });
   const d = 104, x0 = C.pad + 32, right = W - C.pad - 32, tx = x0 + d + 28, R = valueRanks();
   let swapY = 0;
   for (const S of [M.A, M.B]) {
-    // measured first: each player's stats wrap to the width beside his photo
-    const rows = S.players.map(p => {
+    // measured first: each player's stats wrap to the width beside his photo; a pick is one or two lines
+    const rows = [...S.players.map(p => {
       font(27); const stats = wrapText(ctx, [...(M.P ? [`${fmtGames(playoffGames(p, M.P))} playoff G`] : []), ...dealLine(p)].join(' · '), right - tx, ' · ');
       return { p, stats, h: Math.max(d, 88 + stats.length * 37) };
-    });
+    }), ...S.picks.map(k => ({ k, h: 84 }))];
     const h = 28 + 52 + sum(rows.map(r => r.h)) + (rows.length - 1) * 36 + 30;
     round(C.pad, y, inner, h, 24, C.card);
     let ty = y + 28;
@@ -582,6 +621,16 @@ async function tradeCanvas(L, M) {
     ty += 52;
     rows.forEach((r, i) => {
       if (i) { ctx.fillStyle = C.line; ctx.fillRect(x0, ty + 16, right - x0, 2); ty += 36; }
+      if (r.k) {
+        // a draft pick: its round in a circle where a photo would be, then the year and round, and whose it was
+        const k = r.k, dd = 80, cx = x0 + d / 2, cy = ty + r.h / 2, orig = k.from !== S.sender;
+        ctx.fillStyle = C.line; ctx.beginPath(); ctx.arc(cx, cy, dd / 2, 0, Math.PI * 2); ctx.fill();
+        font(30, 800); ctx.textBaseline = 'middle'; text(`R${k.round}`, cx, cy, C.accent, 'center'); ctx.textBaseline = 'top';
+        font(36, 800); text(`${pickName(k)} pick`, tx, ty + (orig ? 4 : 22));
+        if (orig) { font(26); text(fitText(ctx, `originally ${fxTeamName(k.from)}`, right - tx), tx, ty + 50, C.muted); }
+        ty += r.h;
+        return;
+      }
       const p = r.p;
       photo(p, x0, ty, d);
       font(30, 800); const pv = fmtValue(value(p)), pvW = ctx.measureText(pv).width;
@@ -609,34 +658,39 @@ async function tradeCanvas(L, M) {
     ctx.moveTo(x - 7, swapY + 7 * dir); ctx.lineTo(x, swapY + 14 * dir); ctx.lineTo(x + 7, swapY + 7 * dir); ctx.stroke();
   }
 
-  // side by side: the row's name, then each side's number, the better one on an orange pill
-  y += 48;
-  font(28, 800); text('SIDE BY SIDE · PER GAME', C.pad, y, C.accent); y += 52;
-  // (a shooting row is taller: its makes-attempts a game under each number)
-  const labW = 230, colW = (right - x0 - labW) / 2, mid = [x0 + labW + colW / 2, x0 + labW + colW * 1.5], rowH = r => (r.va || r.vb ? 92 : 60);
-  const h = 28 + 48 + sum(M.rows.map(rowH)) + 16;
-  round(C.pad, y, inner, h, 24, C.card);
-  let ty = y + 28;
-  font(26, 800);
-  [M.A, M.B].forEach((S, i) => text(fitText(ctx, S.name, colW - 16), mid[i], ty, C.text, 'center'));
-  ty += 48;
-  for (const r of M.rows) {
-    ctx.fillStyle = C.line; ctx.fillRect(x0, ty, right - x0, 2);
-    font(28, 700); text(r.label, x0, ty + 16, '#d5d9e0');
-    [[r.sa, r.va], [r.sb, r.vb]].forEach(([v, vol], i) => {
-      const lead = r.lead === (i ? -1 : 1);
-      font(31, lead ? 800 : 500);
-      if (lead) { const w = ctx.measureText(v).width + 32; ctx.globalAlpha = 0.2; round(mid[i] - w / 2, ty + 8, w, 46, 23, C.accent); ctx.globalAlpha = 1; }
-      text(v, mid[i], ty + 15, lead ? C.accent : r.lead ? C.muted : C.text, 'center');
-      if (vol) { font(23); text(vol, mid[i], ty + 58, C.muted, 'center'); }
-    });
-    ty += rowH(r);
+  const notes = [];
+  if (compare) {
+    // side by side: the row's name, then each side's number, the better one on an orange pill
+    y += 48;
+    font(28, 800); text('SIDE BY SIDE · PER GAME', C.pad, y, C.accent); y += 52;
+    // (a shooting row is taller: its makes-attempts a game under each number)
+    const labW = 230, colW = (right - x0 - labW) / 2, mid = [x0 + labW + colW / 2, x0 + labW + colW * 1.5], rowH = r => (r.va || r.vb ? 92 : 60);
+    const h = 28 + 48 + sum(M.rows.map(rowH)) + 16;
+    round(C.pad, y, inner, h, 24, C.card);
+    let ty = y + 28;
+    font(26, 800);
+    [M.A, M.B].forEach((S, i) => text(fitText(ctx, S.name, colW - 16), mid[i], ty, C.text, 'center'));
+    ty += 48;
+    for (const r of M.rows) {
+      ctx.fillStyle = C.line; ctx.fillRect(x0, ty, right - x0, 2);
+      font(28, 700); text(r.label, x0, ty + 16, '#d5d9e0');
+      [[r.sa, r.va], [r.sb, r.vb]].forEach(([v, vol], i) => {
+        const lead = r.lead === (i ? -1 : 1);
+        font(31, lead ? 800 : 500);
+        if (lead) { const w = ctx.measureText(v).width + 32; ctx.globalAlpha = 0.2; round(mid[i] - w / 2, ty + 8, w, 46, 23, C.accent); ctx.globalAlpha = 1; }
+        text(v, mid[i], ty + 15, lead ? C.accent : r.lead ? C.muted : C.text, 'center');
+        if (vol) { font(23); text(vol, mid[i], ty + 58, C.muted, 'center'); }
+      });
+      ty += rowH(r);
+    }
+    y += h;
+    notes.push(`${valueLabel()}: what each side's players add per game${isPoints() ? ' in fantasy points' : ' to winning categories'}, less a waiver player for each roster spot they take.`);
+    if (M.P) notes.push(`Playoff games: each team's games in the league's playoffs, ${playoffWeeks(M.P)}${M.P.started ? ', still to play' : ''}.`);
+    if (M.rows.some(r => r.va || r.vb)) notes.push(TRADE_SHOTS);
   }
-  y += h + 22;
+  if (picks) notes.push("Draft picks aren't in the numbers: next season's draft order isn't known yet.");
+  y += 22;
   font(24);
-  const notes = [`${valueLabel()}: what each side's players add per game${isPoints() ? ' in fantasy points' : ' to winning categories'}, less a waiver player for each roster spot they take.`];
-  if (M.P) notes.push(`Playoff games: each team's games in the league's playoffs, ${playoffWeeks(M.P)}${M.P.started ? ', still to play' : ''}.`);
-  if (M.rows.some(r => r.va || r.vb)) notes.push(TRADE_SHOTS);
   for (const note of notes) { for (const l of wrapText(ctx, note, inner)) { text(l, C.pad, y, C.muted); y += 34; } y += 8; }
   return K.done(y);
 }

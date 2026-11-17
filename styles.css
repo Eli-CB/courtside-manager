@@ -659,6 +659,19 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .pick-list input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
 .pick-list .grow { flex: 1; min-width: 0; }
 .pick-list .val { font-variant-numeric: tabular-nums; font-weight: 700; }
+/* a team's draft picks under its players, each a chip to tick (its checkbox kept for keyboards, out of sight) */
+.pp { margin-top: 12px; }
+.pp-head { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 6px; }
+.pp-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pp-chip { position: relative; display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
+  font-size: .8rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; user-select: none; }
+.pp-chip:hover { background: var(--surface-2); }
+.pp-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.pp-chip:has(input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
+.pp-chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.pp-from { font-weight: 400; color: var(--muted); font-size: .74rem; }
+.pp-note { margin: 10px 0 0; }
+.tp-table .pk-ico { font-size: .7rem; font-weight: 800; color: var(--muted); }
 .verdict { font-size: 1.15rem; font-weight: 700; }
 .delta-table td.num { font-weight: 600; }
 /* the trade proposal (tradeCard, views.js): what each side gets, then the two sides per game */

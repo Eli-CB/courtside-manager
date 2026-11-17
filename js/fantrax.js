@@ -530,6 +530,35 @@ async function getLeague(id, force) {
   return res;
 }
 
+// ----- Future draft picks, to trade -----
+// A league's future picks: [{ year, round, from (whose pick it was), owner (who has it now) }]. Read from its site the first
+// time the Trades tab needs them, then kept on the league (and with it on this device), so they're read again only with
+// the league: 6 hours on, or ↻ Reload. Not with changed('league'), which a Sleeper league hears on game nights. None for a
+// site that doesn't trade picks (ESPN; Yahoo here) or a league that doesn't (a Sleeper redraft league).
+// Returns { list }, { loading }, or { error } (Try again: tradePicksRetry).
+const picksLoads = new Map(); // league id -> the read in progress
+function leaguePicks(L = fxLeague()) {
+  const read = !L ? null : (L.source || 'fantrax') === 'fantrax' ? fetchFantraxPicks : L.source === 'sleeper' && L.pickInfo && L.pickInfo.type ? fetchSleeperPicks : null;
+  if (!read) return { list: [] };
+  if (L.futurePicks) return L.futurePicks;
+  if (!picksLoads.has(L.id)) {
+    picksLoads.set(L.id, read(L).then(list => {
+      L.futurePicks = { list };
+      const all = readLeagueCache();
+      if (all[L.id]) { all[L.id].res.league.futurePicks = L.futurePicks; store.setJson(FX_CACHE_KEY, all); }
+    }).catch(e => { L.futurePicks = { error: (e && e.message) || 'no answer' }; })
+      .finally(() => { picksLoads.delete(L.id); if (ui.tab === 'trade') render(); }));
+  }
+  return { loading: true };
+}
+// Fantrax lists every future pick (getDraftPicks: futureDraftPicks; its currentDraftPicks are this draft's, unmade ones
+// included, not for trading); a league that doesn't trade them answers an empty list
+async function fetchFantraxPicks(L) {
+  const r = await fxGet(`getDraftPicks?leagueId=${encodeURIComponent(L.id)}`);
+  if (!r || r.error) throw new Error((r && r.error && r.error.message) || 'no answer');
+  return (r.futureDraftPicks || []).map(p => ({ year: +p.year, round: +p.round, from: String(p.originalOwnerTeamId), owner: String(p.currentOwnerTeamId) }));
+}
+
 // Pull the league fresh from its site: matchups, rosters and lineups change during the week
 async function refreshLeague(force = true) {
   const id = state.fxLeagueId || (NBA.siteLeague && NBA.siteLeague.id);

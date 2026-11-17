@@ -1040,7 +1040,7 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     assert.ok(oneSide.includes('Trade proposal') && oneSide.includes('For your team') && !oneSide.includes('trade-share'), 'one side: what it does for you, nothing to share yet');
     theirs.slice(0, 2).forEach(p => ui.tradeGet.add(String(p.nbaId)));
     const T = app.tradeDeal();
-    assert.deepEqual(JSON.parse(JSON.stringify(T)), { from: t1, to: t2, give: [String(mine[0].nbaId)], get: theirs.slice(0, 2).map(p => String(p.nbaId)) });
+    assert.deepEqual(JSON.parse(JSON.stringify(T)), { from: t1, to: t2, give: [String(mine[0].nbaId)], get: theirs.slice(0, 2).map(p => String(p.nbaId)), givePicks: [], getPicks: [] });
     const html = app.viewTrade();
     // under the pickers: who gets whom, each with his photo, his card and his average game in the league's categories
     assert.ok(html.indexOf('trade-grid') < html.indexOf('Trade proposal'));
@@ -1189,6 +1189,97 @@ test('a points trade proposal compares fantasy points first', async () => {
   assert.equal(M.rows.find(r => r.key === 'fp').sa, app.fmt(M.A.players.reduce((t, x) => t + app.fantasyPoints(x), 0), 1));
   assert.deepEqual([...M.rows.filter(r => r.key !== 'po').slice(2).map(r => r.key)].sort(), Object.keys(L.points).sort());
   await app.useLeague(CATS9);
+});
+
+const answer = body => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(body), headers: { get: () => null } });
+test("draft picks in trades: each team's future picks (read once, with the league), ticked on either side, in the proposal, its text and its link", async () => {
+  const L = await app.useLeague(CATS9);
+  const state = app.get('state'), ui = app.get('ui'), loads = app.get('picksLoads');
+  const [t1, t2, t3] = app.fxPickable().map(t => t.id);
+  const was = { fxTeam: state.fxTeam, players: state.players, il: state.il, lineup: state.lineup, teamName: state.teamName };
+  const realFetch = app.fetch, asked = [], realToast = app.toast, realHistory = app.history, loc = { search: app.location.search, hash: app.location.hash };
+  app.fetch = url => { if (String(url).includes('getDraftPicks')) asked.push(String(url)); return realFetch(url); };
+  app.toast = () => {};
+  app.history = { replaceState() { app.location.search = ''; } };
+  const clear = () => { for (const s of ['tradeGive', 'tradeGet', 'tradeGivePicks', 'tradeGetPicks']) ui[s].clear(); ui.tradeSeen = null; };
+  try {
+    delete L.futurePicks;
+    useTeam(t1); ui.tradeTeam = t2; clear();
+    assert.ok(app.leaguePicks().loading && app.viewTrade().includes('Loading draft picks'));
+    await loads.get(L.id);
+    // Fantrax's list: next season's draft, every round of every team, none traded yet
+    const list = app.leaguePicks().list;
+    assert.equal(list.length, 110);
+    assert.ok(list.every(p => p.year === 2027 && p.round >= 1 && p.round <= 11 && p.owner === p.from));
+    app.viewTrade(); app.leaguePicks();
+    assert.equal(asked.length, 1, 'read once');
+    const kept = app.readLeagueCache()[L.id];
+    assert.ok(!kept || kept.res.league.futurePicks.list.length === 110, 'kept with the league on the device');
+    // under each list, the team's picks to tick; one traded for says whose it was
+    const tradedFor = list.find(p => p.from === t3 && p.round === 3);
+    tradedFor.owner = t1;
+    let html = app.viewTrade();
+    assert.equal((html.match(/data-change="trade-pick" data-side="give"/g) || []).length, 12);
+    assert.equal((html.match(/data-change="trade-pick" data-side="get"/g) || []).length, 11);
+    assert.ok(html.includes(`value="${app.pickKey(tradedFor)}"`) && html.includes(`<span class="pp-from">${app.esc(app.fxTeamName(t3))}</span>`));
+    // a player and two picks for a player: the picks on the getting side's rows, said in the text and carried by the link
+    const mine = state.players.filter(p => p.nbaId), theirs = app.fxTeamSide(t2).players.filter(p => p.nbaId);
+    ui.tradeGive.add(mine[0].id); ui.tradeGet.add(String(theirs[0].nbaId));
+    ui.tradeGivePicks.add(`2027:2:${t1}`); ui.tradeGivePicks.add(app.pickKey(tradedFor));
+    const T = app.tradeDeal();
+    assert.deepEqual([...T.givePicks], [`2027:2:${t1}`, `2027:3:${t3}`]);
+    html = app.viewTrade();
+    const card = html.slice(html.indexOf('Trade proposal'));
+    assert.ok(card.includes('<b>2027 Round 2</b>') && card.includes('<b>2027 Round 3</b>') && card.includes(`originally ${app.teamLink(t3)}`));
+    assert.ok(card.indexOf('<b>2027 Round 2</b>') > card.indexOf(`${app.teamLink(t2)} gets`), "on the side that gets them");
+    assert.ok(card.includes("Draft picks aren't in the numbers"));
+    const S = app.tradeShare(L, T);
+    assert.ok(S.text.endsWith(`, 2027 Round 2 pick, 2027 Round 3 pick (originally ${app.fxTeamName(t3)})`), S.text);
+    assert.ok(S.url.includes(`&givepicks=${encodeURIComponent(`2027:2:${t1}`)},${encodeURIComponent(`2027:3:${t3}`)}#trade`), S.url);
+    // picks alone against a player are a deal too
+    ui.tradeGive.clear();
+    assert.ok(app.tradeDeal() && app.viewTrade().includes('data-action="trade-share"'));
+    // the team it went to gets the picks on its own get side
+    useTeam(t2); clear();
+    app.location.search = S.url.slice(S.url.indexOf('?'), S.url.indexOf('#')); app.location.hash = '#trade';
+    await app.openSharedLink();
+    app.viewTrade();
+    assert.deepEqual([...ui.tradeGetPicks], [`2027:2:${t1}`, `2027:3:${t3}`]);
+    assert.equal(ui.tradeGivePicks.size, 0);
+    // a pick no longer the other team's drops out
+    tradedFor.owner = t3;
+    app.viewTrade();
+    assert.deepEqual([...ui.tradeGetPicks], [`2027:2:${t1}`]);
+    // the picks don't come: said, with Try again
+    delete L.futurePicks;
+    app.fetch = url => (String(url).includes('getDraftPicks') ? Promise.resolve({ ok: false, status: 404, headers: { get: () => null } }) : realFetch(url));
+    app.leaguePicks();
+    await loads.get(L.id);
+    assert.match(app.leaguePicks().error, /404/);
+    assert.ok(app.viewTrade().includes('data-action="trade-picks-retry"'));
+    app.get('actions')['trade-picks-retry']();
+    assert.ok(!L.futurePicks);
+    app.fetch = realFetch;
+    app.leaguePicks(); await loads.get(L.id);
+  } finally {
+    Object.assign(state, was); Object.assign(app.location, loc);
+    app.fetch = realFetch; app.toast = realToast; app.history = realHistory;
+    clear(); ui.tradeLink = null; ui.afterPick = null; ui.tab = 'dashboard';
+    quiet(app);
+  }
+  // ESPN doesn't trade picks; on Sleeper only keeper and dynasty leagues do, and it lists just the traded ones
+  assert.deepEqual([...app.leaguePicks({ id: '1', source: 'espn' }).list], []);
+  assert.deepEqual([...app.leaguePicks({ id: '2', source: 'sleeper', pickInfo: { type: 0, rounds: 3, season: 2026, drafted: true } }).list], []);
+  const SL = { id: '3', source: 'sleeper', teams: [{ id: '1' }, { id: '2' }], pickInfo: { type: 2, rounds: 2, season: 2026, drafted: true } };
+  app.fetch = url => (String(url).includes('traded_picks') ? answer([{ season: '2027', round: 1, roster_id: 1, previous_owner_id: 1, owner_id: 2 }]) : realFetch(url));
+  try {
+    const dyn = await app.fetchSleeperPicks(SL);
+    assert.equal(dyn.length, 3 * 2 * 2, 'a dynasty league: three seasons from the next draft');
+    assert.deepEqual([...new Set(dyn.map(p => p.year))], [2027, 2028, 2029]);
+    assert.deepEqual([...dyn.filter(p => p.owner !== p.from).map(p => JSON.stringify(p))], [JSON.stringify({ year: 2027, round: 1, from: '1', owner: '2' })]);
+    const keeper = await app.fetchSleeperPicks({ ...SL, pickInfo: { ...SL.pickInfo, type: 1, drafted: false } });
+    assert.deepEqual([...new Set(keeper.map(p => p.year))], [2026, 2027], "a keeper league before its draft: this season's, and a season a trade names");
+  } finally { app.fetch = realFetch; }
 });
 
 test("player profile: value per game (each game, each season's averages) and this season's games added up", async () => {

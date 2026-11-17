@@ -54,7 +54,7 @@ def main():
     save('fantrax/getPlayerIds.json', get('getPlayerIds?sport=NBA'))
     save('fantrax/getAdp.json', get('getAdp?sport=NBA'))
     for lid in LEAGUES:
-        for ep in ('getLeagueInfo', 'getTeamRosters', 'getStandings', 'getDraftResults'):
+        for ep in ('getLeagueInfo', 'getTeamRosters', 'getStandings', 'getDraftResults', 'getDraftPicks'):
             save(f'fantrax/{lid}/{ep}.json', get(f'{ep}?leagueId={lid}'))
         for n in PAST_PERIODS.get(lid, []):
             save(f'fantrax/{lid}/getTeamRosters-{n}.json', get(f'getTeamRosters?leagueId={lid}&period={n}'))

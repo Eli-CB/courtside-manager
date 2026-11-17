@@ -139,6 +139,8 @@ const actions = {
     if (L && T) await shareWith(el, tradeShare(L, T));
   },
   'trade-seen-close'() { ui.tradeSeen = null; render(); },
+  // the league's draft picks didn't come: ask once more (leaguePicks, fantrax.js)
+  'trade-picks-retry'() { const L = fxLeague(); if (L) { delete L.futurePicks; render(); } },
   // the popup's buttons: the picture to the share sheet, copied, or the text and link
   async 'share-img'() {
     const S = ui.share;
@@ -487,7 +489,7 @@ const actions = {
     if (!(await askConfirm('Reset and start over?', 'Removes your leagues, teams and matchup logs from this device. Copy a backup first if you want to keep anything.', 'Reset'))) return;
     await useSport('nba');
     state = emptyState();
-    ui.tradeGive.clear(); ui.tradeGet.clear();
+    ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeGivePicks.clear(); ui.tradeGetPicks.clear();
     ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
     location.hash = '';
     await loadNba(true);
@@ -671,7 +673,12 @@ document.addEventListener('change', e => {
     if (viewingOther()) { ui.viewB = el.value; render(); } else loadFxTeam(el.value);
   } else if (el.dataset.change === 'trade-team') {
     ui.tradeTeam = el.value;
-    ui.tradeGet.clear(); ui.tradeSeen = null; // (a league mate's deal gives way to your own)
+    ui.tradeGet.clear(); ui.tradeGetPicks.clear(); ui.tradeSeen = null; // (a league mate's deal gives way to your own)
+    render();
+  } else if (el.dataset.change === 'trade-pick') { // a draft pick, either side
+    const set = el.dataset.side === 'give' ? ui.tradeGivePicks : ui.tradeGetPicks;
+    if (el.checked) set.add(el.value); else set.delete(el.value);
+    ui.tradeSeen = null;
     render();
   } else if (el.dataset.change === 'trade') {
     const set = el.dataset.side === 'give' ? ui.tradeGive : ui.tradeGet;
@@ -712,7 +719,7 @@ $('#importFile').addEventListener('change', async e => {
   }
 });
 
-// A link someone shared (?league=<id>&week=<n>#recap, or a trade: &from=<team>&to=<team>&give=<ids>&get=<ids>#trade, kept
+// A link someone shared (?league=<id>&week=<n>#recap, or a trade: &from=<team>&to=<team>&give=<ids>&get=<ids>, its draft picks in &givepicks= &getpicks=, #trade, kept
 // until your team is known: applyTradeLink): open that league, or connect it and ask for the team first
 async function openSharedLink() {
   if (!location.search) return;
@@ -721,7 +728,7 @@ async function openSharedLink() {
   history.replaceState(null, '', location.pathname + location.hash);
   if (+q.get('week')) ui.recapWeek = +q.get('week');
   const ids = k => (q.get(k) || '').split(',').filter(Boolean);
-  if (q.get('from') && q.get('to')) { ui.tradeLink = { from: q.get('from'), to: q.get('to'), give: ids('give'), get: ids('get') }; ui.tradeSeen = null; }
+  if (q.get('from') && q.get('to')) { ui.tradeLink = { from: q.get('from'), to: q.get('to'), give: ids('give'), get: ids('get'), givePicks: ids('givepicks'), getPicks: ids('getpicks') }; ui.tradeSeen = null; }
   ui.afterPick = location.hash || '#recap';
   if (currentLeagueId() === id && state.fxTeam) { ui.afterPick = null; route(); return; }
   try {

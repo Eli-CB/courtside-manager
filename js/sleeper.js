@@ -82,6 +82,21 @@ const sleeperWeekNow = periods => (periods.find(p => todayIso() <= p.end) || per
 // Sleeper's slot names -> the ones fxSlot understands ('UTIL' is any position)
 const sleeperSlot = (x, sport = 'nba') => (x === 'UTIL' ? 'Util' : (SPORTS[sport].slpSlots || {})[x] || String(x).replace(/_/g, '/'));
 
+// A keeper or dynasty league's future picks (leaguePicks, fantrax.js). Sleeper lists only the ones traded (traded_picks:
+// season, round, roster_id = the team whose pick it was, owner_id = the team with it now); every other pick is still its
+// own team's. The seasons: from the next draft (this season's while its draft is to come), three in a dynasty league and
+// one in a keeper league (Sleeper's own limits as understood, not yet checked on a real league), and any season a trade names.
+async function fetchSleeperPicks(L) {
+  const I = L.pickInfo, traded = await slpGet(`league/${encodeURIComponent(L.id)}/traded_picks`);
+  if (!I.rounds) return [];
+  const first = I.drafted ? I.season + 1 : I.season;
+  const years = new Set(Array.from({ length: I.type === 2 ? 3 : 1 }, (x, i) => first + i));
+  for (const t of traded || []) if (+t.season >= first) years.add(+t.season);
+  const owner = new Map((traded || []).map(t => [`${t.season}|${t.round}|${t.roster_id}`, String(t.owner_id)]));
+  return [...years].sort().flatMap(y => Array.from({ length: I.rounds }, (x, i) => i + 1)
+    .flatMap(r => L.teams.map(t => ({ year: y, round: r, from: t.id, owner: owner.get(`${y}|${r}|${t.id}`) || t.id }))));
+}
+
 async function fetchSleeperLeague(id) {
   let lg;
   try { lg = await slpGet(`league/${encodeURIComponent(id)}`); } catch (e) { throw e; }
@@ -179,6 +194,8 @@ async function fetchSleeperLeague(id) {
       .map(r => ({ id: String(r.roster_id), rank: +r.settings.waiver_position, left: +s.waiver_type === 2 ? (+s.waiver_budget || 0) - (+r.settings.waiver_budget_used || 0) : null }))
       .sort((a, b) => a.rank - b.rank) : null,
     ...(draftPicks ? {} : { draftFailed: true }), // the picks didn't come: asked for again next time
+    // what its future picks need (fetchSleeperPicks): its type (0 redraft, 1 keeper, 2 dynasty), rounds, season, drafted yet
+    pickInfo: { type: +s.type || 0, rounds: +s.draft_rounds || 0, season: +lg.season || 0, drafted: !['pre_draft', 'drafting'].includes(lg.status) },
   };
   const picks = (draftPicks || []).filter(p => p.player_id);
   if (picks.length) {
