@@ -4,7 +4,6 @@
 
 const DRAFT_MODE_KEY = 'league-layer-draft-mode';
 ui.draftMode = (() => { try { return localStorage.getItem(DRAFT_MODE_KEY) || 'game'; } catch (e) { return 'game'; } })();
-try { localStorage.removeItem('league-layer-strengths'); } catch (e) { /* the Standings card's Starters / Active roster choice: the card is gone */ }
 
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 
@@ -263,7 +262,6 @@ function loadBoxes() {
 
 // This season's Season totals and Awards: the shared weekly rosters (Fantrax ids) mapped to NBA players
 const currentFidNba = () => { const m = new Map(NBA.players.filter(r => r.fx).map(r => [r.fx.id, r.id])); return f => m.get(f) || null; };
-try { localStorage.removeItem('league-layer-lineups-v1'); } catch (e) { /* replaced by the shared weekly rosters */ }
 async function buildSeasonTotals(L) {
   const [weeks, G] = await Promise.all([loadRosterWeeks(L), loadGameLog('cur')]);
   if (!weeks || !G) return {};

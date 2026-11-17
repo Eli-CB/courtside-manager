@@ -177,7 +177,6 @@ function draftAwards(d) {
     return at.filter(t => g(t) === top2);
   };
   const tenth = v => Math.round(v * 10);
-  const median = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
   const byTeam = list => {
     const m = new Map();
     for (const x of list) m.set(x.p.teamId, [...(m.get(x.p.teamId) || []), x]);

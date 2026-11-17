@@ -16,16 +16,8 @@ const awardAmount = p => (isPoints() ? `${fmt(p.v, 0)} FP` : signed(p.v, 1));
 const ROSTER_WEEKS_KEY = 'league-layer-roster-weeks-v2';
 const ROSTER_WEEKS_KEEP = 8;
 function readRosterWeeks() {
-  try {
-    const all = JSON.parse(localStorage.getItem(ROSTER_WEEKS_KEY));
-    if (all) return all;
-    // the earlier format ({ league: { period: rosters } }) carries over, so nothing is fetched again
-    const old = JSON.parse(localStorage.getItem('league-layer-roster-weeks-v1')) || {};
-    localStorage.removeItem('league-layer-roster-weeks-v1');
-    return Object.fromEntries(Object.entries(old).map(([id, p]) => [id, { at: Date.now(), p }]));
-  } catch (e) { return {}; }
+  try { return JSON.parse(localStorage.getItem(ROSTER_WEEKS_KEY)) || {}; } catch (e) { return {}; }
 }
-try { localStorage.removeItem('league-layer-roster-history-v1'); } catch (e) { /* older format, no statuses */ }
 // one load per league at a time, shared by Season totals and Awards
 const rosterWeeksLoad = {};
 keep('league', id => dropKept(rosterWeeksLoad, id));
