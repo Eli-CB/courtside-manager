@@ -252,12 +252,12 @@ function viewRecap() {
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>
     <ul class="rc-finals">${finals}</ul>
-  </div>
-  ${trendsCard(L, period)}`;
+  </div>`;
 }
 
 // ----- Trends: who's playing above or below his usual line -----
-// For the week shown: each player's last TREND_GAMES games through its last game day, against his median game before
+// On a tab of their own (viewTrends; under the Recap until Nov 2026, the owner's ask). Each player's last TREND_GAMES games
+// through the latest day of saved box scores, against his median game before
 // them (at least TREND_BEFORE of those). One list per counting category the league has (fantasy points in a points
 // league), its shooting percentages with real volume, then minutes and shot attempts, the role changes that come first.
 // A list ranks by the change per game, not the percentage (1 to 2.6 threes is +160% but a small change); the
@@ -345,12 +345,10 @@ function teamRegulars(end) {
   return out;
 }
 
-// The Recap's week (period: through its last game day so far), or through a day (endDay: browsing without a league, L null)
-function trendsCard(L, period, endDay) {
+// Through a day (end), for a league's teams, or everyone when browsing without a league (L null)
+function trendsCard(L, end) {
   if (!BOX || isFootball()) return '';
   const up = ui.trendDir !== 'down';
-  const days = period ? matchDates(String(period.start).slice(0, 10)).filter(d => d <= todayIso()) : [];
-  const end = endDay || days[days.length - 1] || String(period.end).slice(0, 10);
   const { stats, players } = trendPlayers(end);
   const owner = new Map();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
@@ -420,16 +418,17 @@ function trendsCard(L, period, endDay) {
   </div>`;
 }
 
-// The Trends on a tab of their own when browsing without a league (state.browse): every player's last games through the
-// latest day the saved box scores have, valued for a standard 9-category league, one list by value (nobody's rostered)
+// The Trends tab: every player's last games through the latest day the saved box scores have. In a league, its teams and
+// scoring; browsing without one (state.browse), a standard 9-category league and one list by value (nobody's rostered)
 function viewTrends() {
   if (!NBA) return '';
+  const L = fxLeague(), note = L ? '' : browseNote();
   if (!BOX) {
     loadBoxes().then(() => { if (ui.tab === 'trends') render(); }).catch(() => {});
-    return `${browseNote()}${loadingCard('Trends', "Loading the season's box scores…")}`;
+    return `${note}${loadingCard('Trends', "Loading the season's box scores…")}`;
   }
   const end = [...BOX.finals].map(k => k.slice(0, 10)).sort().pop();
-  return `${browseNote()}${end ? trendsCard(null, null, end) : ''}`;
+  return `${note}${end ? trendsCard(L, end) : `<div class="card"><div class="empty"><strong>No trends yet</strong>They start once the season's first games are in.</div></div>`}`;
 }
 
 // ----- The recap as a picture, for the league chat -----

@@ -2218,7 +2218,7 @@ test("team codes link to the Players tab filtered by that team; a player's photo
   Object.assign(ui, { perfTeam: [], perfFiltOpen: false });
 });
 
-test("the Recap's Trends: last 5 games against the usual one, per category, with the reason when the box scores tell it", async () => {
+test("Trends: last 5 games against the usual one, per category, with the reason when the box scores tell it", async () => {
   const L = await app.useLeague(CATS9);
   await app.loadBoxes();
   const saved = app.get('BOX'), ui = app.get('ui');
@@ -2233,8 +2233,7 @@ test("the Recap's Trends: last 5 games against the usual one, per category, with
   ]);
   app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer });
   try {
-    const period = L.periods[0]; // Oct 20 - 25
-    const html = await onDay('2026-10-26', () => app.trendsCard(L, period));
+    const html = await onDay('2026-10-26', () => app.trendsCard(L, '2026-10-25'));
     const section = (h, label) => h.split('<section class="tr-cat').find(x => x.includes(`<h3 class="sub">${label}</h3>`)) || '';
     const pts = section(html, 'Points');
     assert.ok(pts.includes(`data-nba="${hot.id}"`) && pts.includes('<b>12.0</b> <span class="muted">vs 6.0</span>') && pts.includes('+100%'), 'heating up in points: 12.0 vs 6.0, +100%');
@@ -2245,7 +2244,7 @@ test("the Recap's Trends: last 5 games against the usual one, per category, with
     assert.ok(!/Last 5 games through/.test(html), 'the dates are in the (i), not on the page');
     assert.ok(html.indexOf('<h3 class="sub">Minutes</h3>') < html.indexOf('<h3 class="sub">Points</h3>'), 'Minutes first');
     ui.trendDir = 'down';
-    const down = section(await onDay('2026-10-26', () => app.trendsCard(L, period)), 'Points');
+    const down = section(await onDay('2026-10-26', () => app.trendsCard(L, '2026-10-25')), 'Points');
     assert.ok(down.includes(`data-nba="${cold.id}"`) && down.includes('<b>8.0</b> <span class="muted">vs 20.0</span>') && down.includes('−60%'), 'cooling off: 8.0 vs 20.0, -60%');
     // no league (browsing): through a day, one list by value for everyone
     const st = app.get('state'), wasBrowse = st.browse;
@@ -2253,7 +2252,7 @@ test("the Recap's Trends: last 5 games against the usual one, per category, with
     try {
       assert.equal(app.fxLeague(), null);
       ui.trendDir = 'up';
-      const all = await onDay('2026-10-26', () => app.trendsCard(null, null, '2026-10-25'));
+      const all = await onDay('2026-10-26', () => app.trendsCard(null, '2026-10-25'));
       const list = all.split('<section class="tr-cat"').find(x => x.includes('All players')) || '';
       assert.ok(list.includes(`data-nba="${hot.id}"`), 'the one heating up, by value');
       assert.ok(!all.includes('<span>Rostered</span>') && !all.includes('<span>Waivers</span>'), 'no Rostered or Waivers lists');
@@ -2261,8 +2260,20 @@ test("the Recap's Trends: last 5 games against the usual one, per category, with
     } finally { st.browse = wasBrowse; ui.trendDir = 'down'; }
     // too few games: nothing to say yet
     app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer: new Map([[hot.id, games(i => (i > 8 ? line(20, 6) : null))]]) });
-    assert.match(await onDay('2026-10-26', () => app.trendsCard(L, period)), /Not enough games yet/);
-  } finally { app.set('BOX', saved); ui.trendDir = 'up'; }
+    assert.match(await onDay('2026-10-26', () => app.trendsCard(L, '2026-10-25')), /Not enough games yet/);
+    // a tab of their own, after Players, with the league's teams; not under the Recap any more, and not in football
+    app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer });
+    ui.trendDir = 'up';
+    assert.equal(app.tabList().map(t => t[0]).join(), 'dashboard,week,recap,players,trends,draft,standings,awards,trade');
+    const tab = app.viewTrends();
+    assert.ok(tab.includes('<div class="card trends">') && /<span>(Rostered|Waivers)<\/span>/.test(tab) && !tab.includes('All players') && !tab.includes('No league connected'));
+    assert.ok(!app.SPORTS.nfl.soonTabs.includes('recap') && app.SPORTS.nfl.soonTabs.includes('trends'));
+    ui.tab = 'recap';
+    app.viewRecap();
+    await new Promise(r => setTimeout(r, 20));
+    const recap = app.viewRecap();
+    assert.ok(recap.includes('standouts') && !recap.includes('class="card trends"'), 'the Recap is the week alone');
+  } finally { app.set('BOX', saved); ui.trendDir = 'up'; ui.tab = 'dashboard'; }
 });
 
 test("a team's code opens its card in the popup: its schedule, then its players by value, each with whose he is", async () => {
@@ -3099,7 +3110,7 @@ test('browsing without a league: the Players and Trends tabs, no league anywhere
     assert.ok(!html.includes('perf-owner') && !html.includes('badge good'), 'no fantasy teams or free-agent badges');
     assert.ok(/data-nba="\d+"/.test(html), 'players listed');
     assert.equal(app.scoreCats().length, 9, 'a standard 9-category league');
-    // Trends: the Recap's, through the latest saved day, with the same note, and no fantasy teams
+    // Trends: through the latest saved day, with the same note, and no fantasy teams
     ui.tab = 'trends';
     const tr = app.viewTrends();
     assert.match(tr, /No league connected[\s\S]*<div class="card trends">/);
@@ -3210,7 +3221,7 @@ test('hockey: every tab shows real numbers, the player card speaks hockey', asyn
   assert.match(app.slotBadge('G'), /pc-orange-1/);
   await a.loadBoxes();
   const ui = a.get('ui'), L = a.fxLeague();
-  assert.equal(a.tabList().length, 8);
+  assert.equal(a.tabList().length, 9);
   assert.equal(a.hasLineupHistory(L), true);
   for (const [tab, make] of Object.entries({ dashboard: () => a.viewDashboard(), week: () => a.withViewedTeam(a.viewWeek, true), players: () => a.viewPlayers(), standings: () => a.viewStandings() })) {
     ui.tab = tab;
@@ -3311,7 +3322,7 @@ test('changing sports: each league comes back as it was, and one that does not l
   assert.equal(a.get('state').sport, 'nba');
   assert.equal(a.fxLeague().id, CATS9);
   assert.equal(a.get('state').slots.length, 8);
-  assert.equal(a.tabList().length, 8);
+  assert.equal(a.tabList().length, 9);
   const nbaTeam = a.get('state').fxTeam;
   await a.switchLeague(HOCKEY);
   quiet(a);
@@ -4164,7 +4175,7 @@ test('football and the other sports leave each other alone', async () => {
   assert.equal(a.get('POSITIONS')[0], 'PG');
   assert.equal(a.dayOffset('2026-10-26'), 0, 'basketball weeks start on Monday');
   assert.equal(a.statVal({ fgPct: 0.5, fga: 10 }, 'fgm'), 5);
-  assert.equal(a.tabList().length, 8);
+  assert.equal(a.tabList().length, 9);
   await assert.rejects(a.connectLeague('999000000000000099'), /didn't find that league/);
   assert.equal(a.get('SPORT').key, 'nba');
   await a.switchLeague(FOOTBALL);

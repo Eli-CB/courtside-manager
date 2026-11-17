@@ -198,7 +198,7 @@ const SPORTS = {
     espnTeams: { WSH: 'WAS' },
     game: { minutes: 60, periods: 4, tag: 'Q' },
     weekShift: 1,
-    soonTabs: ['draft', 'trade'],
+    soonTabs: ['draft', 'trade', 'trends'], // (Trends: a week is one game, too few to trend)
     // How far a starter's week lands from his projection. A real league's 80 team-weeks missed by 7.8 (QB), 7.6 (RB), 7.8 (WR),
     // 6 (TE), 5.2 (K) and 6 (DEF); those are × 0.8 here, or a team's week would swing more than it did: matchup margins
     // missed by 24 points, where nine players moving independently make 30.

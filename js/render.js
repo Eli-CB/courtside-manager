@@ -109,9 +109,9 @@ function teamMenu() {
 // which knows one) and kept per league (keyed by Fantrax's league history id); a past season gets its own tabs.
 // Fantrax leagues only, so far.
 // (the addresses keep the tabs' old names, dashboard and week, so saved links still work)
-const TABS_NOW = [['dashboard', 'Matchup'], ['week', 'Plan Ahead'], ['recap', 'Recap'], ['players', 'Players'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
+const TABS_NOW = [['dashboard', 'Matchup'], ['week', 'Plan Ahead'], ['recap', 'Recap'], ['players', 'Players'], ['trends', 'Trends'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
-const TABS_BROWSE = [['players', 'Players'], ['trends', 'Trends']]; // browsing without a league (Trends: the Recap's, on its own)
+const TABS_BROWSE = [['players', 'Players'], ['trends', 'Trends']]; // browsing without a league
 const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};

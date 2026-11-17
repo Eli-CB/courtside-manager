@@ -97,8 +97,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     bench regret, best all-play week (categories only); points leagues add Carried (biggest share of a team's points, 20%+), Tough luck / Lucky win (best losing / worst winning score, on the wrong side of the middle) and Nail-biter (closest final under 5% of the winner, not a game already told as luck); hockey Goalie of the week and Hat trick, football Defense of the week; then every final, the week's top team 👑 and bottom 💩 marked, in the picture too (`X.rank`, `recapMark`/`recapMarkTip`: most/fewest points in points leagues, best/worst all-play record in category leagues; a tie marks each)) from `benchSwaps` on the shared `pastWeeksOf` data; Share (`shareWith`/`sharePopup`/`shareText` in recap.js, also the Draft Retrospective's: `recapShare`, `draftShare`; the picture `shareCanvas`) opens a popup with the
     recap as a picture (`recapCanvas`: 1080 px PNG on a canvas, headshots from the sheet `IMG.sheet`; Share image / Copy image / Save
     image) or the text: the standouts + a link `?league=<id>&week=<n>#recap` (`openSharedLink` connects the league, asks for the team, then shows it).
-    Fantrax, Sleeper and ESPN basketball (`hasWeekLineups`; the Matchup tab doesn't point to it, Nov 2026). Under it, Trends (`trendsCard`, recap.js; not football): Heating up / Cooling off (`ui.trendDir`), each player's last 5 games
-    through the week's last game day against his median game before them (5+ earlier games; a regular: 15+ minutes, hockey 10), one top-5 list per
+    Fantrax, Sleeper and ESPN basketball (`hasWeekLineups`; the Matchup tab doesn't point to it, Nov 2026). Trends, a tab of its own after Players (`#trends`, `viewTrends`/`trendsCard`, recap.js; under the Recap until Nov 2026, the owner's ask; not football: in its `soonTabs`): Heating up / Cooling off (`ui.trendDir`), each player's last 5 games
+    through the latest day of saved box scores against his median game before them (5+ earlier games; a regular: 15+ minutes, hockey 10), one top-5 list per
     counting category (points leagues: fantasy points), shooting % with volume, Minutes and Shot attempts, ranked by the change per game; first by Value
     (`lineValue` now and its change): Rostered and Waivers (unowned). Notes from the box scores only (`teammateOut`: a 24+ minute teammate missing most of those games;
     minutes moved 4+). Owners are today's rosters. Info text `trends`
@@ -122,7 +122,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
   - No league (`state.browse`, the landing page's "Just browse players"): `fxLeague()` is null (the daily file's site
     league stays loaded for the demo), `clearLeaguePlayers()` drops its rosters/positions from the players, the tabs are
-    Players and Trends (`TABS_BROWSE`; `viewTrends`, recap.js: the Recap's `trendsCard` through the latest saved day, one All players list by value instead of Rostered/Waivers; `browseNote` heads both; the owner's ask), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
+    Players and Trends (`TABS_BROWSE`; Trends there: one All players list by value instead of Rostered/Waivers; `browseNote` heads both; the owner's ask), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
     any league ends it. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
 - `scripts/update_data.py`: daily data job (GitHub Actions 08:00 UTC = 4 a.m. ET, 3 a.m. in winter) builds `data/players.json` and
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
