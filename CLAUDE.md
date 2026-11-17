@@ -225,6 +225,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   days are asked for, once (`league-layer-espn-days-v1`). Checked on a real points league: 18 of 20 team-weeks matched
   ESPN's finals exactly, the other two within 4 points. Season totals, Awards and past seasons stay Fantrax/Sleeper-only
   (`hasLineupHistory`): they'd need every day of the season (40 MB by spring). A category league and ESPN football aren't checked. ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
+- Escaping: a shared link opens any league on leaguelayer.com, so text a league's members type (its name, team names) goes through `esc()`
+  wherever it's drawn. A `data-tip` is HTML put in the page again as HTML (`showTip`), so text inside one is escaped twice: `esc()` in the tip, `esc()` on the attribute.
+  The last test in app.test.js draws every tab and popup of nine leagues with names made to break out of HTML (audited Nov 17, 2026: none did).
 - `python serve.py` (preview config "site", port 5173) refreshes `data/` locally: never commit
   `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
 - cdn.nba.com answers GitHub runners 403: `get_json` falls back to the same files on NBA's S3 storage (`CDN_MIRROR`), so box

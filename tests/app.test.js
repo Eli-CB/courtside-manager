@@ -4513,3 +4513,106 @@ test("Stats used is a choice only early in a season: once the typical team is mo
     assert.equal(a.get('nbaStats')(out, 'cur'), null, "asked for this season by name (a draft's grades): only this season");
   } finally { a.setClock(); }
 });
+
+// ----- Names a league's members choose are text, never HTML -----
+// A shared link opens any league on leaguelayer.com, so a league's own name and its teams' names (anything a member can
+// type) must never be read as HTML: here each is written to break out of any HTML it lands in, every tab and every
+// popup a tab's buttons open is drawn, and the names must come out escaped. A tooltip (data-tip) is HTML kept in an
+// attribute and put in the page again as HTML, so a name in one has to be escaped twice.
+const XSS = `"'<i id=xss>`, XSS_ESCAPED = '&quot;&#39;&lt;i id=xss';
+const POPUPS = ['team-card', 'player-detail', 'sport-team', 'award-team', 'draft-award', 'draft-team', 'waiver-order', 'feedback', 'recap-step', 'week-shift'];
+const unattr = t => t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+// Each place a name broke out of its HTML: anywhere it isn't escaped exactly as esc() does, or a quote or < left as it was
+function unescapedNames(html, where) {
+  const bad = [], tips = [];
+  // (a tooltip's HTML, as the page will put it in: its attribute read once)
+  const rest = html.replace(/data-tip="([^"]*)"/g, (m, t) => { tips.push(unattr(t)); return 'data-tip=""'; });
+  const check = (text, ctx) => {
+    for (const m of text.matchAll(/i id=xss|"'(<|&lt;)|'</g)) {
+      if (m[0] === 'i id=xss' && text.slice(m.index - XSS_ESCAPED.length + 8, m.index + 8) === XSS_ESCAPED) continue;
+      bad.push(`${where}${ctx}: …${text.slice(Math.max(0, m.index - 60), m.index + 20)}…`);
+    }
+  };
+  check(rest, '');
+  for (const t of tips) check(t, ' (tooltip)');
+  return bad;
+}
+
+async function xssPass(a, id, label) {
+  const settle = async () => { for (let i = 0; i < 4; i++) await new Promise(r => setTimeout(r, 5)); };
+  // the page's elements, each kept so what's drawn into it can be read back
+  const els = new Map(), El = a.document.createElement().constructor;
+  a.document.querySelector = sel => { if (!els.has(sel)) els.set(sel, new El()); return els.get(sel); };
+  a.document.getElementById = idOf => a.document.querySelector('#' + idOf);
+  const shown = [], read = what => { for (const s of ['#view', '#leagueMenu', '#teamMenu', '#gearMenu', '#ctxMeta', '#tabs', '#detailBody', '#detailTitle', '#infoBody']) { const h = els.get(s) && els.get(s).innerHTML; if (h) shown.push([`${label} ${what} ${s}`, h]); } };
+  const L0 = await a.connectLeague(id).then(() => a.fxLeague());
+  // every name the league's members chose, made into one that breaks out of HTML (the same name, the same way)
+  const made = new Map(), named = s => { if (!made.has(s)) made.set(s, `N${made.size}${XSS}`); return made.get(s); };
+  const poison = (o, names, seen = new Set()) => {
+    if (!o || typeof o !== 'object' || seen.has(o)) return;
+    seen.add(o);
+    if (o instanceof Map) { for (const [k, v] of o) typeof v === 'string' && names.has(v) ? o.set(k, named(v)) : poison(v, names, seen); return; }
+    for (const k of Object.keys(o)) typeof o[k] === 'string' && names.has(o[k]) ? (o[k] = named(o[k])) : poison(o[k], names, seen);
+  };
+  const namesOf = L => new Set([L.name, ...L.teams.map(t => t.name)].filter(Boolean));
+  const names = namesOf(L0);
+  poison(L0, names); poison(a.get('state'), names);
+  a.render(); await settle(); a.render(); read('landing');
+  a.adoptTeam(a.fxLeague().teams[0].id);
+  quiet(a);
+  const ui = a.get('ui'), actions = a.get('actions'), done = new Set();
+  const popups = async (html, what) => {
+    let players = 0, teams = 0;
+    for (const m of html.matchAll(/<[a-z]+\b[^>]*\bdata-action="([^"]+)"[^>]*>/g)) {
+      if (!POPUPS.includes(m[1])) continue;
+      const dataset = {};
+      for (const d of m[0].matchAll(/\bdata-([a-z-]+)="([^"]*)"/g)) if (d[1] !== 'action' && d[1] !== 'tip') dataset[d[1].replace(/-([a-z])/g, (x, c) => c.toUpperCase())] = unattr(d[2]);
+      // (a popup is the same from any tab: each once; a step to another week, once a tab)
+      const key = `${/step|shift/.test(m[1]) ? ui.tab : ''}|${m[1]}|${JSON.stringify(dataset)}`;
+      if (done.has(key) || (m[1] === 'player-detail' && ++players > 8) || (m[1] === 'sport-team' && ++teams > 3)) continue;
+      done.add(key);
+      for (const s of ['#detailBody', '#detailTitle', '#infoBody']) a.document.querySelector(s).innerHTML = '';
+      await actions[m[1]]({ dataset, closest: () => null, disabled: false });
+      await (/step|shift/.test(m[1]) ? settle() : new Promise(r => setImmediate(r)));
+      read(`${what} ${m[1]} ${JSON.stringify(dataset)}`);
+    }
+  };
+  const tabs = async what => {
+    for (const [tab] of a.tabList()) {
+      ui.tab = tab;
+      a.render(); await settle(); a.render();
+      read(`${what} ${tab}`);
+      await popups(['#view', '#gearMenu', '#ctxMeta'].map(s => a.document.querySelector(s).innerHTML).join(''), `${what} ${tab}`);
+      quiet(a);
+    }
+  };
+  await tabs('this season');
+  // past seasons: their own names, poisoned the same way (a team keeps its name across seasons, so stays the same team)
+  for (const P of (a.fxLeague().pastSeasons || []).map(p => p.id || p)) {
+    try { await a.switchSeason(P, 'standings'); } catch (e) { continue; }
+    const past = a.get('pastCache')[P];
+    if (!past || !past.league) continue;
+    const pn = namesOf(past.league);
+    poison(past, pn);
+    a.route();
+    await tabs(`past season ${P}`);
+    await a.switchSeason(null, 'standings');
+  }
+  quiet(a);
+  return shown;
+}
+
+test("a league's own name and its teams' names are shown as text on every tab and popup, never as HTML", async () => {
+  const runs = [['Fantrax categories', CATS9], ['Fantrax points', POINTS], ['Fantrax daily, not drafted', DAILY], ['ESPN', ESPN], ['Sleeper', SLEEPER], ['Yahoo', YAHOO], ['hockey', HOCKEY], ['football', FOOTBALL], ['ESPN football', ESPN_FOOTBALL]];
+  const problems = [];
+  for (const [label, id] of runs) {
+    const a = loadApp();
+    await a.ready();
+    if (id === YAHOO) { a.get('yahoo').proxy = 'https://yahoo.test'; a.localStorage.setItem('league-layer-yahoo', JSON.stringify({ access: 'a', refresh: 'r', until: a.NOW + 36e5 })); }
+    const shown = await xssPass(a, id, label);
+    assert.ok(shown.some(([, h]) => h.includes(XSS_ESCAPED)), `${label}: the names reached the page`);
+    assert.ok(shown.some(([w, h]) => w.includes(' feedback ') && h.includes(XSS_ESCAPED)), `${label}: and the feedback popup, with the league's name`);
+    for (const [where, h] of shown) problems.push(...unescapedNames(h, where));
+  }
+  assert.deepEqual([...new Set(problems)].slice(0, 40), []);
+});
