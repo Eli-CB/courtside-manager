@@ -189,6 +189,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   what's on main in its `test` job, and publishes exactly that commit only if they pass (`site.yml`; `tests.yml` covers pull requests).
 
 ## Rules settled with the owner (keep them)
+- How the owner works (Nov 17, 2026): several sessions at once, each in its own worktree and branch, and the owner doesn't read code. No pull requests: a session lands
+  its own work on main once it's tested and checked, rebasing onto origin/main and fixing any conflict itself, keeping both sides' changes (Deploy, under Gotchas).
 - Everything follows each league's own settings on Fantrax or ESPN (category list or point values, slots, daily
   vs weekly lineups, playoffs). Never hard-code the owner's league.
 - Weekly lineups lock when the week starts, so the lineup people are setting is next week's: Fantrax leagues with weekly
@@ -233,8 +235,11 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 - Escaping: a shared link opens any league on leaguelayer.com, so text a league's members type (its name, team names) goes through `esc()`
   wherever it's drawn. A `data-tip` is HTML put in the page again as HTML (`showTip`), so text inside one is escaped twice: `esc()` in the tip, `esc()` on the attribute.
   The full-draw test in app.test.js draws every tab and popup of nine leagues with names made to break out of HTML (audited Nov 17, 2026: none did); it also checks every position is in its color.
-- `python serve.py` (preview config "site", port 5173) refreshes `data/` locally: never commit
+- `python serve.py [port]` (preview config "site", port 5173) refreshes `data/` locally: never commit
   `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
+  `.claude/` is git-ignored, so a worktree has no `launch.json`: write one there whose port no other session uses (5174, 5175...: `runtimeArgs` `["serve.py", "5174"]`;
+  serve.py refuses a port in use, as Windows would otherwise let two servers share one). Another port is another origin: connect the league again there, and the Worker
+  answers only localhost:5173 (`SITE_ORIGINS`), so the page there falls back to ESPN directly: check changes to the Worker's routes (live feed, `/espn/`) on 5173.
 - cdn.nba.com answers GitHub runners 403: `get_json` falls back to the same files on NBA's S3 storage (`CDN_MIRROR`), so box
   scores stay NBA.com's (official; ESPN keeps stats the NBA later takes away, Fantrax follows the NBA). The last 3 days'
   games are downloaded again each run for stat corrections; ESPN copies are dropped once the NBA copy is cached.
@@ -244,7 +249,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 - Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data. It publishes only what the page reads
   (`index.html`, `404.html`, `styles.css`, `manifest.webmanifest`, `js/`, `data/`, `fonts/`, `icons/`: the deploy job's "Gather" step): a new top-level file or folder the page needs must be added there. Each sport's refresh
   runs apart; one that fails (or NFL projections failing) fails the run at the end, so GitHub says so, and the rest still publishes.
-  Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`.
+  Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`. In a worktree (its own branch) the push is
+  `git push -q origin HEAD:main` (plain `main` there is the stale local branch, not the work), and the tests run again after the rebase, before it.
+  In the main folder other sessions' unfinished edits may sit beside yours: commit only your own files (`git commit <files>`).
   Commit messages end with the Co-Authored-By line.
 - The repo must stay public on GitHub's free plan: making it private deletes the Pages site at once (leaguelayer.com answered 404, Nov 16, 2026), and
   making it public again doesn't bring it back. To restore: `gh api -X POST repos/Eli-CB/league-layer/pages -f build_type=workflow`, then

@@ -3,6 +3,9 @@
 Serves the site on http://localhost:5173 and refreshes NBA data:
   - on start, when data/players.json is missing or older than 6 hours
   - on demand, when the app's "Refresh stats" button calls /api/refresh
+
+`python serve.py 5174` serves on another port (or PORT=5174), so sessions in separate
+worktrees can each preview their own copy. A port already in use is refused, never shared.
 """
 import http.server
 import json
@@ -14,7 +17,7 @@ import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(ROOT, 'data', 'players.json')
-PORT = int(os.environ.get('PORT', 5173))
+PORT = int(sys.argv[1] if len(sys.argv) > 1 else os.environ.get('PORT', 5173))
 lock = threading.Lock()
 
 
@@ -49,10 +52,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404)
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # On Windows, address reuse lets a second server take a port that's already serving, and each
+    # request then goes to either one: a preview could show another worktree's code. Refuse instead.
+    allow_reuse_address = os.name != 'nt'
+
+
 if __name__ == '__main__':
+    try:
+        server = Server(('127.0.0.1', PORT), Handler)
+    except OSError:
+        sys.exit(f'Port {PORT} is in use (another preview?): run on another one, e.g. python serve.py {PORT + 1}')
     stale = not os.path.exists(DATA) or time.time() - os.path.getmtime(DATA) > 6 * 3600
     if stale:
         print('NBA data is missing or stale, refreshing...', flush=True)
         refresh()
     print(f'League Layer running at http://localhost:{PORT}', flush=True)
-    http.server.ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()
+    server.serve_forever()
