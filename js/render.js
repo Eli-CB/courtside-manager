@@ -248,9 +248,9 @@ function gearMenu() {
   el.innerHTML = `<details class="gear"${wasOpen ? ' open' : ''}>
     <summary class="icon-btn" aria-label="Settings" title="Settings">${lineIcon(ICON_GEAR_D, 'hd-ico')}</summary>
     <div class="gear-pop">
-      ${hasLeague ? `<div class="lm-sec">League</div>
+      ${hasLeague && (league || !seasonSettled()) ? `<div class="lm-sec">League</div>
       ${league ? row('data-action="league-reload"', ICON_RELOAD, `Reload from ${sourceName()}`, reloadWait() > 0 ? 'read just now' : 'rosters, lineups and standings') : ''}
-      <div class="gear-row gear-pick">${GEAR_STATS}<span class="gear-text">Stats used ${infoBtn('projection')}</span><select class="ctx-team" data-change="set-basis" aria-label="Stats used">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      ${seasonSettled() ? '' : `<div class="gear-row gear-pick">${GEAR_STATS}<span class="gear-text">Stats used ${infoBtn('projection')}</span><select class="ctx-team" data-change="set-basis" aria-label="Stats used">${Object.entries(BASIS_LABELS).map(([k, l]) => `<option value="${k}" ${state.basis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`}
       ${league ? row('data-action="copy-league-id" title="Copy it, to send to a friend who connects the same league"', GEAR_COPY, 'Copy league ID', esc(fxLeague().id)) : ''}` : ''}
       <div class="lm-sec">Appearance</div>
       ${toggle('toggle-theme', GEAR_MOON, 'Dark mode', '', dark)}

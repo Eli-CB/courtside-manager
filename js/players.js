@@ -215,7 +215,7 @@ function topPerformancesCard() {
   const day = dates[0];
   const updated = range === 'day' || range === 'last' || avg ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
     : live.at ? ` · updated ${fmtTime(live.at)}` : '';
-  const when = proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${BASIS_LABELS[state.basis]} stats ${infoBtn('projection')}` : (weekly || perWeek ? `${fmtDay(dates[0])}${dates.length > 1 ? ` – ${fmtDay(dates[dates.length - 1])}` : ''}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
+  const when = proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${basisLabel()} stats ${infoBtn('projection')}` : (weekly || perWeek ? `${fmtDay(dates[0])}${dates.length > 1 ? ` – ${fmtDay(dates[dates.length - 1])}` : ''}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
   const toggle = `<div class="perf-when-pick"><select class="ctx-team perf-range" data-change="perf-range" aria-label="Show games from">${opts.map(([k, l]) => `<option value="${k}" ${k === chosen ? 'selected' : ''}>${l}</option>`).join('')}</select>${many
     ? `<div class="seg seg-sm" role="group" aria-label="Totals or per game">${[['0', 'Totals'], ['1', 'Per game']].map(([v, l]) => `<button type="button" class="${String(+per) === v ? 'on' : ''}" data-action="perf-per" data-per="${v}" aria-pressed="${String(+per) === v}">${l}</button>`).join('')}</div>` : ''}</div>`;
 

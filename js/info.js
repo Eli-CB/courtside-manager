@@ -85,7 +85,8 @@ const INFO = {
     <p><b>Points leagues:</b> value is fantasy points per game (FP/G), using your league's points for each stat.</p>`],
   projection: ['Which stats are used', `
     <p><b>Smart blend (default):</b> this season's averages with 10 games of last season mixed in: (this season × games played + last season × 10) ÷ (games played + 10). Early on it leans on last season; after a month or two it's mostly this season.</p>
-    <p>Switch to this season only, last season only, or the last 10 games from the league menu at the top.</p>`],
+    <p>Switch to this season only, last season only, or the last 10 games under <b>Stats used</b> in the settings menu.</p>
+    <p>That choice is for the start of a season. Once teams have played more than 10 games, everything uses this season's averages alone (last season's for a player who hasn't played yet), and the choice is gone until next season.</p>`],
   strengths: ['Category strengths', `
     <p><b>Who counts.</b> Each team's best players by their value this season, as many as a lineup starts, injured reserve left out. An end-of-bench player or a one-off start doesn't move it.</p>
     <p><b>Per player.</b> Those players' real per-game numbers: the average per player for counting stats, and FG% and FT% as total makes ÷ total attempts.</p>

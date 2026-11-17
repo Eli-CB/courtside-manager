@@ -12,6 +12,22 @@ const nbaByName = new Map();
 let nbaCache = null; // player-like objects for the Players tab
 keep('players sport', () => { nbaCache = null; });
 const BASIS_LABELS = { blend: 'Smart blend', cur: 'This season', prev: 'Last season', l10: 'Last 10 games' };
+// Which averages stand in for a player's games to come is a choice (Stats used, in the settings menu) only early in a season:
+// once the typical team has played more than 10 games it's this season's alone, and the choice is gone (the owner's rule,
+// Nov 2026: by then last season says little). 'now' is that: this season, or last season's for someone yet to play in this one.
+const BASIS_GAMES = 10;
+let settled = null;
+keep('players sport', () => { settled = null; });
+function seasonSettled() {
+  if (!NBA || !NBA.teams) return false;
+  const today = todayIso(), key = `${today}|${NBA.updated}`;
+  if (settled && settled.key === key) return settled.on;
+  const played = Object.values(NBA.teams).map(t => (t.dates || []).filter(d => d < today).length).sort((a, b) => a - b);
+  settled = { key, on: played.length > 0 && played[played.length >> 1] > BASIS_GAMES };
+  return settled.on;
+}
+const basisNow = () => (seasonSettled() ? 'now' : state.basis);
+const basisLabel = () => BASIS_LABELS[seasonSettled() ? 'cur' : state.basis];
 
 const normName = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   .replace(/-/g, ' ').replace(/[^a-z ]/g, '').replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '').replace(/\s+/g, ' ').trim();
@@ -25,11 +41,12 @@ function statObj(arr) {
 
 // Per-game stats for a player under the chosen basis. "Smart blend" shrinks a small
 // current-season sample toward last season (10 games of weight), then trusts this season.
-function nbaStats(raw, basis = state.basis) {
+function nbaStats(raw, basis = basisNow()) {
   if (String(basis).startsWith('arch:')) return archivedStats(raw, basis.slice(5));
   const cur = statObj(raw.cur), prev = statObj(raw.prev), l10 = statObj(raw.l10);
   let s;
   if (basis === 'cur') s = cur;
+  else if (basis === 'now') s = cur && cur.gp ? cur : prev;
   else if (basis === 'prev') s = prev;
   else if (basis === 'l10') s = l10 || cur;
   else if (cur && cur.gp && prev && prev.gp) {
@@ -173,7 +190,7 @@ async function loadNba(fresh = false) {
 
 function nbaPlayers() {
   if (!NBA) return [];
-  if (nbaCache && nbaCache.basis === state.basis) return nbaCache.list;
+  if (nbaCache && nbaCache.basis === basisNow()) return nbaCache.list;
   const list = NBA.players.map(raw => {
     const s = nbaStats(raw) || {};
     const t = teamInfo(raw.team);
@@ -186,7 +203,7 @@ function nbaPlayers() {
     p.val = p.gp ? value(p) : -99;
     return p;
   });
-  nbaCache = { basis: state.basis, list };
+  nbaCache = { basis: basisNow(), list };
   return list;
 }
 

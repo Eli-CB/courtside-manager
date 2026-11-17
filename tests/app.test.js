@@ -3460,9 +3460,9 @@ test('hockey history: weeks, recaps and awards run on its box scores, and a heal
 
 test('hockey trades and waivers weigh a goalie by the games he plays; past seasons stay with their sport', async () => {
   const a = await hockeyApp();
-  const players = a.get('NBA').players, backup = players.find(p => p.pos.includes('G') && p.st > 0 && p.st < 0.5 && p.cur);
+  const players = a.get('NBA').players, backup = players.find(p => p.pos.includes('G') && p.st > 0 && p.st < 0.5 && p.cur && p.cur[0] > 2);
   const P = a.playerFromRaw(backup);
-  assert.ok(a.gameWorth(P) < a.value(P));
+  assert.ok(Math.abs(a.gameWorth(P)) < Math.abs(a.value(P))); // (nearer nothing: a backup can be worth less than not playing)
   assert.equal(a.gameWorth(P).toFixed(4), (a.value(P) * backup.st).toFixed(4));
   const skater = a.playerFromRaw(players.find(p => p.pos.includes('C') && p.cur));
   assert.equal(a.gameWorth(skater), a.value(skater));
@@ -4350,4 +4350,28 @@ test("a hockey team's record keeps its overtime and shootout losses apart (W-L-O
   a.set('BOX', { ...box, scores: new Map([...game(dates[0], tri, 'BOS', 3, 2, 'OT'), ...game(dates[1], tri, 'BOS', 2, 3, 'OT'), ...game(dates[2], 'NYR', tri, 4, 3, 'SO'), ...game(dates[3], 'NYR', tri, 5, 1, 'REG')]) });
   a.get('live').games = [{ d: dates[4], home: tri, away: 'TOR', hs: 1, as: 2, state: 'post', period: 4 }];
   assert.equal(a.teamRecord(tri), '1-1-3', 'an overtime win is a win; two late losses, and tonight\'s in overtime');
+});
+
+test("Stats used is a choice only early in a season: once the typical team is more than 10 games in, it's this season's alone", async () => {
+  const a = loadApp();
+  await a.ready();
+  try {
+    const S = a.get('state'), NBA = a.get('NBA');
+    const raw = NBA.players.find(p => p.cur && p.cur[0] && p.prev && p.prev[0]);
+    const key = NBA.statKeys.find(k => k !== 'gp' && a.get('nbaStats')(raw, 'cur')[k] !== a.get('nbaStats')(raw, 'prev')[k]);
+    const now = () => a.get('nbaStats')(raw)[key];
+    assert.equal(a.get('seasonSettled')(), false, 'a week in: the choice stands');
+    S.basis = 'prev';
+    assert.equal(now(), a.get('nbaStats')(raw, 'prev')[key]);
+    assert.equal(a.get('basisLabel')(), 'Last season');
+    a.setClock('2026-12-15T12:00:00-05:00');
+    assert.equal(a.get('seasonSettled')(), true, 'two months in');
+    assert.equal(now(), a.get('nbaStats')(raw, 'cur')[key], 'this season, whatever was chosen');
+    assert.equal(a.get('basisLabel')(), 'This season');
+    assert.equal(a.get('nbaPlayers')().find(p => p.nbaId === raw.id)[key], now(), 'the Players list too');
+    // someone yet to play this season: last season's, not nothing
+    const out = { ...raw, cur: null };
+    assert.equal(a.get('nbaStats')(out)[key], a.get('nbaStats')(raw, 'prev')[key]);
+    assert.equal(a.get('nbaStats')(out, 'cur'), null, "asked for this season by name (a draft's grades): only this season");
+  } finally { a.setClock(); }
 });
