@@ -1049,7 +1049,8 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const M = app.tradeModel(T);
     assert.deepEqual([...M.A.players.map(p => p.nbaId)].sort(), theirs.slice(0, 2).map(p => p.nbaId).sort());
     assert.deepEqual([...M.B.players.map(p => p.nbaId)], [mine[0].nbaId]);
-    assert.match(app.dealLine(M.B.players[0]).join(' · '), /^[\d.]+ MIN · (\.\d{3}|—) FG% · (\.\d{3}|—) FT% · [\d.]+ 3PM · [\d.]+ PTS · /);
+    // (shooting with its makes and attempts a game, as the Recap's lines)
+    assert.match(app.dealLine(M.B.players[0]).join(' · '), /^[\d.]+ MIN · [\d.]+-[\d.]+ FG \((\.\d{3}|—)\) · [\d.]+-[\d.]+ FT \((\.\d{3}|—)\) · [\d.]+ 3PM · [\d.]+ PTS · /);
     // side by side: value over a waiver player as the verdict counts it, then each category's per-game total, the better marked
     const wv = app.waiverValue(), over = ps => ps.reduce((t, p) => t + app.gameWorth(p) - wv, 0);
     assert.deepEqual([M.rows[0].sa, M.rows[0].sb], [app.fmtValue(over(M.A.players)), app.fmtValue(over(M.B.players))]);
@@ -1061,6 +1062,20 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const to = M.rows.find(r => r.key === 'to');
     if (to.sa !== to.sb) assert.equal(to.lead, +to.sa < +to.sb ? 1 : -1, 'fewer turnovers is better');
     assert.match(card, /tp-lead pos-good/, 'your side: its better numbers green');
+    // FG% and FT% count volume: makes-attempts a game under each side's %, and the better side adds more makes over the
+    // league average on its attempts, so a few shots at a high % lose to many at a good one
+    const avg = app.get('BASE').fgPct[0], madeOver = p => (p.fgPct - avg) * p.fga;
+    const fgRow = M.rows.find(r => r.key === 'fgPct');
+    assert.equal(fgRow.va, `${app.fmt(M.A.tot.fgm, 1)}-${app.fmt(M.A.tot.fga, 1)}`);
+    assert.ok(card.includes(`<div class="tp-vol">${fgRow.va}</div>`) && card.includes('Percentages count volume'));
+    const all = app.nbaPlayers().filter(p => p.gp >= 3);
+    const few = all.find(p => p.fga > 0.5 && p.fga < 2 && p.fgPct > avg + 0.05);
+    const many = [...all].filter(p => p.fgPct < few.fgPct - 0.01).sort((a, b) => madeOver(b) - madeOver(a))[0];
+    assert.ok(madeOver(many) > madeOver(few) + 0.1, `${many.name} adds more makes than ${few.name}`);
+    const V = app.tradeModel({ from: t1, to: t2, give: [String(few.nbaId)], get: [String(many.nbaId)] });
+    const fg = V.rows.find(r => r.key === 'fgPct');
+    assert.ok(+fg.sb > +fg.sa && fg.lead === 1, `${fg.sa} on volume beats ${fg.sb} on ${app.fmt(few.fga, 1)} shots`);
+    assert.match(fg.ta, /^[\d.]+-[\d.]+ a game: [\d.]+ more makes than the league's average of \.\d{3} would give$/);
     // shared: a picture (the same numbers), the text and a link
     const S = app.tradeShare(L, T);
     assert.ok(S.url.endsWith(`?league=${L.id}&from=${t1}&to=${t2}&give=${T.give.join(',')}&get=${T.get.join(',')}#trade`), S.url);
@@ -3746,7 +3761,7 @@ test('hockey trades and waivers weigh a goalie by the games he plays; past seaso
   // a trade proposal: a goalie's line is a goalie's, a skater's a skater's; the side with no goalie has no goalie rates
   const goalieKeys = new Set(a.get('SPORT').goalieCats), cats = a.dealCats();
   const labels = keep => new Set(cats.filter(c => !c.fp && keep(goalieKeys.has(c.key))).map(c => ` ${c.label}`));
-  const has = (line, set) => line.some(x => [...set].some(l => x.endsWith(l)));
+  const has = (line, set) => line.some(x => [...set].some(l => x.endsWith(l) || x.includes(`${l.replace('%', '')} (`))); // ("25.1-27.3 SV (.919)")
   assert.ok(!has(a.dealLine(P), labels(g => !g)) && !has(a.dealLine(skater), labels(g => g)));
   const [t1, t2] = a.fxPickable().map(t => t.id);
   const M = a.tradeModel({ from: t1, to: t2, give: [String(skater.nbaId)], get: [String(backup.id)] });

@@ -446,19 +446,25 @@ function applyTradeLink() {
 const dealCats = () => { const cs = scoreCats(); return [...cs.filter(c => c.fp), ...cs.filter(c => !c.fp)]; };
 // a category's number as the site shows it; null (no attempts: a side without a goalie has no GAA) is a dash
 const dealShow = (c, v) => (v == null ? '—' : c.rate ? fmt(v, 2) : c.pct ? fmtPct(v) : fmt(v, c.dec || 1));
-// One player's average game in the league's categories (a goalie's in the goalie ones), minutes first
+// a shooting category's volume: makes and attempts a game ("7.2-14.5")
+const dealVol = (made, att) => `${fmt(made, 1)}-${fmt(att, 1)}`;
+// One player's average game in the league's categories (a goalie's in the goalie ones), minutes first; a percentage with
+// its makes and attempts, as the Recap's lines show them ("7.2-14.5 FG (.496)")
 function dealLine(p) {
   const goalie = isGoalie(p), parts = p.min ? [`${fmt(p.min, 1)} MIN`] : [];
   for (const c of dealCats()) {
     if (isHockey() && SPORT.goalieCats.includes(c.key) !== goalie) continue;
-    parts.push(`${dealShow(c, c.pct ? (statVal(p, c.att) ? pctOf(p, c) : null) : statOf(p, c))} ${c.label}`);
+    const m = c.pct && statVal(p, c.made), a = c.pct && statVal(p, c.att);
+    if (c.pct && !c.rate) parts.push(`${dealVol(m, a)} ${c.label.replace('%', '')} (${a ? fmtPct(m / a) : '—'})`);
+    else parts.push(`${dealShow(c, c.pct ? (a ? pctOf(p, c) : null) : statOf(p, c))} ${c.label}`);
   }
   return parts;
 }
 
 // Both sides of a deal, for the card, the picture and the text: what each team gets (players as the Players tab has
 // them, best first), its value over a waiver player (as the verdict counts it) and its per-game totals, then the
-// comparison's rows: { key, label, sa, sb (as shown), lead: 1 (the first side's is better), -1, or 0 (even, or no number) }
+// comparison's rows: { key, label, sa, sb (as shown), lead: 1 (the first side's is better), -1, or 0 (even, or no number),
+// and for a shooting percentage va, vb (makes-attempts a game) and ta, tb (what the volume adds, for a tip) }
 function tradeModel(T) {
   const rawOf = id => nbaById.get(+id) || nbaById.get(id);
   const wv = waiverValue(), over = p => gameWorth(p) - wv;
@@ -472,8 +478,19 @@ function tradeModel(T) {
     return { key, label, sa, sb, lead: a == null || b == null || sa === sb ? 0 : (neg ? a < b : a > b) ? 1 : -1 };
   };
   const catOf = (t, c) => (c.fp ? t.fp : c.pct ? (t[c.att] ? t[c.made] / t[c.att] : null) : lineStat(t, c.key));
+  // a shooting percentage counts its volume, as Value does: the better side adds more makes over what the league's
+  // average percentage would give on its attempts (a .513 on 4 shots a game isn't better than a .498 on 15)
+  const shotRow = c => {
+    const r = row(c.key, c.label, catOf(A.tot, c), catOf(B.tot, c), v => dealShow(c, v), c.neg), avg = BASE[c.key] && BASE[c.key][0];
+    const what = c.made === 'sv' ? 'saves' : c.made === 'fow' ? 'faceoffs won' : 'makes';
+    const over = t => (t[c.att] && avg ? (c.neg ? -1 : 1) * (t[c.made] - avg * t[c.att]) : null);
+    const tip = t => (over(t) == null ? '' : `${dealVol(t[c.made], t[c.att])} a game: ${fmt(Math.abs(over(t)), 1)} ${over(t) >= 0 ? 'more' : 'fewer'} ${what} than the league's average of ${fmtPct(avg)} would give`);
+    const [oa, ob] = [over(A.tot), over(B.tot)];
+    return { ...r, va: A.tot[c.att] ? dealVol(A.tot[c.made], A.tot[c.att]) : '', vb: B.tot[c.att] ? dealVol(B.tot[c.made], B.tot[c.att]) : '', ta: tip(A.tot), tb: tip(B.tot),
+      lead: oa == null || ob == null ? r.lead : Math.abs(oa - ob) < 0.05 ? 0 : oa > ob ? 1 : -1 };
+  };
   const rows = [row('value', valueLabel(), A.value, B.value, v => fmtValue(v)),
-    ...dealCats().map(c => row(c.key, c.label, catOf(A.tot, c), catOf(B.tot, c), v => dealShow(c, v), c.neg))];
+    ...dealCats().map(c => (c.pct && !c.rate ? shotRow(c) : row(c.key, c.label, catOf(A.tot, c), catOf(B.tot, c), v => dealShow(c, v), c.neg)))];
   return { A, B, rows };
 }
 
@@ -488,8 +505,10 @@ function tradeCard(T) {
         <div class="pmeta">${p.team ? teamBtn(p.team) : 'FA'} · ${posTags(p.pos)} · ${p.gp} GP</div></div><span class="val" title="${valueLabel()} per game">${fmtValue(value(p))}</span></div>
       <div class="rc-stats tp-line">${dealLine(p).map(x => `<span>${x}</span>`).join(' · ')}</div></li>`).join('')}</ul></section>`;
   const cls = (r, col) => (r.lead !== col ? '' : ` tp-lead${mineAt ? (col === mineAt ? ' pos-good' : ' pos-bad') : ''}`);
+  const cell = (r, col, v, vol, tip) => `<td class="num${cls(r, col)}"${tip ? ` title="${esc(tip)}"` : ''}>${v}${vol ? `<div class="tp-vol">${vol}</div>` : ''}</td>`;
   const rows = M.rows.map(r => `<tr${r.key === 'value' ? ' class="tp-val"' : ''}><td><b>${r.label}</b>${r.key === 'value' ? ` ${infoBtn('tradeValue')}<div class="muted small">over a waiver player</div>` : ''}</td>
-    <td class="num${cls(r, 1)}">${r.sa}</td><td class="num${cls(r, -1)}">${r.sb}</td></tr>`).join('');
+    ${cell(r, 1, r.sa, r.va, r.ta)}${cell(r, -1, r.sb, r.vb, r.tb)}</tr>`).join('');
+  const shots = M.rows.some(r => r.va || r.vb);
   return `<div class="card tp">
     <div class="card-head"><h2>Trade proposal</h2><div class="tp-btns">${seen ? '<button type="button" class="btn sm" data-action="trade-seen-close">Close</button>' : ''}<button type="button" class="btn sm primary" data-action="trade-share">Share</button></div></div>
     ${seen ? `<p class="muted small tp-note">A trade a league mate shared, between ${teamLink(M.A.tid)} and ${teamLink(M.B.tid)}.</p>` : ''}
@@ -499,9 +518,11 @@ function tradeCard(T) {
       <thead><tr><th></th><th class="num">${esc(M.A.name)} gets</th><th class="num">${esc(M.B.name)} gets</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
-    <p class="small muted tp-foot">Each player's average game (${basisLabel().toLowerCase()}), each side's added up.</p>
+    <p class="small muted tp-foot">Each player's average game (${basisLabel().toLowerCase()}), each side's added up.${shots ? ` ${TRADE_SHOTS}` : ''}</p>
   </div>`;
 }
+// what a percentage row says about volume (the card's and the picture's)
+const TRADE_SHOTS = 'Percentages count volume: makes-attempts a game under each, and the better side is the one with more makes over the league average on its attempts.';
 
 // Sharing it (shareWith, recap.js): a picture, or the text and a link that opens the deal on the Trades tab
 const tradeUrl = (L, T) => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}&from=${encodeURIComponent(T.from)}&to=${encodeURIComponent(T.to)}`
@@ -563,8 +584,9 @@ async function tradeCanvas(L, M) {
   // side by side: the row's name, then each side's number, the better one on an orange pill
   y += 48;
   font(28, 800); text('SIDE BY SIDE · PER GAME', C.pad, y, C.accent); y += 52;
-  const labW = 230, colW = (right - x0 - labW) / 2, mid = [x0 + labW + colW / 2, x0 + labW + colW * 1.5], rowH = 60;
-  const h = 28 + 48 + M.rows.length * rowH + 16;
+  // (a shooting row is taller: its makes-attempts a game under each number)
+  const labW = 230, colW = (right - x0 - labW) / 2, mid = [x0 + labW + colW / 2, x0 + labW + colW * 1.5], rowH = r => (r.va || r.vb ? 92 : 60);
+  const h = 28 + 48 + sum(M.rows.map(rowH)) + 16;
   round(C.pad, y, inner, h, 24, C.card);
   let ty = y + 28;
   font(26, 800);
@@ -573,16 +595,19 @@ async function tradeCanvas(L, M) {
   for (const r of M.rows) {
     ctx.fillStyle = C.line; ctx.fillRect(x0, ty, right - x0, 2);
     font(28, 700); text(r.label, x0, ty + 16, '#d5d9e0');
-    [r.sa, r.sb].forEach((v, i) => {
+    [[r.sa, r.va], [r.sb, r.vb]].forEach(([v, vol], i) => {
       const lead = r.lead === (i ? -1 : 1);
       font(31, lead ? 800 : 500);
       if (lead) { const w = ctx.measureText(v).width + 32; ctx.globalAlpha = 0.2; round(mid[i] - w / 2, ty + 8, w, 46, 23, C.accent); ctx.globalAlpha = 1; }
       text(v, mid[i], ty + 15, lead ? C.accent : r.lead ? C.muted : C.text, 'center');
+      if (vol) { font(23); text(vol, mid[i], ty + 58, C.muted, 'center'); }
     });
-    ty += rowH;
+    ty += rowH(r);
   }
   y += h + 22;
   font(24);
-  for (const l of wrapText(ctx, `${valueLabel()}: what each side's players add per game${isPoints() ? ' in fantasy points' : ' to winning categories'}, less a waiver player for each roster spot they take.`, inner)) { text(l, C.pad, y, C.muted); y += 34; }
+  const notes = [`${valueLabel()}: what each side's players add per game${isPoints() ? ' in fantasy points' : ' to winning categories'}, less a waiver player for each roster spot they take.`];
+  if (M.rows.some(r => r.va || r.vb)) notes.push(TRADE_SHOTS);
+  for (const note of notes) { for (const l of wrapText(ctx, note, inner)) { text(l, C.pad, y, C.muted); y += 34; } y += 8; }
   return K.done(y);
 }

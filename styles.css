@@ -676,6 +676,7 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .tp-cmp th.num, .tp-cmp td.num { width: 34%; font-variant-numeric: tabular-nums; }
 .tp-cmp thead th.num { color: var(--text); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .tp-cmp td.tp-lead { font-weight: 800; background: var(--surface-2); } /* the better side of a row */
+.tp-vol { font-size: .75rem; font-weight: 400; color: var(--muted); } /* a percentage's makes-attempts a game */
 .tp-cmp td.tp-lead.pos-good { background: var(--good-soft); }
 .tp-cmp td.tp-lead.pos-bad { background: var(--bad-soft); }
 .tp-foot { margin: 10px 0 0; }
