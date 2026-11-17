@@ -2930,9 +2930,9 @@ test("the player card: how he came to his fantasy team", async () => {
     const how = (nba, f) => app.cardHow(L, { id: nba }, t1, f);
     assert.equal(how(keeper, 'keep'), 'Keeper');
     assert.equal(how(pick[3], 'pick'), `Drafted · round ${pick[0]}, pick ${pick[1]}`);
-    assert.equal(how(1, 'added'), 'Waiver add · week 2');
+    assert.equal(how(1, 'added'), 'Pickup · week 2');
     assert.equal(how(2, 'traded'), `Traded from ${app.fxTeamName(t2)} · week 2`);
-    assert.equal(how(3, 'new'), 'Waiver add · this week', 'not on the latest weekly rosters yet');
+    assert.equal(how(3, 'new'), 'Pickup · this week', 'not on the latest weekly rosters yet');
   } finally { if (was) loads[L.id] = was; else delete loads[L.id]; }
   // without weekly rosters (ESPN): the draft, else added after it
   const E = await app.useLeague(ESPN);

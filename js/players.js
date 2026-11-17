@@ -365,7 +365,7 @@ function cardOwner(raw) {
 }
 
 // The card's line for it: the Roster tab's badge (same colors; Drafted blue, as grey is a free agent's), then the rest in grey
-const HOW_BADGE = [[/^Keeper$/, 'Keeper', 'accent'], [/^Drafted · /, 'Drafted', 'info'], [/^Waiver add · /, 'Waiver add', 'good'], [/^Added /, 'Added', 'good'], [/^Traded /, 'Trade', 'warn']];
+const HOW_BADGE = [[/^Keeper$/, 'Keeper', 'accent'], [/^Drafted · /, 'Drafted', 'info'], [/^Pickup · /, 'Pickup', 'good'], [/^Added /, 'Added', 'good'], [/^Traded /, 'Trade', 'warn']];
 function howBadge(how) {
   if (!how) return '';
   const b = HOW_BADGE.find(([re]) => re.test(how));
@@ -395,13 +395,13 @@ function cardHow(L, raw, tid, fid) {
   const last = weeks[weeks.length - 1];
   if (!on(last)) { // joined since the latest rosters
     const was = last.owner.get(fid);
-    return was ? `Traded from ${fxTeamName(was.tid)} · this week` : 'Waiver add · this week';
+    return was ? `Traded from ${fxTeamName(was.tid)} · this week` : 'Pickup · this week';
   }
   let j = weeks.length - 1;
   while (j > 0 && on(weeks[j - 1])) j--;
   if (!j) return fromDraft || `On the team since ${when(weeks[0])}`;
   const prev = weeks[j - 1].owner.get(fid);
-  return prev ? `Traded from ${fxTeamName(prev.tid)} · ${when(weeks[j])}` : `Waiver add · ${when(weeks[j])}`;
+  return prev ? `Traded from ${fxTeamName(prev.tid)} · ${when(weeks[j])}` : `Pickup · ${when(weeks[j])}`;
 }
 // Every game he's played this season, newest first: the saved box scores (and today's, as they're played), else
 // the few the daily file keeps (preseason ones too, before the season starts)
