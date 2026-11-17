@@ -338,15 +338,22 @@ async function pollLive() {
   try {
     await loadBoxes().catch(() => null); // to know which finished games are saved already
     const feed = await liveFeedGet(), sb = feed ? feed.scoreboard : await espnSite('scoreboard');
+    const today = todayIso(), was = live.games;
     live.games = espnGames(sb);
     live.day = (sb.day && sb.day.date) || (live.games[0] && live.games[0].d) || live.day;
+    // ESPN's scoreboard stays on last night's games until late morning (still at 11 a.m. ET, Nov 17, 2026): today's, with
+    // their tip-offs, from today's own scoreboard meanwhile. Through the Worker, which keeps a dated day 10 minutes, unless
+    // a game of today is on or that close to starting (ESPN directly then, fresh)
+    if (!live.games.some(g => g.d === today) && [...teamDates.values()].some(ds => ds.has(today))) {
+      const near = was.some(g => g.d === today && (g.state !== 'pre' || g.start - Date.now() < 10 * 60e3));
+      try { live.games.push(...espnGames(await espnSite(`scoreboard?dates=${espnDate(today)}`, 1, !near))); } catch (e) { /* the opponent alone, until the next update */ }
+    }
     // (football: only the scoreboard. Its live points come from Sleeper, in the league's scoring: footballLines)
     if (isFootball()) {
       for (const g of live.games) if (g.state === 'post') live.done.add(g.id);
     } else await readBoxes(live.games.filter(g => g.state !== 'pre' && !live.done.has(g.id) && !savedFinal(g) && (feed || boxDue(g))), feed);
     // yesterday and earlier days of this week that the saved box scores don't have yet: once each (a miss is
     // tried next time)
-    const today = todayIso();
     const days = new Set(isFootball() ? [] : [addDays(today, -1), ...matchDates(mondayOf(today)).filter(d => d < today)]);
     for (const d of [...days].filter(d => d !== live.day && !live.done.has(d))) {
       if (![...teamDates].some(([t, ds]) => ds.has(d) && !(BOX && BOX.finals.has(`${d} ${t}`)))) { live.done.add(d); continue; }

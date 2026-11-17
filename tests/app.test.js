@@ -2026,6 +2026,52 @@ test("a week is over once its last game day's box scores are in, before Fantrax 
   assert.equal(await onDay('2026-10-26', () => app.periodOver(L.periods[1])), false, 'week 2 just starting');
 });
 
+test("the morning: ESPN's scoreboard still on last night's games, today's tip-offs come from today's own", async () => {
+  await app.loadBoxes();
+  await app.useLeague(CATS9);
+  const live = app.get('live'), d = '2026-10-28';
+  const keep = { games: live.games, day: live.day, lines: live.lines, done: live.done, read: live.read, at: live.at, tried: live.tried, error: live.error, off: app.get('liveFeed').off };
+  // ESPN's answer without a date: Tuesday's (its finals saved or not, beside the point here); Wednesday's own: the saved evening, before tip-off
+  const sb = JSON.parse(readFixture('espn/live/scoreboard.json'));
+  for (const e of sb.events) { e.status.type.state = 'pre'; for (const c of e.competitions[0].competitors) c.score = '0'; }
+  const urls = [], realFetch = app.fetch;
+  const answer = body => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(body) });
+  app.fetch = url => { const u = String(url); urls.push(u); return u.endsWith('/scoreboard') ? answer({ day: { date: '2026-10-27' }, events: [] }) : u.endsWith(`scoreboard?dates=${d.replace(/-/g, '')}`) ? answer(sb) : realFetch(url); };
+  const at = async (t, fn) => { const RealDate = app.Date; app.Date = class extends RealDate { constructor(...a) { super(...(a.length ? a : [t])); } static now() { return t; } }; try { return await fn(); } finally { app.Date = RealDate; } };
+  try {
+    Object.assign(live, { games: [], lines: new Map(), done: new Set(), read: new Map(), at: 0, tried: 0, error: '' });
+    app.ui.tab = 'dashboard';
+    const games = app.espnGames(sb), first = Math.min(...games.map(g => +g.start));
+    await at(Date.parse(`${d}T09:00:00-04:00`), () => app.pollLive());
+    assert.equal(live.error, '');
+    assert.equal(live.games.filter(g => g.d === d).length, games.length, "today's games, from today's scoreboard");
+    assert.ok(urls.includes('https://api.leaguelayer.com/espn/basketball/nba/scoreboard?dates=20261028'), 'hours before tip-off: the Worker\'s copy');
+    // the Matchup tab: each player's game with its tip-off, not just the opponent
+    const g = games[0], raw = app.NBA.players.find(r => r.team === g.home);
+    const p = { ...raw, nbaId: raw.id };
+    const bubble = await at(Date.parse(`${d}T09:00:00-04:00`), () => app.dashGame(p, d));
+    assert.ok(bubble.includes(`vs ${g.away} ${app.fmtTime(g.start)}`), bubble);
+    // close to the first tip-off: ESPN itself, fresh
+    urls.length = 0;
+    live.at = 0; live.tried = 0;
+    await at(first - 5 * 60e3, () => app.pollLive());
+    assert.ok(urls.includes('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261028'), urls.join('\n'));
+    // once ESPN's scoreboard has today's games, nothing more is asked
+    urls.length = 0;
+    live.at = 0; live.tried = 0;
+    app.fetch = url => { const u = String(url); urls.push(u); return u.endsWith('/scoreboard') ? answer({ ...sb, day: { date: d } }) : realFetch(url); };
+    await at(Date.parse(`${d}T13:00:00-04:00`), () => app.pollLive());
+    assert.ok(!urls.some(u => u.includes('dates=20261028')), urls.join('\n'));
+    assert.equal(live.games.length, games.length, 'no game twice');
+  } finally {
+    app.fetch = realFetch;
+    clearTimeout(live.timer); live.timer = null;
+    app.get('liveFeed').off = keep.off;
+    delete keep.off;
+    Object.assign(live, keep);
+  }
+});
+
 test("the night a week ends: its last games from ESPN, before the daily job saves them", async () => {
   await app.loadBoxes();
   const L = await app.useLeague(CATS9);
