@@ -2636,7 +2636,7 @@ test('box scores by month: the same season as the one file, each month at its ow
     // a month that fails to load fails the lot (no season with a hole in it), and the next ask tries again
     app.changed('sport');
     NBA.box = { ...NBA.box, '2031-01': 'x' };
-    await assert.rejects(app.loadBoxes(), /box scores 404/);
+    await assert.rejects(app.loadBoxes(), /answered 404/);
     assert.equal(app.get('BOX'), null);
   } finally {
     app.fetch = realFetch;
@@ -3759,6 +3759,38 @@ test("the sandbox's scoring and sport: categories, a site's standard points or y
   assert.deepEqual([...a.sbState().roster], best.slice(0, 3).map(p => p.nbaId));
   assert.ok(!a.isPoints() && a.scoreCats().length === 9);
   assert.equal(JSON.parse(a.localStorage.getItem('league-layer-v1')).sandbox.nhl.roster.length, 2, "hockey's team kept too");
+  const live = a.get('live');
+  clearTimeout(live.timer); live.timer = null;
+});
+
+test("box scores started for one sport and finishing after a switch stay out of the other's page; a failed load says so with Try again", async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  const real = a.fetch, ui = a.get('ui');
+  ui.tab = 'standings';
+  // basketball's still coming when the page turns to hockey (the sandbox's sport menu, or a hockey league): they gave
+  // hockey's players basketball's games, and could leave Live on "Loading" until a click
+  a.set('BOX', null); a.set('boxLoad', null);
+  a.fetch = (u, ...r) => (/^data\/box\//.test(String(u)) ? new Promise(res => setTimeout(() => res(real(u, ...r)), 40)) : real(u, ...r));
+  const slow = a.loadBoxes();
+  await a.useSport('nhl');
+  a.fetch = real;
+  const B = await slow;
+  assert.equal(a.SPORT.key, 'nhl');
+  assert.ok(a.get('BOX') === B && B.cols.includes('sog'), "hockey's box scores, not basketball's");
+  // a load that fails: Trends says so, with Try again, rather than loading for ever
+  a.set('BOX', null); a.set('boxLoad', null);
+  a.fetch = (u, ...r) => (/^data\/(nhl\/)?box(\/|scores)/.test(String(u)) ? Promise.resolve({ ok: false, status: 404, text: async () => '' }) : real(u, ...r));
+  ui.tab = 'trends';
+  assert.match(a.viewTrends(), /Loading the season's box scores/);
+  await a.loadBoxes().catch(() => {});
+  assert.match(a.viewTrends(), /Couldn't load the box scores[\s\S]*data-action="box-retry">Try again/);
+  a.fetch = real;
+  a.actions['box-retry']();
+  await a.loadBoxes();
+  assert.ok(a.get('BOX') && !/Couldn't load/.test(a.viewTrends()), 'and Try again loads them');
+  ui.tab = 'standings';
   const live = a.get('live');
   clearTimeout(live.timer); live.timer = null;
 });

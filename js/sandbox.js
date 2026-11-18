@@ -58,13 +58,14 @@ function sbSetScoring(k) {
 }
 // The sport picked on the bar: its data, and its own team, players followed and scoring (nothing's drawn until it's in: ui.hold)
 async function sbSetSport(key) {
-  if (key === SPORT.key || !SB_SPORTS.includes(key)) return;
+  if (key === SPORT.key || !SB_SPORTS.includes(key)) return true;
   ui.hold = true;
-  try { await useSport(key); } finally { ui.hold = false; }
+  try { await useSport(key); } catch (e) { toast(`Couldn't load ${SPORTS[key].name} data`); return false; } finally { ui.hold = false; }
   state.sandbox.sport = key;
   ui.sbGive.clear(); ui.sbGet = []; ui.sbQ = {}; ui.watchRange = null;
   clearLeaguePlayers(); // (no league's positions or rosters on this sport's players either)
   sbRescore(`${SPORTS[key].name} sandbox`);
+  return true;
 }
 
 // The note on every sandbox tab: what it is, its sport and scoring (and your points to edit), and the way back to your
@@ -198,7 +199,7 @@ function viewSandboxTeam() {
 // now first, then finished, then still to come by tip-off, then no game (his next one).
 function viewSandboxWatch() {
   if (!NBA) return loadingCard('Loading player data…');
-  if (!BOX) { loadBoxes().then(() => { if (ui.tab === 'watch') render(); }).catch(() => {}); return `${browseNote()}${loadingCard('Live', 'Loading the latest box scores…')}`; }
+  if (!BOX) return `${browseNote()}${boxWait('watch', 'Live', 'Loading the latest box scores…')}`;
   startLive(); // (today's games, as they're played)
   const W = sbState().watch, P = perfDays(), today = todayIso(), yesterday = addDays(today, -1);
   const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)]].filter(Boolean);

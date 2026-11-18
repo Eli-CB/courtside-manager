@@ -226,14 +226,21 @@ function boxCounts(st) {
 // from before months had the whole season in boxscores.json, new every day.
 async function boxFiles() {
   const dir = SPORT.data, months = Object.entries(NBA.box || {});
-  const get = async url => { const r = await fetch(url); if (!r.ok) throw new Error(`box scores ${r.status}`); return r.json(); };
+  const get = url => getJson(url, 'League Layer', undefined, 3); // (a dropped connection or a server hiccup: asked again)
   if (!months.length) return get(`${dir}boxscores.json?v=${encodeURIComponent(NBA.updated || '')}`);
   const parts = await Promise.all(months.map(([month, v]) => get(`${dir}box/${month}.json?v=${v}`)));
   return { ...parts[0], games: Object.assign({}, ...parts.map(p => p.games)) };
 }
 
+// (a load started for another sport, finishing after a switch, isn't this page's: it gives way to this sport's load. It
+// used to land in BOX, the other sport's games under this one's players, and could leave a tab on "Loading" until a click)
+let boxFail = ''; // the last load's failure, for a tab with nothing else to show (boxWait)
+keep('sport', () => { boxFail = ''; });
 function loadBoxes() {
-  boxLoad = boxLoad || boxFiles().then(data => {
+  if (boxLoad) return boxLoad;
+  const sport = SPORT;
+  const load = boxLoad = boxFiles().then(data => {
+    if (SPORT !== sport) return loadBoxes();
     const unique = new Map(), cols = data.keys || SPORT.boxCols; // (a box row's columns, as boxGameLog reads them too)
     for (const [gid, g] of Object.entries(data.games || {})) {
       const key = `${g.d} ${g.home} ${g.away}`;
@@ -254,10 +261,18 @@ function loadBoxes() {
       }
     }
     BOX = { cols, byPlayer, finals, scores, day: new Map([...byPlayer].map(([id, games]) => [id, new Map(games.map(([d, st, margin]) => [d, { ...st, margin }]))])) };
+    boxFail = '';
     dropPlayedInjuries();
     return BOX;
-  }).catch(e => { boxLoad = null; throw e; });
-  return boxLoad;
+  }).catch(e => { if (boxLoad === load) { boxLoad = null; boxFail = e.message || 'no answer'; } throw e; });
+  return load;
+}
+// A tab that needs the box scores and has nothing to show without them (Live, Trends): loads them (drawn again when
+// they're in), and meanwhile a loading card, or what went wrong with Try again ('box-retry')
+function boxWait(tab, title, text) {
+  if (boxFail && !boxLoad) return `<div class="card"><div class="empty"><strong>Couldn't load the box scores</strong>${esc(boxFail)}. <button type="button" class="link-btn" data-action="box-retry">Try again</button></div></div>`;
+  loadBoxes().then(() => { if (ui.tab === tab) render(); }).catch(() => { if (ui.tab === tab) render(); });
+  return loadingCard(title, text);
 }
 
 // This season's Season totals and Awards: the shared weekly rosters (Fantrax ids) mapped to NBA players

@@ -292,7 +292,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 - Fantrax rate limits answer 200 OK with `{ error: { code: 'RATE_LIMITED', message: '... at most once every 5 seconds per
   IP address.' } }` (getDraftResults: 5 s): `getJson` waits what it says and asks again; a draft that still doesn't come
   marks the league `draftFailed` (not kept on the device; Draft tab offers Try again), never "no draft".
-- Box score cache holds NBA.com and ESPN copies of games: always dedupe by date+teams (`loadBoxes` does).
+- Box score cache holds NBA.com and ESPN copies of games: always dedupe by date+teams (`loadBoxes` does). A load that finishes after a sport switch
+  is dropped for the new sport's (`loadBoxes` checks `SPORT`: it used to put basketball's games on hockey's page, Nov 18, 2026); a tab with only box
+  scores to show waits through `boxWait` (views.js: the loading card, or the failure with Try again, never "Loading" for ever).
 - Box scores reach the site by month: each job keeps `boxscores.json` as its own working copy and also writes `box/<YYYY-MM>.json` beside it
   (`box_months`, update_data.py), with `box: {month: version}` in the players file; the site asks for `box/<month>.json?v=<version>` (`boxFiles`, views.js), so a
   finished month is downloaded once and only the month underway each day. A players file without `box` falls back to the one file. Nothing on the site reads `boxscores.json` otherwise.

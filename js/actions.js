@@ -318,6 +318,8 @@ const actions = {
     render();
   },
   'watch-range'(el) { ui.watchRange = el.dataset.range; render(); },
+  // the box scores didn't load (boxWait, views.js): ask again
+  'box-retry'() { boxFail = ''; render(); },
   // the sandbox's own points (sandbox.js): edit them, or fill the form with a site's standard
   'sb-points'() { sbPointsOpen(); },
   'sb-points-from'(el) {
@@ -755,7 +757,7 @@ document.addEventListener('change', e => {
   } else if (el.dataset.change === 'sb-scoring') { // the sandbox's scoring and sport (sandbox.js)
     if (!sbSetScoring(el.value)) el.value = sbState().scoring;
   } else if (el.dataset.change === 'sb-sport') {
-    sbSetSport(el.value).catch(() => { el.value = SPORT.key; toast(`Couldn't load ${SPORTS[el.value] ? SPORTS[el.value].name : ''} data`); });
+    sbSetSport(el.value).then(ok => { if (!ok) el.value = SPORT.key; }); // (its data didn't load: it says so, and the sport stays)
   } else if (el.dataset.change === 'sb-give') { // the sandbox's trade (sandbox.js)
     if (el.checked) ui.sbGive.add(+el.value); else ui.sbGive.delete(+el.value);
     render();

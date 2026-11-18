@@ -426,10 +426,7 @@ function trendsCard(L, end) {
 function viewTrends() {
   if (!NBA) return '';
   const L = fxLeague(), note = L ? '' : browseNote();
-  if (!BOX) {
-    loadBoxes().then(() => { if (ui.tab === 'trends') render(); }).catch(() => {});
-    return `${note}${loadingCard('Trends', "Loading the season's box scores…")}`;
-  }
+  if (!BOX) return `${note}${boxWait('trends', 'Trends', "Loading the season's box scores…")}`;
   const end = [...BOX.finals].map(k => k.slice(0, 10)).sort().pop();
   return `${note}${end ? trendsCard(L, end) : `<div class="card"><div class="empty"><strong>No trends yet</strong>They start once the season's first games are in.</div></div>`}`;
 }
