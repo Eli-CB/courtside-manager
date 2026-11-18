@@ -2105,8 +2105,8 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.deepEqual(Array.from(X.rank.bottom, String).sort(), recs.filter(a => a.w + a.t / 2 === Math.min(...vals)).map(a => String(a.tid)).sort());
     assert.ok(X.rank.top.includes(X.allPlay.tid), 'Best week is the crowned one');
     const results = html.split('class="rc-finals"')[1];
-    assert.equal((results.match(/class="rc-badge rc-top"[^>]*>Top</g) || []).length, X.rank.top.length);
-    assert.equal((results.match(/class="rc-badge rc-bottom"[^>]*>Bottom</g) || []).length, X.rank.bottom.length);
+    assert.equal((results.match(/class="rc-badge rc-top"[^>]*>Best</g) || []).length, X.rank.top.length);
+    assert.equal((results.match(/class="rc-badge rc-bottom"[^>]*>Worst</g) || []).length, X.rank.bottom.length);
     assert.match(results, /title="Best week in the league: \d+-\d+(-\d+)? against every other team"/);
     for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);
     assert.match(html, /would have beaten (every other team|\d+ of \d+ teams)/, 'Best week counts teams beaten, not categories');

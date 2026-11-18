@@ -139,10 +139,10 @@ function buildRecap(L, P, period) {
   };
 }
 
-// The week's top and bottom team in the results (and the picture's): 'top', 'bottom' or '' (a badge, Top or Bottom: no
+// The week's top and bottom team in the results (and the picture's): 'top', 'bottom' or '' (a badge, Best or Worst: no
 // emoji in the recap, the owner's ask), and why, for its tooltip
 const recapMark = (X, tid) => (!X.rank ? '' : X.rank.top.includes(tid) ? 'top' : X.rank.bottom.includes(tid) ? 'bottom' : '');
-const RECAP_MARK = { top: 'Top', bottom: 'Bottom' };
+const RECAP_MARK = { top: 'Best', bottom: 'Worst' }; // (the owner's words)
 function recapMarkTip(X, tid) {
   const top = X.rank.top.includes(tid);
   if (isPoints()) return `${top ? 'Most' : 'Fewest'} points this week: ${fmtFp(X.rank.score[tid])}`;
@@ -786,7 +786,7 @@ async function shareCanvas(H) {
     round(x0, y, w, 84, 22, C.card);
     round(W / 2 - sw / 2, y + 15, sw, 54, 27, C.bg);
     text(sc, W / 2, y + 26, C.accent, 'center');
-    // a team's name cut to fit, its badge (Top, Bottom) kept whole on the outer edge
+    // a team's name cut to fit, its badge (Best, Worst) kept whole on the outer edge
     const side = (tid, left, weight, color) => {
       const k = H.mark ? H.mark(tid) : '', edge = left ? x0 + 32 : x0 + w - 32;
       font(17, 700, 1.5);
