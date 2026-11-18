@@ -117,7 +117,8 @@ const INFO = {
   watch: ['Live', `
     <p>Each player's game and stat line as it's played: ESPN's box scores, which your browser asks for every 30 seconds while games are on (a minute with your browser's data saver on). ESPN runs a minute or so behind the broadcast. A number flashes green or red as it changes: green for what helps (a make, a rebound), red for what hurts (a miss, a turnover).</p>
     <p>During a game the dot by the clock is solid while he's on the floor and light while he's on the bench or between periods. <b>Value</b> is what the game has added so far to winning a week's categories, against not playing (see Players).</p>
-    <p>Until today's first tip-off it shows the last game day; Today then shows each game's tip-off. Players on a game now come first, then finished games, then games still to come, then players with no game (and their next one).</p>`],
+    <p>Until today's first tip-off it shows the last game day; Today then shows each game's tip-off. Players on a game now come first, then finished games, then games still to come, then players with no game (and their next one).</p>
+    <p><b>Week</b>: Monday to Sunday so far. Each player's games played and still to come (a game on now with its clock), his stats from those games added up, and their value; players on a game now first, then by that value.</p>`],
   storage: ['Saved on this device', `
     <p>To keep requests to Fantrax and ESPN low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), each site's player list (and Fantrax's ADP, refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
     <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved league data</b> removes only what came from Fantrax and ESPN; it's fetched again the next time it's needed.</p>`],

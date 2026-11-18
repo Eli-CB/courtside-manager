@@ -3618,6 +3618,13 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   const watch = a.viewSandboxWatch();
   assert.equal((watch.match(/class="mu-p sb-w/g) || []).length, 12);
   assert.ok(watch.includes(`data-action="sb-unwatch" data-id="${p4.nbaId}"`) && !watch.includes('id="sbQ-watch"'), 'each with a ✕; no search while full');
+  assert.ok(watch.includes('12 of 12</span><span class="badge sb-max"') && !/Following 12|room for/.test(watch), 'full: a Max badge by the count, no sentence');
+  // the week (Monday to Sunday) so far: each player's games played and left, his line added up
+  ui.watchRange = 'week';
+  const wk = a.viewSandboxWatch();
+  assert.ok(wk.includes('data-range="week" aria-pressed="true"') && wk.includes('data-range="today"'), 'Today, Yesterday, Week');
+  assert.equal((wk.match(/<div class="mu-game">\d+ G/g) || []).length, 12, 'each player: his games this week');
+  ui.watchRange = null;
   a.actions['sb-unwatch']({ dataset: { id: String(p4.nbaId) } });
   assert.ok(!a.sbState().watch.includes(p4.nbaId) && a.viewSandboxWatch().includes('id="sbQ-watch"'));
   // Trades: My team's players for anyone, found by name

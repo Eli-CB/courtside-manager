@@ -194,51 +194,66 @@ const valueTip = () => (isPoints() ? 'Fantasy points from his average game, in t
 function viewSandboxTeam() {
   if (!NBA) return loadingCard('Loading player data…');
   const R = sbState().roster, list = sortDesc(sbRoster(), sbWorth);
-  const head = `<div class="card-head"><h2>My team ${infoBtn('sandbox')}</h2><span class="muted small">${R.length} of ${SANDBOX_MAX}</span>${R.length ? '<button type="button" class="link-btn quiet sb-clear" data-action="sb-clear">Start over</button>' : ''}</div>`;
-  const find = R.length >= SANDBOX_MAX ? `<p class="muted small">My team is full: remove a player to add another.</p>` : sbSearch('team', new Set(R));
+  const full = R.length >= SANDBOX_MAX;
+  const head = `<div class="card-head"><h2>My team ${infoBtn('sandbox')}</h2><span class="muted small">${R.length} of ${SANDBOX_MAX}</span>${full ? '<span class="badge sb-max" title="As many as My team holds: remove one to add another">Max</span>' : ''}${R.length ? '<button type="button" class="link-btn quiet sb-clear" data-action="sb-clear">Start over</button>' : ''}</div>`;
+  const find = full ? '' : sbSearch('team', new Set(R));
   const body = list.length ? sbTeamTable(list)
     : `<div class="empty"><strong>Build a team from any ${SPORT.name} players</strong>Find them above. Your team shows on the Players and Trends tabs, follow anyone on Live, and trade any of them for anyone on Trades.</div>`;
   return `<div class="card sb-team">${head}${find}${body}</div>`;
 }
 
 // ----- Live: up to 12 players, each one's game and line as it's played -----
-// Today, or the last game day (until today's games start, as the Matchup tab does): each player's game in its bubble
-// (tip-off, the score and clock, the final), his line in the categories and its value, a bubble flashing as it moves. On
-// now first, then finished, then still to come by tip-off, then no game (his next one).
+// Today, the last game day (until today's games start, as the Matchup tab does), or the Week (Monday to Sunday) so far. A
+// day: each player's game in its bubble (tip-off, the score and clock, the final), his line in the categories and its value,
+// a bubble flashing as it moves; on now first, then finished, then still to come by tip-off, then no game (his next one). The
+// week: his games played and still to come (a game on now with its clock), the week's line added up and its value; on now
+// first, then by that value. A full list says Max by its count (the search goes).
 function viewSandboxWatch() {
   if (!NBA) return loadingCard('Loading player data…');
   if (!BOX) return `${boxWait('watch', 'Live', 'Loading the latest box scores…')}`;
   startLive(); // (today's games, as they're played)
   const W = sbState().watch, P = perfDays(), today = todayIso(), yesterday = addDays(today, -1);
-  const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)]].filter(Boolean);
+  const all = matchDates(mondayOf(today)), soFar = all.filter(x => x <= today); // (this week, and its days so far)
+  const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], ['week', 'Week', `${fmtDay(all[0])} – ${fmtDay(all[all.length - 1])}`]].filter(Boolean);
   const range = opts.some(([k]) => k === ui.watchRange) ? ui.watchRange : P.today && (P.started || !P.day) ? 'today' : P.day ? 'day' : 'today';
-  const d = range === 'day' ? P.day : today;
-  const toggle = opts.length > 1 ? `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="watch-range" data-range="${k}" aria-pressed="${k === range}">${l}</button>`).join('')}</div>` : '';
+  const week = range === 'week', d = range === 'day' ? P.day : today;
+  const toggle = `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l, tip]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="watch-range" data-range="${k}" aria-pressed="${k === range}"${tip ? ` title="${tip}"` : ''}>${l}</button>`).join('')}</div>`;
   const room = WATCH_MAX - W.length, unwatched = sortDesc(sbRoster().filter(p => !sbWatching(p.nbaId)), sbWorth);
   const addTeam = room > 0 && unwatched.length ? `<button type="button" class="btn sm" data-action="sb-watch-team">Follow my team${unwatched.length > room ? ` (best ${room})` : ''}</button>` : '';
-  const find = room > 0 ? sbSearch('watch', new Set(W)) : `<p class="muted small">Following ${WATCH_MAX}, the most there's room for: remove one to follow another.</p>`;
-  const when = d === today ? (live.error ? `<span class="pos-bad">ESPN: ${esc(live.error)}</span>` : live.at ? `${fmtDay(d)} · updated ${fmtTime(live.at)}` : fmtDay(d)) : `${d === yesterday ? 'Last night' : ''} ${fmtDay(d)}`.trim();
-  const head = `<div class="card-head"><h2>Live ${infoBtn('watch')}</h2><span class="muted small">${W.length} of ${WATCH_MAX}</span>${toggle}</div>`;
-  const tools = `<div class="sb-tools">${find}${addTeam ? `<div class="sb-team-btn">${addTeam}</div>` : ''}</div>`;
+  const find = room > 0 ? sbSearch('watch', new Set(W)) : '';
+  const updated = live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>` : live.at ? ` · updated ${fmtTime(live.at)}` : '';
+  const when = week ? `${fmtDay(all[0])} – ${fmtDay(all[all.length - 1])}${updated}`
+    : d === today ? (live.error ? `<span class="pos-bad">ESPN: ${esc(live.error)}</span>` : live.at ? `${fmtDay(d)} · updated ${fmtTime(live.at)}` : fmtDay(d)) : `${d === yesterday ? 'Last night' : ''} ${fmtDay(d)}`.trim();
+  const head = `<div class="card-head"><h2>Live ${infoBtn('watch')}</h2><span class="muted small">${W.length} of ${WATCH_MAX}</span>${room > 0 ? '' : '<span class="badge sb-max" title="As many as Live follows: remove one to follow another">Max</span>'}${toggle}</div>`;
+  const tools = find || addTeam ? `<div class="sb-tools">${find}${addTeam ? `<div class="sb-team-btn">${addTeam}</div>` : ''}</div>` : '';
   if (!W.length) return `<div class="card sb-watch-card">${head}${tools}<div class="empty"><strong>Follow up to ${WATCH_MAX} players</strong>Each one's game and stat line as it's played, updated every 30 seconds while games are on.</div></div>`;
 
-  const stage = p => {
-    if (!playsOn(p, d)) return [3, 0];
-    const g = liveGame(p, d);
-    if (g && g.state === 'in') return [0, 0];
-    if (gameFinal(p, d) || (g && g.state === 'post')) return [1, 0];
-    return [2, g && g.start ? +g.start : Infinity];
-  };
-  const players = sbPlayers(W).map((p, i) => ({ p, i, s: stage(p) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.i - b.i).map(x => x.p);
-  // today's bubbles flash when a live update moves them (chipFlash, dashboard.js)
-  const isToday = d === today, chipNext = new Map();
-  const flash = (p, line) => { if (!isToday) return undefined; const f = chipFlash(p.nbaId, line); chipNext.set(p.nbaId, f.now); return f.flash; };
-  const cell = p => {
-    const plays = playsOn(p, d), line = lineOn(p, d);
-    const over = gameFinal(p, d) || !!(liveGame(p, d) && liveGame(p, d).state === 'post');
+  // what each player's cell shows: { game (its words), line (his stats), dim (nothing to show), order }
+  const dayOf = p => {
+    const plays = playsOn(p, d), line = lineOn(p, d), g = liveGame(p, d);
+    const over = gameFinal(p, d) || !!(g && g.state === 'post');
     const game = plays ? linkTeams(dashGame(p, d)) : `<span class="muted">No game${d === today && p.next ? ` · next ${linkTeams(nextGame(p.next))}` : ''}</span>`;
-    const v = line && !isPoints() ? `<span class="mu-chip sb-val" title="${esc(valueTip().replace('his average game', 'this game'))}"><b>${fmtValue(lineValue(line))}</b> ${isPoints() ? 'FP' : 'value'}</span>` : '';
-    return `<div class="mu-p sb-w${!plays || (over && !line) ? ' out' : ''}">
+    const order = !plays ? [3, 0] : g && g.state === 'in' ? [0, 0] : over ? [1, 0] : [2, g && g.start ? +g.start : Infinity];
+    return { game, line, dim: !plays || (over && !line), order };
+  };
+  const weekOf = p => {
+    const lines = soFar.map(x => lineOn(p, x)).filter(Boolean), line = lines.length ? lines.reduce((t, l) => addLine(t, l), {}) : null;
+    const left = all.filter(x => playsOn(p, x) && !lineOn(p, x) && (x > today || (x === today && !gameFinal(p, x) && !(liveGame(p, x) && liveGame(p, x).state === 'post')))).length;
+    const toCome = isGoalie(p) ? `about ${fmt(expectedGames(p, all.filter(x => x >= today && !gameFinal(p, x))), 1)}` : left;
+    const on = liveOn(p, today);
+    const game = linkTeams(`${lines.length} G${left && p.status !== 'Out' ? ` · ${toCome} left` : ''}${on ? ` · ${liveStatus(p, today)}` : ''}`);
+    return { game, line, dim: !lines.length && !left, order: [on ? 0 : 1, line ? -lineValue(line) : Infinity] };
+  };
+  const info = new Map(sbPlayers(W).map(p => [p, week ? weekOf(p) : dayOf(p)]));
+  const players = [...info.keys()].map((p, i) => ({ p, i, s: info.get(p).order })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.i - b.i).map(x => x.p);
+  // today's bubbles (and the week's, while its games are on) flash when a live update moves them (chipFlash, dashboard.js)
+  const isToday = range !== 'day', chipNext = new Map();
+  const flash = (p, line) => { if (!isToday) return undefined; const f = chipFlash(p.nbaId, line); chipNext.set(p.nbaId, f.now); return f.flash; };
+  const valTip = esc(week ? "Categories won by his games this week: what they added to winning a week's categories, against not playing" : valueTip().replace('his average game', 'this game'));
+  const cell = p => {
+    const { game, line, dim } = info.get(p);
+    const v = line && !isPoints() ? `<span class="mu-chip sb-val" title="${valTip}"><b>${fmtValue(lineValue(line))}</b> value</span>` : '';
+    return `<div class="mu-p sb-w${dim ? ' out' : ''}">
       <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${sbOwns(p.nbaId) ? ' <span class="badge accent sb-mine" title="On My team">Mine</span>' : ''}</div></div>
         <button type="button" class="icon-btn xs sb-x" data-action="sb-unwatch" data-id="${p.nbaId}" aria-label="Stop following ${esc(p.name)}" title="Stop following">✕</button></div>
       <div class="mu-game">${game}</div>

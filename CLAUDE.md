@@ -134,7 +134,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     each sport its own team, watch list and scoring) and the scoring (`sbSetScoring`): the sport's standard categories (`CATS`), a site's standard points
     (`SB_POINTS`: basketball's ESPN default since 2020 and Yahoo's head-to-head points, both checked Nov 2026; hockey none, ESPN doesn't publish its whole table)
     or your own points (a popup, `sbPointsForm`). `leaguePoints()` asks `sbPoints()` with no league, and `scoreCats` keys its memo on the points too. Tabs (`TABS_BROWSE`): My team (`#team`: any players, up to `SANDBOX_MAX`),
-    Live (`#watch`: up to `WATCH_MAX` 12 followed live, `watchTabLive` in live.js; cells built from the Matchup tab's `dashGame`/`lineChips`), Players, Trends
+    Live (`#watch`: up to `WATCH_MAX` 12 followed live, `watchTabLive` in live.js; cells built from the Matchup tab's `dashGame`/`lineChips`; Today / Yesterday / Week,
+    Monday to Sunday so far; a full list or team says Max by its count, no sentence, the owner's ask), Players, Trends
     (My team / Everyone else lists), Trades (`#trade`: give My team's players, get anyone found by name; `tradeCard` drawn inside `withState` with My team as
     `state.players`; shared with the site's address, no league link). Kept in `state.sandbox` { sport, nba: {roster, watch, scoring, points}, nhl: {...} } (`sandboxClean`
     in core.js; `sbState()` is this sport's), apart from any league. My team is the team id `SB_ME`: `myTeamId()` and `fxTeamName` know it, so `teamLink` draws "My team" in orange. Add / Follow live also on every
