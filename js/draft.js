@@ -374,7 +374,7 @@ function draftRow(p, mine) {
   return `<tr class="${p.teamId === mine ? 'dr-mine' : ''}">
     <td class="st-name"><div class="bplayer">${headshot({ nbaId: p.nbaId, name: p.name }, hsPx(32, 28))}<div class="bmain"><div class="bname">${p.nbaId ? `${playerBtn(p.nbaId, p.name)}` : esc(p.name)}</div>
       <div class="pmeta">${teamLink(p.teamId)}${p.teamId === mine ? ' <span class="badge accent">you</span>' : ''}</div></div></div></td>
-    <td class="num">R${p.round} · <b>#${p.pick}</b></td>
+    <td class="num dr-at">R${p.round} · <b>#${p.pick}</b></td>
     <td class="num">${p.gp ? `#${p.rank}` : '<span class="muted">—</span>'}</td>
     <td class="num"><b class="${gainCls}">${p.gp ? signed(p.gain, 0) : 'DNP'}</b></td>
     <td class="num hide-sm">${p.gp}</td>

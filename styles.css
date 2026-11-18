@@ -1173,6 +1173,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 /* ---------- Draft ---------- */
 .dr-table { min-width: 460px; }
 .dr-table td.st-name { min-width: 170px; }
+.dr-table td.dr-at { white-space: nowrap; }
 tr.dr-mine td { background: color-mix(in srgb, var(--accent-soft) 60%, transparent); }
 .dr-teams { min-width: 560px; }
 .dr-board { table-layout: fixed; min-width: 1100px; }
@@ -1366,6 +1367,8 @@ a.lm-item { text-decoration: none; }
   .dr-table { min-width: 0; }
   .dr-table td.st-name { min-width: 0; }
   .dr-table .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+  .dr-table .pmeta .team-link { max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+  .dr-table th, .dr-table td { padding-left: 6px; padding-right: 6px; }
 }
 
 /* ---------- Phones: the sections in a bar along the bottom, each with its icon; past five, the rest under More ---------- */
