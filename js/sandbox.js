@@ -70,7 +70,8 @@ async function sbSetSport(key) {
 // The note on every sandbox tab: what it is, its sport and scoring (and your points to edit), and the way back to your
 // league, or to connect one
 function sbBar() {
-  const S = sbState(), back = state.fxTeam && NBA && NBA.league && !state.demo ? NBA.league.name : null;
+  const S = sbState(), B = state.sandbox.back;
+  const back = !state.fxTeam || state.demo ? null : B ? B.name : SPORT.key === 'nba' && NBA && NBA.league ? NBA.league.name : 'your league'; // (the league you came from)
   const sel = (change, label, opts, on) => `<select class="ctx-team sb-sel" data-change="${change}" aria-label="${label}">${opts.map(([k, l]) => `<option value="${k}"${k === on ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
   const scoring = S.scoring === 'custom' && !S.points ? 'cats' : sbScorings().some(([k]) => k === S.scoring) ? S.scoring : 'cats';
   return `<div class="sample-banner browse-note"><span class="sb-bar"><b>Sandbox.</b> No league connected:
@@ -142,7 +143,11 @@ function sbSearch(key, skip) {
   const hit = p => `<li><button type="button" class="sb-hit" data-action="${S.action}" data-id="${p.nbaId}">${headshot(p, hsPx(32, 30))}
     <span class="sb-hit-main"><span class="sb-hit-name">${esc(p.name)}${p.inj ? ` ${injBadge(p.inj)}` : ''}</span><span class="pmeta">${esc(p.team || 'FA')} · ${posTags(p.pos)}${p.gp ? ` · ${fmtValue(p.val)} a game` : ''}</span></span>
     <span class="sb-hit-add">+ ${S.verb}</span></button></li>`;
-  const list = hits.length ? `<ul class="sb-hits">${hits.map(hit).join('')}</ul>` : q.trim().length >= 2 ? `<p class="muted small sb-none">No ${SPORT.name} player matches “${esc(q.trim())}”.</p>` : '';
+  // nothing new to add: say so, or who it found that's already in (on My team, followed, in the deal)
+  const nq = normName(q), had = !hits.length && nq.length >= 2 ? nbaPlayers().filter(p => skip.has(p.nbaId) && normName(p.name).includes(nq)).slice(0, 2) : [];
+  const where = key === 'watch' ? 'followed' : key === 'get' ? 'in this deal or on My team' : 'on My team';
+  const none = had.length ? `${had.map(p => esc(p.name)).join(' and ')} ${had.length > 1 ? 'are' : 'is'} already ${where}.` : `No ${SPORT.name} player matches “${esc(q.trim())}”.`;
+  const list = hits.length ? `<ul class="sb-hits">${hits.map(hit).join('')}</ul>` : q.trim().length >= 2 ? `<p class="muted small sb-none">${none}</p>` : '';
   return `<form class="sb-find" data-form="sb-find" data-key="${key}" role="search"><input id="sbQ-${key}" class="sb-q" type="search" placeholder="${S.hint}" aria-label="${S.hint}" value="${esc(q)}" data-input="sb-q" data-key="${key}" autocomplete="off" spellcheck="false"></form>${list}`;
 }
 

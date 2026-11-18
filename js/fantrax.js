@@ -661,6 +661,9 @@ function fxWeekNotes(ctx) {
 const fxNoTeam = () => (fxLeague() && !state.fxTeam ? '<div class="fx-strip"><span>Pick your team at the top to load your roster and matchup.</span></div>' : '');
 
 function validateLineup() {
+  // (the sandbox: the league underneath keeps its lineup as it is; its spots may be another sport's, which this one's
+  // table doesn't have)
+  if (state.browse) return;
   const ids = new Set(state.players.map(p => p.id));
   state.il = state.il.filter(id => ids.has(id));
   const lu = Array(state.slots.length).fill(null);

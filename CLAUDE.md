@@ -137,7 +137,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     `state.players`; shared with the site's address, no league link). Kept in `state.sandbox` { sport, nba: {roster, watch, scoring, points}, nhl: {...} } (`sandboxClean`
     in core.js; `sbState()` is this sport's), apart from any league. My team is the team id `SB_ME`: `myTeamId()` and `fxTeamName` know it, so `teamLink` draws "My team" in orange. Add / Follow live also on every
     player's card (`sbCardLine` via `cardOwner`); searches are `sbSearch` (`ui.sbQ`). `browse-exit` goes back to your league (read again with `switchLeague`,
-    which puts its players' league details back) or to the landing page. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
+    which puts its players' league details back) or to the landing page. The league underneath stays in `state` (players, lineup, slots), maybe another
+    sport's: `validateLineup` leaves it alone in the sandbox (it threw on basketball's PG in hockey's table, Nov 18, 2026), the league to go back to is named on
+    entry (`state.sandbox.back`: the other sport's data doesn't know the site's own league) and `browse-exit` stashes its state before `switchLeague`. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
 - `scripts/update_data.py`: daily data job (GitHub Actions, started at 08:00 UTC = 4 a.m. ET, 3 a.m. in winter, by the Worker's Cron Trigger through
   GitHub's API, `startDataJob` in worker/yahoo.js: GitHub ran the workflow's own schedule hours late, 14:54-18:12 UTC on Nov 11-16, 2026;
   the workflow's 09:23 UTC schedule is the backstop. Set up Nov 17, 2026 (the owner's fine-grained `GITHUB_TOKEN`, Actions read/write on

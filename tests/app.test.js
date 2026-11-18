@@ -3626,6 +3626,9 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   team = a.viewSandboxTeam();
   for (const p of [p1, p2, p3]) assert.ok(team.includes(`data-action="sb-drop" data-id="${p.nbaId}"`), `${p.name}: on the team, with a ✕`);
   assert.match(team, /<tfoot><tr class="sb-tot"><td class="pf-name"><b>My team<\/b>/, 'the team a game');
+  ui.sbQ.team = p1.name;
+  assert.ok(a.viewSandboxTeam().includes(`${p1.name} is already on My team.`), "searching for someone already on it says so");
+  ui.sbQ.team = '';
   // the Players tab: My team's rows marked, its filters My team and everyone else (no other teams, no lineups)
   Object.assign(ui, { perfRange: 'year', perfPer: true, perfFiltOpen: true });
   const players = a.viewPlayers();
@@ -3769,14 +3772,53 @@ test('the sandbox from a league: the league menu offers it, and leaving it goes 
   a.adoptTeam(tid);
   const fx = () => a.NBA.players.filter(r => r.fx).length, before = fx();
   assert.ok(before > 100, "the league's players");
+  const lineup = JSON.stringify(st.lineup), slots = JSON.stringify(st.slots);
+  assert.ok(st.lineup.filter(Boolean).length > 3, 'a lineup set');
   a.actions['land-browse']();
   assert.ok(st.browse && a.fxLeague() === null && fx() === 0);
   assert.ok(a.browseNote().includes(`Back to ${L.name}`));
+  // the sandbox on hockey with a basketball league underneath: adding a player works (its lineup's spots, PG, SG..., aren't
+  // hockey's: this threw), and the league's lineup stays as it was
+  await a.sbSetSport('nhl');
+  const puck = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val)[0];
+  a.actions['sb-add']({ dataset: { id: String(puck.nbaId) } });
+  assert.deepEqual([...a.sbState().roster], [puck.nbaId]);
+  assert.equal(JSON.stringify(st.lineup), lineup, "the league's lineup untouched");
   await a.actions['browse-exit']();
   assert.ok(!st.browse && a.fxLeague() && a.fxLeague().id === CATS9, 'the league again');
+  assert.equal(a.SPORT.key, 'nba', 'in its own sport');
   assert.equal(st.fxTeam, tid, 'your team');
   assert.equal(fx(), before, "its players' league details are back");
+  assert.ok(JSON.stringify(st.lineup) === lineup && JSON.stringify(st.slots) === slots, 'and its lineup');
   assert.equal(a.location.hash, '#dashboard');
+  // the other way round: a hockey league underneath, the sandbox on basketball
+  await a.switchLeague(HOCKEY);
+  a.adoptTeam(a.fxLeague().teams[0].id);
+  const hockeyLineup = JSON.stringify(st.lineup);
+  a.get('ui').tab = 'standings';
+  st.sandbox.sport = 'nba'; // (the sandbox opens on the sport it was last on)
+  a.actions['land-browse']();
+  for (let i = 0; i < 50 && !(st.browse && a.SPORT.key === 'nba'); i++) await new Promise(r => setTimeout(r, 10)); // (its sport loads first)
+  assert.equal(a.SPORT.key, 'nba');
+  const hoop = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val)[0];
+  a.actions['sb-add']({ dataset: { id: String(hoop.nbaId) } });
+  assert.ok(a.sbState().roster.includes(hoop.nbaId));
+  assert.equal(JSON.stringify(st.lineup), hockeyLineup, "the hockey league's lineup untouched");
+  assert.ok(a.browseNote().includes(`Back to ${a.get('state').sandbox.back.name}`));
+  await a.actions['browse-exit']();
+  assert.ok(!st.browse && a.fxLeague() && a.fxLeague().id === HOCKEY && a.SPORT.key === 'nhl', 'the hockey league again, in hockey');
+  assert.equal(JSON.stringify(st.lineup), hockeyLineup, 'with its lineup');
+  // a sandbox saved by the version before (no league named to go back to), on hockey over the site's own basketball league:
+  // back to it, team and lineup as they were
+  await a.switchLeague(CATS9);
+  assert.equal(st.fxTeam, tid);
+  a.actions['land-browse']();
+  await a.sbSetSport('nhl');
+  st.sandbox.back = null;
+  assert.ok(a.browseNote().includes('Back to your league'));
+  await a.actions['browse-exit']();
+  assert.ok(a.fxLeague() && a.fxLeague().id === CATS9 && a.SPORT.key === 'nba', 'the league again');
+  assert.ok(st.fxTeam === tid && JSON.stringify(st.lineup) === lineup, 'its team and lineup');
   a.get('ui').tab = 'standings'; // no live box scores in the background
   const live = a.get('live');
   clearTimeout(live.timer); live.timer = null;

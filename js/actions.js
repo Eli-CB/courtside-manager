@@ -264,6 +264,10 @@ const actions = {
   // page or the league menu (a league stays underneath, to go back to; the demo's borrowed team doesn't)
   'land-browse'() {
     $('#leagueMenu details')?.removeAttribute('open');
+    // the league to go back to, named before another sport's data comes in (that sport's data doesn't know it); the demo's
+    // borrowed team isn't kept
+    const L = !state.browse && !state.demo && state.fxTeam ? fxLeague() : null;
+    if (!state.browse) state.sandbox.back = L ? { id: currentLeagueId(), name: L.name } : null;
     const go = () => {
       if (state.demo) Object.assign(state, { fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp(), leagueChosen: false });
       state.browse = true; state.demo = false; ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
@@ -274,11 +278,16 @@ const actions = {
     const sport = state.sandbox.sport; // (the sport it was last on: basketball the first time)
     if (SPORT.key === sport) go(); else useSport(sport).then(go).catch(() => toast(`Couldn't load ${SPORTS[sport].name} data`));
   },
-  // out of the sandbox: back to your league, read again (its players' league positions too), else the landing page
+  // out of the sandbox: back to your league, read again (its players' league positions too), else the landing page. Its
+  // team, lineup and the rest are kept under it first, so they come back whichever sport the sandbox was on. (A sandbox
+  // entered before the league was named: your own league's ID, else the site's own league, which basketball's data names)
   async 'browse-exit'() {
-    const back = state.fxTeam && currentLeagueId();
-    state.browse = false; state.leagueChosen = false;
+    const B = state.sandbox.back;
+    let back = state.fxTeam ? (B && B.id) || state.fxLeagueId : null;
+    if (state.fxTeam && !back) back = ((await fetchSport('nba').catch(() => null)) || {}).siteLeague?.id || null;
+    state.browse = false; state.leagueChosen = false; state.sandbox.back = null;
     if (back) {
+      stashLeague(back);
       try { await switchLeague(back); } catch (e) { toast(e.message); }
       location.hash = '#dashboard';
     }

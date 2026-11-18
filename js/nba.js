@@ -280,7 +280,7 @@ function autoLineupIds(s = state) {
 // Assign candidates (in priority order) to slots; returns player id per slot (null = empty)
 function fillSlots(cands, slots) {
   const match = Array(slots.length).fill(null);
-  const order = slots.map((_, i) => i).sort((a, b) => ELIG[slots[a]].length - ELIG[slots[b]].length);
+  const order = slots.map((_, i) => i).sort((a, b) => (ELIG[slots[a]] || []).length - (ELIG[slots[b]] || []).length);
   const find = new Map(cands.map(p => [p.id, p]));
   const tryAssign = (p, seen) => {
     for (const i of order) {

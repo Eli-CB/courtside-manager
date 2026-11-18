@@ -180,7 +180,9 @@ function sandboxClean(sb) {
   };
   const one = (k, o) => ({ roster: ids(o.roster, SANDBOX_MAX), watch: ids(o.watch, WATCH_MAX), scoring: typeof o.scoring === 'string' ? o.scoring : 'cats', points: pts(k, o.points) });
   const old = Array.isArray(sb.roster) ? sb : {};
-  return { sport: SB_SPORTS.includes(sb.sport) ? sb.sport : 'nba', ...Object.fromEntries(SB_SPORTS.map(k => [k, one(k, sb[k] && typeof sb[k] === 'object' ? sb[k] : k === 'nba' ? old : {})])) };
+  // (back: the league it was entered from, to go back to: { id, name })
+  const back = sb.back && typeof sb.back.id === 'string' ? { id: sb.back.id, name: String(sb.back.name || '') } : null;
+  return { sport: SB_SPORTS.includes(sb.sport) ? sb.sport : 'nba', back, ...Object.fromEntries(SB_SPORTS.map(k => [k, one(k, sb[k] && typeof sb[k] === 'object' ? sb[k] : k === 'nba' ? old : {})])) };
 }
 
 function normalizePlayer(p) {
@@ -279,7 +281,7 @@ const signed = (n, d = 1) => { const t = Math.abs(n).toFixed(d); return (+t === 
 const sum = arr => arr.reduce((a, b) => a + b, 0);
 
 const byId = id => state.players.find(p => p.id === id);
-const canPlay = (p, slot) => p.pos.some(x => ELIG[slot].includes(x));
+const canPlay = (p, slot) => p.pos.some(x => (ELIG[slot] || []).includes(x)); // (a spot this sport doesn't have: nobody)
 
 // A player's contribution to each category the league counts, against an average rostered player.
 // Percentages count shot volume: (his % − average %) × his attempts.
