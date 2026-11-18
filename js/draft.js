@@ -184,10 +184,20 @@ function draftAwardKit() {
   const teamWho = t => `<div class="bmain"><b>${teamLink(t.tid)}</b>`;
   const breakdown = (label, head, rows) => ({ title: label, html: `<p class="aw-break-total">${head}</p><ul class="aw-break">${rows}</ul>` });
   // a team award: the winners (all of them on a tie), what they did, the breakdown
-  const teamAward = (label, winners, said, head, rows) => out.push({
-    label, html: `${and(winners.map(t => `<b>${teamLink(t.tid)}</b>`))}${winners.length > 1 ? ' tied' : ''}${said}`,
-    text: `${and(winners.map(t => fxTeamName(t.tid)))}${winners.length > 1 ? ' tied' : ''}${said}`, detail: breakdown(label, head, rows),
-  });
+  // (said: the same words for both, or [html, text] where a name in it opens his card; more: { faces } of the players it names)
+  const teamAward = (label, winners, said, head, rows, more) => {
+    const [sh, st] = Array.isArray(said) ? said : [said, said];
+    out.push({
+      label, html: `${and(winners.map(t => `<b>${teamLink(t.tid)}</b>`))}${winners.length > 1 ? ' tied' : ''}${sh}`,
+      text: `${and(winners.map(t => fxTeamName(t.tid)))}${winners.length > 1 ? ' tied' : ''}${st}`, detail: breakdown(label, head, rows), ...more,
+    });
+  };
+  // Each winner's player who stands out (its quickest pick, its youngest player...): named after the award's line and
+  // shown as a face on its card (the owner's ask). pick: a winner -> { p, v } (v: what's said in brackets)
+  const standout = (said, winners, word, pick) => {
+    const ps = winners.map(pick), line = name => `; ${word}: ${and(ps.map(y => `${name(y.p)} (${y.v})`))}`;
+    return [[`${said}${line(who)}`, `${said}${line(p => lastName(p.name))}`], { faces: ps.map(y => y.p) }];
+  };
   // the teams on top by f (then by g on a tie), or none when the top isn't worth an award
   const best = (list, f, g = () => 0) => {
     const top = Math.max(...list.map(f)), at = list.filter(t => f(t) === top), top2 = Math.max(...at.map(g));
@@ -200,7 +210,7 @@ function draftAwardKit() {
     const most = Math.max(0, ...[...m.values()].map(xs => xs.length));
     return [...m].filter(([, xs]) => xs.length >= most / 2).map(([tid, xs]) => ({ tid, xs, n: xs.length }));
   };
-  return { out, plural, and, who, named, award, row, teamWho, breakdown, teamAward, best, tenth, byTeam };
+  return { out, plural, and, who, named, award, row, teamWho, breakdown, teamAward, standout, best, tenth, byTeam };
 }
 
 // ----- against consensus ADP: Reach, Fall (Value Meal, the team whose typical pick went latest, is gone: the owner's ask) -----
@@ -230,23 +240,27 @@ function draftAdpAwards(d, { out, plural, award, row, breakdown }) {
 
 // ----- how long each pick took, from Fantrax's pick times (ESPN, Sleeper and Yahoo give none): Trigger Finger, Clock Milker -----
 // A pick's time is the wait since the pick before (the first pick's, since the draft opened). Only real times: a draft
-// whose picks all carry one time (Fantrax rewrites an old draft's) has none. Each team's typical (median) pick time, so
-// a pause in the draft (a break, the commissioner's) doesn't decide it; the average breaks a tie.
-function draftClockAwards(d, { plural, who, row, teamWho, teamAward, best, tenth, byTeam }) {
+// whose picks all carry one time (Fantrax rewrites an old draft's) has none. Each team's average pick time (the owner's
+// ask, Nov 2026: one number; the median beside the average read as a mistake), a pause in the draft (a break, the
+// commissioner's) included; with the winner's quickest pick (Trigger Finger) or longest (Clock Milker) on its card.
+function draftClockAwards(d, { plural, who, row, teamWho, teamAward, standout, best, tenth, byTeam }) {
   const timed = d.picks.filter(p => p.at).sort((a, b) => a.pick - b.pick);
   if (timed.length < d.picks.length / 2 || new Set(timed.map(p => p.at)).size < timed.length / 2) return;
   const waits = [];
   let prev = d.start;
   for (const p of timed) { if (prev && p.at >= prev) waits.push({ p, s: (p.at - prev) / 1000 }); prev = p.at; }
-  const clocks = byTeam(waits).map(t => { const ss = t.xs.map(x => x.s); return { ...t, med: median(ss), avg: sum(ss) / ss.length, long: sortDesc(t.xs, x => x.s)[0] }; });
+  const clocks = byTeam(waits).map(t => { const ss = t.xs.map(x => x.s); return { ...t, avg: sum(ss) / ss.length, quick: sortDesc(t.xs, x => -x.s)[0], long: sortDesc(t.xs, x => x.s)[0] }; });
   if (clocks.length < 2) return;
   const sec = s => `${Math.round(s)} s`;
-  const said = t => `: their typical pick took ${plural(Math.round(t.med), 'second')} (${Math.round(t.avg)} on average)`;
-  // (each number said: the typical pick on the right, the average under the name; unlabeled, 47 s beside "61 s on average" read as a mistake)
-  const rows = sign => sortDesc(clocks, t => sign * (t.med * 1e4 + t.avg)).map(t => row(teamWho(t), `${Math.round(t.avg)} s average · longest: ${who(t.long.p)}, ${sec(t.long.s)}`, `${sec(t.med)} typical`)).join('');
-  const fast = best(clocks, t => -t.med, t => -tenth(t.avg)), slow = best(clocks, t => t.med, t => tenth(t.avg));
-  teamAward('Trigger Finger', fast, said(fast[0]), "Each team's typical pick time (the middle one of its picks), fastest first. A pause in the draft counts as pick time.", rows(-1));
-  teamAward('Clock Milker', slow, said(slow[0]), "Each team's typical pick time (the middle one of its picks), slowest first. A pause in the draft counts as pick time.", rows(1));
+  // each award: its winners by their average, their quickest (or longest) pick, and every team's in the breakdown
+  const give = (label, sign, word, end, order) => {
+    const won = best(clocks, t => sign * tenth(t.avg));
+    const rows = sortDesc(clocks, t => sign * t.avg).map(t => row(teamWho(t), `${word}: ${who(t[end].p)}, ${sec(t[end].s)}`, sec(t.avg))).join('');
+    const [said, more] = standout(`: their picks took ${plural(Math.round(won[0].avg), 'second')} on average`, won, word, t => ({ p: t[end].p, v: sec(t[end].s) }));
+    teamAward(label, won, said, `Each team's average pick time, ${order} first. A pause in the draft counts as pick time.`, rows, more);
+  };
+  give('Trigger Finger', -1, 'quickest', 'quick', 'fastest');
+  give('Clock Milker', 1, 'longest', 'long', 'slowest');
 }
 
 // Glass: the most games missed a season, the last two seasons, by the team's players (each player-season counted once;
@@ -269,8 +283,9 @@ function draftGlassAward(squads, { row, teamWho, teamAward, best, tenth, named }
     `Games each team's players (picks and keepers) missed a season, the last two seasons (${esc(seasons[1])} and ${esc(seasons[0])}). Rookies have none to count.`, rows);
 }
 
-// Youngins and Uncs: the youngest and oldest players on average, by age on draft day
-function draftAgeAwards(d, squads, { row, teamWho, teamAward, best, tenth, named }) {
+// Youngins and Uncs: the youngest and oldest players on average, by age on draft day; the winner's youngest (oldest)
+// player on its card
+function draftAgeAwards(d, squads, { row, teamWho, teamAward, standout, best, tenth, named }) {
   const day = Date.parse(`${d.date || todayIso()}T12:00:00`);
   const ageOf = raw => (raw.born ? (day - Date.parse(`${raw.born}T12:00:00`)) / (365.25 * 864e5) : null);
   const ages = squads.map(t => {
@@ -278,13 +293,15 @@ function draftAgeAwards(d, squads, { row, teamWho, teamAward, best, tenth, named
     return each.length ? { ...t, each, avg: sum(each.map(y => y.a)) / each.length } : null;
   }).filter(Boolean);
   if (ages.length < 2) return;
-  const ageRows = (sign, word) => sortDesc(ages, t => sign * t.avg).map(t => {
-    const end = sortDesc(t.each, y => sign * y.a)[0];
-    return row(teamWho(t), `${word}: ${named(end.x.p)}, ${Math.floor(end.a)}`, fmt(t.avg, 1));
-  }).join('');
-  const young = best(ages, t => -tenth(t.avg)), old = best(ages, t => tenth(t.avg));
-  teamAward('Youngins', young, `: their players averaged ${fmt(young[0].avg, 1)} years old`, "Each team's players' average age on draft day (picks and keepers), youngest first", ageRows(-1, 'youngest'));
-  teamAward('Uncs', old, `: their players averaged ${fmt(old[0].avg, 1)} years old`, "Each team's players' average age on draft day (picks and keepers), oldest first", ageRows(1, 'oldest'));
+  const endOf = (t, sign) => sortDesc(t.each, y => sign * y.a)[0]; // (a team's youngest, sign -1, or oldest player)
+  const give = (label, sign, word) => {
+    const won = best(ages, t => sign * tenth(t.avg));
+    const rows = sortDesc(ages, t => sign * t.avg).map(t => { const end = endOf(t, sign); return row(teamWho(t), `${word}: ${named(end.x.p)}, ${Math.floor(end.a)}`, fmt(t.avg, 1)); }).join('');
+    const [said, more] = standout(`: their players averaged ${fmt(won[0].avg, 1)} years old`, won, word, t => { const end = endOf(t, sign); return { p: end.x.p, v: Math.floor(end.a) }; });
+    teamAward(label, won, said, `Each team's players' average age on draft day (picks and keepers), ${word} first`, rows, more);
+  };
+  give('Youngins', -1, 'youngest');
+  give('Uncs', 1, 'oldest');
 }
 
 // Homer: the most players from one real team (by each player's team now); Passport (was The Globalist, then Frequent Flyer): the most
