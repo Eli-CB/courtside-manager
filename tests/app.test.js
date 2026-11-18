@@ -3560,6 +3560,12 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   ui.sbQ.team = p1.name;
   assert.ok(a.viewSandboxTeam().includes(`${p1.name} is already on My team.`), "searching for someone already on it says so");
   ui.sbQ.team = '';
+  // an injury is its short badge (the news on hover and on his card), not the whole note under his name
+  const hurt = a.nbaPlayers().find(p => p.inj && p.inj.note && !best.slice(0, 4).includes(p));
+  a.actions['sb-add']({ dataset: { id: String(hurt.nbaId) } });
+  const hurtRow = a.viewSandboxTeam().split('<tr>').find(r => r.includes(`data-id="${hurt.nbaId}"`));
+  assert.ok(hurtRow.includes('class="badge inj') && !hurtRow.includes('pmeta inj'), 'the badge alone');
+  a.actions['sb-drop']({ dataset: { id: String(hurt.nbaId) } });
   // the Players tab: My team's rows marked, its filters My team and everyone else (no other teams, no lineups)
   Object.assign(ui, { perfRange: 'year', perfPer: true, perfFiltOpen: true });
   const players = a.viewPlayers();

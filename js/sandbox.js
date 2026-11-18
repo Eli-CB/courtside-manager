@@ -153,7 +153,7 @@ function sbSearch(key, skip) {
 }
 
 // ----- My team -----
-// Every player on it, best first: photo, name, positions and team (any injury under it), games, minutes, his average game in
+// Every player on it, best first: photo, name, positions and team (an injury as its short badge: the news is on his card), games, minutes, his average game in
 // the categories, value a game; then the team's per-game totals. The ✕ beside the name takes him off.
 function sbTeamTable(list) {
   const cats = scoreCats().filter(c => !c.fp);
@@ -166,10 +166,9 @@ function sbTeamTable(list) {
   };
   const row = p => {
     const raw = nbaById.get(p.nbaId) || {};
-    const inj = p.inj ? `<div class="pmeta inj" title="${esc(p.inj.note)}">${esc(p.inj.label)}${p.inj.note ? ': ' + esc(p.inj.note) : ''}</div>` : '';
     return `<tr><td class="pf-name"><div class="bplayer">${headshot(p, 34)}<div class="bmain">
-      <div class="bname">${playerBtn(p.nbaId, p.name)}${rookieBadge(raw, 'by-name')}${sbWatching(p.nbaId) ? ' <span class="badge sb-live" title="Followed on the Live tab">Live</span>' : ''}</div>
-      <div class="pmeta">${rookieBadge(raw, 'in-meta')}${[posTags(p.pos), p.team && teamBtn(p.team)].filter(Boolean).join(' · ')}</div>${inj}</div>
+      <div class="bname">${playerBtn(p.nbaId, p.name)}${rookieBadge(raw, 'by-name')}${injBadge(p.inj, 'by-name')}${sbWatching(p.nbaId) ? ' <span class="badge sb-live" title="Followed on the Live tab">Live</span>' : ''}</div>
+      <div class="pmeta">${rookieBadge(raw, 'in-meta')}${injBadge(p.inj, 'in-meta')}${[posTags(p.pos), p.team && teamBtn(p.team)].filter(Boolean).join(' · ')}</div></div>
       <button type="button" class="icon-btn xs sb-x" data-action="sb-drop" data-id="${p.nbaId}" aria-label="Remove ${esc(p.name)}" title="Remove from my team">✕</button></div></td>
       <td class="sc">${p.gp || '—'}</td><td class="sc">${p.gp ? fmt(p.min, 1) : '—'}</td>${cats.map(c => cell(p, c)).join('')}<td class="num pf-v"><b>${p.gp ? fmtValue(value(p)) : '—'}</b></td></tr>`;
   };
