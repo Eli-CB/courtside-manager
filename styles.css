@@ -486,6 +486,13 @@ button.dr-award-btn:hover { text-decoration: underline; color: var(--text); }
 .badge.rk { background: var(--surface-2); color: var(--text); } /* plain grey: a fact about the player, not a warning */
 @media (max-width: 640px) { .badge.inj.by-name, .badge.rk.by-name { display: none; } .badge.inj.in-meta, .badge.rk.in-meta { display: inline-block; } } /* phones: under the name, which keeps its room */
 .perf-table .pf-name .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a long fantasy team's name is cut short with its own "…" (its whole name in its tip): the line's "…" can't cut into a
+   button, and swapped the whole name for "…". So that line is a row (spaces kept), the name taking the room left over */
+.perf-table .pf-name .pmeta:has(> .perf-owner) { display: flex; align-items: baseline; white-space: pre; }
+.pmeta:has(> .perf-owner) > * { flex: none; }
+.pmeta:has(> .perf-owner) > .perf-owner { flex: 0 1 auto; min-width: 0; margin-right: .28em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pmeta:has(> .perf-owner) > .perf-owner > .team-link { max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.pmeta:has(> .perf-owner) > .lv-dot { position: relative; bottom: calc(.36em - 4px); } /* (its vertical-align, which a row ignores) */
 .perf-table .pf-v { position: sticky; right: 0; z-index: 1; background: var(--surface); padding-left: 8px; } /* the value stays in view too */
 .perf-table thead th.pf-v { z-index: 3; }
 .perf-table td.pf-v { font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -520,7 +527,7 @@ button.dr-award-btn:hover { text-decoration: underline; color: var(--text); }
 .pf-more { position: sticky; left: 0; display: inline-block; padding: 10px 8px; }
 .perf-owner.mine { color: var(--accent); font-weight: 600; } /* your team's name: orange */
 .perf-owner.opp { color: var(--text); font-weight: 700; } /* this matchup's opponent: bold */
-@media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 156px; } .perf-table .pf-name .pmeta { white-space: normal; } .perf-table .pf-name .hs { display: none; } } /* phones: no photo, so the stats get the room; badges wrap instead of hiding */
+@media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 156px; } .perf-table .pf-name .pmeta, .perf-table .pf-name .pmeta:has(> .perf-owner) { display: block; white-space: normal; } .pmeta:has(> .perf-owner) > .perf-owner, .pmeta:has(> .perf-owner) > .perf-owner > .team-link { margin-right: 0; white-space: normal; overflow: visible; vertical-align: baseline; } .pmeta:has(> .perf-owner) > .lv-dot { bottom: 0; } .perf-table .pf-name .hs { display: none; } } /* phones: no photo, so the stats get the room; badges wrap instead of hiding */
 
 .btn {
   font: inherit; font-weight: 500; font-size: .875rem;

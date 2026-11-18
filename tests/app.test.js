@@ -1779,7 +1779,8 @@ test('performances: Active and Bench filters, and an Active badge', async () => 
     for (const tr of avg) {
       const tid = owners.get(+tr.match(/data-nba="(\d+)"/)[1]);
       assert.ok(tr.includes('<span class="badge bad" title="On injured reserve">IR</span>'), 'red IR badge');
-      assert.ok(/<span class="perf-owner( mine| opp)?">/.test(tr) && tr.includes(`${app.teamLink(tid)}</span>`) && tr.includes(`data-action="team-card" data-team="${tid}"`), `${app.fxTeamName(tid)}'s IR player shows the team, a link to its card`);
+      // (its whole name as the tip: a long one is cut short with "…" on a computer)
+      assert.ok(/<span class="perf-owner( mine| opp)?" title="[^"]+">/.test(tr) && tr.includes(` title="${app.esc(app.fxTeamName(tid))}">${app.teamLink(tid)}</span>`) && tr.includes(`data-action="team-card" data-team="${tid}"`), `${app.fxTeamName(tid)}'s IR player shows the team, a link to its card`);
     }
     app.ui.perfSpot = 'active';
     html = app.topPerformancesCard();

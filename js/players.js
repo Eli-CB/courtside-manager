@@ -255,8 +255,9 @@ function perfOwners() {
   // except on IR (out of the lineup, so whose he is helps)
   const who = id => {
     const tid = owner.get(id);
-    // every rostered player names his team: yours in orange, this matchup's opponent in bold
-    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : opp && tid === opp.id ? ' opp' : ''}">${teamLink(tid)}</span> ${lineupBadge(id)}`;
+    // every rostered player names his team: yours in orange, this matchup's opponent in bold (a long name is cut short
+    // with "…": its whole name is its tip)
+    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : opp && tid === opp.id ? ' opp' : ''}" title="${esc(fxTeamName(tid))}">${teamLink(tid)}</span> ${lineupBadge(id)}`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
