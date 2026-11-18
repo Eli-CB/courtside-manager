@@ -280,7 +280,6 @@ function viewRecap() {
   const items = recapItems(X).map(x => standoutCard(x)).join('');
   return `<div class="card">
     <div class="card-head"><h2>Period ${period.n} recap ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
-    <p class="muted small rc-when">${esc(L.name)} · ${fmtDay(period.start)} – ${fmtDay(matchDates(period.start).slice(-1)[0] || period.end)} · starters only</p>
     ${items ? `<div class="rx-grid">${items}</div>` : '<p class="muted small" style="margin:0">Nothing stood out.</p>'}
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>
