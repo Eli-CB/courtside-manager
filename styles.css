@@ -492,8 +492,8 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rc-item .pname { font-size: inherit; }
 .dr-gap { margin-top: 16px; }
 /* an award's title opens its breakdown: the label's look, underlined on hover */
-button.dr-award-btn { display: block; padding: 0; text-align: left; font-size: .74rem; font-weight: 800; color: var(--muted); }
-button.dr-award-btn:hover { text-decoration: underline; color: var(--text); }
+button.dr-award-btn { display: block; padding: 0; text-align: left; font-size: .7rem; font-weight: 700; color: var(--muted); }
+button.dr-award-btn:hover { text-decoration: underline; text-underline-offset: 2px; color: var(--text); }
 .rc-label { font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 2px; }
 .perf-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
 .pill { font: inherit; font-size: .8rem; font-weight: 500; padding: 4px 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }

@@ -2828,7 +2828,7 @@ test("a team's card has its record: its finals, then today's game once it's over
   } finally { app.set('BOX', saved); live.games = was; doc.querySelector = realQuery; }
 });
 
-test("Draft awards: The Reach is the pick taken furthest ahead of consensus ADP, keepers off the board first; shareable", async () => {
+test("Draft awards: Reach is the pick taken furthest ahead of consensus ADP, keepers off the board first; shareable", async () => {
   const L = await app.useLeague(CATS9);
   const d = app.draftData();
   assert.ok(d && d.picks.length > 20, 'the fixture league has a draft');
@@ -2842,67 +2842,44 @@ test("Draft awards: The Reach is the pick taken furthest ahead of consensus ADP,
     // every pick where consensus has him: no reach anywhere, so no award
     const picks = d.picks.filter(p => p.raw).sort((a, b) => a.pick - b.pick);
     picks.forEach(p => setAdp(p.raw, keepers.length + p.pick));
-    assert.ok(!app.draftAwards(d).some(x => x.label === 'The Reach'), 'nobody taken early');
+    assert.ok(!app.draftAwards(d).some(x => x.label === 'Reach'), 'nobody taken early');
     // one taken far ahead of consensus: his spot is last of the drafted players
     const reacher = picks[Math.floor(picks.length / 3)];
     setAdp(reacher.raw, 999);
     const awards = app.draftAwards(d), award = awards[0];
-    assert.equal(award.label, 'The Reach');
+    assert.equal(award.label, 'Reach');
     assert.equal(award.p.nbaId, reacher.nbaId);
     const early = picks.length - reacher.pick;
     assert.equal(award.stats, `Taken #${reacher.pick}, ${early} picks early: consensus #${picks.length} (ADP 999.0)`, award.stats);
     assert.equal(award.text, `${reacher.name} (${app.fxTeamName(reacher.teamId)}): taken #${reacher.pick}, ${early} picks early: consensus #${picks.length} (ADP 999.0)`);
-    // Value Meal: the team whose picks went furthest after their consensus spots, added up (worked out here from the ADPs set)
-    const spotOf = new Map([...picks].sort((a, b) => a.raw.fx.adp - b.raw.fx.adp).map((p, i) => [p.nbaId, i + 1]));
-    const totals = {}, counts = {};
-    for (const p of picks) { totals[p.teamId] = (totals[p.teamId] || 0) + p.pick - spotOf.get(p.nbaId); counts[p.teamId] = (counts[p.teamId] || 0) + 1; }
-    // each team's typical pick (the median), the average breaking a tie
-    const lates = {};
-    for (const p of picks) (lates[p.teamId] = lates[p.teamId] || []).push(p.pick - spotOf.get(p.nbaId));
-    const med = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-    const meds = Object.fromEntries(Object.entries(lates).map(([t, vs]) => [t, med(vs)]));
-    const avgOf = t => Math.round(totals[t] / counts[t] * 10);
-    const top = Math.max(...Object.values(meds)), atTop = Object.keys(meds).filter(t => meds[t] === top);
-    const won = atTop.filter(t => avgOf(t) === Math.max(...atTop.map(avgOf)));
-    const auto = awards.find(x => x.label === 'Value Meal');
-    assert.ok(top > 0 && auto, `a team ahead of consensus: ${top}`);
-    for (const t of won) assert.ok(auto.text.includes(app.fxTeamName(t)), `${app.fxTeamName(t)} in ${auto.text}`);
-    assert.ok(auto.text.endsWith(`their typical pick went ${top} spot${top === 1 ? '' : 's'} late`), auto.text);
-    assert.equal(auto.p, undefined, "a team's award: no player's photo in the picture");
+    // no Value Meal any more, and no emoji on any award (the owner's asks)
+    assert.ok(!awards.some(x => x.label === 'Value Meal') && awards.every(x => !x.e));
     // on the Draft tab, with Share; shared as a picture or as the text and a link to the league's Draft tab
     const card = app.draftAwardsCard(d);
     assert.match(card, /data-action="draft-share"/);
     assert.ok(card.includes(`data-nba="${reacher.nbaId}"`));
-    // each award's title opens its breakdown: the 10 biggest reaches; every team's total, most value first
-    assert.match(card, /data-action="draft-award" data-key="The Reach"/);
-    assert.match(card, /data-action="draft-award" data-key="Value Meal"/);
+    // drawn as the Recap's standouts: a player award a card with his photo, a team award a card of its line; no emoji
+    assert.ok(card.includes('class="rx-card rx-player"') && card.includes(`class="pc-photo rx-ph" data-photo="${reacher.nbaId}"`));
+    assert.equal((card.match(/class="rx-card rx-player"/g) || []).length, awards.filter(x => x.p).length);
+    assert.ok(!/\p{Extended_Pictographic}/u.test(card), 'no emoji');
+    // each award's title opens its breakdown: the 10 biggest reaches
+    assert.match(card, /data-action="draft-award" data-key="Reach"/);
     const details = app.get('draftAwardDetails');
-    const reaches = details.get('The Reach').html;
+    const reaches = details.get('Reach').html;
     assert.ok(reaches.indexOf(`data-nba="${reacher.nbaId}"`) < reaches.indexOf('</li>'), 'the biggest reach first');
     assert.ok(reaches.includes(`<b class="aw-break-v ">${early} early</b>`), reaches.slice(0, 400));
     assert.ok((reaches.match(/<li>/g) || []).length <= 10);
-    const teamTotals = details.get('Value Meal').html;
-    assert.equal((teamTotals.match(/<li>/g) || []).length, Object.keys(totals).length, 'every team');
-    // each team's typical pick, in words, not signs: "3 late" (value), "6 early" (reaches), "even"
-    const shown = [...teamTotals.matchAll(/<b class="aw-break-v [^"]*">([^<]+)<\/b>/g)].map(m => (m[1] === 'even' ? 0 : m[1].endsWith(' late') ? 1 : -1) * parseFloat(m[1]) || 0);
-    assert.deepEqual(shown, Object.values(meds).sort((a, b) => b - a), 'the latest typical pick first');
-    // under it: the pick that fell furthest (how far) and the biggest reach (who), by name, each opening his card; no pick count
-    const name = '<button[^>]*data-action="player-detail"[^>]*>[^<]+</button>';
-    assert.ok(new RegExp(`fell: ${name}, \\d+ spots?`).test(teamTotals), teamTotals.slice(0, 600));
-    assert.ok(new RegExp(`reach: ${name}</div>`).test(teamTotals), 'the reach: just who');
-    assert.ok(!/\d+ picks?\b/.test(teamTotals) && !/steal/.test(teamTotals));
-    assert.ok(!/[+−]\d/.test(teamTotals), 'no signs to decode');
     const doc = app.document, realQuery = doc.querySelector, els = {};
     doc.querySelector = sel => (['#infoBody', '#infoTitle', '#infoDialog'].includes(sel) ? (els[sel] = els[sel] || { innerHTML: '', textContent: '', open: false, showModal() { this.open = true; } }) : realQuery(sel));
     try {
-      app.actions['draft-award']({ dataset: { key: 'Value Meal' } });
+      app.actions['draft-award']({ dataset: { key: 'Reach' } });
       assert.equal(els['#infoDialog'].open, true);
-      assert.equal(els['#infoTitle'].textContent, '🍔 Value Meal');
-      assert.equal(els['#infoBody'].innerHTML, teamTotals);
+      assert.equal(els['#infoTitle'].textContent, 'Reach');
+      assert.equal(els['#infoBody'].innerHTML, reaches);
     } finally { doc.querySelector = realQuery; }
     const S = app.draftShare(L, d, [award]);
     assert.ok(S.url.endsWith(`?league=${L.id}#draft`), S.url);
-    assert.equal(S.text, `${app.SPORT.emoji} ${L.name} · ${app.seasonLabel(L.year)} Draft Retrospective\n\n🦒 The Reach: ${award.text}`);
+    assert.equal(S.text, `${L.name} · ${app.seasonLabel(L.year)} Draft Retrospective\n\nReach: ${award.text}`);
     assert.match(S.file, /-draft-retrospective\.png$/);
     // the Recap shares the same way
     assert.equal(typeof app.recapShare, 'function');
@@ -2911,7 +2888,7 @@ test("Draft awards: The Reach is the pick taken furthest ahead of consensus ADP,
     assert.equal(app.adpOf({ fx: { adp: 3 }, adp: 12.5 }), 3, "a Fantrax league's own first");
     // too few picks with an ADP to say: none of the ADP awards (the players' own, ages and teams, still)
     for (const p of picks.slice(0, Math.ceil(picks.length * 0.6))) delete p.raw.fx.adp;
-    assert.ok(!app.draftAwards(d).some(x => ['The Reach', 'The Fall', 'Value Meal'].includes(x.label)));
+    assert.ok(!app.draftAwards(d).some(x => ['Reach', 'Fall'].includes(x.label)));
     // a past season: today's ADP says nothing about its draft
     picks.forEach(p => setAdp(p.raw, keepers.length + p.pick));
     setAdp(reacher.raw, 999);
@@ -2938,67 +2915,7 @@ test("Draft tab: a pick's fantasy team opens its card, and each team's best and 
   assert.ok(html.indexOf('dr-awards') > html.indexOf('<table class="dr-board">'), 'under the draft board');
 });
 
-test('Draft awards: Value Meal, the team furthest ahead of consensus over its whole draft; a tie names each team', async () => {
-  const L = await app.useLeague(CATS9);
-  const [A, B, C, D] = L.teams.map(t => t.id);
-  const players = app.NBA.players, saved = players.map(r => [r, r.fx && { ...r.fx }, r.adp]);
-  try {
-    for (const r of players) { if (r.fx) delete r.fx.adp; delete r.adp; }
-    // four picks: A and C each take a player one spot early, B and D each one a spot late
-    const [w, x, y, z] = players.slice(0, 4);
-    [[w, 2], [x, 1], [y, 4], [z, 3]].forEach(([r, adp]) => { r.fx = { ...(r.fx || {}), adp }; });
-    const pick = (n, tid, r) => ({ round: 1, pick: n, teamId: tid, nbaId: r.id, raw: r, name: r.name });
-    const d = { picks: [pick(1, A, w), pick(2, B, x), pick(3, C, y), pick(4, D, z)], keepers: {} };
-    const auto = app.draftAwards(d).find(a => a.label === 'Value Meal');
-    assert.equal(auto.text, `${app.fxTeamName(B)} and ${app.fxTeamName(D)} tied: their typical pick went 1 spot late`);
-    assert.match(auto.html, /<b>.*<\/b> and <b>.*<\/b> tied/);
-    // D's player a spot later still: D alone, with its picks and how far a pick
-    z.fx.adp = 0.5; // (z first in consensus, so D's pick at #4 is 3 spots late)
-    const solo = app.draftAwards(d).find(a => a.label === 'Value Meal');
-    assert.equal(solo.text, `${app.fxTeamName(D)}: their typical pick went 3 spots late`);
-    // its breakdown: D 3 late, its pick the one that fell; A 2 early, its pick the reach
-    const rows = app.draftAwards(d).find(a => a.label === 'Value Meal').detail.html.split('<li>').slice(1);
-    assert.match(rows[0], /fell: <button[^>]*>[^<]+<\/button>, 3 spots<\/div>.*>3 late<\/b>/);
-    assert.match(rows[rows.length - 1], /reach: <button[^>]*>[^<]+<\/button><\/div>.*>2 early<\/b>/);
-    assert.ok(rows.some(r => />even<\/b>/.test(r)), "B's pick right on its spot: even");
-  } finally {
-    for (const [r, fx, adp] of saved) { if (fx) r.fx = fx; else delete r.fx; if (adp != null) r.adp = adp; else delete r.adp; }
-  }
-});
-
-test("Draft awards: Value Meal goes by each team's typical pick (the median), so one big reach doesn't sink a team", async () => {
-  const L = await app.useLeague(CATS9);
-  const [A, B, C, D] = L.teams.map(t => t.id);
-  const players = app.NBA.players, saved = players.map(r => [r, r.fx && { ...r.fx }, r.adp]);
-  try {
-    for (const r of players) { if (r.fx) delete r.fx.adp; delete r.adp; }
-    const r = players.slice(0, 10);
-    const pick = (n, tid) => ({ round: 1, pick: n, teamId: tid, nbaId: r[n - 1].id, raw: r[n - 1], name: r[n - 1].name });
-    const d = { keepers: {}, picks: [pick(1, A), pick(2, B), pick(3, C), pick(4, A), pick(5, B), pick(6, C), pick(7, A), pick(8, C), pick(9, B)] };
-    // consensus: A reaches 6 spots at #1, then two picks fall 2 spots each (typical 2 late, average 0.7 early); B's three
-    // each fall a spot (typical 1 late, average 1 late); C's on their spots or a spot early
-    [[1, 7], [2, 1], [3, 3], [4, 2], [5, 4], [6, 6], [7, 5], [8, 9], [9, 8]].forEach(([n, adp]) => { r[n - 1].fx = { ...(r[n - 1].fx || {}), adp }; });
-    const auto = () => app.draftAwards(d).find(a => a.label === 'Value Meal');
-    assert.equal(auto().text, `${app.fxTeamName(A)}: their typical pick went 2 spots late`, 'A, though its reach puts its average below B');
-    const order = () => auto().detail.html.split('<li>').slice(1).map(x => x.match(/data-team="([^"]+)"/)[1]);
-    assert.deepEqual(order(), [A, B, C]);
-    // the same typical pick, 2 late: the average breaks the tie (A's 0.7 early, B's picks falling 1, 2 and 3 spots: 2 late)
-    [[1, 7], [2, 1], [3, 4], [4, 2], [5, 3], [6, 8], [7, 5], [8, 9], [9, 6]].forEach(([n, adp]) => { r[n - 1].fx.adp = adp; });
-    assert.equal(auto().text, `${app.fxTeamName(B)}: their typical pick went 2 spots late`);
-    assert.deepEqual(order(), [B, A, C]);
-    assert.deepEqual(auto().detail.html.match(/>(\d+ late|\d+ early|even)<\/b>/g), ['>2 late</b>', '>2 late</b>', '>1 early</b>']);
-    // a team with one pick, the steal of the draft: under half as many picks as the most, so not in it
-    [[1, 7], [2, 1], [3, 3], [4, 2], [5, 4], [6, 6], [7, 5], [8, 9], [9, 8]].forEach(([n, adp]) => { r[n - 1].fx.adp = adp; });
-    d.picks.push(pick(10, D));
-    r[9].fx = { ...(r[9].fx || {}), adp: 0.1 };
-    assert.ok(auto().text.startsWith(`${app.fxTeamName(A)}: `), auto().text);
-    assert.ok(!auto().detail.html.includes(`data-team="${D}"`));
-  } finally {
-    for (const [x, fx, adp] of saved) { if (fx) x.fx = fx; else delete x.fx; if (adp != null) x.adp = adp; else delete x.adp; }
-  }
-});
-
-test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist', async () => {
+test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Frequent Flyer', async () => {
   const L = await app.useLeague(CATS9);
   const [A, B, C] = L.teams.map(t => t.id);
   const players = app.NBA.players, archives = app.get('archives');
@@ -3022,11 +2939,11 @@ test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist
     const gp = new Map([[a1.id, 80], [a2.id, 80], [a3.id, 80], [b1.id, 40], [b3.id, 82], [c2.id, 82], [c3.id, 70]]);
     for (const s of seasons) archives[s] = { keys: ['gp'], players: new Map([...gp].map(([id, g]) => [id, { n: '', s: [g] }])) };
     const awards = app.draftAwards(d), get = label => awards.find(x => x.label === label);
-    assert.deepEqual(Array.from(awards, x => x.label), ['The Reach', 'The Fall', 'Glass', 'Youngins', 'Uncs', 'The Homer', 'The Globalist'], 'no Value Meal: no typical pick went late');
-    // The Fall: the pick taken furthest past consensus
-    assert.equal(get('The Fall').text, `${b3.name} (${app.fxTeamName(B)}): taken #9, 8 picks late: consensus #1 (ADP 0.5)`);
-    assert.equal(get('The Fall').p.nbaId, b3.id);
-    assert.ok(get('The Fall').detail.html.includes('>8 late</b>'));
+    assert.deepEqual(Array.from(awards, x => x.label), ['Reach', 'Fall', 'Glass', 'Youngins', 'Uncs', 'Homer', 'Frequent Flyer'], 'no Value Meal: gone');
+    // Fall: the pick taken furthest past consensus
+    assert.equal(get('Fall').text, `${b3.name} (${app.fxTeamName(B)}): taken #9, 8 picks late: consensus #1 (ADP 0.5)`);
+    assert.equal(get('Fall').p.nbaId, b3.id);
+    assert.ok(get('Fall').detail.html.includes('>8 late</b>'));
     // Glass: B's picks missed (42 + 42 + 82 + 82 + 0 + 0) / 6 = 41 a season; its most, the one out both years
     assert.equal(get('Glass').text, `${app.fxTeamName(B)}: their players missed 41 games a season, the last two seasons`);
     const glassRows = get('Glass').detail.html.split('<li>').slice(1);
@@ -3037,10 +2954,11 @@ test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist
     assert.equal(get('Youngins').text, `${app.fxTeamName(A)}: their players averaged ${age('2005-06-01').toFixed(1)} years old`);
     assert.equal(get('Uncs').text, `${app.fxTeamName(B)}: their players averaged ${age('1990-06-01').toFixed(1)} years old`);
     assert.ok(get('Uncs').detail.html.indexOf(`data-team="${B}"`) < get('Uncs').detail.html.indexOf(`data-team="${A}"`), 'oldest first');
-    // The Homer: three Thunder; The Globalist: three countries (players' nationalities, not their teams)
-    assert.equal(get('The Homer').text, `${app.fxTeamName(A)} has 3 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1')}`);
-    assert.equal(get('The Globalist').text, `${app.fxTeamName(B)}: their players came from 3 countries`);
-    const globeRows = get('The Globalist').detail.html.split('<li>').slice(1);
+    // Homer: three Thunder, their faces on its card; Frequent Flyer: three countries (players' nationalities, not their teams)
+    assert.deepEqual(Array.from(get('Homer').faces, p => p.nbaId).sort(), [a1, a2, a3].map(x => x.id).sort(), "Homer's card: the faces of the players it names");
+    assert.equal(get('Homer').text, `${app.fxTeamName(A)} has 3 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1')}`);
+    assert.equal(get('Frequent Flyer').text, `${app.fxTeamName(B)}: their players came from 3 countries`);
+    const globeRows = get('Frequent Flyer').detail.html.split('<li>').slice(1);
     assert.match(globeRows[0], />3 countries<\/b>/);
     assert.equal((globeRows[0].match(/<img class="flag"/g) || []).length, 3, "B's three flags");
     assert.match(globeRows.find(x => x.includes(`data-team="${C}"`)), /alt="United States"[^>]*>×2/, "C's two Americans: one flag, ×2");
@@ -3048,15 +2966,15 @@ test('Draft awards: The Fall, Glass, Youngins, Uncs, The Homer and The Globalist
     Object.assign(k, { born: '1985-06-01', team: 'OKC', nat: 'FR', exp: 0 });
     d.keepers = { [A]: [{ nbaId: k.id, name: k.name }] };
     const withK = app.draftAwards(d), getK = label => withK.find(x => x.label === label);
-    assert.equal(getK('The Homer').text, `${app.fxTeamName(A)} has 4 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ')} and ${app.lastName(k.name)}`);
-    assert.match(getK('The Homer').detail.html, /\(keeper\)/, 'marked as a keeper in the breakdown');
+    assert.equal(getK('Homer').text, `${app.fxTeamName(A)} has 4 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ')} and ${app.lastName(k.name)}`);
+    assert.match(getK('Homer').detail.html, /\(keeper\)/, 'marked as a keeper in the breakdown');
     assert.equal(getK('Youngins').text, `${app.fxTeamName(A)}: their players averaged ${((3 * age('2005-06-01') + age('1985-06-01')) / 4).toFixed(1)} years old`);
-    assert.match(getK('The Globalist').detail.html.split('<li>').slice(1).find(x => x.includes(`data-team="${A}"`)), />2 countries<\/b>/);
-    assert.equal(getK('The Fall').text, get('The Fall').text, 'never in the ADP awards');
+    assert.match(getK('Frequent Flyer').detail.html.split('<li>').slice(1).find(x => x.includes(`data-team="${A}"`)), />2 countries<\/b>/);
+    assert.equal(getK('Fall').text, get('Fall').text, 'never in the ADP awards');
     d.keepers = {};
-    // a tie names each team (with its real team on The Homer)
+    // a tie names each team (with its real team on Homer)
     c3.team = 'BOS';
-    assert.equal(app.draftAwards(d).find(x => x.label === 'The Homer').text, `${app.fxTeamName(A)} (OKC) and ${app.fxTeamName(C)} (BOS) tied: 3 players each from one team`);
+    assert.equal(app.draftAwards(d).find(x => x.label === 'Homer').text, `${app.fxTeamName(A)} (OKC) and ${app.fxTeamName(C)} (BOS) tied: 3 players each from one team`);
     // the seasons' archives not in yet (on their way): no Glass until they are
     const loading = app.get('glassLoading');
     for (const s of seasons) { delete archives[s]; loading.add(s); }

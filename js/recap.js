@@ -227,23 +227,23 @@ function recapText(L, X) {
   return [`${L.name} · Period ${X.period.n} recap`, '', ...recapItems(X).map(x => `${x.label}: ${x.text}`)].join('\n\n');
 }
 
-// A standout on the Recap tab, as the share picture draws it (the owner's ask: the tab matches the picture): a player
-// beside his photo on his team's color (the player card's playerPhoto), the award, his name, his fantasy team, his NBA team
-// and positions, his numbers (his value or points first); any other the award and its line, with the faces of the players
-// it names
-function recapCard(x) {
+// A standout on the Recap tab or the Draft Retrospective, as the share picture draws it (the owner's ask: the tabs match the
+// picture): a player beside his photo on his team's color (the player card's playerPhoto), the award, his name, his fantasy
+// team, his NBA team and positions, his numbers (his value or points first) or the award's words; any other the award and
+// its line, with the faces of the players it names. label: the award's title as HTML (the Draft tab's opens its breakdown)
+function standoutCard(x, label = `<div class="rx-label">${x.label}</div>`) {
   if (!x.p) {
     const faces = (x.faces || []).filter(f => f && f.nbaId != null).slice(0, 3);
-    return `<article class="rx-card rx-note"><div class="rx-body"><div class="rx-label">${x.label}</div><div class="rx-text">${x.html}</div></div>`
+    return `<article class="rx-card rx-note"><div class="rx-body">${label}<div class="rx-text">${x.html}</div></div>`
       + `${faces.length ? `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>` : ''}</article>`;
   }
   const raw = nbaById.get(x.p.nbaId) || { id: x.p.nbaId, name: x.p.name }, pos = x.p.pos || raw.pos || [];
   const stats = x.tiles
     ? [[x.score[0], x.score[1], isBelowZero(x.score[0]) ? 'pos-bad' : ''], ...x.tiles.map(t => [t.v, `${t.k}${t.made ? ` ${t.made}` : ''}`, ''])]
       .map(([v, k, cls]) => `<span><b${cls ? ` class="${cls}"` : ''}>${esc(v)}</b> ${esc(k)}</span>`).join('')
-    : `<span class="rx-words">${esc(x.stats)}</span>`; // (football: its line in words)
+    : `<span class="rx-words">${esc(x.stats)}</span>`; // (football's line, a draft award's: words)
   return `<article class="rx-card rx-player">${playerPhoto(raw, 'rx-ph')}<div class="rx-body">
-    <div class="rx-label">${x.label}</div>
+    ${label}
     <div class="rx-name">${playerBtn(x.p.nbaId, x.p.name)}</div>
     <div class="rx-team">${teamLink(x.tid)}</div>
     <div class="rx-meta">${raw.team ? teamBtn(raw.team) : 'FA'}${pos.length ? ` · ${posTags(pos)}` : ''}${x.per ? ` · ${x.per} G, per game` : ''}</div>
@@ -277,7 +277,7 @@ function viewRecap() {
   // the finals, the week's top and bottom teams marked on the row's outer edge (before the left team, after the right)
   const mark = tid => { const k = recapMark(X, tid); return k ? `<span class="rc-badge rc-${k}" title="${esc(recapMarkTip(X, tid))}">${RECAP_MARK[k]}</span>` : ''; };
   const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${mark(g.a)}${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}${mark(g.b)}</span></li>`).join('');
-  const items = recapItems(X).map(recapCard).join('');
+  const items = recapItems(X).map(x => standoutCard(x)).join('');
   return `<div class="card">
     <div class="card-head"><h2>Period ${period.n} recap ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
     <p class="muted small rc-when">${esc(L.name)} · ${fmtDay(period.start)} – ${fmtDay(matchDates(period.start).slice(-1)[0] || period.end)} · starters only</p>
@@ -723,11 +723,11 @@ async function sharePad(tall = 5000) {
 }
 
 // A picture to share in a league chat (1080 px wide): a kicker, the league's name and any line under it, then the
-// standouts (each player beside his photo, every one alike: no larger card for the first, the owner's ask; the rest beside
-// their emoji, with the faces of any players they name), then any finals. H: { kicker, title, sub, items, games, mark: tid
-// -> its emoji }.
-// An item: { e, label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's
-// numbers are a game of), score: [number, unit] }, one naming players { faces }
+// standouts (each player beside his photo, every one alike: no larger card for the first, the owner's ask; the rest with
+// the faces of any players they name; no emoji, the owner's ask), then any finals. H: { kicker, title, sub, items, games,
+// mark: tid -> 'top' | 'bottom' | '' }.
+// An item: { label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's numbers
+// are a game of), score: [number, unit] }, one naming players { faces }
 async function shareCanvas(H) {
   const items = H.items, games = H.games || [];
   const K = await sharePad(900 + sum(items.map(it => (it.p ? 440 : 340))) + games.length * 100);
@@ -735,7 +735,7 @@ async function shareCanvas(H) {
   await K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])]);
   const x0 = C.pad, w = inner;
   const posOf = p => p.pos || (nbaById.get(p.nbaId) || {}).pos;
-  const labelText = (it, x, y, max) => { font(22, 700, 2); text(fitText(ctx, `${it.e ? `${it.e}  ` : ''}${it.label.toUpperCase()}`, max), x, y, C.accent); };
+  const labelText = (it, x, y, max) => { font(22, 700, 2); text(fitText(ctx, it.label.toUpperCase(), max), x, y, C.accent); };
 
   // A player: his photo on his team's colors at the left, the award, his name, his teams, his numbers (his value or points
   // first, in orange)
@@ -753,18 +753,14 @@ async function shareCanvas(H) {
     return y + h;
   };
 
-  // The rest: any emoji, the award, its line (names bold), and the faces of the players it names
+  // The rest: the award, its line (names bold), and the faces of the players it names
   const note = (it, y) => {
     const faces = (it.faces || []).filter(f => f && f.nbaId != null).slice(0, 3), fd = 104, step = 72;
-    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : 0, ex = x0 + 30, tx = it.e ? ex + 88 + 28 : x0 + 40, tw = x0 + w - 32 - fw - tx;
+    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : 0, tx = x0 + 40, tw = x0 + w - 32 - fw - tx;
     const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), block = 40 + lines.length * 44 - 8;
     const h = Math.max(block + 64, faces.length ? fd + 60 : 0, 148), ty = y + (h - block) / 2;
     round(x0, y, w, h, 28, C.card);
-    if (it.e) { // (the Draft Retrospective's awards have one; the recap's don't)
-      ctx.fillStyle = hexA(C.accent, 0.14); ctx.beginPath(); ctx.arc(ex + 44, y + h / 2, 44, 0, Math.PI * 2); ctx.fill();
-      font(42); ctx.textBaseline = 'middle'; text(it.e, ex + 44, y + h / 2 + 2, C.text, 'center'); ctx.textBaseline = 'top';
-    }
-    labelText({ ...it, e: '' }, tx, ty, tw);
+    labelText(it, tx, ty, tw);
     drawLay(lines, tx, ty + 40, 31, 44);
     faces.forEach((f, i) => face(f, x0 + w - 32 - fd / 2 - (faces.length - 1 - i) * step, y + h / 2, fd, C.card));
     return y + h;
