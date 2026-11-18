@@ -359,6 +359,14 @@ function playoffGames(p, P = playoffDays()) {
   if (isOneGame()) return P.ps.filter(q => periodDates(q).some(d => P.days.includes(d) && playsOn(p, d))).length;
   return expectedGames(p, P.days);
 }
+// An NBA (NHL) team's games in each playoff period still to play (once one has started, the games it has left), for its
+// card's title; null without playoffs to come
+function playoffSlate(tri, P = playoffDays()) {
+  if (!P || !tri) return null;
+  const ds = teamDates.get(tri) || new Set();
+  return P.ps.map(q => periodDates(q).filter(d => P.days.includes(d)))
+    .filter(days => days.length).map(days => days.filter(d => ds.has(d)).length);
+}
 // games as a count: whole when they are (a goalie's expected starts keep their tenth)
 const fmtGames = n => (n == null ? '—' : Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : fmt(n, 1));
 // A player's games this season, whatever Stats used is (the data's own count)

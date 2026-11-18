@@ -572,10 +572,13 @@ function showSportTeamCard(tri) {
   // the title: its name, then its record (filled in once the box scores are in, if they weren't yet; no code: the name says it)
   const name = (SPORT.teamNames || {})[tri] || tri;
   const recTip = isHockey() ? 'Wins-losses-overtime losses' : isFootball() ? 'Wins-losses(-ties)' : 'Wins-losses';
+  // its games in each of the league's playoff periods still to play (not football's: a game a week)
+  const slate = isFootball() ? null : playoffSlate(tri), P = slate && playoffDays();
+  const poTip = slate && `Its games in each playoff period${P.started ? ' still to play (this one: the games it has left)' : ''}`;
   const title = () => {
     const rec = teamRecord(tri);
     // (dt-team: a bigger logo, and the record set off by a line on the same row; a long name gives way)
-    return `<span class="dt-name dt-team">${IMG && IMG.logos[tri] ? teamLogo(tri, 32) : ''}${esc(name)}</span>${rec ? `<span class="dt-bio dt-team-rec"><span class="dt-rec" title="${recTip}, this regular season">${rec}</span></span>` : ''}`;
+    return `<span class="dt-name dt-team">${IMG && IMG.logos[tri] ? teamLogo(tri, 32) : ''}${esc(name)}</span>${rec ? `<span class="dt-bio dt-team-rec"><span class="dt-rec" title="${recTip}, this regular season">${rec}</span></span>` : ''}${slate && slate.length ? `<span class="dt-bio dt-team-rec dt-team-po" title="${poTip}">Playoff Games: <span class="dt-rec">${slate.join('-')}</span></span>` : ''}`;
   };
   $('#detailTitle').innerHTML = title();
   cardOpen = null;

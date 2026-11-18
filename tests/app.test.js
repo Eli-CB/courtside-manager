@@ -2792,7 +2792,12 @@ test("a team's card has its record: its finals, then today's game once it's over
     live.games = [];
     assert.equal(app.teamRecord(tri), '2-1');
     app.actions['sport-team']({ dataset: { team: tri } });
-    assert.match(els['#detailTitle'].innerHTML, /<span class="dt-bio dt-team-rec"><span class="dt-rec"[^>]*>2-1<\/span><\/span>$/, 'in the title, after its name');
+    assert.match(els['#detailTitle'].innerHTML, /<span class="dt-bio dt-team-rec"><span class="dt-rec"[^>]*>2-1<\/span><\/span><span class="dt-bio dt-team-rec dt-team-po"/, 'in the title, after its name');
+    // then its games in each of the league's playoff periods, from its schedule
+    const L = app.fxLeague(), ps = L.periods.filter(q => q.n >= L.playoffPeriod);
+    const each = ps.map(q => app.periodDates(q).filter(d => dates.includes(d)).length);
+    assert.ok(ps.length > 1 && each.every(n => n > 0), `the test league has playoffs: ${each}`);
+    assert.match(els['#detailTitle'].innerHTML, new RegExp(`<span class="dt-bio dt-team-rec dt-team-po"[^>]*>Playoff Games: <span class="dt-rec">${each.join('-')}</span></span>$`), 'Playoff Games: one number a period');
     assert.doesNotMatch(els['#detailTitle'].innerHTML.replace(/<[^>]*>/g, ''), /\bPHI\b/, 'without its code: the full name says it');
     // tonight's game counts once it's over; a preseason game (not on its schedule) never does
     live.games = [{ d: dates[3], home: 'ATL', away: tri, hs: 90, as: 95, state: 'in', period: 4 }, { d: '2026-10-05', home: tri, away: 'ORL', hs: 80, as: 120, state: 'post', period: 4 }];
