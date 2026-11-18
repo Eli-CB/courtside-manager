@@ -3522,14 +3522,14 @@ test('the sandbox, as a first visit opens it: no league anywhere, the Players an
     assert.deepEqual([...app.tabList().map(t => t[0])], ['team', 'watch', 'players', 'trends', 'trade']);
     assert.ok(app.NBA.players.every(r => !r.fx), "nobody shows as free in someone else's league");
     const html = app.viewPlayers();
-    assert.match(html, /No league connected[\s\S]*data-action="browse-exit"/);
+    assert.ok(!html.includes('browse-note') && /data-sport="nba">✓ Basketball/.test(app.sbMenus()), 'the sport and scoring in the head, no bar');
     assert.ok(!html.includes('perf-owner') && !html.includes('badge good'), 'no fantasy teams or free-agent badges');
     assert.ok(/data-nba="\d+"/.test(html), 'players listed');
     assert.equal(app.scoreCats().length, 9, 'a standard 9-category league');
     // Trends: through the latest saved day, with the same note, and no fantasy teams
     ui.tab = 'trends';
     const tr = app.viewTrends();
-    assert.match(tr, /No league connected[\s\S]*<div class="card trends">/);
+    assert.ok(tr.startsWith('<div class="card trends">'), 'Trends, with no bar above it');
     assert.ok(!tr.includes('perf-owner') && !tr.includes('Rostered') && !tr.includes('Waivers'), 'nobody rostered');
     // back out: the landing page again
     app.actions['browse-exit']();
@@ -3558,7 +3558,8 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   assert.equal(a.myTeamId(), a.SB_ME);
   // My team, empty: the search and what it's for
   let team = a.viewSandboxTeam();
-  assert.match(team, /Sandbox\.<\/b> No league connected[\s\S]*data-action="browse-exit">Connect a league</);
+  assert.ok(!team.includes('browse-note'), 'no bar under the tabs');
+  assert.match(a.sbMenus(), /<details class="tm sb-m" data-m="sport">[\s\S]*<span class="tm-name">Basketball<\/span>[\s\S]*data-m="scoring">[\s\S]*<span class="tm-name">9 categories<\/span>/, 'its sport and scoring as menus in the head');
   assert.match(team, /id="sbQ-team"[\s\S]*Build a team from any NBA players/);
   // a search: the best matches by value, each a button that adds him
   const best = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val), [p1, p2, p3, p4] = best;
@@ -3646,7 +3647,7 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   // Trends: the sandbox's, no league lists
   ui.tab = 'trends';
   const tr = a.viewTrends();
-  assert.match(tr, /Sandbox\.[\s\S]*<div class="card trends">/);
+  assert.ok(tr.startsWith('<div class="card trends">'), 'Trends, no bar above it');
   assert.ok(!tr.includes('<span>Rostered</span>') && !tr.includes('<span>Waivers</span>'), 'no league lists');
   // out of it: no league to go back to, so the landing page; My team stays for next time
   ui.tab = 'standings';
@@ -3672,8 +3673,13 @@ test("the sandbox's scoring and sport: categories, a site's standard points or y
   const best = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val);
   for (const p of best.slice(0, 3)) a.actions['sb-add']({ dataset: { id: String(p.nbaId) } });
   // the bar: the sport and the scoring
-  assert.match(a.sbBar(), /data-change="sb-sport"[\s\S]*value="nba" selected>Basketball[\s\S]*data-change="sb-scoring"[\s\S]*value="cats" selected>9 categories<[\s\S]*>ESPN points<[\s\S]*>Yahoo points<[\s\S]*>Your own points</);
-  assert.ok(!a.isPoints() && !a.sbBar().includes('Edit points'));
+  assert.match(a.sbMenus(), /data-action="sb-sport-pick" data-sport="nba">✓ Basketball<[\s\S]*data-sport="nhl">Hockey<[\s\S]*data-action="sb-scoring-pick" data-k="cats">✓ 9 categories<[\s\S]*data-k="espn">ESPN points<[\s\S]*data-k="yahoo">Yahoo points<[\s\S]*data-k="custom">Your own points</);
+  assert.ok(!a.isPoints() && !a.sbMenus().includes('Edit your points'));
+  // the menu's own choices do the same (and keep the menus shut after)
+  a.actions['sb-scoring-pick']({ dataset: { k: 'yahoo' } });
+  assert.ok(a.isPoints() && a.sbMenus().includes('<span class="tm-name">Yahoo points</span>'));
+  a.actions['sb-scoring-pick']({ dataset: { k: 'cats' } });
+  assert.ok(!a.isPoints());
   const id = best[0].nbaId, me = () => a.nbaPlayers().find(p => p.nbaId === id), v = k => a.statVal(me(), k);
   // ESPN's default points (since 2020): each player's value in fantasy points, and the scored stats as the columns
   assert.equal(a.sbSetScoring('espn'), true);
@@ -3692,7 +3698,7 @@ test("the sandbox's scoring and sport: categories, a site's standard points or y
   a.forms['sb-points'](form({ pts: '2', reb: '', ast: '-1', stl: '0' }));
   assert.deepEqual({ ...a.sbState().points }, { pts: 2, ast: -1 });
   assert.ok(a.sbState().scoring === 'custom' && near(me().val, 2 * v('pts') - v('ast')), 'your own');
-  assert.ok(a.sbBar().includes('value="custom" selected>Your own points') && a.sbBar().includes('data-action="sb-points"'), 'Edit points');
+  assert.ok(a.sbMenus().includes('data-k="custom">✓ Your own points') && a.sbMenus().includes('data-action="sb-points" >Edit your points…'), 'Edit your points');
   assert.deepEqual(JSON.parse(a.localStorage.getItem('league-layer-v1')).sandbox.nba.points, { pts: 2, ast: -1 }, 'kept on the device');
   a.sbSetScoring('cats');
   assert.ok(!a.isPoints() && a.scoreCats().length === 9);
@@ -3701,7 +3707,7 @@ test("the sandbox's scoring and sport: categories, a site's standard points or y
   assert.equal(a.SPORT.key, 'nhl');
   assert.equal(st.sandbox.sport, 'nhl');
   assert.deepEqual([...a.sbState().roster], [], 'its own team');
-  assert.match(a.sbBar(), /value="nhl" selected>Hockey[\s\S]*value="cats" selected>8 categories<\/option><option value="custom">Your own points</);
+  assert.match(a.sbMenus(), /data-sport="nhl">✓ Hockey<[\s\S]*data-k="cats">✓ 8 categories<\/button><button type="button" class="lm-item" data-action="sb-scoring-pick" data-k="custom">Your own points</);
   assert.ok(a.NBA.players.every(r => !r.fx), 'no league details on its players either');
   await a.loadBoxes();
   const hp = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val), skater = hp.find(p => !a.isGoalie(p)), goalie = hp.find(p => a.isGoalie(p));
@@ -3758,6 +3764,37 @@ test("box scores started for one sport and finishing after a switch stay out of 
   clearTimeout(live.timer); live.timer = null;
 });
 
+test('a reload in the sandbox on the other sport keeps the league underneath, its team pick included', async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.switchLeague(CATS9);
+  const tid = a.fxLeague().teams[0].id;
+  a.get('ui').tab = 'standings';
+  a.adoptTeam(tid);
+  a.commit();
+  a.actions['land-browse']();
+  await a.sbSetSport('nhl');
+  // the page loads again (a refresh) on the hockey sandbox: the basketball league's team isn't in hockey's data, and was dropped
+  const b = loadApp({ 'league-layer-v1': a.localStorage.getItem('league-layer-v1') });
+  await b.ready();
+  const st = b.get('state');
+  b.get('ui').tab = 'standings';
+  assert.ok(st.browse && b.SPORT.key === 'nhl', 'still the hockey sandbox');
+  assert.equal(st.fxTeam, tid, 'the team pick kept');
+  b.get('ui').tab = 'team'; // (on My team, a tab leagues don't have)
+  await b.actions['league-switch']({ dataset: { id: CATS9 } }); // (picked in the league menu)
+  b.get('ui').tab = 'standings';
+  assert.ok(b.fxLeague() && b.fxLeague().id === CATS9 && st.fxTeam === tid && !b.needsLanding(), 'back to the league with its team');
+  assert.equal(b.location.hash, '#dashboard', "on the league's own tabs");
+  // a pick already lost that way comes back from the copy kept with the league
+  b.actions['land-browse']();
+  for (let i = 0; i < 50 && !(st.browse && b.SPORT.key === 'nhl'); i++) await new Promise(r => setTimeout(r, 10));
+  st.fxTeam = null;
+  await b.actions['league-switch']({ dataset: { id: CATS9 } });
+  assert.ok(b.fxLeague().id === CATS9 && st.fxTeam === tid, 'its team again');
+  for (const x of [a, b]) { x.get('ui').tab = 'standings'; const live = x.get('live'); clearTimeout(live.timer); live.timer = null; }
+});
+
 test('the sandbox from a league: the league menu offers it, and leaving it goes back to the league as it was', async () => {
   const a = loadApp();
   await a.ready();
@@ -3773,7 +3810,7 @@ test('the sandbox from a league: the league menu offers it, and leaving it goes 
   assert.ok(st.lineup.filter(Boolean).length > 3, 'a lineup set');
   a.actions['land-browse']();
   assert.ok(st.browse && a.fxLeague() === null && fx() === 0);
-  assert.ok(a.browseNote().includes(`Back to ${L.name}`));
+  assert.equal(st.sandbox.back.name, L.name, 'the league it came from, to go back to');
   // the sandbox on hockey with a basketball league underneath: adding a player works (its lineup's spots, PG, SG..., aren't
   // hockey's: this threw), and the league's lineup stays as it was
   await a.sbSetSport('nhl');
@@ -3801,8 +3838,9 @@ test('the sandbox from a league: the league menu offers it, and leaving it goes 
   a.actions['sb-add']({ dataset: { id: String(hoop.nbaId) } });
   assert.ok(a.sbState().roster.includes(hoop.nbaId));
   assert.equal(JSON.stringify(st.lineup), hockeyLineup, "the hockey league's lineup untouched");
-  assert.ok(a.browseNote().includes(`Back to ${a.get('state').sandbox.back.name}`));
-  await a.actions['browse-exit']();
+  assert.equal(st.sandbox.back.id, HOCKEY);
+  // back by picking it in the league menu (league-switch), from the basketball sandbox
+  await a.actions['league-switch']({ dataset: { id: HOCKEY } });
   assert.ok(!st.browse && a.fxLeague() && a.fxLeague().id === HOCKEY && a.SPORT.key === 'nhl', 'the hockey league again, in hockey');
   assert.equal(JSON.stringify(st.lineup), hockeyLineup, 'with its lineup');
   // a sandbox saved by the version before (no league named to go back to), on hockey over the site's own basketball league:
@@ -3812,8 +3850,7 @@ test('the sandbox from a league: the league menu offers it, and leaving it goes 
   a.actions['land-browse']();
   await a.sbSetSport('nhl');
   st.sandbox.back = null;
-  assert.ok(a.browseNote().includes('Back to your league'));
-  await a.actions['browse-exit']();
+  await a.actions['league-switch']({ dataset: { id: CATS9 } }); // (from the league menu, as the bar's button did)
   assert.ok(a.fxLeague() && a.fxLeague().id === CATS9 && a.SPORT.key === 'nba', 'the league again');
   assert.ok(st.fxTeam === tid && JSON.stringify(st.lineup) === lineup, 'its team and lineup');
   a.get('ui').tab = 'standings'; // no live box scores in the background

@@ -457,7 +457,7 @@ function trendsCard(L, end) {
 // scoring; in the sandbox (state.browse), a standard 9-category league, My team's list by value and everyone else's
 function viewTrends() {
   if (!NBA) return '';
-  const L = fxLeague(), note = L ? '' : browseNote();
+  const L = fxLeague(), note = ''; // (the sandbox's sport and scoring are menus in the head: sbMenus)
   if (!BOX) return `${note}${boxWait('trends', 'Trends', "Loading the season's box scores…")}`;
   const end = [...BOX.finals].map(k => k.slice(0, 10)).sort().pop();
   return `${note}${end ? trendsCard(L, end) : `<div class="card"><div class="empty"><strong>No trends yet</strong>They start once the season's first games are in.</div></div>`}`;

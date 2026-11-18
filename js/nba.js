@@ -162,7 +162,11 @@ async function loadNba(fresh = false) {
     // a reload from Fantrax since this morning's file beats the file (the site's own league is on Fantrax)
     const fresher = NBA.league && !state.fxLeagueId && !state.browse ? cachedLeague(NBA.league.id) : null;
     if (fresher) applyFantraxLeague(withSiteExtras(fresher));
-    const other = state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId);
+    // (the sandbox leaves the league underneath as it is: its sport may not be this data's, and leaving the sandbox reads it
+    // again. Reloaded on hockey over a basketball league, the team check below didn't find the team in hockey's data and
+    // dropped it, Nov 18, 2026)
+    const sb = !!state.browse;
+    const other = !sb && state.fxLeagueId && (!NBA.league || NBA.league.id !== state.fxLeagueId);
     if (other) {
       // someone else's league: from this device if it's fresh, else from its site
       try {
@@ -171,10 +175,10 @@ async function loadNba(fresh = false) {
         toast(`Couldn't load your ${SOURCE_NAME[leagueSourceOf(state.fxLeagueId)]} league right now. Showing ${NBA.league ? NBA.league.name : 'the site league'}.`);
       }
     }
-    if (state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
-    if (state.fxTeam) syncLeagueRules();
+    if (!sb && state.fxTeam && !(NBA.league && NBA.league.teams.some(t => t.id === state.fxTeam))) state.fxTeam = null;
+    if (!sb && state.fxTeam) syncLeagueRules();
     if (state.demo && fxLeague()) { demoNames(fxLeague()); adoptTeam(state.fxTeam || demoTeam()); } // back in the demo: its names, today's rosters
-    const migrate = state.fxTeam && !state.demo && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
+    const migrate = !sb && state.fxTeam && !state.demo && NBA.league && !(state.savedLeagues || []).some(l => l.id === NBA.league.id);
     if (migrate) rememberLeague(NBA.league.id, NBA.league);
     const folded = foldPastSeasons();
     if (state.browse) clearLeaguePlayers(); // browsing without a league: none of the site league's on the players

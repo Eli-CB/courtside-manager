@@ -321,7 +321,10 @@ const actions = {
   // the box scores didn't load (boxWait, views.js): ask again
   'box-retry'() { boxFail = ''; render(); },
   // the sandbox's own points (sandbox.js): edit them, or fill the form with a site's standard
-  'sb-points'() { sbPointsOpen(); },
+  'sb-points'() { sbCloseMenus(); sbPointsOpen(); },
+  // the sandbox's sport and scoring menus in the head (sbMenus)
+  'sb-sport-pick'(el) { sbCloseMenus(); sbSetSport(el.dataset.sport); },
+  'sb-scoring-pick'(el) { sbCloseMenus(); sbSetScoring(el.dataset.k); },
   'sb-points-from'(el) {
     const P = (SB_POINTS[SPORT.key] || {})[el.dataset.preset], f = el.closest('form');
     if (P && f) for (const box of f.querySelectorAll('input[name]')) box.value = P[box.name] != null ? P[box.name] : '';
@@ -706,8 +709,8 @@ document.addEventListener('click', e => {
   if (document.body.classList.contains('nav-open') && !e.target.closest('.tab-more') && (!e.target.closest('.tabs-extra') || e.target.closest('#tabs a'))) setNav(false);
   const menu = $('#leagueMenu details');
   if (menu && menu.open && !e.target.closest('#leagueMenu')) menu.removeAttribute('open');
-  const team = $('#teamMenu details');
-  if (team && team.open && !e.target.closest('#teamMenu')) team.removeAttribute('open');
+  // (the team picker, or the sandbox's sport and scoring menus: a tap outside one, or on the other, closes it)
+  document.querySelectorAll('#teamMenu details[open]').forEach(d => { if (!d.contains(e.target)) d.removeAttribute('open'); });
   const gear = $('#gearMenu details');
   if (gear && gear.open && !e.target.closest('#gearMenu') && !e.target.closest('#infoDialog')) gear.removeAttribute('open');
   // the Players tab's position or team menu shuts on a tap anywhere else

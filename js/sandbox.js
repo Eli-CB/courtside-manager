@@ -68,16 +68,25 @@ async function sbSetSport(key) {
   return true;
 }
 
-// The note on every sandbox tab: what it is, its sport and scoring (and your points to edit), and the way back to your
-// league, or to connect one
-function sbBar() {
-  const S = sbState(), B = state.sandbox.back;
-  const back = !state.fxTeam || state.demo ? null : B ? B.name : SPORT.key === 'nba' && NBA && NBA.league ? NBA.league.name : 'your league'; // (the league you came from)
-  const sel = (change, label, opts, on) => `<select class="ctx-team sb-sel" data-change="${change}" aria-label="${label}">${opts.map(([k, l]) => `<option value="${k}"${k === on ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
-  const scoring = S.scoring === 'custom' && !S.points ? 'cats' : sbScorings().some(([k]) => k === S.scoring) ? S.scoring : 'cats';
-  return `<div class="sample-banner browse-note"><span class="sb-bar"><b>Sandbox.</b> No league connected:
-    ${sel('sb-sport', 'Sport', [['nba', 'Basketball'], ['nhl', 'Hockey']], SPORT.key)}${sel('sb-scoring', 'Scoring', sbScorings(), scoring)}${scoring === 'custom' ? '<button type="button" class="link-btn" data-action="sb-points">Edit points</button>' : ''}</span>
-    <button type="button" class="btn sm" data-action="browse-exit">${back ? `Back to ${esc(back)}` : 'Connect a league'}</button></div>`;
+// The sandbox's two menus in the head, where a league's team picker is (teamMenu, render.js; the owner's ask, Nov 2026: no bar
+// under the tabs): the sport, and the scoring (with your own points to edit). Icons on a phone, their names too on a computer.
+// The league you came from (or any other) is in the league menu on the left; picking it leaves the sandbox (switchLeague).
+const SB_ICONS = {
+  nba: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.7 5.7c3.4 3.4 3.4 9.2 0 12.6M18.3 5.7c-3.4 3.4-3.4 9.2 0 12.6"/>',
+  nhl: '<path d="M9 3l4.5 15H20"/><path d="M13.5 18v2.5H21V18"/><ellipse cx="5.5" cy="19.5" rx="3" ry="1.5"/>',
+  scoring: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M6.5 10l1.5-1v6M15.5 9.5h2.5v2.5h-2.5v2.5h2.5"/>',
+};
+const SB_SPORT_NAMES = [['nba', 'Basketball'], ['nhl', 'Hockey']];
+// the scoring in use, as one of the menu's choices (your own without points yet: categories)
+const sbScoringKey = () => { const S = sbState(); return S.scoring === 'custom' && !S.points ? 'cats' : sbScorings().some(([k]) => k === S.scoring) ? S.scoring : 'cats'; };
+const sbCloseMenus = () => document.querySelectorAll('#teamMenu details[open]').forEach(d => d.removeAttribute('open'));
+// open: the menu that was open, kept open when the head is drawn again
+function sbMenus(open = '') {
+  const on = sbScoringKey();
+  const item = (action, attrs, label, chosen) => `<button type="button" class="lm-item${chosen ? ' on' : ''}" data-action="${action}" ${attrs}>${chosen ? '✓ ' : ''}${label}</button>`;
+  const menu = (m, icon, label, what, body) => `<details class="tm sb-m" data-m="${m}"${open === m ? ' open' : ''}><summary aria-label="${what}: ${esc(label)}" title="${what}">${lineIcon(icon, 'hd-ico')}<span class="tm-name">${esc(label)}</span></summary><div class="gear-pop tm-pop">${body}</div></details>`;
+  const sport = SB_SPORT_NAMES.find(([k]) => k === SPORT.key) || SB_SPORT_NAMES[0];
+  return `<div class="sb-menus">${menu('sport', SB_ICONS[SPORT.key] || SB_ICONS.nba, sport[1], 'Sport', `<div class="lm-sec">Sport</div>${SB_SPORT_NAMES.map(([k, l]) => item('sb-sport-pick', `data-sport="${k}"`, l, k === SPORT.key)).join('')}`)}${menu('scoring', SB_ICONS.scoring, sbScoringName(), 'Scoring', `<div class="lm-sec">Scoring</div>${sbScorings().map(([k, l]) => item('sb-scoring-pick', `data-k="${k}"`, l, k === on)).join('')}${on === 'custom' ? item('sb-points', '', 'Edit your points…', false) : ''}`)}</div>`;
 }
 
 // Your own points, in a popup: each stat's points (blank or 0: not scored), filled from what's in use, or a site's standard
@@ -189,7 +198,7 @@ function viewSandboxTeam() {
   const find = R.length >= SANDBOX_MAX ? `<p class="muted small">My team is full: remove a player to add another.</p>` : sbSearch('team', new Set(R));
   const body = list.length ? sbTeamTable(list)
     : `<div class="empty"><strong>Build a team from any ${SPORT.name} players</strong>Find them above. Your team shows on the Players and Trends tabs, follow anyone on Live, and trade any of them for anyone on Trades.</div>`;
-  return `${browseNote()}<div class="card sb-team">${head}${find}${body}</div>`;
+  return `<div class="card sb-team">${head}${find}${body}</div>`;
 }
 
 // ----- Live: up to 12 players, each one's game and line as it's played -----
@@ -198,7 +207,7 @@ function viewSandboxTeam() {
 // now first, then finished, then still to come by tip-off, then no game (his next one).
 function viewSandboxWatch() {
   if (!NBA) return loadingCard('Loading player data…');
-  if (!BOX) return `${browseNote()}${boxWait('watch', 'Live', 'Loading the latest box scores…')}`;
+  if (!BOX) return `${boxWait('watch', 'Live', 'Loading the latest box scores…')}`;
   startLive(); // (today's games, as they're played)
   const W = sbState().watch, P = perfDays(), today = todayIso(), yesterday = addDays(today, -1);
   const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)]].filter(Boolean);
@@ -211,7 +220,7 @@ function viewSandboxWatch() {
   const when = d === today ? (live.error ? `<span class="pos-bad">ESPN: ${esc(live.error)}</span>` : live.at ? `${fmtDay(d)} · updated ${fmtTime(live.at)}` : fmtDay(d)) : `${d === yesterday ? 'Last night' : ''} ${fmtDay(d)}`.trim();
   const head = `<div class="card-head"><h2>Live ${infoBtn('watch')}</h2><span class="muted small">${W.length} of ${WATCH_MAX}</span>${toggle}</div>`;
   const tools = `<div class="sb-tools">${find}${addTeam ? `<div class="sb-team-btn">${addTeam}</div>` : ''}</div>`;
-  if (!W.length) return `${browseNote()}<div class="card sb-watch-card">${head}${tools}<div class="empty"><strong>Follow up to ${WATCH_MAX} players</strong>Each one's game and stat line as it's played, updated every 30 seconds while games are on.</div></div>`;
+  if (!W.length) return `<div class="card sb-watch-card">${head}${tools}<div class="empty"><strong>Follow up to ${WATCH_MAX} players</strong>Each one's game and stat line as it's played, updated every 30 seconds while games are on.</div></div>`;
 
   const stage = p => {
     if (!playsOn(p, d)) return [3, 0];
@@ -238,7 +247,7 @@ function viewSandboxWatch() {
   };
   const grid = players.map(cell).join('');
   chipWas = isToday ? chipNext : new Map();
-  return `${browseNote()}<div class="card sb-watch-card">${head}${tools}<p class="muted small sb-when">${when}</p><div class="sb-watch">${grid}</div></div>`;
+  return `<div class="card sb-watch-card">${head}${tools}<p class="muted small sb-when">${when}</p><div class="sb-watch">${grid}</div></div>`;
 }
 
 // ----- Trades: your team's players for anyone -----
@@ -264,7 +273,7 @@ function viewSandboxTrade() {
   const find = get.length >= SB_GET_MAX ? '' : sbSearch('get', new Set([...sbState().roster, ...ui.sbGet]));
   const card = give.length || get.length ? sbStandIn(() => tradeCard(T, tradeForYou(give, get)))
     : `<div class="card"><div class="empty"><strong>Pick who you'd give and who you'd get</strong>See how the deal changes My team's per-game numbers, and share it.</div></div>`;
-  return `${browseNote()}<div class="trade-grid">
+  return `<div class="trade-grid">
     <div class="card"><div class="card-head"><h2>You give</h2><span class="muted small">${give.length} selected</span></div>${giveList}</div>
     <div class="card"><div class="card-head"><h2>You get</h2><span class="muted small">${get.length} selected</span></div>${find}${getList}</div>
   </div>

@@ -757,9 +757,10 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .sb-watch .mu-p.out { opacity: .62; }
 .mu-chip.sb-val { border-color: var(--muted); }
 .sb-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-/* the note bar's sport and scoring menus, and your own points (a popup) */
-.sb-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.sb-bar .sb-sel { width: auto; min-width: 0; padding-top: 4px; padding-bottom: 4px; font-size: .86rem; }
+/* the sport and scoring menus in the head (as the team picker), and your own points (a popup) */
+.sb-menus { display: flex; align-items: center; gap: 2px; }
+.sb-m { position: relative; }
+.sb-m .gear-pop { width: 230px; }
 .sb-pts { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .sb-pt { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .85rem; font-weight: 600; }
 .sb-pt input { width: 64px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }

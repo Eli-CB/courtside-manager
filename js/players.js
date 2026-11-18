@@ -383,12 +383,8 @@ function viewPlayers() {
   // the latest games come from the box scores, loaded on first need; today's as they're played
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'players') render(); }).catch(() => {});
   startLive();
-  if (!fxLeague()) return `${browseNote()}${topPerformancesCard()}`; // the sandbox: no league
   return topPerformancesCard(); // (ideas for pickups: the Matchups tab's, made against this week's matchup)
 }
-
-// The sandbox's tabs (Players and Trends too): its sport, its scoring, and the way back to your league (sbBar, sandbox.js)
-const browseNote = () => sbBar();
 
 // A country's flag (ISO code from the daily data job), named on hover: flagImg alone, flag after a " · " (the player card)
 const flagImg = iso => {

@@ -85,6 +85,8 @@ function teamMenu() {
   const el = $('#teamMenu');
   if (!el) return;
   const L = fxLeague();
+  // the sandbox: its sport and scoring menus here instead (sbMenus, sandbox.js), whichever was open kept open
+  if (!L && state.browse && !needsLanding()) { const open = el.querySelector('details[open]'); el.innerHTML = sbMenus(open ? open.dataset.m : ''); return; }
   if (!L || needsLanding()) { el.innerHTML = ''; return; }
   const wasOpen = isOpen(el);
   const P = pastSeason();

@@ -165,7 +165,13 @@ async function switchLeague(input) {
   // the league's sport has to be on screen before the league can be: nothing's drawn until both are (ui.hold), and
   // a league that doesn't load leaves the sport as it was. Fantrax and Sleeper leagues say their sport; the other sites are basketball.
   // (coming from the demo, nothing is kept: its team was only borrowed, even if this is the same league)
-  const cur = currentLeagueId(), was = SPORT.key, fromDemo = !!state.demo;
+  // (out of the sandbox, picked in the league menu or its way back: the league underneath is the one it was entered from,
+  // which the sandbox's sport may not know, and its team and lineup are kept under it first, so they come back with it)
+  let back = state.browse && state.fxTeam && state.sandbox && state.sandbox.back;
+  // (a sandbox saved before it named that league: your own league's ID, else the site's own league, which basketball's data names)
+  if (state.browse && state.fxTeam && !back) { const id0 = state.fxLeagueId || ((await fetchSport('nba').catch(() => null)) || {}).siteLeague?.id; if (id0) back = { id: id0 }; }
+  if (back) stashLeague(back.id);
+  const cur = back ? back.id : currentLeagueId(), was = SPORT.key, fromDemo = !!state.demo;
   let res;
   ui.hold = true;
   try {
@@ -188,7 +194,10 @@ async function switchLeague(input) {
   state.leagueChosen = true;
   ui.viewA = null; ui.viewB = null;
   if (!wasCurrent) { ui.weekShift = 0; ui.weekChosen = false; } // Plan Ahead: next week again
-  if (!wasCurrent) {
+  // (the same league with no team picked, where a team was kept for it: that team again. A reload in the sandbox on the
+  // other sport once dropped the pick: loadNba)
+  const lost = wasCurrent && !state.fxTeam && state.leagueStates && state.leagueStates[id] && state.leagueStates[id].fxTeam;
+  if (!wasCurrent || lost) {
     const saved = state.leagueStates && state.leagueStates[id];
     if (saved) Object.assign(state, JSON.parse(JSON.stringify(saved)));
     else {
@@ -200,6 +209,7 @@ async function switchLeague(input) {
   foldPastSeasons();
   syncLinked();
   validateLineup();
+  if (!tabList().some(([k]) => k === ui.tab)) location.hash = '#dashboard'; // (out of the sandbox, on one of its own tabs: the Matchup tab)
   return res.league;
 }
 
