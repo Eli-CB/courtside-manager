@@ -734,6 +734,11 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 /* a player's ✕ (off My team, or Live) at the end of his name */
 .sb-x { flex: none; margin-left: auto; }
 .sb-table .pf-name .bplayer { padding-right: 2px; }
+/* the Players tab's + (add to My team) and ✓ (on it: remove) */
+.icon-btn.xs.sb-add { font-size: .95rem; font-weight: 700; }
+.icon-btn.xs.sb-add:hover { color: var(--accent); }
+.icon-btn.xs.sb-add.on { color: var(--accent); }
+.icon-btn.xs.sb-add.on:hover { color: var(--bad); }
 .sb-table tfoot td { border-top: 1px solid var(--border); padding-top: 8px; font-weight: 700; }
 .sb-table tfoot td.sc { font-weight: 700; }
 .badge.sb-live { margin-left: 4px; }

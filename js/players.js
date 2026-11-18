@@ -368,7 +368,7 @@ function perfTable(rows, picked, shown, W, { opp, who, teamOf }) {
           <div class="bname">${playerBtn(r.raw.id, r.raw.name)}${rookieBadge(r.raw, 'by-name')}${injBadge(r.raw.inj, 'by-name')}</div>
           <div class="pmeta">${rookieBadge(r.raw, 'in-meta')}${injBadge(r.raw.inj, 'in-meta')}${[ // (" · " only between pieces: no team, no dot left over)
             proj ? esc(r.game) : avg || perWeek ? `${r.g} GP` : weekly ? `${r.on ? liveDot(r.raw, r.on) : ''}${r.g} G` : day === today ? clock(r) : '',
-            football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''}`, who(r.raw.id)].filter(Boolean).join(' · ')}</div></div></div></td>
+            football ? '' : `${Math.round(r.tot.min || 0)} min${avg ? '/g' : ''}`, who(r.raw.id)].filter(Boolean).join(' · ')}</div></div>${sbAddBtn(r.raw.id)}</div></td>
         ${cats.map(c => cell(r, c)).join('')}
         <td class="num pf-v" style="${value.shade(r)}" data-tip="${value.tip}">${pts ? (avg || perWeek ? fmt(r.v, 1) : fmtFp(r.v)) : signed(r.v, 2)}</td>
       </tr>`).join('')}</tbody>

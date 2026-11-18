@@ -136,7 +136,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     (My team / Everyone else lists), Trades (`#trade`: give My team's players, get anyone found by name; `tradeCard` drawn inside `withState` with My team as
     `state.players`; shared with the site's address, no league link). Kept in `state.sandbox` { sport, nba: {roster, watch, scoring, points}, nhl: {...} } (`sandboxClean`
     in core.js; `sbState()` is this sport's), apart from any league. My team is the team id `SB_ME`: `myTeamId()` and `fxTeamName` know it, so `teamLink` draws "My team" in orange. Add / Follow live also on every
-    player's card (`sbCardLine` via `cardOwner`); searches are `sbSearch` (`ui.sbQ`). `browse-exit` goes back to your league (read again with `switchLeague`,
+    player's card (`sbCardLine` via `cardOwner`), and + / ✓ on each Players tab row (`sbAddBtn`, the owner's ask); searches are `sbSearch` (`ui.sbQ`). `browse-exit` goes back to your league (read again with `switchLeague`,
     which puts its players' league details back) or to the landing page. The league underneath stays in `state` (players, lineup, slots), maybe another
     sport's: `validateLineup` leaves it alone in the sandbox (it threw on basketball's PG in hockey's table, Nov 18, 2026), the league to go back to is named on
     entry (`state.sandbox.back`: the other sport's data doesn't know the site's own league) and `browse-exit` stashes its state before `switchLeague`. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.

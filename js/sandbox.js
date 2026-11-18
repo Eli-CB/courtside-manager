@@ -277,6 +277,13 @@ function sbTradeShare() {
   return { ...tradeShare(SB_SHARE_LEAGUE, T), url: `${location.origin}${location.pathname}`, link: 'Try your own on League Layer' };
 }
 
+// The Players tab's rows in the sandbox (perfTable, players.js): + puts him on My team, ✓ (he's on it) takes him off
+function sbAddBtn(id) {
+  if (fxLeague() || !state.browse) return '';
+  const on = sbOwns(id), name = esc((nbaById.get(id) || {}).name || '');
+  return `<button type="button" class="icon-btn xs sb-x sb-add${on ? ' on' : ''}" data-action="${on ? 'sb-drop' : 'sb-add'}" data-id="${id}" aria-pressed="${on}" aria-label="${on ? `Remove ${name} from My team` : `Add ${name} to My team`}" title="${on ? 'On My team: remove' : 'Add to My team'}">${on ? '✓' : '+'}</button>`;
+}
+
 // The player card's line in the sandbox (cardOwner, players.js): whether he's on My team and followed live, each a button
 function sbCardLine(raw) {
   const id = raw.id, mine = sbOwns(id), w = sbWatching(id);

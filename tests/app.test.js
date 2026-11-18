@@ -3572,6 +3572,12 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   assert.ok(players.includes('<tr class="pf-me">') && /<span class="perf-owner mine"[^>]*><span class="team-mine">My team<\/span><\/span>/.test(players), 'his row says My team, in orange');
   assert.match(players, /data-key="me"[^>]*>My team<[\s\S]*data-key="fa"[^>]*>Everyone else</);
   assert.ok(!players.includes('perfOthers') && !players.includes('data-action="perf-spot"'), 'no other teams, no lineups');
+  // each row's + adds him to My team; ✓ (he's on it) takes him off
+  assert.ok(players.includes(`data-action="sb-drop" data-id="${p1.nbaId}" aria-pressed="true"`) && players.includes(`data-action="sb-add" data-id="${p4.nbaId}" aria-pressed="false"`));
+  a.actions['sb-add']({ dataset: { id: String(p4.nbaId) } });
+  assert.ok(a.sbState().roster.includes(p4.nbaId) && a.viewPlayers().includes(`data-action="sb-drop" data-id="${p4.nbaId}"`), 'added from the Players tab');
+  a.actions['sb-drop']({ dataset: { id: String(p4.nbaId) } });
+  assert.ok(!a.sbState().roster.includes(p4.nbaId));
   ui.perfWhose = { me: true, opp: true, other: true, fa: false };
   const mineOnly = a.viewPlayers();
   assert.ok(mineOnly.includes(`data-nba="${p1.nbaId}"`) && !mineOnly.includes(`data-nba="${p4.nbaId}"`), 'My team alone');
@@ -3741,6 +3747,8 @@ test('the sandbox from a league: the league menu offers it, and leaving it goes 
   a.adoptTeam(tid);
   const fx = () => a.NBA.players.filter(r => r.fx).length, before = fx();
   assert.ok(before > 100, "the league's players");
+  await a.loadBoxes();
+  assert.ok(a.viewPlayers().includes('data-nba=') && !a.viewPlayers().includes('sb-add'), "a league's Players tab has no sandbox +");
   const lineup = JSON.stringify(st.lineup), slots = JSON.stringify(st.slots);
   assert.ok(st.lineup.filter(Boolean).length > 3, 'a lineup set');
   a.actions['land-browse']();
