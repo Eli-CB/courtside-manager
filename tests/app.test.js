@@ -3629,7 +3629,7 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   // the Players tab: My team's rows marked, its filters My team and everyone else (no other teams, no lineups)
   Object.assign(ui, { perfRange: 'year', perfPer: true, perfFiltOpen: true });
   const players = a.viewPlayers();
-  assert.ok(players.includes('<tr class="pf-me">') && players.includes('<span class="perf-owner mine"><span class="team-mine">My team</span></span>'), 'his row says My team, in orange');
+  assert.ok(players.includes('<tr class="pf-me">') && /<span class="perf-owner mine"[^>]*><span class="team-mine">My team<\/span><\/span>/.test(players), 'his row says My team, in orange');
   assert.match(players, /data-key="me"[^>]*>My team<[\s\S]*data-key="fa"[^>]*>Everyone else</);
   assert.ok(!players.includes('perfOthers') && !players.includes('data-action="perf-spot"'), 'no other teams, no lineups');
   ui.perfWhose = { me: true, opp: true, other: true, fa: false };
