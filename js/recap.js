@@ -15,19 +15,25 @@ const finishedPeriods = L => (L.periods || []).filter(p => periodOver(p) && ((L.
 // A game's or a week's full line in the league's own categories (a week per game; shooting as makes-attempts, a
 // week's with its %), minutes first
 function fullLine(s, perGame) {
+  if (isFootball()) { const w = footballWords(s, perGame ? s.gp1 || 1 : 1); return w.length ? w : ['played, no stats']; }
+  return lineTiles(s, perGame).map(t => (t.made != null ? `${t.made} ${t.k.replace('%', '')}${perGame && t.att ? ` (${fmtPct(t.pct)})` : ''}` : `${t.v} ${t.k}`));
+}
+// The same line as numbers and their labels (the share pictures' tiles): { v, k }, a percentage also { made: makes-attempts,
+// att, pct }; null in football (its lines are words)
+function lineTiles(s, perGame) {
+  if (isFootball()) return null;
   const g = perGame ? s.gp1 || 1 : 1, v = (k, d) => fmt(lineStat(s, k) / g, perGame ? 1 : d);
-  if (isFootball()) { const w = footballWords(s, g); return w.length ? w : ['played, no stats']; }
-  const parts = [`${v('min', 0)} MIN`];
+  const out = [{ v: v('min', 0), k: 'MIN' }];
   const goalie = isHockey() && !!(s.sa || s.gs); // hockey: a skater's line or a goalie's, not both
   for (const c of scoreCats()) {
     if (c.fp || (isHockey() && SPORT.goalieCats.includes(c.key) !== goalie)) continue;
-    if (c.rate) parts.push(`${fmt(s[c.att] ? (s[c.made] || 0) / s[c.att] : 0, 2)} ${c.label}`);
+    if (c.rate) out.push({ v: fmt(s[c.att] ? (s[c.made] || 0) / s[c.att] : 0, 2), k: c.label });
     else if (c.pct) {
       const m = s[c.made] || 0, a = s[c.att] || 0;
-      parts.push(`${fmt(m / g, perGame ? 1 : 0)}-${fmt(a / g, perGame ? 1 : 0)} ${c.label.replace('%', '')}${perGame && a ? ` (${fmtPct(m / a)})` : ''}`);
-    } else parts.push(`${v(c.key, c.dec || 0)} ${c.label}`);
+      out.push({ v: a ? (m / a).toFixed(3).replace(/^0/, '') : '—', k: c.label, made: `${fmt(m / g, perGame ? 1 : 0)}-${fmt(a / g, perGame ? 1 : 0)}`, att: a, pct: a ? m / a : 0 });
+    } else out.push({ v: v(c.key, c.dec || 0), k: c.label });
   }
-  return parts;
+  return out;
 }
 
 function buildRecap(L, P, period) {
@@ -155,7 +161,9 @@ function recapItems(X) {
   const stand = (e, label, x, perGame, cls = '') => {
     const parts = fullLine(x.line, perGame), head = perGame ? `${x.line.gp1} G, per game: ` : '';
     add(e, label, `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${isPoints() && !perGame ? fmtFp(x.v) : fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
-      `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}` });
+      `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}`,
+        // (the picture's: his numbers as tiles, the games they're a game of, and his value or points)
+        tiles: lineTiles(x.line, perGame), per: perGame ? x.line.gp1 : 0, score: [isPoints() && !perGame ? fmtFp(x.v) : fmtValue(x.v, perGame ? 1 : 2), unit] });
   };
   if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
   if (X.goalie) stand('🥅', 'Goalie of the week', X.goalie, true);
@@ -170,22 +178,22 @@ function recapItems(X) {
     const list = html => shown.map(x => who(x, html)).join(', ') + (more ? ` and ${more} other${more === 1 ? '' : 's'}` : '');
     const tail = isOneGame() ? (X.missed.length > 1 ? 'each started without playing a game' : 'started without playing a game')
       : X.missed.length > 1 ? `each missed ${g} game${g === 1 ? '' : 's'} while starting` : `missed ${g} of ${X.missed[0].sched} games while starting`;
-    add('🤕', 'Street clothes', `${list(true)} ${tail}`, `${list(false)} ${tail}`);
+    add('🤕', 'Street clothes', `${list(true)} ${tail}`, `${list(false)} ${tail}`, { faces: shown.map(x => ({ nbaId: x.nba, name: x.name })) });
   }
   if (X.regret) {
     const r = X.regret, o = Math.sign(Math.round((r.sc.me - r.sc.opp) * 10)), res = o > 0 ? 'won' : 'tied';
     add('🪑', 'Bench regret', `<b>${teamLink(r.tid)}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
-      `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`);
+      `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`, { faces: [r.w.inP, r.w.outP] });
   }
   if (X.hats && X.hats.length) {
     const who = html => X.hats.map(x => (html ? `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span>` : `${x.p.name} (${team(x.tid)})`)).join(', ');
     const tail = X.hats.length > 1 ? 'each scored three goals in a game' : `scored ${fmt(lineStat(X.hats[0].line, 'g'), 0)} goals in a game`;
-    add('🎩', 'Hat trick', `${who(true)} ${tail}`, `${who(false)} ${tail}`);
+    add('🎩', 'Hat trick', `${who(true)} ${tail}`, `${who(false)} ${tail}`, { faces: X.hats.map(x => x.p) });
   }
   if (X.carry) {
     const c = X.carry, pct = Math.round(c.share * 100);
     add('🎒', 'Carried', `${name(c.p, true)} scored ${fmtFp(c.pts)} of <b>${teamLink(c.tid)}</b>'s ${fmtFp(c.of)} (${pct}%)`,
-      `${c.p.name} scored ${fmtFp(c.pts)} of ${team(c.tid)}'s ${fmtFp(c.of)} (${pct}%)`);
+      `${c.p.name} scored ${fmtFp(c.pts)} of ${team(c.tid)}'s ${fmtFp(c.of)} (${pct}%)`, { faces: [c.p] });
   }
   const final = g => `${fmtFp(g.sc.me)}–${fmtFp(g.sc.opp)}`;
   if (X.unlucky) {
@@ -432,18 +440,57 @@ function viewTrends() {
 }
 
 // ----- The recap as a picture, for the league chat -----
-// 1080 px wide, as tall as it needs: the league and week, the standouts (photos for the players), every final, the
-// site's address. Drawn on a canvas from the same recap; the headshots come from the site's own sheet.
-const RC_IMG = { w: 1080, pad: 64, bg: '#15171b', card: '#1f2228', line: '#2c3038', text: '#f3f4f6', muted: '#9aa3b2', accent: '#f07a2a' };
-const RC_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+// 1080 px wide, as tall as it needs: the league and week, the standouts, every final, the site's name. Each player stands
+// on his NBA team's colors in front of its logo, as the player card shows him (ESPN's cutout; the round photo from the
+// site's own sheet where there's none). Drawn on a canvas from the same recap.
+const RC_IMG = { w: 1080, pad: 56, bg: '#0b0c0f', card: '#16181d', card2: '#1f2229', line: '#2a2e36', text: '#f4f4f5', soft: '#d4d8df', muted: '#9aa3b2', accent: '#f07a2a', bad: '#f87171' };
+const RC_FONT = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
-const loadSheet = () => new Promise(res => {
-  if (!IMG || !IMG.sheet) return res(null);
-  const im = new Image();
-  im.onload = () => res(im);
-  im.onerror = () => res(null);
-  im.src = IMG.sheet;
+// An image for a canvas, or null if it won't load in 8 s. cors: from another site, which must allow it (a canvas that
+// drew an image its site didn't allow can't be saved)
+const canvasImg = (src, cors) => new Promise(res => {
+  const im = new Image(), t = setTimeout(() => res(null), 8000);
+  if (cors) im.crossOrigin = 'anonymous';
+  im.onload = () => { clearTimeout(t); res(im); };
+  im.onerror = () => { clearTimeout(t); res(null); };
+  im.src = src;
 });
+const loadSheet = () => (IMG && IMG.sheet ? canvasImg(IMG.sheet) : Promise.resolve(null));
+// A player's cutout for the pictures: ESPN's by his ESPN id, every sport (ESPN's photo server lets a canvas use it;
+// NBA.com's, the player card's, doesn't), 520 x 380; asked once a visit (one that failed, again the next time)
+const shotImgs = new Map();
+function shotImg(raw) {
+  if (!raw || !raw.espn || (raw.pos && raw.pos[0] === 'DEF')) return Promise.resolve(null);
+  const src = `https://a.espncdn.com/combiner/i?img=/i/headshots/${SPORT.key}/players/full/${raw.espn}.png&w=520&h=380`;
+  if (!shotImgs.has(src)) shotImgs.set(src, canvasImg(src, true).then(im => { if (!im) shotImgs.delete(src); return im; }));
+  return shotImgs.get(src);
+}
+// A team's logo for the pictures: the site's own (an SVG), given a size first (Firefox won't draw an SVG without one)
+const logoImgs = new Map();
+function logoImg(team) {
+  const src = IMG && team && IMG.logos[team];
+  if (!src) return Promise.resolve(null);
+  if (!logoImgs.has(src)) {
+    let url = src;
+    const m = /^data:image\/svg\+xml;base64,(.*)$/.exec(src);
+    if (m) {
+      try {
+        const svg = atob(m[1]);
+        if (!/<svg[^>]*\swidth=/.test(svg)) url = `data:image/svg+xml;base64,${btoa(svg.replace('<svg', '<svg width="400" height="400"'))}`;
+      } catch (e) { url = src; }
+    }
+    logoImgs.set(src, canvasImg(url));
+  }
+  return logoImgs.get(src);
+}
+// A team's color to tint a picture with: its first, or its second where the first is too dark to show on the dark
+// picture (Brooklyn's black) or too light, else a gray. hexA: a color as rgba, darkened (dark 0-1), at an opacity
+const lumOf = hex => { const n = parseInt(hex.slice(1), 16); return (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
+const teamTint = team => (TEAM_COLORS[team] || []).find(c => /^#[0-9a-f]{6}$/i.test(c) && lumOf(c) > 0.07 && lumOf(c) < 0.8) || '#3a404c';
+function hexA(hex, a = 1, dark = 0) {
+  const n = parseInt(hex.slice(1), 16), k = 1 - dark;
+  return `rgba(${Math.round((n >> 16) * k)},${Math.round(((n >> 8) & 255) * k)},${Math.round((n & 255) * k)},${a})`;
+}
 
 // lines of text that fit the width, at the font already set, broken between words (or between stats: sep ' · ')
 function wrapText(ctx, text, max, sep = ' ') {
@@ -463,27 +510,71 @@ function fitText(ctx, text, max) {
   while (t.length > 1 && ctx.measureText(t + '…').width > max) t = t.slice(0, -1);
   return t.trimEnd() + '…';
 }
+// Text in styled pieces ([text, style]: 'b' bold, 'm' gray, 'a' orange, '' plain) as units that stay on one line: each
+// word, its pieces joined where no space parts them ("face" + ":")
+function wordUnits(list) {
+  const units = [];
+  let cur = null, space = true;
+  for (const [t, st] of list) {
+    for (const piece of String(t).split(/(\s+)/)) {
+      if (!piece) continue;
+      if (/^\s+$/.test(piece)) { space = true; continue; }
+      if (space || !cur) units.push(cur = []);
+      cur.push([piece, st]);
+      space = false;
+    }
+  }
+  return units;
+}
+// A standout's line from its HTML, styled as the page shows it: names bold, a player's fantasy team after him gray (in
+// brackets: the page sets it apart by its color alone)
+function htmlRuns(html) {
+  const out = [];
+  const walk = (node, st) => {
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) out.push([c.textContent, st]);
+      else if (c.nodeType !== 1) continue;
+      else if (st !== 'm' && c.classList.contains('muted')) { out.push(['(', 'm']); walk(c, 'm'); out.push([')', 'm']); }
+      else walk(c, st === 'm' ? 'm' : ['B', 'STRONG', 'BUTTON'].includes(c.tagName) || c.classList.contains('team-mine') ? 'b' : st);
+    }
+  };
+  walk(new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html').body, '');
+  return out;
+}
+// numbers as units: each number bold (hot: orange, red below zero), its label gray after it ("27.5 PTS", ".623 FG% 10.8-17.3")
+const statUnits = tiles => tiles.map(t => [[t.v, t.hot ? (isBelowZero(t.v) ? 'r' : 'a') : 'b'], [` ${t.k}${t.made ? ` ${t.made}` : ''}`, 'm']]);
+const isBelowZero = v => /^[-−]/.test(String(v));
 
 // The picture of a week's recap: its standouts, then every final
 const recapCanvas = (L, X) => shareCanvas({
-  kicker: `WEEK ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games, mark: tid => recapMark(X, tid),
+  kicker: `WEEK ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games, mark: tid => recapMark(X, tid), hero: true,
   sub: `${fmtDay(X.period.start)} – ${fmtDay(matchDates(X.period.start).slice(-1)[0] || X.period.end)}`,
 });
 
 // What every share picture is drawn with (the recap's, the draft's, a trade's): a canvas `tall` px high in the share
-// colors, and its tools (K): fonts, text, rounded cards, a player's photo, the top (a kicker, a title, a line under it),
-// then done(y): the site's name at the bottom and the canvas cut to what was drawn
+// colors, and its tools (K): fonts, text, rounded cards, styled lines (lay, drawLay), a player on his team's colors
+// (prep loads the photos and logos first; panel, face, photo), his team and positions (meta), the top (a kicker, a
+// title, a line under it), then done(y): the site's name at the bottom and the canvas cut to what was drawn
 async function sharePad(tall = 5000) {
-  const C = RC_IMG, W = C.w, sheet = await loadSheet();
+  const C = RC_IMG, W = C.w;
+  // (the site's own font: the page has it, a picture waits for it, Latin Extended too: Jokić)
+  const fonts = typeof document !== 'undefined' && document.fonts ? Promise.all([400, 500, 600, 700].map(w => document.fonts.load(`${w} 40px Inter`, 'Ać'))).catch(() => {}) : null;
+  const [sheet] = await Promise.all([loadSheet(), fonts]);
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = tall;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, cv.height);
+  // a warm glow from the top corner
+  const glow = ctx.createRadialGradient(W * 0.12, -80, 0, W * 0.12, -80, 980);
+  glow.addColorStop(0, hexA(C.accent, 0.22)); glow.addColorStop(1, hexA(C.accent, 0));
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 1000);
   ctx.textBaseline = 'top';
-  const font = (px, weight = 400) => { ctx.font = `${weight} ${px}px ${RC_FONT}`; };
+  const spacing = 'letterSpacing' in ctx;
+  const font = (px, weight = 400, ls = 0) => { ctx.font = `${weight} ${px}px ${RC_FONT}`; if (spacing) ctx.letterSpacing = `${ls}px`; };
   const text = (t, x, y, color = C.text, align = 'left') => { ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(t, x, y); };
   const round = (x, y, w, h, r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
-  // a player's photo in a ring of his NBA team's colors (as on the site); his initials without one
+  const clip = (x, y, w, h, r) => { ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.clip(); };
+  // a player's round photo in a ring of his NBA team's colors (as on the site); his initials without one
   const photo = (p, x, y, d) => {
     const raw = nbaById.get(p.nbaId), tc = TEAM_COLORS[raw && raw.team], cx = x + d / 2, cy = y + d / 2, i = IMG_INDEX.get(p.nbaId);
     ctx.save();
@@ -492,75 +583,226 @@ async function sharePad(tall = 5000) {
     else { font(d * 0.36, 700); ctx.textBaseline = 'middle'; text(initials(p.name), cx, cy, C.muted, 'center'); ctx.textBaseline = 'top'; }
     ctx.restore();
     if (tc) {
-      ctx.lineWidth = 5;
+      ctx.lineWidth = Math.max(4, d / 22);
       const a0 = (240 - 90) * Math.PI / 180;
       for (const [c, from, to] of [[tc[0], 0, 2 / 3], [tc[1], 2 / 3, 1]]) {
-        ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(cx, cy, d / 2 - 2.5, a0 + from * Math.PI * 2, a0 + to * Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(cx, cy, d / 2 - ctx.lineWidth / 2, a0 + from * Math.PI * 2, a0 + to * Math.PI * 2); ctx.stroke();
       }
     }
   };
-  const inner = W - C.pad * 2;
-  // the top: what it is, the league, when; the y below it
-  const top = H => {
-    let y = C.pad;
-    font(28, 800); text(H.kicker, C.pad, y, C.accent); y += 44;
-    font(58, 800);
-    for (const l of wrapText(ctx, H.title, inner).slice(0, 2)) { text(l, C.pad, y); y += 70; }
-    font(30); text(H.sub, C.pad, y, C.muted); y += 64;
+  // the cutouts and logos of the players a picture shows, loaded before it's drawn (8 s at most each)
+  const shots = new Map(), logos = new Map();
+  const prep = ps => Promise.all(ps.filter(p => p && p.nbaId != null).map(async p => {
+    const raw = nbaById.get(p.nbaId);
+    const [shot, logo] = await Promise.all([shotImg(raw), logoImg(raw && raw.team)]);
+    if (shot) shots.set(p.nbaId, shot);
+    if (logo) logos.set(raw.team, logo);
+  }));
+  // A player on his team's colors in a rounded box (r as roundRect takes it): its color, its logo faint behind him, his
+  // cutout standing on the bottom edge; his round photo where there's no cutout
+  const panel = (p, x, y, w, h, r) => {
+    const raw = nbaById.get(p.nbaId) || {}, tint = teamTint(raw.team), shot = shots.get(p.nbaId), logo = logos.get(raw.team);
+    clip(x, y, w, h, r);
+    const g = ctx.createLinearGradient(x, y, x + w * 0.5, y + h);
+    g.addColorStop(0, hexA(tint, 1, 0.1)); g.addColorStop(1, hexA(tint, 1, 0.62));
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    if (logo) { const s = Math.max(w, h) * 1.05; ctx.globalAlpha = 0.2; ctx.drawImage(logo, x + (w - s) / 2, y + (h - s) / 2, s, s); ctx.globalAlpha = 1; }
+    if (shot) { const sh = h * 0.92, sw = sh * shot.width / shot.height; ctx.drawImage(shot, x + (w - sw) / 2, y + h - sh, sw, sh); }
+    else standIn(p, raw, logo, x, y, w, h);
+    ctx.restore();
+  };
+  // where there's no cutout, in the middle of a box: a team defense's logo, else his round photo
+  const standIn = (p, raw, logo, x, y, w, h) => {
+    if (logo && raw.pos && raw.pos[0] === 'DEF') { const s = Math.min(w, h) * 0.72; ctx.drawImage(logo, x + (w - s) / 2, y + (h - s) / 2, s, s); return; }
+    const d = Math.min(w, h) * 0.62;
+    photo(p, x + (w - d) / 2, y + (h - d) / 2, d);
+  };
+  // a player's face in a circle on his team's color (his cutout's head and shoulders), ringed in `ring` so faces that
+  // overlap stand apart
+  const face = (p, cx, cy, d, ring) => {
+    const raw = nbaById.get(p.nbaId) || {}, shot = shots.get(p.nbaId);
+    if (!shot) { photo(p, cx - d / 2, cy - d / 2, d); return; }
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = hexA(teamTint(raw.team), 1, 0.3); ctx.fill(); ctx.clip();
+    const s = shot.height * 0.84;
+    ctx.drawImage(shot, (shot.width - s) / 2, shot.height * 0.04, s, s, cx - d / 2, cy - d / 2, d, d);
+    ctx.restore();
+    ctx.lineWidth = 6; ctx.strokeStyle = ring; ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.stroke();
+  };
+  // styled units (wordUnits, statUnits) in lines that fit maxW at px, `gap` apart (a space by default); then drawn from
+  // (x, y), lh apart, returning the y under them
+  const STYLE = { b: [700, C.text], m: [500, C.muted], a: [700, C.accent], r: [700, C.bad], '': [400, C.soft] };
+  const unitW = (u, px) => sum(u.map(([t, st]) => { font(px, STYLE[st][0]); return ctx.measureText(t).width; }));
+  const lay = (units, maxW, px, gap) => {
+    font(px);
+    const g = gap ?? ctx.measureText(' ').width, lines = [];
+    let line = null, w = 0;
+    for (const u of units) {
+      const uw = unitW(u, px);
+      if (!line || (line.length && w + g + uw > maxW)) { lines.push(line = []); w = -g; }
+      line.push({ u, x: w + g }); w += g + uw;
+    }
+    return lines;
+  };
+  const drawLay = (lines, x, y, px, lh) => {
+    for (const line of lines) {
+      for (const { u, x: ux } of line) {
+        let cx = x + ux;
+        for (const [t, st] of u) { font(px, STYLE[st][0]); text(t, cx, y, STYLE[st][1]); cx += ctx.measureText(t).width; }
+      }
+      y += lh;
+    }
     return y;
+  };
+  // his NBA team and his positions in their colors (as on the site: slotInk), then any more ([text, color, weight])
+  const meta = (x, y, px, team, pos, more = []) => {
+    const runs = [[team || 'FA', C.muted, 600], ...(pos || []).flatMap((q, j) => [[j ? ',' : ' · ', C.muted], [q, slotInk(q) || C.muted, 700]]), ...more];
+    let cx = x;
+    for (const [t, color, weight] of runs) { font(px, weight || 500); text(t, cx, y, color); cx += ctx.measureText(t).width; }
+  };
+  const inner = W - C.pad * 2;
+  // the top: what it is (an orange tab), the league, when; the y below it
+  const top = H => {
+    let y = C.pad + 8;
+    font(22, 700, 2.5);
+    round(C.pad, y, ctx.measureText(H.kicker).width + 40, 48, 24, C.accent);
+    text(H.kicker, C.pad + 20, y + 13, '#16181d');
+    y += 48 + 30;
+    font(80, 700, -2);
+    for (const l of wrapText(ctx, H.title, inner).slice(0, 2)) { text(fitText(ctx, l, inner), C.pad, y); y += 92; }
+    font(30, 500); text(H.sub, C.pad, y, C.muted);
+    return y + 84;
+  };
+  // the site's mark, as icons/logo.svg draws it (its shapes: copy them here if it changes)
+  const mark = (x, y, s) => {
+    const k = s / 64;
+    round(x, y, s, s, s * 0.2, '#161a22');
+    for (const [pts, color] of [[[36.09, 39.16, 56.56, 28.93, 44.28, 22.78, 36.09, 26.88, 19.71, 18.69, 7.42, 24.83], '#ffffff'],
+      [[7.42, 28.93, 36.09, 43.26, 56.56, 33.02, 56.56, 39.16, 36.09, 49.4, 7.42, 35.07], '#7f8a9c']]) {
+      ctx.fillStyle = color; ctx.beginPath();
+      for (let i = 0; i < pts.length; i += 2) ctx[i ? 'lineTo' : 'moveTo'](x + pts[i] * k, y + pts[i + 1] * k);
+      ctx.closePath(); ctx.fill();
+    }
   };
   // the bottom: where it came from
   const done = y => {
-    y += 32;
-    ctx.fillStyle = C.line; ctx.fillRect(C.pad, y, inner, 2); y += 30;
-    font(30, 800); text('League Layer', C.pad, y, C.text);
-    font(28); text('leaguelayer.com', W - C.pad, y + 2, C.muted, 'right');
-    y += 40 + C.pad - 10;
+    y += 44;
+    ctx.fillStyle = C.line; ctx.fillRect(C.pad, y, inner, 2); y += 36;
+    mark(C.pad, y, 52);
+    font(30, 700, -0.3); text('League Layer', C.pad + 70, y + 10, C.text);
+    font(26, 500); text('leaguelayer.com', W - C.pad, y + 13, C.muted, 'right');
+    y += 52 + C.pad;
     const out = document.createElement('canvas');
     out.width = W; out.height = Math.ceil(y);
     out.getContext('2d').drawImage(cv, 0, 0);
     return out;
   };
-  return { C, W, inner, ctx, font, text, round, photo, top, done };
+  return { C, W, inner, ctx, font, text, round, clip, photo, standIn, prep, panel, face, lay, drawLay, meta, shots, logos, top, done };
 }
 
-// A picture to share in a league chat (1080 px wide): a kicker, the league's name and a line under it, then each standout
-// in a card (a player's with his photo), then any finals. H: { kicker, title, sub, items, games, mark: tid -> its emoji }
+// A picture to share in a league chat (1080 px wide): a kicker, the league's name and a line under it, then the standouts
+// (with hero, the recap's: the first player large, his numbers in tiles; each other player beside his photo; the rest
+// beside their emoji, with the faces of any players they name), then any finals. H: { kicker, title, sub, items, games,
+// mark: tid -> its emoji, hero }. (The Draft Retrospective has no large player, the owner's ask: The Reach as The Fall.)
+// An item: { e, label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's
+// numbers are a game of), score: [number, unit] }, one naming players { faces }
 async function shareCanvas(H) {
-  const K = await sharePad(), { C, W, inner, ctx, font, text, round, photo } = K;
-  let y = K.top(H);
+  const items = H.items, games = H.games || [], heroAt = H.hero ? items.findIndex(it => it.p) : -1;
+  const K = await sharePad(900 + sum(items.map((it, i) => (i === heroAt ? 760 : it.p ? 440 : 340))) + games.length * 100);
+  const { C, W, inner, ctx, font, text, round, clip, standIn, panel, face, lay, drawLay, meta, shots, logos } = K;
+  await K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])]);
+  const x0 = C.pad, w = inner;
+  const posOf = p => p.pos || (nbaById.get(p.nbaId) || {}).pos;
+  const labelText = (it, x, y, max) => { font(22, 700, 2); text(fitText(ctx, `${it.e ? `${it.e}  ` : ''}${it.label.toUpperCase()}`, max), x, y, C.accent); };
 
-  // the standouts, each in a card
-  for (const it of H.items) {
-    const d = it.p ? 112 : 0, tx = C.pad + 32 + (d ? d + 28 : 0), tw = W - C.pad - 32 - tx;
-    let body;
-    if (it.p) {
-      font(40, 800); const name = fitText(ctx, it.p.name, tw);
-      font(28); const team = fitText(ctx, fxTeamName(it.tid), tw);
-      font(27); const stats = wrapText(ctx, it.stats, tw, ' · ');
-      body = { name, team, stats, h: 44 + 50 + 42 + stats.length * 38 };
-    } else {
-      font(32, 500); const lines = wrapText(ctx, it.text, tw);
-      body = { lines, h: 44 + 4 + lines.length * 44 };
+  // The first player, large: his name over his team's colors and his cutout, his numbers in tiles under him (his value or
+  // points first, in orange), or the award's words
+  const hero = (it, y) => {
+    const p = it.p, raw = nbaById.get(p.nbaId) || {}, topH = 384, tx = x0 + 44, tw = 470;
+    const tiles = it.tiles && [{ v: it.score[0], k: it.score[1].toUpperCase(), hot: true }, ...(it.per ? [{ v: String(it.per), k: it.per === 1 ? 'GAME' : 'GAMES' }] : []), ...it.tiles];
+    const rows = tiles ? Math.ceil(tiles.length / 6) : 0, perRow = tiles ? Math.ceil(tiles.length / rows) : 0;
+    font(30); const said = tiles ? [] : wrapText(ctx, it.stats || '', w - 88);
+    const stripH = tiles ? rows * 116 : said.length * 42 + 64, h = topH + stripH;
+    round(x0, y, w, h, 32, C.card);
+    clip(x0, y, w, h, 32);
+    const tint = teamTint(raw.team), g = ctx.createLinearGradient(x0 + w * 0.3, 0, x0 + w, 0);
+    g.addColorStop(0, hexA(tint, 0, 0.3)); g.addColorStop(1, hexA(tint, 0.8, 0.3));
+    ctx.fillStyle = g; ctx.fillRect(x0, y, w, topH);
+    const logo = logos.get(raw.team), shot = shots.get(p.nbaId);
+    if (logo) { ctx.globalAlpha = 0.18; ctx.drawImage(logo, x0 + w - 470, y - 36, 450, 450); ctx.globalAlpha = 1; }
+    if (shot) { const sh = topH - 14, sw = sh * shot.width / shot.height; ctx.drawImage(shot, x0 + w - sw + 22, y + topH - sh, sw, sh); }
+    else standIn(p, raw, logo, x0 + w - 400, y + 7, 370, 370);
+    ctx.fillStyle = 'rgba(8,9,12,0.82)'; ctx.fillRect(x0, y + topH, w, stripH);
+    ctx.restore();
+    labelText(it, tx, y + 44, tw);
+    // first name over the last, the last large ("Victor" / "WEMBANYAMA")
+    const parts = p.name.split(' '), first = parts.length > 1 ? parts[0] : '', last = (parts.length > 1 ? parts.slice(1) : parts).join(' ').toUpperCase();
+    font(36, 600); text(fitText(ctx, first, tw), tx, y + 96, C.soft);
+    let px = 76;
+    for (font(px, 700, -1); px > 44 && ctx.measureText(last).width > tw; font(px, 700, -1)) px -= 2;
+    text(fitText(ctx, last, tw), tx, y + 140 + (76 - px) / 2, C.text);
+    font(30, 700); text(fitText(ctx, fxTeamName(it.tid), tw), tx, y + 248, C.text);
+    meta(tx, y + 292, 25, raw.team, posOf(p), it.per ? [[' · per game', C.muted]] : []);
+    if (!tiles) { font(30); said.forEach((l, j) => text(l, tx, y + topH + 32 + j * 42, C.soft)); return y + h; }
+    for (let r = 0; r < rows; r++) {
+      const row = tiles.slice(r * perRow, (r + 1) * perRow), cw = w / row.length, ry = y + topH + r * 116;
+      if (r) { ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(x0 + 28, ry, w - 56, 2); }
+      row.forEach((t, j) => {
+        const cx = x0 + cw * (j + 0.5);
+        if (j) { ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(x0 + cw * j, ry + 26, 2, 64); }
+        font(42, 700, -0.5); text(fitText(ctx, t.v, cw - 16), cx, ry + 22, !t.hot ? C.text : isBelowZero(t.v) ? C.bad : C.accent, 'center');
+        font(18, 600, 1.5); text(fitText(ctx, `${t.k}${t.made ? ` ${t.made}` : ''}`, cw - 14), cx, ry + 76, C.muted, 'center');
+      });
     }
-    const h = Math.max(body.h, d) + 56;
-    round(C.pad, y, inner, h, 24, C.card);
-    let ty = y + 28;
-    if (d) photo(it.p, C.pad + 32, y + (h - d) / 2, d);
-    font(26, 800); text(`${it.e}  ${it.label.toUpperCase()}`, tx, ty, C.accent); ty += 44;
-    if (it.p) {
-      font(40, 800); text(body.name, tx, ty); ty += 50;
-      font(28); text(body.team, tx, ty, C.muted); ty += 42;
-      font(27); for (const l of body.stats) { text(l, tx, ty, '#d5d9e0'); ty += 38; }
-    } else { ty += 4; font(32, 500); for (const l of body.lines) { text(l, tx, ty); ty += 44; } }
-    y += h + 20;
-  }
+    return y + h;
+  };
 
-  // every final, winner on the left in bold
-  if ((H.games || []).length) { y += 28; font(28, 800); text('RESULTS', C.pad, y, C.accent); y += 52; }
-  for (const g of H.games || []) {
-    font(34, 800); const colW = (inner - 64 - ctx.measureText(scoreLine(g.sc)).width - 48) / 2; // the names share what the score leaves
-    round(C.pad, y, inner, 76, 18, C.card);
+  // Every other player: his photo on his team's colors at the left, the award, his name, his teams, his numbers
+  const player = (it, y) => {
+    const p = it.p, raw = nbaById.get(p.nbaId) || {}, pw = 300, tx = x0 + pw + 40, tw = x0 + w - 40 - tx;
+    const units = it.tiles ? statUnits([{ v: it.score[0], k: it.score[1], hot: true }, ...it.tiles]) : wordUnits([[it.stats || '', '']]);
+    const lines = lay(units, tw, 27, it.tiles ? 22 : undefined), h = Math.max(300, 214 + lines.length * 40 + 26);
+    round(x0, y, w, h, 28, C.card);
+    panel(p, x0, y, pw, h, [28, 0, 0, 28]);
+    labelText(it, tx, y + 36, tw);
+    font(44, 700, -0.5); text(fitText(ctx, p.name, tw), tx, y + 74, C.text);
+    font(27, 600); text(fitText(ctx, fxTeamName(it.tid), tw), tx, y + 132, C.soft);
+    meta(tx, y + 172, 23, raw.team, posOf(p), it.per ? [[` · ${it.per} G, per game`, C.muted]] : []);
+    drawLay(lines, tx, y + 216, 27, 40);
+    return y + h;
+  };
+
+  // The rest: their emoji, the award, its line (names bold), and the faces of the players it names
+  const note = (it, y) => {
+    const faces = (it.faces || []).filter(f => f && f.nbaId != null).slice(0, 3), fd = 104, step = 72;
+    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : 0, ex = x0 + 30, tx = ex + 88 + 28, tw = x0 + w - 32 - fw - tx;
+    const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), block = 40 + lines.length * 44 - 8;
+    const h = Math.max(block + 64, faces.length ? fd + 60 : 0, 148), ty = y + (h - block) / 2;
+    round(x0, y, w, h, 28, C.card);
+    ctx.fillStyle = hexA(C.accent, 0.14); ctx.beginPath(); ctx.arc(ex + 44, y + h / 2, 44, 0, Math.PI * 2); ctx.fill();
+    font(42); ctx.textBaseline = 'middle'; text(it.e, ex + 44, y + h / 2 + 2, C.text, 'center'); ctx.textBaseline = 'top';
+    labelText({ ...it, e: '' }, tx, ty, tw);
+    drawLay(lines, tx, ty + 40, 31, 44);
+    faces.forEach((f, i) => face(f, x0 + w - 32 - fd / 2 - (faces.length - 1 - i) * step, y + h / 2, fd, C.card));
+    return y + h;
+  };
+
+  let y = K.top(H);
+  items.forEach((it, i) => { y = (i === heroAt ? hero : it.p ? player : note)(it, y) + 22; });
+
+  // every final, winner on the left in bold, the score in the middle
+  if (games.length) {
+    y += 30;
+    font(22, 700, 2); text('RESULTS', x0, y, C.accent);
+    const lw = ctx.measureText('RESULTS').width;
+    ctx.fillStyle = C.line; ctx.fillRect(x0 + lw + 20, y + 12, w - lw - 20, 2);
+    y += 52;
+  }
+  for (const g of games) {
+    font(32, 700); const sc = scoreLine(g.sc), sw = ctx.measureText(sc).width + 44, colW = (w - 64 - sw - 40) / 2; // (the names share what the score leaves)
+    round(x0, y, w, 84, 22, C.card);
+    round(W / 2 - sw / 2, y + 15, sw, 54, 27, C.bg);
+    text(sc, W / 2, y + 26, C.accent, 'center');
     // a team's name cut to fit with its mark (👑 💩) kept whole, on the outer edge
     const named = (tid, left) => {
       const m = H.mark ? H.mark(tid) : '';
@@ -568,13 +810,12 @@ async function shareCanvas(H) {
       const n = fitText(ctx, fxTeamName(tid), colW - ctx.measureText(`${m} `).width);
       return left ? `${m} ${n}` : `${n} ${m}`;
     };
-    font(31, g.margin ? 800 : 500); text(named(g.a, true), C.pad + 32, y + 21);
-    font(34, 800); text(scoreLine(g.sc), W / 2, y + 19, C.accent, 'center');
-    font(31, 500); text(named(g.b, false), W - C.pad - 32, y + 21, C.muted, 'right');
-    y += 88;
+    font(30, g.margin ? 700 : 500); text(named(g.a, true), x0 + 32, y + 26, C.text);
+    font(30, 500); text(named(g.b, false), x0 + w - 32, y + 26, C.muted, 'right');
+    y += 96;
   }
 
-  return K.done(y);
+  return K.done(y - 22);
 }
 
 const recapBlob = cv => new Promise(res => cv.toBlob(res, 'image/png'));

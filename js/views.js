@@ -505,7 +505,7 @@ function tradeModel(T) {
   const A = side(T.from, T.get, T.getPicks, T.to), B = side(T.to, T.give, T.givePicks, T.from);
   const row = (key, label, a, b, show, neg) => {
     const sa = show(a), sb = show(b);
-    return { key, label, sa, sb, lead: a == null || b == null || sa === sb ? 0 : (neg ? a < b : a > b) ? 1 : -1 };
+    return { key, label, a, b, sa, sb, lead: a == null || b == null || sa === sb ? 0 : (neg ? a < b : a > b) ? 1 : -1 };
   };
   const catOf = (t, c) => (c.fp ? t.fp : c.pct ? (t[c.att] ? t[c.made] / t[c.att] : null) : lineStat(t, c.key));
   // a shooting percentage counts its volume, as Value does: the better side adds more makes over what the league's
@@ -516,7 +516,7 @@ function tradeModel(T) {
     const over = t => (t[c.att] && avg ? (c.neg ? -1 : 1) * (t[c.made] - avg * t[c.att]) : null);
     const tip = t => (over(t) == null ? '' : `${dealVol(t[c.made], t[c.att])} a game: ${fmt(Math.abs(over(t)), 1)} ${over(t) >= 0 ? 'more' : 'fewer'} ${what} than the league's average of ${fmtPct(avg)} would give`);
     const [oa, ob] = [over(A.tot), over(B.tot)];
-    return { ...r, va: A.tot[c.att] ? dealVol(A.tot[c.made], A.tot[c.att]) : '', vb: B.tot[c.att] ? dealVol(B.tot[c.made], B.tot[c.att]) : '', ta: tip(A.tot), tb: tip(B.tot),
+    return { ...r, pct: true, va: A.tot[c.att] ? dealVol(A.tot[c.made], A.tot[c.att]) : '', vb: B.tot[c.att] ? dealVol(B.tot[c.made], B.tot[c.att]) : '', ta: tip(A.tot), tb: tip(B.tot),
       lead: oa == null || ob == null ? r.lead : Math.abs(oa - ob) < 0.05 ? 0 : oa > ob ? 1 : -1 };
   };
   // a league with playoffs to come: each side's games in them (more is better: they decide the title)
@@ -613,52 +613,54 @@ function tradeShare(L, T) {
   };
 }
 
-// The picture: each side in a card (what it gets: photos, positions, games missed, each player's average game; its draft picks),
-// a swap mark between them, then (both sides with players) the comparison with each row's better number picked out, and
-// what its numbers mean
+// The picture: each side in a card (what it gets: each player on his team's colors with his positions, games missed and
+// average game; its draft picks), a swap mark between them, then (both sides with players) the comparison, each row's
+// two numbers on bars growing from the middle, the better one orange, and what its numbers mean
 async function tradeCanvas(L, M) {
   const n = M.A.players.length + M.B.players.length, picks = M.A.picks.length + M.B.picks.length, compare = !!(M.A.players.length && M.B.players.length);
-  const K = await sharePad(Math.max(5000, 1400 + n * 300 + picks * 130 + M.rows.length * 64)), { C, W, inner, ctx, font, text, round, photo } = K;
+  const K = await sharePad(Math.max(4000, 1400 + n * 300 + picks * 160 + M.rows.length * 100)), { C, W, inner, ctx, font, text, round, panel, lay, drawLay, meta } = K;
+  await K.prep([...M.A.players, ...M.B.players]);
   let y = K.top({ kicker: 'TRADE PROPOSAL', title: L.name, sub: `${fmtDay(todayIso())} · per game, ${basisLabel().toLowerCase()}` });
-  const d = 104, x0 = C.pad + 32, right = W - C.pad - 32, tx = x0 + d + 28;
+  const x0 = C.pad + 32, right = W - C.pad - 32, pw = 210, ph = 154, tx = x0 + pw + 28;
   let swapY = 0;
   for (const S of [M.A, M.B]) {
-    // measured first: each player's stats wrap to the width beside his photo; a pick is one or two lines
+    // measured first: each player's numbers wrap to the width beside his photo (the number bold, its label gray); a pick
+    // is one or two lines
     const rows = [...S.players.map(p => {
-      font(27); const stats = wrapText(ctx, [...(M.P ? [`${fmtGames(playoffGames(p, M.P))} playoff G`] : []), ...dealLine(p)].join(' · '), right - tx, ' · ');
-      return { p, stats, h: Math.max(d, 88 + stats.length * 37) };
-    }), ...S.picks.map(k => ({ k, h: 84 }))];
-    const h = 28 + 52 + sum(rows.map(r => r.h)) + (rows.length - 1) * 36 + 30;
-    round(C.pad, y, inner, h, 24, C.card);
-    let ty = y + 28;
-    font(26, 800); text(fitText(ctx, `${S.name} gets`.toUpperCase(), right - x0), x0, ty, C.accent);
-    ty += 52;
+      const units = [...(M.P ? [[[fmtGames(playoffGames(p, M.P)), 'b'], [' playoff G', 'm']]] : []),
+        ...dealLine(p).map(s => { const i = s.indexOf(' '); return [[s.slice(0, i), 'b'], [s.slice(i), 'm']]; })];
+      const lines = lay(units, right - tx, 25, 20);
+      return { p, lines, h: Math.max(ph, 96 + lines.length * 36) };
+    }), ...S.picks.map(k => ({ k, h: 110 }))];
+    const h = 30 + 50 + sum(rows.map(r => r.h)) + (rows.length - 1) * 36 + 32;
+    round(C.pad, y, inner, h, 28, C.card);
+    let ty = y + 30;
+    font(22, 700, 2); text(fitText(ctx, `${S.name} gets`.toUpperCase(), right - x0), x0, ty, C.accent);
+    ty += 50;
     rows.forEach((r, i) => {
-      if (i) { ctx.fillStyle = C.line; ctx.fillRect(x0, ty + 16, right - x0, 2); ty += 36; }
+      if (i) { ctx.fillStyle = C.line; ctx.fillRect(x0, ty + 17, right - x0, 2); ty += 36; }
       if (r.k) {
-        // a draft pick: its round in a circle where a photo would be, then the year and round, and whose it was
-        const k = r.k, dd = 80, cx = x0 + d / 2, cy = ty + r.h / 2, orig = k.from !== S.sender;
-        ctx.fillStyle = C.line; ctx.beginPath(); ctx.arc(cx, cy, dd / 2, 0, Math.PI * 2); ctx.fill();
-        font(30, 800); ctx.textBaseline = 'middle'; text(`R${k.round}`, cx, cy, C.accent, 'center'); ctx.textBaseline = 'top';
-        font(36, 800); text(`${pickName(k)} pick`, tx, ty + (orig ? 4 : 22));
-        if (orig) { font(26); text(fitText(ctx, `originally ${fxTeamName(k.from)}`, right - tx), tx, ty + 50, C.muted); }
+        // a draft pick: its round where a photo would be, then the year and round, and whose it was
+        const k = r.k, orig = k.from !== S.sender;
+        round(x0, ty, pw, r.h, 18, C.card2);
+        font(17, 700, 2); text('ROUND', x0 + pw / 2, ty + 16, C.muted, 'center');
+        font(52, 700); text(String(k.round), x0 + pw / 2, ty + 40, C.accent, 'center');
+        font(36, 700, -0.5); text(fitText(ctx, `${pickName(k)} pick`, right - tx), tx, ty + (orig ? 18 : 36));
+        if (orig) { font(25); text(fitText(ctx, `originally ${fxTeamName(k.from)}`, right - tx), tx, ty + 66, C.muted); }
         ty += r.h;
         return;
       }
       const p = r.p;
-      photo(p, x0, ty, d);
-      font(30, 800); const pv = fmtValue(value(p)), pvW = ctx.measureText(pv).width;
-      text(pv, right, ty + 6, C.text, 'right');
-      font(38, 800); text(fitText(ctx, p.name, right - tx - pvW - 20), tx, ty);
-      // his team, his positions in their colors (as on the site: slotInk), his games and games missed this season, and an
-      // injury in red
+      panel(p, x0, ty, pw, ph, 18);
+      // his value a game over a waiver player, in a pill on the right
+      font(27, 700); const pv = fmtValue(value(p)), pvW = ctx.measureText(pv).width + 32;
+      round(right - pvW, ty, pvW, 44, 22, 'rgba(255,255,255,0.08)'); text(pv, right - pvW / 2, ty + 9, C.text, 'center');
+      font(38, 700, -0.5); text(fitText(ctx, p.name, right - tx - pvW - 16), tx, ty + 2);
+      // his team, his positions in their colors, his games and games missed this season, and an injury in red
       const missed = gamesMissed(p);
-      const runs = [[`${p.team || 'FA'} · `, C.muted], ...p.pos.flatMap((x, j) => [...(j ? [[',', C.muted]] : []), [x, slotInk(x) || C.muted, 700]]),
-        [` · ${seasonGp(p)} GP`, C.muted], ...(missed ? [[` · ${missed} missed`, '#d5d9e0', 700]] : []),
-        ...(p.inj ? [[` · ${p.status.toUpperCase()}`, '#f87171']] : [])];
-      let rx = tx;
-      for (const [t, color, weight] of runs) { font(26, weight || 400); text(t, rx, ty + 48, color); rx += ctx.measureText(t).width; }
-      font(27); r.stats.forEach((l, j) => text(l, tx, ty + 88 + j * 37, '#d5d9e0'));
+      meta(tx, ty + 54, 24, p.team, p.pos, [[` · ${seasonGp(p)} GP`, C.muted], ...(missed ? [[` · ${missed} missed`, C.soft, 700]] : []),
+        ...(p.inj ? [[` · ${p.status.toUpperCase()}`, C.bad, 700]] : [])]);
+      drawLay(r.lines, tx, ty + 96, 25, 36);
       ty += r.h;
     });
     y += h;
@@ -674,28 +676,33 @@ async function tradeCanvas(L, M) {
 
   const notes = [];
   if (compare) {
-    // side by side: the row's name, then each side's number, the better one on an orange pill
+    // side by side: each side's number at its edge, a bar from the middle as long as its share of the bigger one (a
+    // percentage has none: its marking counts makes, not the bare %), the better one orange
     y += 48;
-    font(28, 800); text('SIDE BY SIDE · PER GAME', C.pad, y, C.accent); y += 52;
-    // (a shooting row is taller: its makes-attempts a game under each number)
-    const labW = 230, colW = (right - x0 - labW) / 2, mid = [x0 + labW + colW / 2, x0 + labW + colW * 1.5], rowH = r => (r.va || r.vb ? 92 : 60);
-    const h = 28 + 48 + sum(M.rows.map(rowH)) + 16;
-    round(C.pad, y, inner, h, 24, C.card);
-    let ty = y + 28;
-    font(26, 800);
-    [M.A, M.B].forEach((S, i) => text(fitText(ctx, S.name, colW - 16), mid[i], ty, C.text, 'center'));
-    ty += 48;
+    font(22, 700, 2); text('SIDE BY SIDE · PER GAME', C.pad, y, C.accent); y += 50;
+    const cx = W / 2, lw = 104, maxBar = cx - lw - 14 - (x0 + 132), rowH = r => (r.va || r.vb ? 96 : 74);
+    const h = 30 + 54 + sum(M.rows.map(rowH)) + 16;
+    round(C.pad, y, inner, h, 28, C.card);
+    let ty = y + 30;
+    font(26, 700);
+    text(fitText(ctx, M.A.name, cx - x0 - 24), x0, ty, C.text);
+    text(fitText(ctx, M.B.name, right - cx - 24), right, ty, C.text, 'right');
+    ty += 54;
     for (const r of M.rows) {
+      const rh = rowH(r), bars = !r.pct && r.a != null && r.b != null && r.a >= 0 && r.b >= 0 && Math.max(r.a, r.b) > 0;
       ctx.fillStyle = C.line; ctx.fillRect(x0, ty, right - x0, 2);
-      font(28, 700); text(r.label, x0, ty + 16, '#d5d9e0');
-      [[r.sa, r.va], [r.sb, r.vb]].forEach(([v, vol], i) => {
-        const lead = r.lead === (i ? -1 : 1);
-        font(31, lead ? 800 : 500);
-        if (lead) { const w = ctx.measureText(v).width + 32; ctx.globalAlpha = 0.2; round(mid[i] - w / 2, ty + 8, w, 46, 23, C.accent); ctx.globalAlpha = 1; }
-        text(v, mid[i], ty + 15, lead ? C.accent : r.lead ? C.muted : C.text, 'center');
-        if (vol) { font(23); text(vol, mid[i], ty + 58, C.muted, 'center'); }
+      font(19, 700, 1.5); text(fitText(ctx, r.label.toUpperCase(), lw * 2 - 8), cx, ty + (rh - 18) / 2, C.muted, 'center');
+      [[r.sa, r.va, r.a, 1], [r.sb, r.vb, r.b, -1]].forEach(([v, vol, num, side], i) => {
+        const lead = r.lead === side, edge = i ? right : x0, align = i ? 'right' : 'left';
+        font(32, lead ? 700 : 500); text(v, edge, ty + 19, lead ? C.accent : r.lead ? C.muted : C.text, align);
+        if (vol) { font(20); text(vol, edge, ty + 60, C.muted, align); }
+        if (bars) {
+          const len = Math.max(8, maxBar * num / Math.max(r.a, r.b)), from = i ? cx + lw + 14 : cx - lw - 14, by = ty + (rh - 12) / 2;
+          round(i ? from : from - maxBar, by, maxBar, 12, 6, 'rgba(255,255,255,0.06)');
+          round(i ? from : from - len, by, len, 12, 6, lead ? C.accent : '#4a505c');
+        }
       });
-      ty += rowH(r);
+      ty += rh;
     }
     y += h;
     // (short: the picture has no (i), and the site's own card says the rest)
@@ -704,8 +711,8 @@ async function tradeCanvas(L, M) {
     if (M.rows.some(r => r.va || r.vb)) notes.push('FG% and FT% marked by makes over the league average');
   }
   if (picks) notes.push("draft picks aren't valued");
-  y += 22;
-  font(24);
+  y += 24;
+  font(23);
   const said = notes.join(' · ');
   if (said) for (const l of wrapText(ctx, `${said[0].toUpperCase()}${said.slice(1)}.`, inner)) { text(l, C.pad, y, C.muted); y += 34; }
   return K.done(y);
