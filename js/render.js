@@ -32,6 +32,8 @@ const TAB_ICONS = {
   trade: '<path d="M4 8h15.5L16 4.5M20 16H4.5L8 19.5"/>',
   rosters: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/>',
   trends: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  team: ICON_JERSEY_D, // (the sandbox's My team and Live)
+  watch: '<circle cx="12" cy="12" r="2.2"/><path d="M8 8a5.7 5.7 0 0 0 0 8M16 8a5.7 5.7 0 0 1 0 8M5 5a9.9 9.9 0 0 0 0 14M19 5a9.9 9.9 0 0 1 0 14"/>',
   more: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
 };
 const TABS_SHOWN = 4; // phones: past 5 sections, the bottom bar shows this many and the rest sit under More
@@ -42,16 +44,16 @@ const TABS_SHOWN = 4; // phones: past 5 sections, the bottom bar shows this many
 function leagueMenu() {
   const el = $('#leagueMenu');
   if (!el) return;
-  const L = fxLeague();
-  if (!L || needsLanding()) { el.innerHTML = ''; return; }
-  const cur = currentLeagueId();
+  const L = fxLeague(), sb = !L && state.browse; // (the sandbox: no league on the page, its leagues to go back to)
+  if ((!L && !sb) || needsLanding()) { el.innerHTML = ''; return; }
+  const cur = sb ? null : currentLeagueId();
   const saved = state.savedLeagues || [];
   const site = NBA && NBA.siteLeague;
   const wasOpen = isOpen(el);
   const P = pastSeason();
   // the current league's seasons, under it (Fantrax leagues: the others don't share past seasons)
   let seasons = '';
-  if (!state.demo && (L.source || 'fantrax') === 'fantrax') {
+  if (!sb && !state.demo && (L.source || 'fantrax') === 'fantrax') {
     const past = seasonsFor(L);
     const rows = past.length ? [{ id: '', year: L.year }, ...past] : [];
     seasons = rows.map(x => {
@@ -60,7 +62,7 @@ function leagueMenu() {
     }).join('') + '<button type="button" class="lm-item lm-sub" data-action="season-add">+ Add an earlier season</button>';
   }
   el.innerHTML = `<details class="lm"${wasOpen ? ' open' : ''}>
-    <summary aria-label="League menu">${LOGO_MARK}<span class="lm-name">${esc(L.name)}${P ? ` · ${esc(P.label)}` : ''}</span>${lineIcon('<path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/>', 'lm-caret')}</summary>
+    <summary aria-label="League menu">${LOGO_MARK}<span class="lm-name">${sb ? 'Sandbox' : esc(L.name)}${P ? ` · ${esc(P.label)}` : ''}</span>${lineIcon('<path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/>', 'lm-caret')}</summary>
     <div class="lm-pop">
       <div class="lm-sec">Leagues</div>
       ${saved.map(l => {
@@ -72,6 +74,7 @@ function leagueMenu() {
       ${state.demo ? `<div class="lm-row"><span class="lm-item on">✓ ${esc(L.name)}</span></div>` : ''}
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
+      ${sb ? '<div class="lm-row"><span class="lm-item on">✓ Sandbox</span></div>' : '<button type="button" class="lm-item" data-action="land-browse">Sandbox: any players, no league</button>'}
     </div>
   </details>`;
 }
@@ -111,7 +114,7 @@ function teamMenu() {
 // (the addresses keep the tabs' old names, dashboard and week, so saved links still work)
 const TABS_NOW = [['dashboard', 'Matchup'], ['week', 'Plan Ahead'], ['recap', 'Recap'], ['players', 'Players'], ['trends', 'Trends'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
-const TABS_BROWSE = [['players', 'Players'], ['trends', 'Trends']]; // browsing without a league
+const TABS_BROWSE = [['team', 'My team'], ['watch', 'Live'], ['players', 'Players'], ['trends', 'Trends'], ['trade', 'Trades']]; // the sandbox: no league (sandbox.js)
 const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
@@ -333,8 +336,9 @@ function render() {
   const early = preDraft();
   if (early && ['week', 'dashboard', 'draft', 'standings', 'trade'].includes(ui.tab)) { $('#view').innerHTML = viewPreDraft(early); return; }
   const views = { week: () => withViewedTeam(viewWeek, true), draft: viewDraft, players: viewPlayers, dashboard: () => withViewedTeam(viewDashboard), standings: viewStandings, awards: viewAwardsSoFar, trade: viewTrade, recap: viewRecap, trends: viewTrends };
+  if (state.browse) Object.assign(views, { team: viewSandboxTeam, watch: viewSandboxWatch, trade: viewSandboxTrade }); // the sandbox's own (sandbox.js)
   // keep scroll position of inner lists (e.g. trade picker, performances) across re-renders
-  const inner = '.pick-list, .perf-wrap.scroll';
+  const inner = '.pick-list, .perf-wrap.scroll, .perf-wrap.sb-wrap';
   const scrolls = [...document.querySelectorAll(inner)].map(el => [el.scrollTop, el.scrollLeft]);
   $('#view').innerHTML = (views[ui.tab] || viewDashboard)();
   rollCards();

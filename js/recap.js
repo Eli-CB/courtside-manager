@@ -345,13 +345,14 @@ function teamRegulars(end) {
   return out;
 }
 
-// Through a day (end), for a league's teams, or everyone when browsing without a league (L null)
+// Through a day (end), for a league's teams, or everyone in the sandbox (L null: My team, then everyone else)
 function trendsCard(L, end) {
   if (!BOX || isFootball()) return '';
   const up = ui.trendDir !== 'down';
   const { stats, players } = trendPlayers(end);
   const owner = new Map();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
+  if (!L && state.browse) for (const id of state.sandbox.roster) owner.set(id, SB_ME); // (sandbox.js)
   const mine = myTeamId(), regulars = up ? teamRegulars(end) : null;
   const whose = raw => {
     const tid = owner.get(raw.id);
@@ -392,7 +393,9 @@ function trendsCard(L, end) {
     .sort((a, b) => (up ? b.gain - a.gain : a.gain - b.gain)).slice(0, n);
   const rostered = fxLeague() ? byValue(players.filter(row => owner.has(row.id)), TREND_TOP) : [];
   const waivers = fxLeague() ? byValue(players.filter(row => !owner.has(row.id) && row.raw.fx && row.raw.fx.st !== 'T'), TREND_WAIVERS) : [];
-  const everyone = fxLeague() ? [] : byValue(players, TREND_TOP); // (no league: nobody's rostered, one list)
+  // (the sandbox: My team's, then everyone else's; one list while My team is empty)
+  const mineList = fxLeague() ? [] : byValue(players.filter(row => owner.has(row.id)), TREND_TOP);
+  const everyone = fxLeague() ? [] : byValue(players.filter(row => !owner.has(row.id)), TREND_TOP);
   const valueRows = list => list.map((row, i) => {
     // why: a teammate out (heating up), and the two stats that moved most his way
     const moved = stats.filter(st => !st.pct && !st.role && row.stats[st.key] && (up ? row.stats[st.key].move > 0 : row.stats[st.key].move < 0) && row.stats[st.key].was > 0)
@@ -404,7 +407,7 @@ function trendsCard(L, end) {
     return rowHtml(row, i, num, note);
   }).join('');
   const valueList = (title, list) => (list.length ? `<section class="tr-cat"><h3 class="sub tr-head"><span>${title}</span><span class="tr-col">${VAL}</span></h3><ol class="tr-list">${valueRows(list)}</ol></section>` : '');
-  const valueLists = [valueList('Rostered', rostered), valueList('Waivers', waivers), valueList('All players', everyone)].filter(Boolean);
+  const valueLists = [valueList('Rostered', rostered), valueList('Waivers', waivers), valueList('My team', mineList), valueList(owner.size ? 'Everyone else' : 'All players', everyone)].filter(Boolean);
 
   const seg = `<div class="seg seg-sm" role="group" aria-label="Trending">${[['up', 'Heating up'], ['down', 'Cooling off']].map(([k, l]) =>
     `<button type="button" class="${(k === 'up') === up ? 'on' : ''}" data-action="trend-dir" data-dir="${k}" aria-pressed="${(k === 'up') === up}">${l}</button>`).join('')}</div>`;
@@ -419,7 +422,7 @@ function trendsCard(L, end) {
 }
 
 // The Trends tab: every player's last games through the latest day the saved box scores have. In a league, its teams and
-// scoring; browsing without one (state.browse), a standard 9-category league and one list by value (nobody's rostered)
+// scoring; in the sandbox (state.browse), a standard 9-category league, My team's list by value and everyone else's
 function viewTrends() {
   if (!NBA) return '';
   const L = fxLeague(), note = L ? '' : browseNote();

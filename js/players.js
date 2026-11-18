@@ -138,7 +138,9 @@ function perfBadges(rows, { range, day, avg, perWeek, cuts: given }) {
 // team (each a menu to pick any number from: `perfMenu`; `ui.perfPos` / `ui.perfTeam` are lists, empty = all; the one open
 // is `ui.perfMenu`), only rookies, only injured. The button counts the filters that are on.
 const PERF_WHOSE = { me: true, opp: true, other: true, fa: true };
-const perfFilterCount = () => (Object.values(ui.perfWhose).some(v => !v) || perfOtherTeams().picked.length ? 1 : 0) + (ui.perfSpot !== 'all') + !!ui.perfPos.length + !!ui.perfTeam.length + !!ui.perfOnly.rookie + !!ui.perfOnly.inj;
+// (the sandbox has My team and everyone else, and no lineups)
+const perfWhoseKeys = () => (fxLeague() ? Object.keys(PERF_WHOSE) : ['me', 'fa']);
+const perfFilterCount = () => (perfWhoseKeys().some(k => !ui.perfWhose[k]) || perfOtherTeams().picked.length ? 1 : 0) + (ui.perfSpot !== 'all' && !!fxLeague()) + !!ui.perfPos.length + !!ui.perfTeam.length + !!ui.perfOnly.rookie + !!ui.perfOnly.inj;
 
 // The other teams (not yours, not this matchup's opponent) and which of them are picked (`ui.perfOthers`, team ids):
 // none picked = all of them, and one that isn't an other team any more (another league, next week's opponent) doesn't count
@@ -181,12 +183,12 @@ function perfFilters(owner, opp, rows) {
   const only = (k, l, title) => `<button type="button" class="pill${ui.perfOnly[k] ? ' on' : ''}" data-action="perf-only" data-key="${k}" aria-pressed="${!!ui.perfOnly[k]}" title="${title}">${l}</button>`;
   // a row of the panel: its label only beside others (a league's Show and Lineup); Done (and Clear filters) at the end of
   // the last, on its line where there's room (the owner's ask)
-  const league = owner.size && rows.length;
+  const league = owner.size && rows.length, sb = !fxLeague(); // (sb: the sandbox, My team its one team)
   const row = (label, body, tail = '') => `<div class="pp-row">${league ? `<span class="pp-label">${label}</span>` : ''}<div class="perf-filters">${body}</div>${tail}</div>`;
   const foot = `<div class="pp-foot">${n ? '<button type="button" class="link-btn pp-clear" data-action="perf-clear">Clear filters</button>' : ''}<button type="button" class="btn sm" data-action="perf-filt">Done</button></div>`;
   const panel = `<div class="perf-panel" id="perfPanel" role="group" aria-label="Filters">
-    ${league ? row('Show', `${toggle('me', 'My team')}${opp ? toggle('opp', 'Opponent', opp.name) : ''}${perfOtherMenu()}${toggle('fa', 'Waivers', 'Not on a roster in your league')}`) : ''}
-    ${league ? row('Lineup', `<div class="seg seg-sm" role="group" aria-label="Where in the lineup">${spots.map(([k, l, t]) => `<button type="button" class="${ui.perfSpot === k ? 'on' : ''}" data-action="perf-spot" data-spot="${k}" aria-pressed="${ui.perfSpot === k}"${t ? ` title="${t}"` : ''}${rostered ? '' : ' disabled'}>${l}</button>`).join('')}</div>`) : ''}
+    ${league ? row('Show', `${toggle('me', 'My team')}${opp ? toggle('opp', 'Opponent', opp.name) : ''}${sb ? '' : perfOtherMenu()}${sb ? toggle('fa', 'Everyone else', 'Not on My team') : toggle('fa', 'Waivers', 'Not on a roster in your league')}`) : ''}
+    ${league && !sb ? row('Lineup', `<div class="seg seg-sm" role="group" aria-label="Where in the lineup">${spots.map(([k, l, t]) => `<button type="button" class="${ui.perfSpot === k ? 'on' : ''}" data-action="perf-spot" data-spot="${k}" aria-pressed="${ui.perfSpot === k}"${t ? ` title="${t}"` : ''}${rostered ? '' : ' disabled'}>${l}</button>`).join('')}</div>`) : ''}
     ${row('Player', `${perfMenu('perfPos', 'Position', 'positions', POSITIONS)}${perfMenu('perfTeam', `${SPORT.name} team`, 'teams', [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}`, foot)}
   </div>`;
   return find + btn + info + panel;
@@ -241,8 +243,9 @@ function perfOwners() {
   const owner = new Map(), spot = new Map();
   const L = fxLeague();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) { owner.set(x.nba, tid); spot.set(x.nba, x); }
-  const mine = ui.viewing ? ui.viewA : state.fxTeam;
-  const opp = owner.size && mine ? fxOpponentFor(weekStartAt(0), mine) : null;
+  if (!L && state.browse) for (const id of state.sandbox.roster) owner.set(id, SB_ME); // the sandbox: My team's (sandbox.js)
+  const mine = !L ? myTeamId() : ui.viewing ? ui.viewA : state.fxTeam;
+  const opp = L && owner.size && mine ? fxOpponentFor(weekStartAt(0), mine) : null;
   // where a player is: in a team's starting lineup (active), on its bench (IR included), or on no roster (waivers)
   const statusOf = id => (!spot.has(id) ? 'fa' : spot.get(id).st === 'ACTIVE' ? 'active' : 'bench');
   const lineupBadge = id => {
@@ -256,8 +259,8 @@ function perfOwners() {
   const who = id => {
     const tid = owner.get(id);
     // every rostered player names his team: yours in orange, this matchup's opponent in bold (a long name is cut short
-    // with "…": its whole name is its tip)
-    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : opp && tid === opp.id ? ' opp' : ''}" title="${esc(fxTeamName(tid))}">${teamLink(tid)}</span> ${lineupBadge(id)}`;
+    // with "…": its whole name is its tip). The sandbox's My team has no lineup
+    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : opp && tid === opp.id ? ' opp' : ''}" title="${esc(fxTeamName(tid))}">${teamLink(tid)}</span>${spot.has(id) ? ` ${lineupBadge(id)}` : ''}`;
     const raw = nbaById.get(id);
     return raw && raw.fx ? `<span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
   };
@@ -280,10 +283,10 @@ function perfRowsFor({ proj, avg, perWeek, dates }) {
 // rostered players, where they are: active or bench (IR counts as bench); waivers have no lineup, so Active or Bench leaves
 // them be. Then the search, positions, NBA teams, rookies and injured.
 function perfPicked(rows, { owner, statusOf, teamOf }, otherPick) {
-  const q = normName(ui.perfQ);
+  const q = normName(ui.perfQ), spotOn = ui.perfSpot !== 'all' && !!fxLeague(); // (the sandbox has no lineups)
   return rows.filter(r => {
     const t = teamOf(r);
-    return (!owner.size || (ui.perfWhose[t || 'fa'] && (t !== 'other' || !otherPick.length || otherPick.includes(owner.get(r.raw.id))) && (!t || ui.perfSpot === 'all' || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q))
+    return (!owner.size || (ui.perfWhose[t || 'fa'] && (t !== 'other' || !otherPick.length || otherPick.includes(owner.get(r.raw.id))) && (!t || !spotOn || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q))
       && (!ui.perfPos.length || ui.perfPos.some(x => (r.raw.pos || []).includes(x))) && (!ui.perfTeam.length || ui.perfTeam.includes(r.raw.team))
       && (!ui.perfOnly.rookie || isRookie(r.raw)) && (!ui.perfOnly.inj || !!r.raw.inj);
   });
@@ -380,12 +383,15 @@ function viewPlayers() {
   // the latest games come from the box scores, loaded on first need; today's as they're played
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'players') render(); }).catch(() => {});
   startLive();
-  if (!fxLeague()) return `${browseNote()}${topPerformancesCard()}`; // browsing without a league
+  if (!fxLeague()) return `${browseNote()}${topPerformancesCard()}`; // the sandbox: no league
   return topPerformancesCard(); // (ideas for pickups: the Matchups tab's, made against this week's matchup)
 }
 
-// Browsing without a league (the Players and Trends tabs): what the values are for, and the way to connect one
-const browseNote = () => `<div class="sample-banner browse-note"><span>No league connected: values are for a standard 9-category league.</span><button type="button" class="btn sm" data-action="browse-exit">Connect a league</button></div>`;
+// The sandbox's tabs (sandbox.js; Players and Trends too): what the values are for, and the way back to your league, or to connect one
+const browseNote = () => {
+  const back = state.fxTeam && NBA && NBA.league ? NBA.league.name : null;
+  return `<div class="sample-banner browse-note"><span><b>Sandbox.</b> No league connected: values are for a standard 9-category league.</span><button type="button" class="btn sm" data-action="browse-exit">${back ? `Back to ${esc(back)}` : 'Connect a league'}</button></div>`;
+};
 
 // A country's flag (ISO code from the daily data job), named on hover: flagImg alone, flag after a " · " (the player card)
 const flagImg = iso => {
@@ -399,6 +405,7 @@ const flag = iso => (iso ? ` · ${flagImg(iso)}` : '');
 // Whose he is in the league: the fantasy team and where in its lineup, else free agent or waivers
 function cardOwner(raw) {
   const L = fxLeague();
+  if (!L && state.browse) return sbCardLine(raw); // the sandbox: on My team or not, followed live or not (sandbox.js)
   if (!L || !L.rosters) return '';
   for (const [tid, r] of Object.entries(L.rosters)) {
     const x = r.find(y => y.nba === raw.id);

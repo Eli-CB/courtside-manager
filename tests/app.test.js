@@ -2707,6 +2707,16 @@ test("Trends: last 5 games against the usual one, per category, with the reason 
       assert.ok(list.includes(`data-nba="${hot.id}"`), 'the one heating up, by value');
       assert.ok(!all.includes('<span>Rostered</span>') && !all.includes('<span>Waivers</span>'), 'no Rostered or Waivers lists');
       assert.ok(section(all, 'Points').includes(`data-nba="${hot.id}"`), 'the categories as in a league');
+      // the sandbox with him on My team: My team's list has him, everyone else's doesn't, and he's marked as yours
+      const wasRoster = st.sandbox.roster;
+      st.sandbox.roster = [hot.id];
+      try {
+        const mine = await onDay('2026-10-26', () => app.trendsCard(null, '2026-10-25'));
+        const lists = mine.split('<section class="tr-cat"');
+        assert.ok((lists.find(x => x.includes('<span>My team</span>')) || '').includes(`data-nba="${hot.id}"`), 'My team');
+        assert.ok(!(lists.find(x => x.includes('<span>Everyone else</span>')) || '').includes(`data-nba="${hot.id}"`), 'not everyone else');
+        assert.ok(section(mine, 'Points').includes('<span class="perf-owner mine"><span class="team-mine">My team</span></span>'), 'his row says so');
+      } finally { st.sandbox.roster = wasRoster; }
     } finally { st.browse = wasBrowse; ui.trendDir = 'down'; }
     // too few games: nothing to say yet
     app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer: new Map([[hot.id, games(i => (i > 8 ? line(20, 6) : null))]]) });
@@ -3545,7 +3555,7 @@ test('the waiver order: from ESPN and Sleeper, a line under the standings and a 
   } finally { st.fxTeam = was; }
 });
 
-test('browsing without a league: the Players and Trends tabs, no league anywhere', async () => {
+test('the sandbox, as a first visit opens it: no league anywhere, the Players and Trends tabs among its own', async () => {
   await app.loadBoxes();
   const st = app.get('state'), ui = app.get('ui');
   const saved = app.NBA.players.map(r => [r, r.fx, r.pos]);
@@ -3558,7 +3568,7 @@ test('browsing without a league: the Players and Trends tabs, no league anywhere
     app.actions['land-browse']();
     assert.ok(st.browse && !app.needsLanding());
     assert.equal(app.fxLeague(), null, "the site's league isn't this visitor's");
-    assert.deepEqual([...app.tabList().map(t => t[0])], ['players', 'trends']);
+    assert.deepEqual([...app.tabList().map(t => t[0])], ['team', 'watch', 'players', 'trends', 'trade']);
     assert.ok(app.NBA.players.every(r => !r.fx), "nobody shows as free in someone else's league");
     const html = app.viewPlayers();
     assert.match(html, /No league connected[\s\S]*data-action="browse-exit"/);
@@ -3581,6 +3591,126 @@ test('browsing without a league: the Players and Trends tabs, no league anywhere
     const live = app.get('live');
     clearTimeout(live.timer); live.timer = null;
   }
+});
+
+test('the sandbox: a team of any players, marked on Players and Trends, up to 12 followed live, and trades for anyone', async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  const st = a.get('state'), ui = a.get('ui');
+  ui.tab = 'standings'; // (no live box scores in the background until a tab here wants them)
+  assert.ok(a.needsLanding(), 'a first visit: the landing page');
+  assert.match(a.viewLanding(), /data-action="land-browse">try the sandbox</);
+  a.actions['land-browse']();
+  assert.ok(st.browse && !a.needsLanding() && a.fxLeague() === null);
+  assert.equal(a.location.hash, '#team', 'it opens on My team');
+  assert.equal(a.myTeamId(), a.SB_ME);
+  // My team, empty: the search and what it's for
+  let team = a.viewSandboxTeam();
+  assert.match(team, /Sandbox\.<\/b> No league connected[\s\S]*data-action="browse-exit">Connect a league</);
+  assert.match(team, /id="sbQ-team"[\s\S]*Build a team from any NBA players/);
+  // a search: the best matches by value, each a button that adds him
+  const best = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val), [p1, p2, p3, p4] = best;
+  ui.sbQ.team = p1.name.slice(0, 5);
+  team = a.viewSandboxTeam();
+  assert.ok(team.includes(`data-action="sb-add" data-id="${p1.nbaId}"`), 'he matches');
+  assert.ok((team.match(/class="sb-hit"/g) || []).length <= 8, 'eight matches at most');
+  ui.sbQ.team = 'zzqqxx';
+  assert.match(a.viewSandboxTeam(), /No NBA player matches “zzqqxx”/);
+  for (const p of [p1, p2, p3]) a.actions['sb-add']({ dataset: { id: String(p.nbaId) } });
+  assert.deepEqual([...st.sandbox.roster], [p1.nbaId, p2.nbaId, p3.nbaId]);
+  assert.equal(ui.sbQ.team, '', 'the search is cleared for the next name');
+  assert.deepEqual(JSON.parse(a.localStorage.getItem('league-layer-v1')).sandbox.roster, [...st.sandbox.roster], 'kept on the device');
+  a.actions['sb-add']({ dataset: { id: String(p1.nbaId) } });
+  assert.equal(st.sandbox.roster.length, 3, 'once each');
+  team = a.viewSandboxTeam();
+  for (const p of [p1, p2, p3]) assert.ok(team.includes(`data-action="sb-drop" data-id="${p.nbaId}"`), `${p.name}: on the team, with a ✕`);
+  assert.match(team, /<tfoot><tr class="sb-tot"><td class="pf-name"><b>My team<\/b>/, 'the team a game');
+  // the Players tab: My team's rows marked, its filters My team and everyone else (no other teams, no lineups)
+  Object.assign(ui, { perfRange: 'year', perfPer: true, perfFiltOpen: true });
+  const players = a.viewPlayers();
+  assert.ok(players.includes('<tr class="pf-me">') && players.includes('<span class="perf-owner mine"><span class="team-mine">My team</span></span>'), 'his row says My team, in orange');
+  assert.match(players, /data-key="me"[^>]*>My team<[\s\S]*data-key="fa"[^>]*>Everyone else</);
+  assert.ok(!players.includes('perfOthers') && !players.includes('data-action="perf-spot"'), 'no other teams, no lineups');
+  ui.perfWhose = { me: true, opp: true, other: true, fa: false };
+  const mineOnly = a.viewPlayers();
+  assert.ok(mineOnly.includes(`data-nba="${p1.nbaId}"`) && !mineOnly.includes(`data-nba="${p4.nbaId}"`), 'My team alone');
+  a.actions['perf-whose']({ dataset: { key: 'me' } });
+  assert.equal(ui.perfWhose.me, true, 'never nobody (the opponent and other teams are no one here)');
+  Object.assign(ui, { perfWhose: { me: true, opp: true, other: true, fa: true }, perfFiltOpen: false, perfRange: null, perfPer: false });
+  // a player's card: on My team or not, followed live or not, each a button
+  assert.match(a.cardOwner(a.nbaById.get(p1.nbaId)), /team-mine"><b>My team<\/b>[\s\S]*data-action="sb-drop"[\s\S]*data-action="sb-watch"/);
+  assert.match(a.cardOwner(a.nbaById.get(p4.nbaId)), /data-action="sb-add"[^>]*>\+ Add to my team/);
+  // Live: up to 12, My team's in one tap
+  a.actions['sb-watch-team']();
+  assert.deepEqual([...st.sandbox.watch], [p1.nbaId, p2.nbaId, p3.nbaId], 'My team, best first');
+  for (const p of best.slice(3, 20)) a.actions['sb-watch']({ dataset: { id: String(p.nbaId) } });
+  assert.equal(st.sandbox.watch.length, a.WATCH_MAX, 'twelve at most');
+  ui.tab = 'watch';
+  assert.ok(a.liveTab(), 'the live scores follow them');
+  const watch = a.viewSandboxWatch();
+  assert.equal((watch.match(/class="mu-p sb-w/g) || []).length, 12);
+  assert.ok(watch.includes(`data-action="sb-unwatch" data-id="${p4.nbaId}"`) && !watch.includes('id="sbQ-watch"'), 'each with a ✕; no search while full');
+  a.actions['sb-unwatch']({ dataset: { id: String(p4.nbaId) } });
+  assert.ok(!st.sandbox.watch.includes(p4.nbaId) && a.viewSandboxWatch().includes('id="sbQ-watch"'));
+  // Trades: My team's players for anyone, found by name
+  ui.tab = 'trade';
+  assert.match(a.viewSandboxTrade(), /Pick who you'd give and who you'd get/);
+  ui.sbGive.add(p2.nbaId);
+  ui.sbQ.get = p4.name.slice(0, 6);
+  assert.ok(a.viewSandboxTrade().includes(`data-action="sb-get" data-id="${p4.nbaId}"`), 'anyone, found by name');
+  a.actions['sb-get']({ dataset: { id: String(p4.nbaId) } });
+  a.actions['sb-get']({ dataset: { id: String(p1.nbaId) } });
+  assert.deepEqual([...ui.sbGet], [p4.nbaId], 'not one of your own');
+  const trade = a.viewSandboxTrade();
+  assert.match(trade, /Trade proposal[\s\S]*<span class="team-mine">My team<\/span> gets[\s\S]*Other team gets[\s\S]*For your team/);
+  assert.ok(!/you'd need to drop/.test(trade), 'no roster limit');
+  assert.ok(trade.includes('data-action="trade-share"'), "shared as a league's");
+  const S = a.sbTradeShare();
+  assert.ok(S.text.includes('League Layer · Trade proposal') && S.text.includes(`My team gets: ${p4.name}`) && S.text.includes(`Other team gets: ${p2.name}`), S.text);
+  assert.ok(!S.url.includes('league='), 'no league link');
+  // taking a player off My team takes him out of the deal too
+  a.actions['sb-drop']({ dataset: { id: String(p2.nbaId) } });
+  assert.ok(!ui.sbGive.has(p2.nbaId) && !st.sandbox.roster.includes(p2.nbaId));
+  // a saved copy that's been tampered with: numbers only, each once, as many as fit
+  const n = a.normalize({ ...st, sandbox: { roster: [1, 1, 'x', 2, ...Array.from({ length: 40 }, (x, i) => 100 + i)], watch: 'no' } });
+  assert.deepEqual([...n.sandbox.roster.slice(0, 3)], [1, 2, 100]);
+  assert.equal(n.sandbox.roster.length, a.SANDBOX_MAX);
+  assert.deepEqual([...n.sandbox.watch], []);
+  // Trends: the sandbox's, no league lists
+  ui.tab = 'trends';
+  const tr = a.viewTrends();
+  assert.match(tr, /Sandbox\.[\s\S]*<div class="card trends">/);
+  assert.ok(!tr.includes('<span>Rostered</span>') && !tr.includes('<span>Waivers</span>'), 'no league lists');
+  // out of it: no league to go back to, so the landing page; My team stays for next time
+  ui.tab = 'standings';
+  await a.actions['browse-exit']();
+  assert.ok(!st.browse && a.needsLanding());
+  assert.equal(st.sandbox.roster.length, 2);
+  const live = a.get('live');
+  clearTimeout(live.timer); live.timer = null;
+});
+
+test('the sandbox from a league: the league menu offers it, and leaving it goes back to the league as it was', async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.switchLeague(CATS9);
+  const st = a.get('state'), L = a.fxLeague(), tid = L.teams[0].id;
+  a.get('ui').tab = 'standings';
+  a.adoptTeam(tid);
+  const fx = () => a.NBA.players.filter(r => r.fx).length, before = fx();
+  assert.ok(before > 100, "the league's players");
+  a.actions['land-browse']();
+  assert.ok(st.browse && a.fxLeague() === null && fx() === 0);
+  assert.ok(a.browseNote().includes(`Back to ${L.name}`));
+  await a.actions['browse-exit']();
+  assert.ok(!st.browse && a.fxLeague() && a.fxLeague().id === CATS9, 'the league again');
+  assert.equal(st.fxTeam, tid, 'your team');
+  assert.equal(fx(), before, "its players' league details are back");
+  assert.equal(a.location.hash, '#dashboard');
+  a.get('ui').tab = 'standings'; // no live box scores in the background
+  const live = a.get('live');
+  clearTimeout(live.timer); live.timer = null;
 });
 
 test('Send feedback: an email to feedback@leaguelayer.com with the league, page and version filled in', async () => {
@@ -3947,7 +4077,7 @@ test('the landing page offers both sports, and says so when a league is on a sit
   const html = a.viewLanding();
   assert.match(html, /fantasy basketball or hockey week/);
   assert.match(html, /basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax/);
-  assert.match(html, /just browse NBA players/);
+  assert.match(html, /try the sandbox<\/button>: a team of any NBA players/);
   await assert.rejects(a.connectLeague('https://fantasy.espn.com/hockey/league?leagueId=12345678'), /Hockey works with Fantrax leagues/);
 });
 

@@ -12,6 +12,8 @@ const SCORES_KEY = 'league-layer-hide-scores'; // this device hides game scores 
 const CLOCK_KEY = 'league-layer-clock'; // '24' or '12': this device's choice of clock; unset = the device's own
 const PICKS_KEY = 'league-layer-picks'; // what was last picked on the Matchup and Players tabs' When menus and Plan Ahead's week (picks)
 const STATUSES = ['Healthy', 'DTD', 'Out'];
+// The sandbox (no league, sandbox.js): a roster of any players, up to SANDBOX_MAX, and up to WATCH_MAX followed live
+const SANDBOX_MAX = 30, WATCH_MAX = 12;
 // this deploy's version (the commit), stamped in by the publish workflow; '__BUILD__' when run locally
 const BUILD = '__BUILD__';
 
@@ -63,6 +65,7 @@ function emptyState() {
     matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] }, savedLeagues: [], leagueStates: {}, pastSeasons: {},
     slots: [...DEFAULT_SLOTS], benchSize: 5, ilSize: 1, slotsSet: true, lineupMode: 'weekly',
     players: [], lineup: [], il: [],
+    sandbox: { roster: [], watch: [] }, // the sandbox's own players, by data id (sandbox.js)
   };
 }
 
@@ -108,7 +111,8 @@ const themeNow = () => document.documentElement.dataset.theme || (typeof matchMe
 let state = null;
 const ui = { weekShift: 0, weekChosen: false, tab: 'dashboard', recapWeek: null, afterPick: null, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, tradeLink: null, tradeSeen: null, tradeGivePicks: new Set(), tradeGetPicks: new Set(), totSort: { key: null, dir: 1 }, csOpen: new Set(),
   dashRange: null, dashBench: false, trendDir: 'up', cardSort: { key: 'date', dir: -1 }, teamSort: { key: 'v', dir: -1 }, perfRange: null, perfPer: false, perfMore: { sig: '', n: 0 }, rollOpen: new Set(), perfQ: '', perfPos: [], perfTeam: [], perfMenu: null, perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
-  perfWhose: { me: true, opp: true, other: true, fa: true }, perfOthers: [], perfSpot: 'all', perfFiltOpen: false };
+  perfWhose: { me: true, opp: true, other: true, fa: true }, perfOthers: [], perfSpot: 'all', perfFiltOpen: false,
+  sbQ: {}, sbGive: new Set(), sbGet: [], watchRange: null }; // (the sandbox's searches, its trade, its Live tab's day: sandbox.js)
 ui.hideScores = store.get(SCORES_KEY) === '1';
 // 24-hour clock: as chosen in the settings menu, else as the device shows times
 ui.clock24 = (() => {
@@ -159,6 +163,10 @@ function normalize(s) {
   if (!Array.isArray(s.matchDays) || !s.matchDays.length || s.matchDays.join() === '0,1,2,3,4') s.matchDays = [0, 1, 2, 3, 4, 5, 6];
   s.opp = { name: '', week: null, starters: null, fxId: null, ...(s.opp || {}) };
   s.opp.players = (s.opp.players || []).map(normalizePlayer);
+  // the sandbox's roster and watch list: data ids, each once, as many as each holds (SANDBOX_MAX, WATCH_MAX)
+  const ids = (list, n) => [...new Set((Array.isArray(list) ? list : []).filter(Number.isFinite))].slice(0, n);
+  const sb = s.sandbox || {};
+  s.sandbox = { roster: ids(sb.roster, SANDBOX_MAX), watch: ids(sb.watch, WATCH_MAX) };
   return s;
 }
 

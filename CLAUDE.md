@@ -23,7 +23,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
   scope; they must load in the order index.html lists: sports, core, nba, info, fantrax, espn, sleeper, football, yahoo, render, history, views,
-  dashboard, players, matchups, recap, live, draft, leagues, actions. Top-level code may only use things defined in earlier files (no hoisting across files), and no two files may declare the same function: a later file's silently replaces the earlier one everywhere (history.js's `periodDays` once broke every week's dates; a test checks).
+  dashboard, players, matchups, recap, live, draft, leagues, sandbox, actions. Top-level code may only use things defined in earlier files (no hoisting across files), and no two files may declare the same function: a later file's silently replaces the earlier one everywhere (history.js's `periodDays` once broke every week's dates; a test checks).
   - sports: `SPORTS` (each sport's positions, slots, stats, categories, team colors, data folder, ESPN feed) and `setSport`, which
     points the plain names the site reads (`POSITIONS`, `ELIG`, `STAT_LABEL`, `COUNT_KEYS`, `TEAM_COLORS`...) at a sport's tables.
     "NBA", `nbaId`, `nbaPlayers` and the like mean "the sport's data" (as "fx" names mean "the league's site")
@@ -126,10 +126,15 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   - Demo (`state.demo`, the landing page's "Explore a basketball demo league"): the daily file's site league, seen as a team (`demoTeam`: the
     best record with a matchup) so every tab has something to show, it and its teams under made-up names (`demoNames`, in memory only); never in `savedLeagues`, the team picker changes the team, `demo-exit` or
     connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
-  - No league (`state.browse`, the landing page's "Just browse players"): `fxLeague()` is null (the daily file's site
-    league stays loaded for the demo), `clearLeaguePlayers()` drops its rosters/positions from the players, the tabs are
-    Players and Trends (`TABS_BROWSE`; Trends there: one All players list by value instead of Rostered/Waivers; `browseNote` heads both; the owner's ask), valued for a standard 9-cat league; "Connect a league" (`browse-exit`) or connecting
-    any league ends it. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
+  - sandbox: the Sandbox (`state.browse`, Nov 2026, the owner's ask; was "Just browse players"; the landing page's "try the sandbox" and the league menu's
+    "Sandbox: any players, no league"): `fxLeague()` is null (the daily file's site league, or your own, stays loaded underneath), `clearLeaguePlayers()`
+    drops its rosters/positions from the players, valued for a standard 9-cat league. Tabs (`TABS_BROWSE`): My team (`#team`: any players, up to `SANDBOX_MAX`),
+    Live (`#watch`: up to `WATCH_MAX` 12 followed live, `watchTabLive` in live.js; cells built from the Matchup tab's `dashGame`/`lineChips`), Players, Trends
+    (My team / Everyone else lists), Trades (`#trade`: give My team's players, get anyone found by name; `tradeCard` drawn inside `withState` with My team as
+    `state.players`; shared with the site's address, no league link). Kept in `state.sandbox` { roster, watch } (data ids, `normalize` cleans them), apart from
+    any league. My team is the team id `SB_ME`: `myTeamId()` and `fxTeamName` know it, so `teamLink` draws "My team" in orange. Add / Follow live also on every
+    player's card (`sbCardLine` via `cardOwner`); searches are `sbSearch` (`ui.sbQ`). `browse-exit` goes back to your league (read again with `switchLeague`,
+    which puts its players' league details back) or to the landing page. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
 - `scripts/update_data.py`: daily data job (GitHub Actions, started at 08:00 UTC = 4 a.m. ET, 3 a.m. in winter, by the Worker's Cron Trigger through
   GitHub's API, `startDataJob` in worker/yahoo.js: GitHub ran the workflow's own schedule hours late, 14:54-18:12 UTC on Nov 11-16, 2026;
   the workflow's 09:23 UTC schedule is the backstop. Set up Nov 17, 2026 (the owner's fine-grained `GITHUB_TOKEN`, Actions read/write on
@@ -150,7 +155,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   spread from `projSd` (sports.js; real misses × 0.8, to match 40 real matchups' margins). Matchups counts as weekly lineups, but `bestFootballIds` locks player by player as each game starts;
   the page follows the week's games live, as the Dashboard does. Adds and pickups replace the weakest at the same position. Checked on a real league's 80 team-weeks, weeks 1-8: projected
   110.8 a week, scored 110.1, team-week miss 19.5, favorites won 25 of 40. (i) texts: `infoOver` in sports.js.
-- NHL (Fantrax leagues only; every tab and past seasons, as basketball; "Just browse" and the demo are NBA only). Goalies: a team's game isn't each
+- NHL (Fantrax leagues only; every tab and past seasons, as basketball; the sandbox and the demo are NBA only). Goalies: a team's game isn't each
   goalie's. `startChance(p, d)` (nba.js) is 1 for skaters; a goalie's comes from `startChain(team)`, game by game from the team's last
   (`teams[t].lg`): his share of recent starts (`raw.st`, `goalie_shares` in the job; roster goalies only, anyone Out shares nothing), cut
   for whoever started the game before (×0.1 on a back-to-back: the same goalie started the second night 7% of the time in 2025-26;
@@ -237,7 +242,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   The full-draw test in app.test.js draws every tab and popup of nine leagues with names made to break out of HTML (audited Nov 17, 2026: none did); it also checks every position is in its color.
 - `python serve.py [port]` (preview config "site", port 5173) refreshes `data/` locally: never commit
   `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
-  `.claude/` is git-ignored, so a worktree has no `launch.json`: write one there whose port no other session uses (5174, 5175...: `runtimeArgs` `["serve.py", "5174"]`;
+  `.claude/` is git-ignored, so a worktree has no `launch.json` (and the preview tool reads the main folder's, which a worktree session may not edit: its "site" serves the main folder's code; if so, run the worktree's `python serve.py 5176` in the background and open its URL): write one there whose port no other session uses (5174, 5175...: `runtimeArgs` `["serve.py", "5174"]`;
   serve.py refuses a port in use, as Windows would otherwise let two servers share one). Another port is another origin: connect the league again there, and the Worker
   answers only localhost:5173 (`SITE_ORIGINS`), so the page there falls back to ESPN directly: check changes to the Worker's routes (live feed, `/espn/`) on 5173.
 - cdn.nba.com answers GitHub runners 403: `get_json` falls back to the same files on NBA's S3 storage (`CDN_MIRROR`), so box

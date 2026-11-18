@@ -135,6 +135,7 @@ const actions = {
   },
   // the Trades tab's deal (or the one a league mate's link brought), the same way: the picture opens on both sides
   async 'trade-share'(el) {
+    if (state.browse) { const S = sbTradeShare(); if (S) await shareWith(el, S); return; } // the sandbox's (sandbox.js)
     const L = fxLeague(), T = tradeDeal();
     if (L && T) await shareWith(el, tradeShare(L, T));
   },
@@ -259,17 +260,54 @@ const actions = {
     if (!state.fxTeam && back) await actions['league-switch']({ dataset: { id: back.id } });
     else commit();
   },
-  // no league: just the Players tab, valued for a standard 9-category league
+  // the sandbox: no league, a team of your own (sandbox.js), valued for a standard 9-category league. From the landing
+  // page or the league menu (a league stays underneath, to go back to; the demo's borrowed team doesn't)
   'land-browse'() {
+    $('#leagueMenu details')?.removeAttribute('open');
     const go = () => {
-      state.browse = true; state.demo = false; ui.addingLeague = false;
+      if (state.demo) Object.assign(state, { fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp(), leagueChosen: false });
+      state.browse = true; state.demo = false; ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
       clearLeaguePlayers();
       commit();
-      location.hash = '#players';
+      location.hash = '#team';
     };
     if (SPORT.key === 'nba') go(); else useSport('nba').then(go);
   },
-  'browse-exit'() { state.browse = false; state.leagueChosen = false; commit(); },
+  // out of the sandbox: back to your league, read again (its players' league positions too), else the landing page
+  async 'browse-exit'() {
+    const back = state.fxTeam && currentLeagueId();
+    state.browse = false; state.leagueChosen = false;
+    if (back) {
+      try { await switchLeague(back); } catch (e) { toast(e.message); }
+      location.hash = '#dashboard';
+    }
+    commit();
+  },
+  // the sandbox's lists (sandbox.js): My team and the Live tab, from a search, a player's card or a ✕
+  'sb-add'(el) { ui.sbQ.team = ''; sbToggle('roster', +el.dataset.id, true); },
+  'sb-drop'(el) { sbToggle('roster', +el.dataset.id, false); },
+  'sb-watch'(el) { ui.sbQ.watch = ''; sbToggle('watch', +el.dataset.id, true); },
+  'sb-unwatch'(el) { sbToggle('watch', +el.dataset.id, false); },
+  // the Live tab: My team's players not followed yet, best first, as many as there's room for
+  'sb-watch-team'() {
+    const add = sortDesc(sbRoster().filter(p => !sbWatching(p.nbaId)), sbWorth).slice(0, WATCH_MAX - state.sandbox.watch.length).map(p => p.nbaId);
+    if (!add.length) return;
+    state.sandbox.watch = [...state.sandbox.watch, ...add];
+    commit(`Following ${add.length} of your players`);
+  },
+  async 'sb-clear'() {
+    if (!(await askConfirm('Start My team over?', 'Takes every player off My team on this device. The players you follow on Live stay.', 'Start over'))) return;
+    state.sandbox.roster = []; ui.sbGive.clear();
+    commit('My team is empty');
+  },
+  // a trade's incoming player, found by name
+  'sb-get'(el) {
+    const id = +el.dataset.id;
+    if (!ui.sbGet.includes(id) && !sbOwns(id) && ui.sbGet.length < SB_GET_MAX) ui.sbGet = [...ui.sbGet, id];
+    ui.sbQ.get = '';
+    render();
+  },
+  'watch-range'(el) { ui.watchRange = el.dataset.range; render(); },
   async 'land-demo'() {
     const site = NBA && NBA.siteLeague;
     if (!site) return;
@@ -291,7 +329,7 @@ const actions = {
   async 'league-switch'(el) {
     const id = el.dataset.id;
     $('#leagueMenu details')?.removeAttribute('open');
-    if (id === currentLeagueId() && state.fxTeam) return;
+    if (id === currentLeagueId() && state.fxTeam && !state.browse) return;
     try {
       // (one saved before past seasons had their own place may turn out to be one)
       const wait = await connectLeague(id);
@@ -408,7 +446,7 @@ const actions = {
   // whose players: any of them, but never none
   'perf-whose'(el) {
     const k = el.dataset.key, next = { ...ui.perfWhose, [k]: !ui.perfWhose[k] };
-    if (!Object.values(next).some(Boolean)) return;
+    if (!perfWhoseKeys().some(x => next[x])) return;
     ui.perfWhose = next;
     render();
   },
@@ -489,7 +527,7 @@ const actions = {
     if (!(await askConfirm('Reset and start over?', 'Removes your leagues, teams and matchup logs from this device. Copy a backup first if you want to keep anything.', 'Reset'))) return;
     await useSport('nba');
     state = emptyState();
-    ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeGivePicks.clear(); ui.tradeGetPicks.clear();
+    ui.tradeGive.clear(); ui.tradeGet.clear(); ui.tradeGivePicks.clear(); ui.tradeGetPicks.clear(); ui.sbGive.clear(); ui.sbGet = [];
     ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
     location.hash = '';
     await loadNba(true);
@@ -516,6 +554,15 @@ const forms = {
       msg.textContent = e.message;
     }
     btn.disabled = false; btn.textContent = label;
+  },
+  // the sandbox's searches (sandbox.js): Enter takes the first match, and the box stays ready for the next name
+  'sb-find'(f) {
+    const key = f.dataset.key, S = SB_SEARCH[key], hit = $('.sb-hits [data-action]', f.parentNode);
+    if (!S || !hit) return;
+    actions[S.action](hit);
+    ui.sbQ[key] = '';
+    render();
+    $(`#sbQ-${key}`)?.focus();
   },
 
 };
@@ -680,6 +727,12 @@ document.addEventListener('change', e => {
     if (el.checked) set.add(el.value); else set.delete(el.value);
     ui.tradeSeen = null;
     render();
+  } else if (el.dataset.change === 'sb-give') { // the sandbox's trade (sandbox.js)
+    if (el.checked) ui.sbGive.add(+el.value); else ui.sbGive.delete(+el.value);
+    render();
+  } else if (el.dataset.change === 'sb-get') {
+    if (!el.checked) ui.sbGet = ui.sbGet.filter(id => id !== +el.value);
+    render();
   } else if (el.dataset.change === 'trade') {
     const set = el.dataset.side === 'give' ? ui.tradeGive : ui.tradeGet;
     if (el.checked) set.add(el.value); else set.delete(el.value);
@@ -696,6 +749,12 @@ document.addEventListener('input', e => {
     const at = el.selectionStart;
     render();
     const box = $('#perfQ');
+    if (box) { box.focus(); box.setSelectionRange(at, at); }
+  } else if (el.dataset.input === 'sb-q') { // a sandbox search (sandbox.js): its matches as it's typed
+    const key = el.dataset.key, at = el.selectionStart;
+    ui.sbQ[key] = el.value;
+    render();
+    const box = $(`#sbQ-${key}`);
     if (box) { box.focus(); box.setSelectionRange(at, at); }
   }
 });
@@ -753,7 +812,7 @@ function route() {
   if (tab === 'lineup' || tab === 'roster') tab = 'standings'; // the old Lineup and Roster tabs: Category strengths is on a team's card now
   if (tab === 'live') tab = 'dashboard'; // and the old Live tab on Performances (Today)
   if (tab === 'rosters' && !ui.season) tab = 'standings';
-  ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : state.browse ? 'players' : 'dashboard';
+  ui.tab = tabList().some(([k]) => k === tab) ? tab : ui.season ? 'standings' : state.browse ? 'team' : 'dashboard';
   if (!VIEW_TABS.includes(ui.tab)) { ui.viewA = null; ui.viewB = null; }
   render();
   window.scrollTo(0, 0);

@@ -41,7 +41,7 @@ const INFO = {
     <p><b>The lists</b> follow your league: one for each counting category (fantasy points in a points league), the shooting percentages for players taking real volume (8 shots, or 3 free throws, a game), then <b>Minutes</b> and <b>Shot attempts</b>, the role changes that usually come before the stats do. Turnovers aren't a list: more of them isn't heating up.</p>
     <p><b>Ranked by the change per game</b>, not the percentage: going from 1 to 2.6 threes is +160% but a smaller change than 15 to 21 points. The percentage is shown next to the numbers; a shooting percentage shows the makes a game above or below his usual rate.</p>
     <p><b>Rostered</b> and <b>Waivers</b>: by Value, what a game of his is worth (categories won, or fantasy points in a points league), his last 5 against his usual game; the players on your league's teams who moved most, and the same for the players on no team.</p>
-    <p><b>No league connected</b> (just browsing): one <b>All players</b> list by Value instead, values for a standard 9-category league.</p>
+    <p><b>The sandbox</b> (no league connected): <b>My team</b> and <b>Everyone else</b> by Value instead (one <b>All players</b> list while My team is empty), values for a standard 9-category league.</p>
     <p><b>Notes</b> say why, where the box scores can: a regular teammate (24+ minutes a game) who missed most of those games, or minutes that moved by 4 or more. The fantasy team shown is who has him today.</p>`],
   recap: ['Weekly recap', `
     <p><b>Results</b>: 👑 marks the week's top team and 💩 its bottom one: the most and fewest points in a points league, and in a category league the best and worst record had each team played every other team that week. Hover one for the numbers.</p>
@@ -108,6 +108,16 @@ const INFO = {
     <p><b>For your team</b>: what the trade does to your active (non-IR) roster's per-game totals in each category, your playoff games, and the net value over a waiver player. Hover a category for now and after.</p>
     <p><b>Draft picks</b> aren't in the numbers: next season's draft order isn't known yet.</p>
     <p>Whether a deal is worth it is yours to judge.</p>`; }],
+  // the sandbox (sandbox.js): My team and Live
+  sandbox: ['The sandbox', `
+    <p>Everything here works without a league: values are for a standard 9-category league (points, rebounds, assists, steals, blocks, threes, turnovers, FG% and FT%), and each player's numbers are his average game this season.</p>
+    <p><b>My team</b> holds up to ${SANDBOX_MAX} of any NBA players: add them by name here, or from any player's card (his name opens it, on every tab). They're marked on the <b>Players</b> tab (Filters: My team or everyone else) and get their own list on <b>Trends</b>. Under the table, the team's per-game totals: every player's average game added up.</p>
+    <p><b>Live</b> follows up to ${WATCH_MAX} players, on My team or not, as their games are played. <b>Trades</b> sends any of My team's players for anyone, and shows the deal as a league's trade proposal: its <b>For your team</b> row is what it does to My team's per-game totals.</p>
+    <p>My team and the players you follow are kept on this device, apart from any league you connect, and stay for your next visit.</p>`],
+  watch: ['Live', `
+    <p>Each player's game and stat line as it's played: ESPN's box scores, which your browser asks for every 30 seconds while games are on (a minute with your browser's data saver on). ESPN runs a minute or so behind the broadcast. A number flashes green or red as it changes: green for what helps (a make, a rebound), red for what hurts (a miss, a turnover).</p>
+    <p>During a game the dot by the clock is solid while he's on the floor and light while he's on the bench or between periods. <b>Value</b> is what the game has added so far to winning a week's categories, against not playing (see Players).</p>
+    <p>Until today's first tip-off it shows the last game day; Today then shows each game's tip-off. Players on a game now come first, then finished games, then games still to come, then players with no game (and their next one).</p>`],
   storage: ['Saved on this device', `
     <p>To keep requests to Fantrax and ESPN low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), each site's player list (and Fantrax's ADP, refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
     <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved league data</b> removes only what came from Fantrax and ESPN; it's fetched again the next time it's needed.</p>`],

@@ -687,6 +687,46 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .delta-table td.num { font-weight: 600; }
 /* the trade proposal (tradeCard, views.js): what each side gets, then the two sides per game */
 .trade-grid + .card, .tp + .trade-grid { margin-top: 16px; }
+/* ---------- The sandbox (sandbox.js): My team, Live, its searches ---------- */
+.sb-find { margin: 0 0 8px; }
+.sb-q { display: block; width: 100%; max-width: 360px; }
+.sb-hits { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; max-width: 520px; }
+.sb-hit { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.sb-hit:hover, .sb-hit:focus-visible { background: var(--surface-2); }
+.sb-hit-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.sb-hit-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-hit .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-hit-add { flex: none; font-size: .8rem; font-weight: 700; white-space: nowrap; }
+.sb-none { margin: 0 0 12px; }
+.sb-clear { margin-left: auto; }
+.sb-team .card-head h2, .sb-watch-card .card-head h2 { margin-right: auto; }
+.sb-team .card-head .muted.small, .sb-watch-card .card-head .muted.small { margin-right: 4px; }
+/* a player's ✕ (off My team, or Live) at the end of his name */
+.sb-x { flex: none; margin-left: auto; }
+.sb-table .pf-name .bplayer { padding-right: 2px; }
+.sb-table tfoot td { border-top: 1px solid var(--border); padding-top: 8px; font-weight: 700; }
+.sb-table tfoot td.sc { font-weight: 700; }
+.badge.sb-live { margin-left: 4px; }
+.sb-tools { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 12px; }
+.sb-tools > .sb-find { flex: 1 1 260px; }
+.sb-tools > .sb-hits { flex: 1 1 100%; order: 3; }
+.sb-tools > .sb-none { flex: 1 1 100%; order: 3; }
+.sb-team-btn { margin-bottom: 8px; }
+.sb-when { margin: 0 0 8px; }
+/* Live: each player a box, as many across as fit (two on a phone, as the Matchup tab's day) */
+.sb-watch { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.sb-watch .mu-p { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.sb-watch .mu-p.out { opacity: .62; }
+.mu-chip.sb-val { border-color: var(--muted); }
+.sb-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.btn.on { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 640px) {
+  .sb-watch { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .sb-watch .mu-p { padding: 7px 8px; }
+  .sb-q { max-width: none; }
+  .badge.sb-live, .badge.sb-mine { display: none; } /* (the name needs the room) */
+}
+
 .tp-btns { display: flex; gap: 8px; margin-left: auto; }
 .tp-note { margin: -6px 0 12px; }
 .tp-head { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; min-width: 0; }

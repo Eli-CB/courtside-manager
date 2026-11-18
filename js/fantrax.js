@@ -413,7 +413,7 @@ function clearLeaguePlayers() {
   for (const raw of NBA.players) { delete raw.fx; raw.pos = raw.basePos; }
   changed('players');
 }
-const myTeamId = () => (viewLeague ? viewTeam : state.fxTeam);
+const myTeamId = () => (viewLeague ? viewTeam : state.browse ? SB_ME : state.fxTeam); // (the sandbox: its own roster, sandbox.js)
 function viewingLeague(L, me, fn) {
   const was = [viewLeague, viewTeam];
   viewLeague = L; viewTeam = me;
@@ -436,7 +436,7 @@ const fxPickable = () => (fxLeague() ? fxLeague().teams : []);
 function fxTeamName(id) {
   const L = fxLeague();
   const t = L && L.teams.find(x => x.id === id);
-  return t ? t.name : '';
+  return t ? t.name : !L && state.browse ? SANDBOX_SIDES[id] || '' : ''; // (the sandbox's two sides of a trade: sandbox.js)
 }
 
 function fxOpponentFor(start, teamId = state.fxTeam) {
