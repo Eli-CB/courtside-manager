@@ -545,10 +545,9 @@ function htmlRuns(html) {
 const statUnits = tiles => tiles.map(t => [[t.v, t.hot ? (isBelowZero(t.v) ? 'r' : 'a') : 'b'], [` ${t.k}${t.made ? ` ${t.made}` : ''}`, 'm']]);
 const isBelowZero = v => /^[-−]/.test(String(v));
 
-// The picture of a week's recap: its standouts, then every final
+// The picture of a week's recap: its standouts, then every final (no dates under the league's name: kept short, the owner's ask)
 const recapCanvas = (L, X) => shareCanvas({
-  kicker: `WEEK ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games, mark: tid => recapMark(X, tid), hero: true,
-  sub: `${fmtDay(X.period.start)} – ${fmtDay(matchDates(X.period.start).slice(-1)[0] || X.period.end)}`,
+  kicker: `PERIOD ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games, mark: tid => recapMark(X, tid),
 });
 
 // What every share picture is drawn with (the recap's, the draft's, a trade's): a canvas `tall` px high in the share
@@ -661,7 +660,7 @@ async function sharePad(tall = 5000) {
     for (const [t, color, weight] of runs) { font(px, weight || 500); text(t, cx, y, color); cx += ctx.measureText(t).width; }
   };
   const inner = W - C.pad * 2;
-  // the top: what it is (an orange tab), the league, when; the y below it
+  // the top: what it is (an orange tab), the league, when (if said); the y below it
   const top = H => {
     let y = C.pad + 8;
     font(22, 700, 2.5);
@@ -670,6 +669,7 @@ async function sharePad(tall = 5000) {
     y += 48 + 30;
     font(80, 700, -2);
     for (const l of wrapText(ctx, H.title, inner).slice(0, 2)) { text(fitText(ctx, l, inner), C.pad, y); y += 92; }
+    if (!H.sub) return y + 34;
     font(30, 500); text(H.sub, C.pad, y, C.muted);
     return y + 84;
   };
@@ -697,67 +697,26 @@ async function sharePad(tall = 5000) {
     out.getContext('2d').drawImage(cv, 0, 0);
     return out;
   };
-  return { C, W, inner, ctx, font, text, round, clip, photo, standIn, prep, panel, face, lay, drawLay, meta, shots, logos, top, done };
+  return { C, W, inner, ctx, font, text, round, photo, prep, panel, face, lay, drawLay, meta, top, done };
 }
 
-// A picture to share in a league chat (1080 px wide): a kicker, the league's name and a line under it, then the standouts
-// (with hero, the recap's: the first player large, his numbers in tiles; each other player beside his photo; the rest
-// beside their emoji, with the faces of any players they name), then any finals. H: { kicker, title, sub, items, games,
-// mark: tid -> its emoji, hero }. (The Draft Retrospective has no large player, the owner's ask: The Reach as The Fall.)
+// A picture to share in a league chat (1080 px wide): a kicker, the league's name and any line under it, then the
+// standouts (each player beside his photo, every one alike: no larger card for the first, the owner's ask; the rest beside
+// their emoji, with the faces of any players they name), then any finals. H: { kicker, title, sub, items, games, mark: tid
+// -> its emoji }.
 // An item: { e, label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's
 // numbers are a game of), score: [number, unit] }, one naming players { faces }
 async function shareCanvas(H) {
-  const items = H.items, games = H.games || [], heroAt = H.hero ? items.findIndex(it => it.p) : -1;
-  const K = await sharePad(900 + sum(items.map((it, i) => (i === heroAt ? 760 : it.p ? 440 : 340))) + games.length * 100);
-  const { C, W, inner, ctx, font, text, round, clip, standIn, panel, face, lay, drawLay, meta, shots, logos } = K;
+  const items = H.items, games = H.games || [];
+  const K = await sharePad(900 + sum(items.map(it => (it.p ? 440 : 340))) + games.length * 100);
+  const { C, W, inner, ctx, font, text, round, panel, face, lay, drawLay, meta } = K;
   await K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])]);
   const x0 = C.pad, w = inner;
   const posOf = p => p.pos || (nbaById.get(p.nbaId) || {}).pos;
   const labelText = (it, x, y, max) => { font(22, 700, 2); text(fitText(ctx, `${it.e ? `${it.e}  ` : ''}${it.label.toUpperCase()}`, max), x, y, C.accent); };
 
-  // The first player, large: his name over his team's colors and his cutout, his numbers in tiles under him (his value or
-  // points first, in orange), or the award's words
-  const hero = (it, y) => {
-    const p = it.p, raw = nbaById.get(p.nbaId) || {}, topH = 384, tx = x0 + 44, tw = 470;
-    const tiles = it.tiles && [{ v: it.score[0], k: it.score[1].toUpperCase(), hot: true }, ...(it.per ? [{ v: String(it.per), k: it.per === 1 ? 'GAME' : 'GAMES' }] : []), ...it.tiles];
-    const rows = tiles ? Math.ceil(tiles.length / 6) : 0, perRow = tiles ? Math.ceil(tiles.length / rows) : 0;
-    font(30); const said = tiles ? [] : wrapText(ctx, it.stats || '', w - 88);
-    const stripH = tiles ? rows * 116 : said.length * 42 + 64, h = topH + stripH;
-    round(x0, y, w, h, 32, C.card);
-    clip(x0, y, w, h, 32);
-    const tint = teamTint(raw.team), g = ctx.createLinearGradient(x0 + w * 0.3, 0, x0 + w, 0);
-    g.addColorStop(0, hexA(tint, 0, 0.3)); g.addColorStop(1, hexA(tint, 0.8, 0.3));
-    ctx.fillStyle = g; ctx.fillRect(x0, y, w, topH);
-    const logo = logos.get(raw.team), shot = shots.get(p.nbaId);
-    if (logo) { ctx.globalAlpha = 0.18; ctx.drawImage(logo, x0 + w - 470, y - 36, 450, 450); ctx.globalAlpha = 1; }
-    if (shot) { const sh = topH - 14, sw = sh * shot.width / shot.height; ctx.drawImage(shot, x0 + w - sw + 22, y + topH - sh, sw, sh); }
-    else standIn(p, raw, logo, x0 + w - 400, y + 7, 370, 370);
-    ctx.fillStyle = 'rgba(8,9,12,0.82)'; ctx.fillRect(x0, y + topH, w, stripH);
-    ctx.restore();
-    labelText(it, tx, y + 44, tw);
-    // first name over the last, the last large ("Victor" / "WEMBANYAMA")
-    const parts = p.name.split(' '), first = parts.length > 1 ? parts[0] : '', last = (parts.length > 1 ? parts.slice(1) : parts).join(' ').toUpperCase();
-    font(36, 600); text(fitText(ctx, first, tw), tx, y + 96, C.soft);
-    let px = 76;
-    for (font(px, 700, -1); px > 44 && ctx.measureText(last).width > tw; font(px, 700, -1)) px -= 2;
-    text(fitText(ctx, last, tw), tx, y + 140 + (76 - px) / 2, C.text);
-    font(30, 700); text(fitText(ctx, fxTeamName(it.tid), tw), tx, y + 248, C.text);
-    meta(tx, y + 292, 25, raw.team, posOf(p), it.per ? [[' · per game', C.muted]] : []);
-    if (!tiles) { font(30); said.forEach((l, j) => text(l, tx, y + topH + 32 + j * 42, C.soft)); return y + h; }
-    for (let r = 0; r < rows; r++) {
-      const row = tiles.slice(r * perRow, (r + 1) * perRow), cw = w / row.length, ry = y + topH + r * 116;
-      if (r) { ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(x0 + 28, ry, w - 56, 2); }
-      row.forEach((t, j) => {
-        const cx = x0 + cw * (j + 0.5);
-        if (j) { ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(x0 + cw * j, ry + 26, 2, 64); }
-        font(42, 700, -0.5); text(fitText(ctx, t.v, cw - 16), cx, ry + 22, !t.hot ? C.text : isBelowZero(t.v) ? C.bad : C.accent, 'center');
-        font(18, 600, 1.5); text(fitText(ctx, `${t.k}${t.made ? ` ${t.made}` : ''}`, cw - 14), cx, ry + 76, C.muted, 'center');
-      });
-    }
-    return y + h;
-  };
-
-  // Every other player: his photo on his team's colors at the left, the award, his name, his teams, his numbers
+  // A player: his photo on his team's colors at the left, the award, his name, his teams, his numbers (his value or points
+  // first, in orange)
   const player = (it, y) => {
     const p = it.p, raw = nbaById.get(p.nbaId) || {}, pw = 300, tx = x0 + pw + 40, tw = x0 + w - 40 - tx;
     const units = it.tiles ? statUnits([{ v: it.score[0], k: it.score[1], hot: true }, ...it.tiles]) : wordUnits([[it.stats || '', '']]);
@@ -788,7 +747,7 @@ async function shareCanvas(H) {
   };
 
   let y = K.top(H);
-  items.forEach((it, i) => { y = (i === heroAt ? hero : it.p ? player : note)(it, y) + 22; });
+  items.forEach(it => { y = (it.p ? player : note)(it, y) + 22; });
 
   // every final, winner on the left in bold, the score in the middle
   if (games.length) {
