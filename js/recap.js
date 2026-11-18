@@ -139,8 +139,10 @@ function buildRecap(L, P, period) {
   };
 }
 
-// The week's top team 👑 and bottom team 💩 in the results (and the picture's), and why, for its tooltip
-const recapMark = (X, tid) => (!X.rank ? '' : X.rank.top.includes(tid) ? '👑' : X.rank.bottom.includes(tid) ? '💩' : '');
+// The week's top and bottom team in the results (and the picture's): 'top', 'bottom' or '' (a badge, Top or Bottom: no
+// emoji in the recap, the owner's ask), and why, for its tooltip
+const recapMark = (X, tid) => (!X.rank ? '' : X.rank.top.includes(tid) ? 'top' : X.rank.bottom.includes(tid) ? 'bottom' : '');
+const RECAP_MARK = { top: 'Top', bottom: 'Bottom' };
 function recapMarkTip(X, tid) {
   const top = X.rank.top.includes(tid);
   if (isPoints()) return `${top ? 'Most' : 'Fewest'} points this week: ${fmtFp(X.rank.score[tid])}`;
@@ -150,27 +152,26 @@ function recapMarkTip(X, tid) {
 
 const scoreLine = sc => (isPoints() ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
 
-// The standouts as { emoji, label, html, text for sharing }; a player's also { p, tid, stats } for the image. Names
-// are plain links (no photo), so they sit on the line with the text around them.
+// The standouts as { label, html, text for sharing } (no emoji, the owner's ask); a player's instead { label, text, p, tid,
+// stats (his line in words), tiles (lineTiles), per (the games a week's line is a game of), score: [value or points, unit] },
+// drawn as a card with his photo; one naming players also { faces }. Names in a line are plain links, in line with the text.
 function recapItems(X) {
   const team = tid => fxTeamName(tid);
   const out = [];
-  const add = (e, label, html, text, more) => out.push({ e, label, html, text, ...more });
+  const add = (label, html, text, more) => out.push({ label, html, text, ...more });
   const name = (p, bold) => `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${bold ? `<b>${esc(p.name)}</b>` : esc(p.name)}</button>`;
   const unit = isPoints() ? 'FP' : 'value';
-  const stand = (e, label, x, perGame, cls = '') => {
+  const stand = (label, x, perGame) => {
     const parts = fullLine(x.line, perGame), head = perGame ? `${x.line.gp1} G, per game: ` : '';
-    add(e, label, `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span><div class="rc-stats">${head}${parts.map(t => `<span>${t}</span>`).join(' · ')} · <span><b class="${cls}">${isPoints() && !perGame ? fmtFp(x.v) : fmtValue(x.v, perGame ? 1 : 2)}</b> ${unit}</span></div>`,
-      `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}`,
-        // (the picture's: his numbers as tiles, the games they're a game of, and his value or points)
-        tiles: lineTiles(x.line, perGame), per: perGame ? x.line.gp1 : 0, score: [isPoints() && !perGame ? fmtFp(x.v) : fmtValue(x.v, perGame ? 1 : 2), unit] });
+    add(label, '', `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}`,
+      tiles: lineTiles(x.line, perGame), per: perGame ? x.line.gp1 : 0, score: [isPoints() && !perGame ? fmtFp(x.v) : fmtValue(x.v, perGame ? 1 : 2), unit] });
   };
-  if (X.mvp) stand('🏆', 'Player of the week', X.mvp, !isOneGame());
-  if (X.goalie) stand('🥅', 'Goalie of the week', X.goalie, true);
-  if (X.defense) stand('🛡️', 'Defense of the week', X.defense, false);
-  if (X.game) stand('🚀', 'Game of the week', X.game, false);
-  if (X.brick) stand('🧱', 'Worst week', X.brick, true, X.brick.v < 0 ? 'pos-bad' : '');
-  if (X.dud) stand('🗑️', 'Worst game', X.dud, false, X.dud.v < 0 ? 'pos-bad' : '');
+  if (X.mvp) stand('Player of the week', X.mvp, !isOneGame());
+  if (X.goalie) stand('Goalie of the week', X.goalie, true);
+  if (X.defense) stand('Defense of the week', X.defense, false);
+  if (X.game) stand('Game of the week', X.game, false);
+  if (X.brick) stand('Worst week', X.brick, true);
+  if (X.dud) stand('Worst game', X.dud, false);
   if (X.missed && X.missed.length) {
     // nobody's photo: names in line with the text, as the others
     const who = (x, html) => (html ? `${name({ nbaId: x.nba, name: x.name }, true)} <span class="muted">${teamLink(x.tid)}</span>` : `${x.name} (${team(x.tid)})`);
@@ -178,42 +179,42 @@ function recapItems(X) {
     const list = html => shown.map(x => who(x, html)).join(', ') + (more ? ` and ${more} other${more === 1 ? '' : 's'}` : '');
     const tail = isOneGame() ? (X.missed.length > 1 ? 'each started without playing a game' : 'started without playing a game')
       : X.missed.length > 1 ? `each missed ${g} game${g === 1 ? '' : 's'} while starting` : `missed ${g} of ${X.missed[0].sched} games while starting`;
-    add('🤕', 'Street clothes', `${list(true)} ${tail}`, `${list(false)} ${tail}`, { faces: shown.map(x => ({ nbaId: x.nba, name: x.name })) });
+    add('Street clothes', `${list(true)} ${tail}`, `${list(false)} ${tail}`, { faces: shown.map(x => ({ nbaId: x.nba, name: x.name })) });
   }
   if (X.regret) {
     const r = X.regret, o = Math.sign(Math.round((r.sc.me - r.sc.opp) * 10)), res = o > 0 ? 'won' : 'tied';
-    add('🪑', 'Bench regret', `<b>${teamLink(r.tid)}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
+    add('Bench regret', `<b>${teamLink(r.tid)}</b>: starting ${name(r.w.inP)} over ${name(r.w.outP)} would have ${res} ${scoreLine(r.sc)}`,
       `${team(r.tid)}: starting ${r.w.inP.name} over ${r.w.outP.name} would have ${res} ${scoreLine(r.sc)}`, { faces: [r.w.inP, r.w.outP] });
   }
   if (X.hats && X.hats.length) {
     const who = html => X.hats.map(x => (html ? `${name(x.p, true)} <span class="muted">${teamLink(x.tid)}</span>` : `${x.p.name} (${team(x.tid)})`)).join(', ');
     const tail = X.hats.length > 1 ? 'each scored three goals in a game' : `scored ${fmt(lineStat(X.hats[0].line, 'g'), 0)} goals in a game`;
-    add('🎩', 'Hat trick', `${who(true)} ${tail}`, `${who(false)} ${tail}`, { faces: X.hats.map(x => x.p) });
+    add('Hat trick', `${who(true)} ${tail}`, `${who(false)} ${tail}`, { faces: X.hats.map(x => x.p) });
   }
   if (X.carry) {
     const c = X.carry, pct = Math.round(c.share * 100);
-    add('🎒', 'Carried', `${name(c.p, true)} scored ${fmtFp(c.pts)} of <b>${teamLink(c.tid)}</b>'s ${fmtFp(c.of)} (${pct}%)`,
+    add('Carried', `${name(c.p, true)} scored ${fmtFp(c.pts)} of <b>${teamLink(c.tid)}</b>'s ${fmtFp(c.of)} (${pct}%)`,
       `${c.p.name} scored ${fmtFp(c.pts)} of ${team(c.tid)}'s ${fmtFp(c.of)} (${pct}%)`, { faces: [c.p] });
   }
   const final = g => `${fmtFp(g.sc.me)}–${fmtFp(g.sc.opp)}`;
   if (X.unlucky) {
     const g = X.unlucky, said = `scored ${fmtFp(g.sc.opp)}, the ${g.place === 1 ? 'most' : ordinal(g.place) + ' most'} in the league, and still lost`;
-    add('😩', 'Tough luck', `<b>${teamLink(g.b)}</b> ${said} to ${teamLink(g.a)} ${final(g)}`, `${team(g.b)} ${said} to ${team(g.a)} ${final(g)}`);
+    add('Tough luck', `<b>${teamLink(g.b)}</b> ${said} to ${teamLink(g.a)} ${final(g)}`, `${team(g.b)} ${said} to ${team(g.a)} ${final(g)}`);
   }
   if (X.lucky) {
     const g = X.lucky, said = `won with ${fmtFp(g.sc.me)}, the ${g.place === X.teams ? 'fewest' : ordinal(g.place) + ' most'} in the league`;
-    add('🍀', 'Lucky win', `<b>${teamLink(g.a)}</b> ${said}, over ${teamLink(g.b)} ${final(g)}`, `${team(g.a)} ${said}, over ${team(g.b)} ${final(g)}`);
+    add('Lucky win', `<b>${teamLink(g.a)}</b> ${said}, over ${teamLink(g.b)} ${final(g)}`, `${team(g.a)} ${said}, over ${team(g.b)} ${final(g)}`);
   }
   if (X.close) {
     const g = X.close, by = `by ${fmt(g.margin, g.margin < 1 ? 2 : 1)}`;
-    add('😬', 'Nail-biter', `<b>${teamLink(g.a)}</b> beat ${teamLink(g.b)} ${final(g)}, ${by}`, `${team(g.a)} beat ${team(g.b)} ${final(g)}, ${by}`);
+    add('Nail-biter', `<b>${teamLink(g.a)}</b> beat ${teamLink(g.b)} ${final(g)}, ${by}`, `${team(g.a)} beat ${team(g.b)} ${final(g)}, ${by}`);
   }
   // Best week: a category week is hard to read from the finals; a points week is just the top score, there for all to see
   if (X.allPlay && X.teams > 2 && !isPoints()) {
     // matchups won against every other team's week, not categories
     const a = X.allPlay, n = X.teams - 1;
     const beat = `${a.w === n ? `every other team (${n} of ${n})` : `${a.w} of ${n} teams`}${a.t ? `, tied ${a.t}` : ''}`;
-    add('📈', 'Best week', `<b>${teamLink(a.tid)}</b> would have beaten ${beat}`, `${team(a.tid)} would have beaten ${beat}`);
+    add('Best week', `<b>${teamLink(a.tid)}</b> would have beaten ${beat}`, `${team(a.tid)} would have beaten ${beat}`);
   }
   return out;
 }
@@ -223,7 +224,31 @@ const recapUrl = (L, n) => `${location.origin}${location.pathname}?league=${enco
 
 // What Share sends: the standouts only (everyone already has the results in their league)
 function recapText(L, X) {
-  return [`${SPORT.emoji} ${L.name} · Week ${X.period.n} standouts`, '', ...recapItems(X).map(x => `${x.e} ${x.label}: ${x.text}`)].join('\n\n');
+  return [`${L.name} · Period ${X.period.n} recap`, '', ...recapItems(X).map(x => `${x.label}: ${x.text}`)].join('\n\n');
+}
+
+// A standout on the Recap tab, as the share picture draws it (the owner's ask: the tab matches the picture): a player
+// beside his photo on his team's color (the player card's playerPhoto), the award, his name, his fantasy team, his NBA team
+// and positions, his numbers (his value or points first); any other the award and its line, with the faces of the players
+// it names
+function recapCard(x) {
+  if (!x.p) {
+    const faces = (x.faces || []).filter(f => f && f.nbaId != null).slice(0, 3);
+    return `<article class="rx-card rx-note"><div class="rx-body"><div class="rx-label">${x.label}</div><div class="rx-text">${x.html}</div></div>`
+      + `${faces.length ? `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>` : ''}</article>`;
+  }
+  const raw = nbaById.get(x.p.nbaId) || { id: x.p.nbaId, name: x.p.name }, pos = x.p.pos || raw.pos || [];
+  const stats = x.tiles
+    ? [[x.score[0], x.score[1], isBelowZero(x.score[0]) ? 'pos-bad' : ''], ...x.tiles.map(t => [t.v, `${t.k}${t.made ? ` ${t.made}` : ''}`, ''])]
+      .map(([v, k, cls]) => `<span><b${cls ? ` class="${cls}"` : ''}>${esc(v)}</b> ${esc(k)}</span>`).join('')
+    : `<span class="rx-words">${esc(x.stats)}</span>`; // (football: its line in words)
+  return `<article class="rx-card rx-player">${playerPhoto(raw, 'rx-ph')}<div class="rx-body">
+    <div class="rx-label">${x.label}</div>
+    <div class="rx-name">${playerBtn(x.p.nbaId, x.p.name)}</div>
+    <div class="rx-team">${teamLink(x.tid)}</div>
+    <div class="rx-meta">${raw.team ? teamBtn(raw.team) : 'FA'}${pos.length ? ` · ${posTags(pos)}` : ''}${x.per ? ` · ${x.per} G, per game` : ''}</div>
+    <div class="rx-stats">${stats}</div>
+  </div></article>`;
 }
 
 function viewRecap() {
@@ -235,28 +260,28 @@ function viewRecap() {
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'recap') render(); }).catch(() => {});
   else fillWeekFromEspn(L); // (the night a week ends, its last games from ESPN before the daily job saves them)
   const done = finishedPeriods(L);
-  if (!done.length) return empty('No finished weeks yet', 'The first recap appears once week 1 is over.');
+  if (!done.length) return empty('No finished periods yet', 'The first recap appears once period 1 is over.');
   const period = done.find(p => p.n === ui.recapWeek) || done[done.length - 1];
   const P = pastWeeksOf(L, period);
-  if (P.state === 'loading') return loadingCard(`Week ${period.n} recap`, `Loading the week's lineups from ${sourceName(L)}…`);
-  if (P.state === 'error') return empty(`Week ${period.n} recap`, `Couldn't load the week's lineups (${esc(P.msg)}).`);
+  if (P.state === 'loading') return loadingCard(`Period ${period.n} recap`, `Loading the period's lineups from ${sourceName(L)}…`);
+  if (P.state === 'error') return empty(`Period ${period.n} recap`, `Couldn't load the period's lineups (${esc(P.msg)}).`);
   const key = `${L.id}|${period.n}`;
   if (!recaps.has(key)) recaps.set(key, P.weeks && P.G ? buildRecap(L, P, period) : null);
   const X = recaps.get(key);
-  if (!X) return empty(`Week ${period.n} recap`, `${sourceName(L)} hasn't shared this week's lineups.`);
+  if (!X) return empty(`Period ${period.n} recap`, `${sourceName(L)} hasn't shared this period's lineups.`);
 
   const me = myTeamId();
-  // every finished week, newest by default: ‹ Week 2 › steps back through the earlier ones
-  const picker = done.length > 1 ? stepper('recap-step', 'week', `<select class="ctx-team" data-change="recap-week" aria-label="Week">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Week ${p.n}</option>`).join('')}</select>`,
+  // every finished period, newest by default: ‹ Period 2 › steps back through the earlier ones
+  const picker = done.length > 1 ? stepper('recap-step', 'week', `<select class="ctx-team" data-change="recap-week" aria-label="Period">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Period ${p.n}</option>`).join('')}</select>`,
     { first: period.n === done[0].n, last: period.n === done[done.length - 1].n }) : '';
   // the finals, the week's top and bottom teams marked on the row's outer edge (before the left team, after the right)
-  const mark = tid => { const e = recapMark(X, tid); return e ? `<span class="rc-mark" title="${esc(recapMarkTip(X, tid))}" aria-label="${esc(recapMarkTip(X, tid))}">${e}</span>` : ''; };
+  const mark = tid => { const k = recapMark(X, tid); return k ? `<span class="rc-badge rc-${k}" title="${esc(recapMarkTip(X, tid))}">${RECAP_MARK[k]}</span>` : ''; };
   const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${mark(g.a)}${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}${mark(g.b)}</span></li>`).join('');
-  const items = recapItems(X).map(x => `<li class="rc-item"><span class="rc-e" aria-hidden="true">${x.e}</span><div><div class="rc-label">${x.label}</div>${x.html}</div></li>`).join('');
+  const items = recapItems(X).map(recapCard).join('');
   return `<div class="card">
-    <div class="card-head"><h2>Week ${period.n} standouts ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
+    <div class="card-head"><h2>Period ${period.n} recap ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
     <p class="muted small rc-when">${esc(L.name)} · ${fmtDay(period.start)} – ${fmtDay(matchDates(period.start).slice(-1)[0] || period.end)} · starters only</p>
-    ${items ? `<ul class="rc-items">${items}</ul>` : '<p class="muted small" style="margin:0">Nothing stood out.</p>'}
+    ${items ? `<div class="rx-grid">${items}</div>` : '<p class="muted small" style="margin:0">Nothing stood out.</p>'}
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>
     <ul class="rc-finals">${finals}</ul>
@@ -443,7 +468,7 @@ function viewTrends() {
 // 1080 px wide, as tall as it needs: the league and week, the standouts, every final, the site's name. Each player stands
 // on his NBA team's colors in front of its logo, as the player card shows him (ESPN's cutout; the round photo from the
 // site's own sheet where there's none). Drawn on a canvas from the same recap.
-const RC_IMG = { w: 1080, pad: 56, bg: '#0b0c0f', card: '#16181d', card2: '#1f2229', line: '#2a2e36', text: '#f4f4f5', soft: '#d4d8df', muted: '#9aa3b2', accent: '#f07a2a', bad: '#f87171' };
+const RC_IMG = { w: 1080, pad: 56, bg: '#0b0c0f', card: '#16181d', card2: '#1f2229', line: '#2a2e36', text: '#f4f4f5', soft: '#d4d8df', muted: '#9aa3b2', accent: '#f07a2a', good: '#4ade80', bad: '#f87171' };
 const RC_FONT = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
 // An image for a canvas, or null if it won't load in 8 s. cors: from another site, which must allow it (a canvas that
@@ -483,10 +508,7 @@ function logoImg(team) {
   }
   return logoImgs.get(src);
 }
-// A team's color to tint a picture with: its first, or its second where the first is too dark to show on the dark
-// picture (Brooklyn's black) or too light, else a gray. hexA: a color as rgba, darkened (dark 0-1), at an opacity
-const lumOf = hex => { const n = parseInt(hex.slice(1), 16); return (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
-const teamTint = team => (TEAM_COLORS[team] || []).find(c => /^#[0-9a-f]{6}$/i.test(c) && lumOf(c) > 0.07 && lumOf(c) < 0.8) || '#3a404c';
+// a color as rgba, darkened (dark 0-1), at an opacity (a team's color: teamTint, core.js)
 function hexA(hex, a = 1, dark = 0) {
   const n = parseInt(hex.slice(1), 16), k = 1 - dark;
   return `rgba(${Math.round((n >> 16) * k)},${Math.round(((n >> 8) & 255) * k)},${Math.round((n & 255) * k)},${a})`;
@@ -731,15 +753,17 @@ async function shareCanvas(H) {
     return y + h;
   };
 
-  // The rest: their emoji, the award, its line (names bold), and the faces of the players it names
+  // The rest: any emoji, the award, its line (names bold), and the faces of the players it names
   const note = (it, y) => {
     const faces = (it.faces || []).filter(f => f && f.nbaId != null).slice(0, 3), fd = 104, step = 72;
-    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : 0, ex = x0 + 30, tx = ex + 88 + 28, tw = x0 + w - 32 - fw - tx;
+    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : 0, ex = x0 + 30, tx = it.e ? ex + 88 + 28 : x0 + 40, tw = x0 + w - 32 - fw - tx;
     const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), block = 40 + lines.length * 44 - 8;
     const h = Math.max(block + 64, faces.length ? fd + 60 : 0, 148), ty = y + (h - block) / 2;
     round(x0, y, w, h, 28, C.card);
-    ctx.fillStyle = hexA(C.accent, 0.14); ctx.beginPath(); ctx.arc(ex + 44, y + h / 2, 44, 0, Math.PI * 2); ctx.fill();
-    font(42); ctx.textBaseline = 'middle'; text(it.e, ex + 44, y + h / 2 + 2, C.text, 'center'); ctx.textBaseline = 'top';
+    if (it.e) { // (the Draft Retrospective's awards have one; the recap's don't)
+      ctx.fillStyle = hexA(C.accent, 0.14); ctx.beginPath(); ctx.arc(ex + 44, y + h / 2, 44, 0, Math.PI * 2); ctx.fill();
+      font(42); ctx.textBaseline = 'middle'; text(it.e, ex + 44, y + h / 2 + 2, C.text, 'center'); ctx.textBaseline = 'top';
+    }
     labelText({ ...it, e: '' }, tx, ty, tw);
     drawLay(lines, tx, ty + 40, 31, 44);
     faces.forEach((f, i) => face(f, x0 + w - 32 - fd / 2 - (faces.length - 1 - i) * step, y + h / 2, fd, C.card));
@@ -762,15 +786,19 @@ async function shareCanvas(H) {
     round(x0, y, w, 84, 22, C.card);
     round(W / 2 - sw / 2, y + 15, sw, 54, 27, C.bg);
     text(sc, W / 2, y + 26, C.accent, 'center');
-    // a team's name cut to fit with its mark (👑 💩) kept whole, on the outer edge
-    const named = (tid, left) => {
-      const m = H.mark ? H.mark(tid) : '';
-      if (!m) return fitText(ctx, fxTeamName(tid), colW);
-      const n = fitText(ctx, fxTeamName(tid), colW - ctx.measureText(`${m} `).width);
-      return left ? `${m} ${n}` : `${n} ${m}`;
+    // a team's name cut to fit, its badge (Top, Bottom) kept whole on the outer edge
+    const side = (tid, left, weight, color) => {
+      const k = H.mark ? H.mark(tid) : '', edge = left ? x0 + 32 : x0 + w - 32;
+      font(17, 700, 1.5);
+      const label = k ? RECAP_MARK[k].toUpperCase() : '', bw = k ? ctx.measureText(label).width + 24 : 0, room = bw ? bw + 12 : 0;
+      if (k) {
+        const ink = k === 'top' ? C.good : C.bad, bx = left ? edge : edge - bw;
+        round(bx, y + 26, bw, 32, 16, hexA(ink, 0.16)); text(label, bx + bw / 2, y + 34, ink, 'center');
+      }
+      font(30, weight); text(fitText(ctx, fxTeamName(tid), colW - room), left ? edge + room : edge - room, y + 26, color, left ? 'left' : 'right');
     };
-    font(30, g.margin ? 700 : 500); text(named(g.a, true), x0 + 32, y + 26, C.text);
-    font(30, 500); text(named(g.b, false), x0 + w - 32, y + 26, C.muted, 'right');
+    side(g.a, true, g.margin ? 700 : 500, C.text);
+    side(g.b, false, 500, C.muted);
     y += 96;
   }
 
@@ -784,8 +812,8 @@ const recapFileName = (L, X) => `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$
 // S: { title (the popup's), name (the share sheet's), what ('Recap': the toast's), text, url, link ('Full recap': before
 // the url), file, alt, draw: () => its canvas }
 const recapShare = (L, X) => ({
-  title: `Week ${X.period.n} recap`, name: `${L.name} · Week ${X.period.n} recap`, what: 'Recap', link: 'Full recap',
-  text: recapText(L, X), url: recapUrl(L, X.period.n), file: recapFileName(L, X), alt: `Week ${X.period.n} recap for ${L.name}`,
+  title: `Period ${X.period.n} recap`, name: `${L.name} · Period ${X.period.n} recap`, what: 'Recap', link: 'Full recap',
+  text: recapText(L, X), url: recapUrl(L, X.period.n), file: recapFileName(L, X), alt: `Period ${X.period.n} recap for ${L.name}`,
   draw: () => recapCanvas(L, X),
 });
 // The picture in the popup; the text and link (copied, or the share sheet) where a picture can't be made

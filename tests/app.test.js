@@ -2074,9 +2074,13 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     app.viewRecap(); // starts loading the week's lineups and box scores
     await new Promise(r => setTimeout(r, 20));
     const html = app.viewRecap();
-    assert.match(html, /Week 1 standouts/);
+    assert.match(html, /Period 1 recap/);
     const X = app.get('recaps').get(`${L.id}|1`);
     assert.equal(X.games.length, L.matchups['1'].length, 'every matchup');
+    // no emoji anywhere in the recap (the owner's ask); each player standout a card with his photo, as the share picture draws it
+    assert.ok(!/\p{Extended_Pictographic}/u.test(html), 'no emoji on the tab');
+    assert.equal((html.match(/class="rx-card rx-player"/g) || []).length, app.recapItems(X).filter(x => x.p).length);
+    assert.ok(html.includes('class="pc-photo rx-ph"') && html.includes(`data-photo="${X.mvp.p.nbaId}"`), "the player's photo, which opens his card");
     // the finals agree with Fantrax's standings (week 1 is the only finished week)
     for (const g of X.games) {
       const ra = L.standings.find(r => r.id === g.a);
@@ -2101,16 +2105,16 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.deepEqual(Array.from(X.rank.bottom, String).sort(), recs.filter(a => a.w + a.t / 2 === Math.min(...vals)).map(a => String(a.tid)).sort());
     assert.ok(X.rank.top.includes(X.allPlay.tid), 'Best week is the crowned one');
     const results = html.split('class="rc-finals"')[1];
-    assert.equal((results.match(/>👑</g) || []).length, X.rank.top.length);
-    assert.equal((results.match(/>💩</g) || []).length, X.rank.bottom.length);
+    assert.equal((results.match(/class="rc-badge rc-top"[^>]*>Top</g) || []).length, X.rank.top.length);
+    assert.equal((results.match(/class="rc-badge rc-bottom"[^>]*>Bottom</g) || []).length, X.rank.bottom.length);
     assert.match(results, /title="Best week in the league: \d+-\d+(-\d+)? against every other team"/);
     for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);
     assert.match(html, /would have beaten (every other team|\d+ of \d+ teams)/, 'Best week counts teams beaten, not categories');
     // the message: the standouts only (everyone has the results), each with its full line in the league's categories
     const text = app.recapText(L, X);
-    assert.ok(text.startsWith(`🏀 ${L.name} · Week 1 standouts`));
+    assert.ok(text.startsWith(`${L.name} · Period 1 recap`) && !/\p{Extended_Pictographic}/u.test(text), text.slice(0, 80));
     assert.ok(!X.games.some(g => text.includes(`${app.fxTeamName(g.a)} ${app.scoreLine(g.sc)} ${app.fxTeamName(g.b)}`)), 'no results');
-    assert.ok(text.includes('🏆 Player of the week: ') && !/<[a-z]/.test(text), 'plain text, no markup');
+    assert.ok(text.includes('Player of the week: ') && !/<[a-z]/.test(text), 'plain text, no markup');
     for (const c of app.scoreCats()) assert.ok(text.includes(` ${c.pct ? c.label.replace('%', '') : c.label}`), `${c.label} in the lines`);
     assert.ok(text.includes(`${X.game.line.fgm}-${X.game.line.fga} FG`), 'shooting as makes-attempts');
     assert.ok(!/Biggest win|Closest/.test(text + html), 'not the biggest win or the closest');
@@ -2152,10 +2156,10 @@ test("ESPN recap: a finished week from each of its days' lineups, asked for once
   useTeam(L.teams[0].id);
   ui.tab = 'recap';
   try {
-    assert.match(app.viewRecap(), /Loading the week's lineups from ESPN/);
+    assert.match(app.viewRecap(), /Loading the period's lineups from ESPN/);
     await new Promise(r => setTimeout(r, 30));
     const html = app.viewRecap();
-    assert.match(html, new RegExp(`Week ${n} standouts`));
+    assert.match(html, new RegExp(`Period ${n} recap`));
     assert.deepEqual(asked.sort((a, b) => a - b), [1, 2, 3, 4, 5, 6], 'one request a day, ESPN numbering days from opening night');
     const X = app.get('recaps').get(`${L.id}|${n}`);
     assert.equal(X.games.length, L.matchups[n].length, 'every matchup');
@@ -2171,7 +2175,7 @@ test("ESPN recap: a finished week from each of its days' lineups, asked for once
     app.get('recaps').clear();
     app.viewRecap();
     await new Promise(r => setTimeout(r, 30));
-    assert.match(app.viewRecap(), new RegExp(`Week ${n} standouts`));
+    assert.match(app.viewRecap(), new RegExp(`Period ${n} recap`));
     assert.equal(asked.length, 6);
     // only the week's days are read
     assert.ok(app.hasWeekLineups(L) && !app.hasLineupHistory(L), 'Awards and Season totals stay off: they need every day');
@@ -2732,7 +2736,7 @@ test("Trends: last 5 games against the usual one, per category, with the reason 
     app.viewRecap();
     await new Promise(r => setTimeout(r, 20));
     const recap = app.viewRecap();
-    assert.ok(recap.includes('standouts') && !recap.includes('class="card trends"'), 'the Recap is the week alone');
+    assert.ok(/Period \d+ recap/.test(recap) && !recap.includes('class="card trends"'), 'the Recap is the week alone');
   } finally { app.set('BOX', saved); ui.trendDir = 'up'; ui.tab = 'dashboard'; }
 });
 
@@ -3401,7 +3405,7 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     app.viewRecap();
     await new Promise(r => setTimeout(r, 30));
     const html = app.viewRecap();
-    assert.match(html, /Week 1 standouts/);
+    assert.match(html, /Period 1 recap/);
     const X = app.get('recaps').get(`${L.id}|1`);
     assert.equal(X.games.length, 6);
     assert.ok(X.mvp && X.mvp.line.gp1 === 1, 'Player of the week: his counted game');
@@ -3417,8 +3421,8 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     const scores = Object.entries(X.rank.score), hi = Math.max(...scores.map(s => s[1])), lo = Math.min(...scores.map(s => s[1]));
     assert.deepEqual(Array.from(X.rank.top, String), scores.filter(s => s[1] === hi).map(s => s[0]));
     assert.deepEqual(Array.from(X.rank.bottom, String), scores.filter(s => s[1] === lo).map(s => s[0]));
-    assert.equal(app.recapMark(X, X.rank.top[0]), '👑');
-    assert.equal(app.recapMark(X, X.rank.bottom[0]), '💩');
+    assert.equal(app.recapMark(X, X.rank.top[0]), 'top');
+    assert.equal(app.recapMark(X, X.rank.bottom[0]), 'bottom');
     assert.ok(html.includes(`title="Most points this week: ${app.fmtFp(hi)}"`) && html.includes(`title="Fewest points this week: ${app.fmtFp(lo)}"`));
     // a points week's luck: the best score that lost and the worst that won (each only on the wrong side of the middle),
     // the closest final, and the starter with the biggest share of his team's points

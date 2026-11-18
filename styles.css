@@ -446,13 +446,44 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rc-when { margin: -6px 0 10px; }
 .rc-img { display: block; width: 100%; max-height: 60vh; object-fit: contain; border-radius: 10px; margin: 0 0 12px; background: #15171b; }
 .rc-finals { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.rc-final { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); font-size: .92rem; }
+.rc-final { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 10px; background: var(--surface-2); font-size: .92rem; }
 .rc-final.me { box-shadow: inset 3px 0 0 var(--accent); }
 .rc-final .rc-t { min-width: 0; overflow-wrap: anywhere; }
 .rc-final .rc-t:last-child { text-align: right; }
 .rc-final .rc-t.won { font-weight: 800; }
-.rc-mark { margin: 0 4px; cursor: default; } /* the week's top 👑 and bottom 💩 team */
-.rc-score { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-score { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; padding: 3px 12px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+/* the week's top and bottom team: a badge on the row's outer edge */
+.rc-badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; cursor: default; }
+.rc-t:first-child .rc-badge { margin-right: 6px; }
+.rc-t:last-child .rc-badge { margin-left: 6px; }
+.rc-badge.rc-top { background: var(--good-soft); color: var(--good); }
+.rc-badge.rc-bottom { background: var(--bad-soft); color: var(--bad); }
+/* its standouts as cards, as the share picture draws them: a player beside his photo on his team's color, the rest with
+   the faces of the players they name */
+.rx-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); }
+.rx-card { display: flex; min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.rx-body { flex: 1; min-width: 0; padding: 14px 16px; }
+.rx-label { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.rx-name { margin-top: 3px; font-size: 1.12rem; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
+.rx-name .pname { font-size: inherit; font-weight: inherit; }
+.rx-team { margin-top: 2px; font-size: .88rem; font-weight: 600; }
+.rx-meta { margin-top: 2px; font-size: .78rem; color: var(--muted); }
+.rx-stats { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 8px; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rx-stats > span { white-space: nowrap; } /* "7 REB" stays together */
+.rx-stats > .rx-words { white-space: normal; }
+.rx-stats b { color: var(--text); font-weight: 700; }
+.rx-stats b.pos-bad { color: var(--bad); }
+.pc-photo.rx-ph { width: 168px; min-height: 172px; aspect-ratio: auto; border-radius: 0; box-shadow: none; align-self: stretch; cursor: pointer;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 92%, #000), color-mix(in srgb, var(--tint) 40%, #000)); }
+.rx-ph .pc-logo { left: 50%; width: 112%; transform: translate(-50%, -50%); opacity: .2; }
+.rx-ph .pc-shot { inset: auto auto 0 50%; width: auto; height: 92%; max-width: none; transform: translateX(-50%); }
+.rx-note { align-items: center; }
+.rx-text { margin-top: 3px; font-size: .92rem; line-height: 1.45; }
+.rx-text .pname { font-size: inherit; }
+.rx-faces { display: flex; flex: none; margin-right: 16px; }
+.rx-faces > .hs { outline: 3px solid var(--surface); }
+.rx-faces > .hs + .hs { margin-left: -10px; }
+@media (max-width: 640px) { .pc-photo.rx-ph { width: 112px; min-height: 150px; } .rx-body { padding: 12px 14px; } .rx-name { font-size: 1.04rem; } }
 .rc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .rc-item { display: flex; gap: 12px; align-items: flex-start; font-size: .92rem; }
 .rc-e { font-size: 1.4rem; line-height: 1.2; width: 1.6rem; text-align: center; flex: none; }

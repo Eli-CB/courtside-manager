@@ -44,7 +44,7 @@ const INFO = {
     <p><b>The sandbox</b> (no league connected): <b>My team</b> and <b>Everyone else</b> by Value instead (one <b>All players</b> list while My team is empty), values for a standard 9-category league.</p>
     <p><b>Notes</b> say why, where the box scores can: a regular teammate (24+ minutes a game) who missed most of those games, or minutes that moved by 4 or more. The fantasy team shown is who has him today.</p>`],
   recap: ['Weekly recap', `
-    <p><b>Results</b>: 👑 marks the week's top team and 💩 its bottom one: the most and fewest points in a points league, and in a category league the best and worst record had each team played every other team that week. Hover one for the numbers.</p>
+    <p><b>Results</b>: <b>Top</b> marks the week's top team and <b>Bottom</b> its bottom one: the most and fewest points in a points league, and in a category league the best and worst record had each team played every other team that week. Hover one for the numbers.</p>
     <p>A finished week's standouts across the league, counted from that week's real lineups and the NBA box scores (as Plan Ahead's finished week counts one matchup), then every matchup's result. Only starters count. Stat lines show your league's categories.</p>
     <ul><li><b>Player of the week:</b> the most value from a starter's games that week (categories won, or fantasy points in points leagues), with his per-game line.</li>
     <li><b>Game of the week:</b> the best single game by a starter.</li>

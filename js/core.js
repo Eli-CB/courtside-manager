@@ -488,13 +488,19 @@ function photoSrcs(raw) {
   return [260, 520].map(w => `https://a.espncdn.com/combiner/i?img=/i/headshots/${SPORT.key}/players/full/${raw.espn}.png&w=${w}&h=${Math.round(w * 190 / 260)}`);
 }
 // The player card's picture, as ESPN shows one: the player in front of his team's logo on a tint of its color; the
-// small round photo if the big one won't load (marked by the page's error listener, actions.js)
-function playerPhoto(raw) {
+// small round photo if the big one won't load (marked by the page's error listener, actions.js). cls: another look (the
+// Recap's cards: rx-ph, on his team's color itself, --tint); a tap on it opens his card (data-photo)
+function playerPhoto(raw, cls = '') {
   const small = headshot({ nbaId: raw.id, name: raw.name }, 64), src = photoSrcs(raw);
   if (!src) return small;
   const tc = TEAM_COLORS[raw.team], logo = IMG && IMG.logos[raw.team];
-  return `<div class="pc-photo"${tc ? ` style="--t1:${tc[0]};--t2:${tc[1]}"` : ''}>${logo ? `<img class="pc-logo" src="${logo}" alt="" aria-hidden="true">` : ''}<img class="pc-shot" src="${src[0]}" srcset="${src[0]} 1x, ${src[1]} 2x" alt="${esc(raw.name)}" decoding="async">${small}</div>`;
+  return `<div class="pc-photo${cls ? ` ${cls}` : ''}" data-photo="${raw.id}" style="--tint:${teamTint(raw.team)}${tc ? `;--t1:${tc[0]};--t2:${tc[1]}` : ''}">${logo ? `<img class="pc-logo" src="${logo}" alt="" aria-hidden="true">` : ''}<img class="pc-shot" src="${src[0]}" srcset="${src[0]} 1x, ${src[1]} 2x" alt="${esc(raw.name)}" decoding="async">${small}</div>`;
 }
+
+// A team's color to tint a photo or picture with: its first, or its second where the first is too dark to show (Brooklyn's
+// black) or too light, else a gray
+const lumOf = hex => { const n = parseInt(hex.slice(1), 16); return (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
+const teamTint = team => (TEAM_COLORS[team] || []).find(c => /^#[0-9a-f]{6}$/i.test(c) && lumOf(c) > 0.07 && lumOf(c) < 0.8) || '#3a404c';
 
 function teamLogo(team, px = 16) {
   const src = IMG && team && IMG.logos[team];
