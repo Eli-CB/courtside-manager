@@ -116,7 +116,7 @@ function draftData() {
 // board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
 // ADP order among the players not kept. Trigger Finger and Clock Milker come from how long each pick took (Fantrax's pick
 // times). The rest come from the players themselves: Glass (games missed the last two seasons), Youngins and Uncs (age
-// on draft day), Homer (their real teams now) and Frequent Flyer (their countries), each team's keepers counted with
+// on draft day), Homer (their real teams now) and Passport (their countries), each team's keepers counted with
 // its picks (the owner's ask: a draft-day roster); the ADP and pick-time ones are picks only. Team awards count
 // only teams with at least half as many picks as the most of any team, and a tie names every team in it. Not for a past
 // season: today's ADP, ages and teams say nothing about a draft from another year. Each award is { label, html, text,
@@ -242,7 +242,8 @@ function draftClockAwards(d, { plural, who, row, teamWho, teamAward, best, tenth
   if (clocks.length < 2) return;
   const sec = s => `${Math.round(s)} s`;
   const said = t => `: their typical pick took ${plural(Math.round(t.med), 'second')} (${Math.round(t.avg)} on average)`;
-  const rows = sign => sortDesc(clocks, t => sign * (t.med * 1e4 + t.avg)).map(t => row(teamWho(t), `${Math.round(t.avg)} s on average · longest: ${who(t.long.p)}, ${sec(t.long.s)}`, sec(t.med))).join('');
+  // (each number said: the typical pick on the right, the average under the name; unlabeled, 47 s beside "61 s on average" read as a mistake)
+  const rows = sign => sortDesc(clocks, t => sign * (t.med * 1e4 + t.avg)).map(t => row(teamWho(t), `${Math.round(t.avg)} s average · longest: ${who(t.long.p)}, ${sec(t.long.s)}`, `${sec(t.med)} typical`)).join('');
   const fast = best(clocks, t => -t.med, t => -tenth(t.avg)), slow = best(clocks, t => t.med, t => tenth(t.avg));
   teamAward('Trigger Finger', fast, said(fast[0]), "Each team's typical pick time (the middle one of its picks), fastest first. A pause in the draft counts as pick time.", rows(-1));
   teamAward('Clock Milker', slow, said(slow[0]), "Each team's typical pick time (the middle one of its picks), slowest first. A pause in the draft counts as pick time.", rows(1));
@@ -286,7 +287,7 @@ function draftAgeAwards(d, squads, { row, teamWho, teamAward, best, tenth, named
   teamAward('Uncs', old, `: their players averaged ${fmt(old[0].avg, 1)} years old`, "Each team's players' average age on draft day (picks and keepers), oldest first", ageRows(1, 'oldest'));
 }
 
-// Homer: the most players from one real team (by each player's team now); Frequent Flyer (was The Globalist): the most
+// Homer: the most players from one real team (by each player's team now); Passport (was The Globalist, then Frequent Flyer): the most
 // countries (the owner's ask: players' nationalities, from the daily file's ISO codes)
 function draftOriginAwards(squads, { out, and, who, row, teamWho, breakdown, teamAward, best, named }) {
   const stacks = squads.map(t => {
@@ -315,7 +316,7 @@ function draftOriginAwards(squads, { out, and, who, row, teamWho, breakdown, tea
     // each team's countries as flags, the most picks first (×2 for two)
     const flags = t => sortDesc([...t.nats], ([, k]) => k).map(([c, k]) => `${flagImg(c)}${k > 1 ? `×${k}` : ''}`).join(' ');
     const rows = sortDesc(stacks, t => t.nats.size * 100 - t.n).map(t => row(teamWho(t), flags(t) || 'no countries known', `${t.nats.size} ${t.nats.size === 1 ? 'country' : 'countries'}`)).join('');
-    teamAward('Frequent Flyer', globe, `: their players came from ${globe[0].nats.size} countries${globe.length > 1 ? ' each' : ''}`,
+    teamAward('Passport', globe, `: their players came from ${globe[0].nats.size} countries${globe.length > 1 ? ' each' : ''}`,
       "How many countries each team's players come from, picks and keepers", rows);
   }
 }
