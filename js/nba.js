@@ -460,7 +460,8 @@ const startWords = (p, d) => { const c = startChance(p, d); return c >= 0.97 ? '
 // spots, the ones with the most minutes), from that season's per-game stats: this season's smart blend, or a past
 // season's archive while one shows, so seasons never mix. Percentages measure (% − average) × attempts.
 const baseMemo = new Map(); // "season|pool size" -> BASE
-const rosterSpots = () => (fxPickable().length || 12) * (state.slots.length + (state.benchSize ?? 5)); // the league's, all teams
+// the league's, all teams (the sandbox: 12 teams of the sport's usual lineup and 5 on the bench)
+const rosterSpots = () => (fxPickable().length || 12) * (fxLeague() ? state.slots.length + (state.benchSize ?? 5) : DEFAULT_SLOTS.length + 5);
 function baseNow() {
   const season = seasonCtx && String(seasonCtx.basis || '').startsWith('arch:') ? seasonCtx.basis.slice(5) : 'cur';
   const n = rosterSpots();

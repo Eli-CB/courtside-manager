@@ -128,11 +128,14 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
   - sandbox: the Sandbox (`state.browse`, Nov 2026, the owner's ask; was "Just browse players"; the landing page's "try the sandbox" and the league menu's
     "Sandbox: any players, no league"): `fxLeague()` is null (the daily file's site league, or your own, stays loaded underneath), `clearLeaguePlayers()`
-    drops its rosters/positions from the players, valued for a standard 9-cat league. Tabs (`TABS_BROWSE`): My team (`#team`: any players, up to `SANDBOX_MAX`),
+    drops its rosters/positions from the players. The bar on every tab (`sbBar`, was `browseNote`) picks the sport (basketball or hockey, `sbSetSport`: `useSport`,
+    each sport its own team, watch list and scoring) and the scoring (`sbSetScoring`): the sport's standard categories (`CATS`), a site's standard points
+    (`SB_POINTS`: basketball's ESPN default since 2020 and Yahoo's head-to-head points, both checked Nov 2026; hockey none, ESPN doesn't publish its whole table)
+    or your own points (a popup, `sbPointsForm`). `leaguePoints()` asks `sbPoints()` with no league, and `scoreCats` keys its memo on the points too. Tabs (`TABS_BROWSE`): My team (`#team`: any players, up to `SANDBOX_MAX`),
     Live (`#watch`: up to `WATCH_MAX` 12 followed live, `watchTabLive` in live.js; cells built from the Matchup tab's `dashGame`/`lineChips`), Players, Trends
     (My team / Everyone else lists), Trades (`#trade`: give My team's players, get anyone found by name; `tradeCard` drawn inside `withState` with My team as
-    `state.players`; shared with the site's address, no league link). Kept in `state.sandbox` { roster, watch } (data ids, `normalize` cleans them), apart from
-    any league. My team is the team id `SB_ME`: `myTeamId()` and `fxTeamName` know it, so `teamLink` draws "My team" in orange. Add / Follow live also on every
+    `state.players`; shared with the site's address, no league link). Kept in `state.sandbox` { sport, nba: {roster, watch, scoring, points}, nhl: {...} } (`sandboxClean`
+    in core.js; `sbState()` is this sport's), apart from any league. My team is the team id `SB_ME`: `myTeamId()` and `fxTeamName` know it, so `teamLink` draws "My team" in orange. Add / Follow live also on every
     player's card (`sbCardLine` via `cardOwner`); searches are `sbSearch` (`ui.sbQ`). `browse-exit` goes back to your league (read again with `switchLeague`,
     which puts its players' league details back) or to the landing page. Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.
 - `scripts/update_data.py`: daily data job (GitHub Actions, started at 08:00 UTC = 4 a.m. ET, 3 a.m. in winter, by the Worker's Cron Trigger through

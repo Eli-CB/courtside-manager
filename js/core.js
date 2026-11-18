@@ -12,7 +12,7 @@ const SCORES_KEY = 'league-layer-hide-scores'; // this device hides game scores 
 const CLOCK_KEY = 'league-layer-clock'; // '24' or '12': this device's choice of clock; unset = the device's own
 const PICKS_KEY = 'league-layer-picks'; // what was last picked on the Matchup and Players tabs' When menus and Plan Ahead's week (picks)
 const STATUSES = ['Healthy', 'DTD', 'Out'];
-// The sandbox (no league, sandbox.js): a roster of any players, up to SANDBOX_MAX, and up to WATCH_MAX followed live
+// The sandbox (no league, sandbox.js): a team of any players, up to SANDBOX_MAX, and up to WATCH_MAX followed live (each sport its own)
 const SANDBOX_MAX = 30, WATCH_MAX = 12;
 // this deploy's version (the commit), stamped in by the publish workflow; '__BUILD__' when run locally
 const BUILD = '__BUILD__';
@@ -65,7 +65,7 @@ function emptyState() {
     matchDays: [0, 1, 2, 3, 4, 5, 6], opp: { name: '', week: null, players: [] }, savedLeagues: [], leagueStates: {}, pastSeasons: {},
     slots: [...DEFAULT_SLOTS], benchSize: 5, ilSize: 1, slotsSet: true, lineupMode: 'weekly',
     players: [], lineup: [], il: [],
-    sandbox: { roster: [], watch: [] }, // the sandbox's own players, by data id (sandbox.js)
+    sandbox: sandboxClean(), // the sandbox's sport, and each sport's team, watch list and scoring (sandbox.js)
   };
 }
 
@@ -163,11 +163,24 @@ function normalize(s) {
   if (!Array.isArray(s.matchDays) || !s.matchDays.length || s.matchDays.join() === '0,1,2,3,4') s.matchDays = [0, 1, 2, 3, 4, 5, 6];
   s.opp = { name: '', week: null, starters: null, fxId: null, ...(s.opp || {}) };
   s.opp.players = (s.opp.players || []).map(normalizePlayer);
-  // the sandbox's roster and watch list: data ids, each once, as many as each holds (SANDBOX_MAX, WATCH_MAX)
-  const ids = (list, n) => [...new Set((Array.isArray(list) ? list : []).filter(Number.isFinite))].slice(0, n);
-  const sb = s.sandbox || {};
-  s.sandbox = { roster: ids(sb.roster, SANDBOX_MAX), watch: ids(sb.watch, WATCH_MAX) };
+  s.sandbox = sandboxClean(s.sandbox);
   return s;
+}
+
+// The sandbox's saved state (sandbox.js): its sport, and for each sport its team and watch list (data ids, each once, as many
+// as each holds), its scoring ('cats', a preset's name, or 'custom') and its own point values (stats the sport has, numbers).
+// A copy from before sports were apart (one roster and watch list) is basketball's.
+const SB_SPORTS = ['nba', 'nhl'];
+function sandboxClean(sb) {
+  sb = sb && typeof sb === 'object' ? sb : {};
+  const ids = (list, n) => [...new Set((Array.isArray(list) ? list : []).filter(Number.isFinite))].slice(0, n);
+  const pts = (k, o) => {
+    const out = Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([x, v]) => SPORTS[k].statLabel[x] && Number.isFinite(v) && v));
+    return Object.keys(out).length ? out : null;
+  };
+  const one = (k, o) => ({ roster: ids(o.roster, SANDBOX_MAX), watch: ids(o.watch, WATCH_MAX), scoring: typeof o.scoring === 'string' ? o.scoring : 'cats', points: pts(k, o.points) });
+  const old = Array.isArray(sb.roster) ? sb : {};
+  return { sport: SB_SPORTS.includes(sb.sport) ? sb.sport : 'nba', ...Object.fromEntries(SB_SPORTS.map(k => [k, one(k, sb[k] && typeof sb[k] === 'object' ? sb[k] : k === 'nba' ? old : {})])) };
 }
 
 function normalizePlayer(p) {
@@ -283,7 +296,8 @@ function catZ(p) {
 const pctOf = (p, c) => { const att = statVal(p, c.att); return att ? statVal(p, c.made) / att : 0; };
 
 // Points leagues score fantasy points from the league's own values; category leagues their own categories
-const leaguePoints = () => { const L = fxLeague(); return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
+// (the sandbox: its points scoring, when one's picked: sbPoints, sandbox.js)
+const leaguePoints = () => { const L = fxLeague(); if (!L && state && state.browse) return sbPoints(); return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
 const isPoints = () => !!leaguePoints();
 // Real fantasy points, as the league counts them: a league whose every point value is a whole number only ever scores whole
 // points, so its scores show no ".0" (projections and averages keep their decimal everywhere)
@@ -321,10 +335,9 @@ function catDef(key) {
 let catsMemo = { L: undefined, cats: CATS };
 keep('sport', () => { catsMemo = { L: undefined, cats: CATS }; });
 function scoreCats() {
-  const L = fxLeague();
-  if (catsMemo.L !== L) {
-    const sc = leaguePoints();
-    catsMemo = { L, cats: sc
+  const L = fxLeague(), sc = leaguePoints(); // (the sandbox's scoring can change with no league: its points are part of the key)
+  if (catsMemo.L !== L || catsMemo.sc !== sc) {
+    catsMemo = { L, sc, cats: sc
       ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0, dec: k === 'dd' || k === 'td' ? 2 : null })), { key: 'fp', label: 'FP', fp: true }]
       : L && L.cats && L.cats.length ? L.cats.map(catDef) : CATS };
     BASE = baseNow(); // and on the league's size (and, for a past season, that season's stats)

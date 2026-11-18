@@ -279,6 +279,6 @@ function viewLanding() {
         <p>Pasting the whole address works too.</p>
       </details>
       <p class="small muted land-foot">Built for head-to-head leagues: basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>
-      ${adding ? '' : `<p class="small muted land-browse">No league to connect? ${NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a basketball demo league</button> or ' : ''}<button class="link-btn" data-action="land-browse">try the sandbox</button>: a team of any NBA players, followed live and traded for anyone.</p>`}`;
+      ${adding ? '' : `<p class="small muted land-browse">No league to connect? ${NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a basketball demo league</button> or ' : ''}<button class="link-btn" data-action="land-browse">try the sandbox</button>: a team of any NBA or NHL players, followed live and traded for anyone, in categories or points.</p>`}`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
 }

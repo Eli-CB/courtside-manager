@@ -269,9 +269,10 @@ const actions = {
       state.browse = true; state.demo = false; ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
       clearLeaguePlayers();
       commit();
-      location.hash = '#team';
+      if (location.hash === '#team') route(); else location.hash = '#team'; // (already there, coming back: no hash change to route it)
     };
-    if (SPORT.key === 'nba') go(); else useSport('nba').then(go);
+    const sport = state.sandbox.sport; // (the sport it was last on: basketball the first time)
+    if (SPORT.key === sport) go(); else useSport(sport).then(go).catch(() => toast(`Couldn't load ${SPORTS[sport].name} data`));
   },
   // out of the sandbox: back to your league, read again (its players' league positions too), else the landing page
   async 'browse-exit'() {
@@ -290,14 +291,14 @@ const actions = {
   'sb-unwatch'(el) { sbToggle('watch', +el.dataset.id, false); },
   // the Live tab: My team's players not followed yet, best first, as many as there's room for
   'sb-watch-team'() {
-    const add = sortDesc(sbRoster().filter(p => !sbWatching(p.nbaId)), sbWorth).slice(0, WATCH_MAX - state.sandbox.watch.length).map(p => p.nbaId);
+    const add = sortDesc(sbRoster().filter(p => !sbWatching(p.nbaId)), sbWorth).slice(0, WATCH_MAX - sbState().watch.length).map(p => p.nbaId);
     if (!add.length) return;
-    state.sandbox.watch = [...state.sandbox.watch, ...add];
+    sbState().watch = [...sbState().watch, ...add];
     commit(`Following ${add.length} of your players`);
   },
   async 'sb-clear'() {
     if (!(await askConfirm('Start My team over?', 'Takes every player off My team on this device. The players you follow on Live stay.', 'Start over'))) return;
-    state.sandbox.roster = []; ui.sbGive.clear();
+    sbState().roster = []; ui.sbGive.clear();
     commit('My team is empty');
   },
   // a trade's incoming player, found by name
@@ -308,6 +309,12 @@ const actions = {
     render();
   },
   'watch-range'(el) { ui.watchRange = el.dataset.range; render(); },
+  // the sandbox's own points (sandbox.js): edit them, or fill the form with a site's standard
+  'sb-points'() { sbPointsOpen(); },
+  'sb-points-from'(el) {
+    const P = (SB_POINTS[SPORT.key] || {})[el.dataset.preset], f = el.closest('form');
+    if (P && f) for (const box of f.querySelectorAll('input[name]')) box.value = P[box.name] != null ? P[box.name] : '';
+  },
   async 'land-demo'() {
     const site = NBA && NBA.siteLeague;
     if (!site) return;
@@ -556,6 +563,15 @@ const forms = {
     btn.disabled = false; btn.textContent = label;
   },
   // the sandbox's searches (sandbox.js): Enter takes the first match, and the box stays ready for the next name
+  // the sandbox's own points: each stat's (blank or 0 isn't scored), then scored by them
+  'sb-points'(f) {
+    const pts = {};
+    for (const box of f.querySelectorAll('input[name]')) { const v = parseFloat(box.value); if (Number.isFinite(v) && v) pts[box.name] = v; }
+    if (!Object.keys(pts).length) { toast('Give at least one stat some points'); return; }
+    Object.assign(sbState(), { points: pts, scoring: 'custom' });
+    $('#infoDialog').close();
+    sbRescore('Scoring: your own points');
+  },
   'sb-find'(f) {
     const key = f.dataset.key, S = SB_SEARCH[key], hit = $('.sb-hits [data-action]', f.parentNode);
     if (!S || !hit) return;
@@ -727,6 +743,10 @@ document.addEventListener('change', e => {
     if (el.checked) set.add(el.value); else set.delete(el.value);
     ui.tradeSeen = null;
     render();
+  } else if (el.dataset.change === 'sb-scoring') { // the sandbox's scoring and sport (sandbox.js)
+    if (!sbSetScoring(el.value)) el.value = sbState().scoring;
+  } else if (el.dataset.change === 'sb-sport') {
+    sbSetSport(el.value).catch(() => { el.value = SPORT.key; toast(`Couldn't load ${SPORTS[el.value] ? SPORTS[el.value].name : ''} data`); });
   } else if (el.dataset.change === 'sb-give') { // the sandbox's trade (sandbox.js)
     if (el.checked) ui.sbGive.add(+el.value); else ui.sbGive.delete(+el.value);
     render();

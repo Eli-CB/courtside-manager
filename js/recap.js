@@ -352,7 +352,7 @@ function trendsCard(L, end) {
   const { stats, players } = trendPlayers(end);
   const owner = new Map();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
-  if (!L && state.browse) for (const id of state.sandbox.roster) owner.set(id, SB_ME); // (sandbox.js)
+  if (!L && state.browse) for (const id of sbState().roster) owner.set(id, SB_ME); // (sandbox.js)
   const mine = myTeamId(), regulars = up ? teamRegulars(end) : null;
   const whose = raw => {
     const tid = owner.get(raw.id);

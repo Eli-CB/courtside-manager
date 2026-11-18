@@ -243,7 +243,7 @@ function perfOwners() {
   const owner = new Map(), spot = new Map();
   const L = fxLeague();
   for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) { owner.set(x.nba, tid); spot.set(x.nba, x); }
-  if (!L && state.browse) for (const id of state.sandbox.roster) owner.set(id, SB_ME); // the sandbox: My team's (sandbox.js)
+  if (!L && state.browse) for (const id of sbState().roster) owner.set(id, SB_ME); // the sandbox: My team's (sandbox.js)
   const mine = !L ? myTeamId() : ui.viewing ? ui.viewA : state.fxTeam;
   const opp = L && owner.size && mine ? fxOpponentFor(weekStartAt(0), mine) : null;
   // where a player is: in a team's starting lineup (active), on its bench (IR included), or on no roster (waivers)
@@ -387,11 +387,8 @@ function viewPlayers() {
   return topPerformancesCard(); // (ideas for pickups: the Matchups tab's, made against this week's matchup)
 }
 
-// The sandbox's tabs (sandbox.js; Players and Trends too): what the values are for, and the way back to your league, or to connect one
-const browseNote = () => {
-  const back = state.fxTeam && NBA && NBA.league ? NBA.league.name : null;
-  return `<div class="sample-banner browse-note"><span><b>Sandbox.</b> No league connected: values are for a standard 9-category league.</span><button type="button" class="btn sm" data-action="browse-exit">${back ? `Back to ${esc(back)}` : 'Connect a league'}</button></div>`;
-};
+// The sandbox's tabs (Players and Trends too): its sport, its scoring, and the way back to your league (sbBar, sandbox.js)
+const browseNote = () => sbBar();
 
 // A country's flag (ISO code from the daily data job), named on hover: flagImg alone, flag after a " · " (the player card)
 const flagImg = iso => {

@@ -2708,15 +2708,15 @@ test("Trends: last 5 games against the usual one, per category, with the reason 
       assert.ok(!all.includes('<span>Rostered</span>') && !all.includes('<span>Waivers</span>'), 'no Rostered or Waivers lists');
       assert.ok(section(all, 'Points').includes(`data-nba="${hot.id}"`), 'the categories as in a league');
       // the sandbox with him on My team: My team's list has him, everyone else's doesn't, and he's marked as yours
-      const wasRoster = st.sandbox.roster;
-      st.sandbox.roster = [hot.id];
+      const wasRoster = app.sbState().roster;
+      app.sbState().roster = [hot.id];
       try {
         const mine = await onDay('2026-10-26', () => app.trendsCard(null, '2026-10-25'));
         const lists = mine.split('<section class="tr-cat"');
         assert.ok((lists.find(x => x.includes('<span>My team</span>')) || '').includes(`data-nba="${hot.id}"`), 'My team');
         assert.ok(!(lists.find(x => x.includes('<span>Everyone else</span>')) || '').includes(`data-nba="${hot.id}"`), 'not everyone else');
         assert.ok(section(mine, 'Points').includes('<span class="perf-owner mine"><span class="team-mine">My team</span></span>'), 'his row says so');
-      } finally { st.sandbox.roster = wasRoster; }
+      } finally { app.sbState().roster = wasRoster; }
     } finally { st.browse = wasBrowse; ui.trendDir = 'down'; }
     // too few games: nothing to say yet
     app.set('BOX', { ...saved, cols: app.SPORT.boxCols, byPlayer: new Map([[hot.id, games(i => (i > 8 ? line(20, 6) : null))]]) });
@@ -3618,11 +3618,11 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   ui.sbQ.team = 'zzqqxx';
   assert.match(a.viewSandboxTeam(), /No NBA player matches “zzqqxx”/);
   for (const p of [p1, p2, p3]) a.actions['sb-add']({ dataset: { id: String(p.nbaId) } });
-  assert.deepEqual([...st.sandbox.roster], [p1.nbaId, p2.nbaId, p3.nbaId]);
+  assert.deepEqual([...a.sbState().roster], [p1.nbaId, p2.nbaId, p3.nbaId]);
   assert.equal(ui.sbQ.team, '', 'the search is cleared for the next name');
-  assert.deepEqual(JSON.parse(a.localStorage.getItem('league-layer-v1')).sandbox.roster, [...st.sandbox.roster], 'kept on the device');
+  assert.deepEqual(JSON.parse(a.localStorage.getItem('league-layer-v1')).sandbox.nba.roster, [...a.sbState().roster], 'kept on the device');
   a.actions['sb-add']({ dataset: { id: String(p1.nbaId) } });
-  assert.equal(st.sandbox.roster.length, 3, 'once each');
+  assert.equal(a.sbState().roster.length, 3, 'once each');
   team = a.viewSandboxTeam();
   for (const p of [p1, p2, p3]) assert.ok(team.includes(`data-action="sb-drop" data-id="${p.nbaId}"`), `${p.name}: on the team, with a ✕`);
   assert.match(team, /<tfoot><tr class="sb-tot"><td class="pf-name"><b>My team<\/b>/, 'the team a game');
@@ -3643,16 +3643,16 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   assert.match(a.cardOwner(a.nbaById.get(p4.nbaId)), /data-action="sb-add"[^>]*>\+ Add to my team/);
   // Live: up to 12, My team's in one tap
   a.actions['sb-watch-team']();
-  assert.deepEqual([...st.sandbox.watch], [p1.nbaId, p2.nbaId, p3.nbaId], 'My team, best first');
+  assert.deepEqual([...a.sbState().watch], [p1.nbaId, p2.nbaId, p3.nbaId], 'My team, best first');
   for (const p of best.slice(3, 20)) a.actions['sb-watch']({ dataset: { id: String(p.nbaId) } });
-  assert.equal(st.sandbox.watch.length, a.WATCH_MAX, 'twelve at most');
+  assert.equal(a.sbState().watch.length, a.WATCH_MAX, 'twelve at most');
   ui.tab = 'watch';
   assert.ok(a.liveTab(), 'the live scores follow them');
   const watch = a.viewSandboxWatch();
   assert.equal((watch.match(/class="mu-p sb-w/g) || []).length, 12);
   assert.ok(watch.includes(`data-action="sb-unwatch" data-id="${p4.nbaId}"`) && !watch.includes('id="sbQ-watch"'), 'each with a ✕; no search while full');
   a.actions['sb-unwatch']({ dataset: { id: String(p4.nbaId) } });
-  assert.ok(!st.sandbox.watch.includes(p4.nbaId) && a.viewSandboxWatch().includes('id="sbQ-watch"'));
+  assert.ok(!a.sbState().watch.includes(p4.nbaId) && a.viewSandboxWatch().includes('id="sbQ-watch"'));
   // Trades: My team's players for anyone, found by name
   ui.tab = 'trade';
   assert.match(a.viewSandboxTrade(), /Pick who you'd give and who you'd get/);
@@ -3671,12 +3671,12 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   assert.ok(!S.url.includes('league='), 'no league link');
   // taking a player off My team takes him out of the deal too
   a.actions['sb-drop']({ dataset: { id: String(p2.nbaId) } });
-  assert.ok(!ui.sbGive.has(p2.nbaId) && !st.sandbox.roster.includes(p2.nbaId));
+  assert.ok(!ui.sbGive.has(p2.nbaId) && !a.sbState().roster.includes(p2.nbaId));
   // a saved copy that's been tampered with: numbers only, each once, as many as fit
   const n = a.normalize({ ...st, sandbox: { roster: [1, 1, 'x', 2, ...Array.from({ length: 40 }, (x, i) => 100 + i)], watch: 'no' } });
-  assert.deepEqual([...n.sandbox.roster.slice(0, 3)], [1, 2, 100]);
-  assert.equal(n.sandbox.roster.length, a.SANDBOX_MAX);
-  assert.deepEqual([...n.sandbox.watch], []);
+  assert.deepEqual([...n.sandbox.nba.roster.slice(0, 3)], [1, 2, 100]);
+  assert.equal(n.sandbox.nba.roster.length, a.SANDBOX_MAX);
+  assert.deepEqual([...n.sandbox.nba.watch], []);
   // Trends: the sandbox's, no league lists
   ui.tab = 'trends';
   const tr = a.viewTrends();
@@ -3686,7 +3686,76 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   ui.tab = 'standings';
   await a.actions['browse-exit']();
   assert.ok(!st.browse && a.needsLanding());
-  assert.equal(st.sandbox.roster.length, 2);
+  assert.equal(a.sbState().roster.length, 2);
+  // and back in, the address still on My team (no hash change to route it): My team, not a blank page
+  ui.tab = 'standings';
+  a.actions['land-browse']();
+  assert.equal(ui.tab, 'team');
+  ui.tab = 'standings';
+  const live = a.get('live');
+  clearTimeout(live.timer); live.timer = null;
+});
+
+test("the sandbox's scoring and sport: categories, a site's standard points or your own, basketball or hockey, each sport its own team", async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  const st = a.get('state'), ui = a.get('ui'), near = (x, y) => Math.abs(x - y) < 1e-6;
+  ui.tab = 'standings';
+  a.actions['land-browse']();
+  const best = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val);
+  for (const p of best.slice(0, 3)) a.actions['sb-add']({ dataset: { id: String(p.nbaId) } });
+  // the bar: the sport and the scoring
+  assert.match(a.sbBar(), /data-change="sb-sport"[\s\S]*value="nba" selected>Basketball[\s\S]*data-change="sb-scoring"[\s\S]*value="cats" selected>9 categories<[\s\S]*>ESPN points<[\s\S]*>Yahoo points<[\s\S]*>Your own points</);
+  assert.ok(!a.isPoints() && !a.sbBar().includes('Edit points'));
+  const id = best[0].nbaId, me = () => a.nbaPlayers().find(p => p.nbaId === id), v = k => a.statVal(me(), k);
+  // ESPN's default points (since 2020): each player's value in fantasy points, and the scored stats as the columns
+  assert.equal(a.sbSetScoring('espn'), true);
+  assert.ok(a.isPoints() && a.valueLabel() === 'FP/G');
+  assert.ok(near(me().val, v('pts') + v('tpm') + 2 * v('fgm') - v('fga') + v('ftm') - v('fta') + v('reb') + 2 * v('ast') + 4 * v('stl') + 4 * v('blk') - 2 * v('to')), 'ESPN');
+  assert.deepEqual([...a.scoreCats().map(c => c.key).sort()], ['ast', 'blk', 'fga', 'fgm', 'fp', 'fta', 'ftm', 'pts', 'reb', 'stl', 'to', 'tpm']);
+  assert.match(a.viewSandboxTeam(), /title="Fantasy points[^"]*">FP\/G</);
+  a.sbSetScoring('yahoo');
+  assert.ok(near(me().val, v('pts') + 1.2 * v('reb') + 1.5 * v('ast') + 3 * v('stl') + 3 * v('blk') - v('to')), 'Yahoo');
+  // your own: the editor opens first (nothing changes until it's saved), then those points
+  assert.equal(a.sbSetScoring('custom'), false);
+  assert.equal(a.sbState().scoring, 'yahoo');
+  const form = boxes => ({ querySelectorAll: () => Object.entries(boxes).map(([name, value]) => ({ name, value })) });
+  a.forms['sb-points'](form({ pts: '', reb: '0', ast: 'x' }));
+  assert.equal(a.sbState().scoring, 'yahoo', 'no points given: nothing changes');
+  a.forms['sb-points'](form({ pts: '2', reb: '', ast: '-1', stl: '0' }));
+  assert.deepEqual({ ...a.sbState().points }, { pts: 2, ast: -1 });
+  assert.ok(a.sbState().scoring === 'custom' && near(me().val, 2 * v('pts') - v('ast')), 'your own');
+  assert.ok(a.sbBar().includes('value="custom" selected>Your own points') && a.sbBar().includes('data-action="sb-points"'), 'Edit points');
+  assert.deepEqual(JSON.parse(a.localStorage.getItem('league-layer-v1')).sandbox.nba.points, { pts: 2, ast: -1 }, 'kept on the device');
+  a.sbSetScoring('cats');
+  assert.ok(!a.isPoints() && a.scoreCats().length === 9);
+  // hockey: its own team, its categories, your own points (no site's preset)
+  await a.sbSetSport('nhl');
+  assert.equal(a.SPORT.key, 'nhl');
+  assert.equal(st.sandbox.sport, 'nhl');
+  assert.deepEqual([...a.sbState().roster], [], 'its own team');
+  assert.match(a.sbBar(), /value="nhl" selected>Hockey[\s\S]*value="cats" selected>8 categories<\/option><option value="custom">Your own points</);
+  assert.ok(a.NBA.players.every(r => !r.fx), 'no league details on its players either');
+  await a.loadBoxes();
+  const hp = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val), skater = hp.find(p => !a.isGoalie(p)), goalie = hp.find(p => a.isGoalie(p));
+  for (const p of [skater, goalie]) a.actions['sb-add']({ dataset: { id: String(p.nbaId) } });
+  const team = a.viewSandboxTeam();
+  assert.ok(team.includes(`data-id="${skater.nbaId}"`) && team.includes(`data-id="${goalie.nbaId}"`) && team.includes('SV%'), 'skaters and goalies, in hockey categories');
+  assert.match(a.viewSandboxTeam(), /Build a team|sb-tot/);
+  ui.sbGive.add(goalie.nbaId);
+  a.actions['sb-get']({ dataset: { id: String(hp.find(p => a.isGoalie(p) && p.nbaId !== goalie.nbaId).nbaId) } });
+  assert.match(a.viewSandboxTrade(), /Trade proposal[\s\S]*For your team/);
+  a.actions['sb-watch-team']();
+  assert.equal((a.viewSandboxWatch().match(/class="mu-p sb-w/g) || []).length, 2);
+  a.forms['sb-points'](form({ g: '3', a: '2', w: '4', ga: '-1', sv: '0.2' }));
+  const s2 = a.nbaPlayers().find(p => p.nbaId === skater.nbaId);
+  assert.ok(a.isPoints() && near(s2.val, 3 * a.statVal(s2, 'g') + 2 * a.statVal(s2, 'a')), 'hockey points');
+  // back to basketball: its team and scoring as they were
+  await a.sbSetSport('nba');
+  assert.deepEqual([...a.sbState().roster], best.slice(0, 3).map(p => p.nbaId));
+  assert.ok(!a.isPoints() && a.scoreCats().length === 9);
+  assert.equal(JSON.parse(a.localStorage.getItem('league-layer-v1')).sandbox.nhl.roster.length, 2, "hockey's team kept too");
   const live = a.get('live');
   clearTimeout(live.timer); live.timer = null;
 });
@@ -4077,7 +4146,7 @@ test('the landing page offers both sports, and says so when a league is on a sit
   const html = a.viewLanding();
   assert.match(html, /fantasy basketball or hockey week/);
   assert.match(html, /basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax/);
-  assert.match(html, /try the sandbox<\/button>: a team of any NBA players/);
+  assert.match(html, /try the sandbox<\/button>: a team of any NBA or NHL players/);
   await assert.rejects(a.connectLeague('https://fantasy.espn.com/hockey/league?leagueId=12345678'), /Hockey works with Fantrax leagues/);
 });
 
