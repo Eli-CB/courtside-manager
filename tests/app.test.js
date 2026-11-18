@@ -1822,14 +1822,34 @@ test("value baselines come from the data: the league's rostered pool, that seaso
   assert.ok(past.pool >= 20 && past !== now && past.pts[0] !== now.pts[0], `2025-26 PTS ${past.pts} vs now ${now.pts}`);
 });
 
-test("player photos get a ring and background in their NBA team's colors", async () => {
+test("player photos get their NBA team's logo behind them, and no ring in its colors", async () => {
   await app.ready();
   const raw = app.NBA.players.find(r => r.team === 'BOS');
   const html = app.headshot({ nbaId: raw.id, name: raw.name }, 40);
-  assert.match(html, /class="hs[^"]* tm"/);
-  assert.ok(html.includes('--t1:#007A33;--t2:#BA9653;--rw:1.67px'), html);
-  assert.ok(!app.headshot({ name: 'Nobody' }, 28).includes(' tm'), 'no team, no ring');
+  assert.match(html, /class="hs hs-none"/, 'no image file: initials, no logo');
+  assert.ok(!html.includes('--t1') && !/\btm\b/.test(html), html);
   assert.equal(Object.keys(app.TEAM_COLORS).length, 30);
+  // with the image file in: the logo by a class (one rule a team, not the logo itself in every photo), the photo's spot on the sheet
+  const was = app.get('IMG'), index = app.get('IMG_INDEX');
+  try {
+    app.set('IMG', { cols: 24, logos: { BOS: 'data:image/svg+xml;base64,AAAA' }, ids: [raw.id] });
+    index.set(raw.id, 25);
+    const shot = app.headshot({ nbaId: raw.id, name: raw.name }, 28);
+    assert.match(shot, /class="hs lg lg-BOS"/, shot);
+    assert.match(app.headshot({ name: 'No Photo', team: 'BOS' }, 28), /class="hs hs-none lg lg-BOS"/, 'no photo: the logo behind the initials');
+    assert.ok(shot.includes('--hs-sz:672px auto;--hs-pos:-28px -28px') && !shot.includes('data:image'), shot);
+    const other = app.NBA.players.find(r => r.team === 'LAL');
+    assert.ok(!app.headshot({ nbaId: other.id, name: other.name }, 28).includes(' lg'), 'a team without a logo: no logo class');
+    const style = { textContent: '' };
+    const doc = app.document, get = doc.getElementById;
+    doc.getElementById = () => style;
+    app.logoRules(app.get('IMG').logos);
+    doc.getElementById = get;
+    assert.equal(style.textContent, '.hs.lg-BOS{--logo:url("data:image/svg+xml;base64,AAAA")}');
+  } finally {
+    app.set('IMG', was);
+    index.delete(raw.id);
+  }
 });
 
 test("performances: today's games from ESPN's box scores, read in the browser as they're played", async () => {

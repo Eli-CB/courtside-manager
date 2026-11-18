@@ -416,7 +416,7 @@ function stepper(action, what, select, ends = {}) {
 // ----- Headshots and team logos (headshots.webp + images.json in the sport's data folder, built by scripts/build_images.py) -----
 let IMG = null;
 const IMG_INDEX = new Map();
-keep('sport', () => { IMG = null; IMG_INDEX.clear(); document.documentElement.style.removeProperty('--hs-sheet'); });
+keep('sport', () => { IMG = null; IMG_INDEX.clear(); document.documentElement.style.removeProperty('--hs-sheet'); logoRules(null); });
 
 async function loadImages() {
   const sport = SPORT;
@@ -435,6 +435,7 @@ async function loadImages() {
     IMG.sheet = `${sport.data}headshots.webp?v=${h.toString(36)}`; // also drawn into the recap image
     document.documentElement.style.setProperty('--hs-sheet', `url(${IMG.sheet})`);
     cropLogos(IMG.logos);
+    logoRules(IMG.logos);
     render();
   } catch (e) { /* images are optional */ }
 }
@@ -462,18 +463,33 @@ function cropLogos(logos) {
 
 const initials = name => String(name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
+// Each team's logo behind its players' round photos (.hs.lg in styles.css): one rule a team in one style element, so a
+// page of 300 photos doesn't carry 300 copies of a logo (6-11 KB each)
+const logoKey = team => String(team).replace(/[^\w]/g, '');
+function logoRules(logos) {
+  let el = document.getElementById('hs-logos');
+  if (!el && logos) {
+    el = document.createElement('style');
+    el.id = 'hs-logos';
+    document.head.appendChild(el);
+  }
+  if (el) el.textContent = Object.entries(logos || {}).map(([t, src]) => `.hs.lg-${logoKey(t)}{--logo:url("${src}")}`).join('\n');
+}
+
 function headshot(p, px = 28) {
   const i = IMG && p && p.nbaId != null ? IMG_INDEX.get(p.nbaId) : undefined;
-  // the ring shows the player's current team, like the jersey in the photo
+  // the faded logo behind the face shows the player's current team, like the jersey in the photo (the edge stays a thin
+  // gray line: a ring in the team's colors was dropped, the owner's ask, Nov 2026)
   const raw = p && p.nbaId != null ? nbaById.get(p.nbaId) : null;
-  const tc = TEAM_COLORS[(raw && raw.team) || (p && p.team)];
-  const box = `width:${px}px;height:${px}px${tc ? `;--t1:${tc[0]};--t2:${tc[1]};--rw:${Math.max(1.25, +(px / 24).toFixed(2))}px` : ''}`;
-  const tm = tc ? ' tm' : '';
+  const team = (raw && raw.team) || (p && p.team);
+  const box = `width:${px}px;height:${px}px`;
+  const lg = IMG && team && IMG.logos[team] ? ` lg lg-${logoKey(team)}` : '';
   // data-photo: a tap on the photo opens his card, as his name does (actions.js; the name stays the button for keyboards)
   const who = p && p.nbaId != null ? ` data-photo="${p.nbaId}"` : '';
-  if (i === undefined) return `<span class="hs hs-none${tm}" style="${box}"${who} aria-hidden="true">${esc(initials(p && p.name))}</span>`;
+  if (i === undefined) return `<span class="hs hs-none${lg}" style="${box}"${who} aria-hidden="true">${esc(initials(p && p.name))}</span>`;
   const col = i % IMG.cols, row = Math.floor(i / IMG.cols);
-  return `<span class="hs${tm}" style="${box};background-size:${IMG.cols * px}px auto;background-position:-${col * px}px -${row * px}px"${who} aria-hidden="true"></span>`;
+  // the photo's spot on the sheet (--hs-sz, --hs-pos): styles.css puts it over the logo
+  return `<span class="hs${lg}" style="${box};--hs-sz:${IMG.cols * px}px auto;--hs-pos:-${col * px}px -${row * px}px"${who} aria-hidden="true"></span>`;
 }
 
 // a photo's size: bigger where there's room (desktop), the phone's otherwise (the sheet's 80 px stay sharp up to 40)

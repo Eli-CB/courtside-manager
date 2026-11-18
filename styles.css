@@ -2,6 +2,7 @@
   --bg: #fafafa;
   --surface: #ffffff;
   --surface-2: #f4f4f5;
+  --hs-wash: rgb(244 244 245 / .6); /* --surface-2, see-through: fades the logo behind a round photo */
   --border: #e4e4e7;
   --text: #09090b;
   --muted: #71717a;
@@ -29,6 +30,7 @@
     --bg: #09090b;
     --surface: #141416; /* a step off the page, as white is off light grey */
     --surface-2: #202024;
+    --hs-wash: rgb(32 32 36 / .6);
     --border: #2c2c31;
     --text: #fafafa;
     --muted: #a1a1aa;
@@ -57,6 +59,7 @@
   --bg: #09090b;
   --surface: #141416; /* a step off the page, as white is off light grey */
   --surface-2: #202024;
+  --hs-wash: rgb(32 32 36 / .6);
   --border: #2c2c31;
   --text: #fafafa;
   --muted: #a1a1aa;
@@ -1024,16 +1027,13 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 }
 
 /* ---------- Headshots, logos, board stats ---------- */
-.hs { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background-color: var(--surface-2); background-image: var(--hs-sheet, none); background-repeat: no-repeat; box-shadow: inset 0 0 0 1px var(--border); }
-/* team colors: a light tint of the secondary color behind the photo, and a thin, soft ring over its edge
-   (two thirds primary, the bottom third secondary), blended toward white so it shows on dark cards too.
-   Browsers without color-mix get the full colors. */
-.hs.tm { position: relative; background-color: color-mix(in srgb, var(--t2) 30%, var(--surface-2)); }
-.hs.tm::after { content: ''; position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(from 240deg, var(--t1) 0 66.67%, var(--t2) 0);
-  background: conic-gradient(from 240deg, color-mix(in srgb, var(--t1) 60%, #fff) 0 66.67%, color-mix(in srgb, var(--t2) 60%, #fff) 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--rw)), #000 calc(100% - var(--rw) + .5px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - var(--rw)), #000 calc(100% - var(--rw) + .5px)); }
+.hs { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background-color: var(--surface-2); background-image: var(--hs-sheet, none); background-repeat: no-repeat;
+  background-size: var(--hs-sz, auto); background-position: var(--hs-pos, 0 0); box-shadow: inset 0 0 0 1px var(--border); }
+/* his team's logo behind the face, as on the player card: faded by a wash of the circle's own gray laid over it (--hs-wash,
+   per theme: a plain color, so no browser loses the photo over a color-mix it can't read); one --logo rule a team, logoRules */
+.hs.lg { background-image: var(--hs-sheet, none), linear-gradient(var(--hs-wash), var(--hs-wash)), var(--logo, none);
+  background-size: var(--hs-sz, auto), auto, 100%; background-position: var(--hs-pos, 0 0), 0 0, center; }
+.hs-none.lg { background-image: linear-gradient(var(--hs-wash), var(--hs-wash)), var(--logo, none); background-size: auto, 100%; background-position: 0 0, center; }
 .hs-none { background-image: none; font-size: .62rem; font-weight: 800; color: var(--muted); }
 .tlogo { display: inline-block; vertical-align: -3px; object-fit: contain; }
 .bplayer { display: flex; align-items: center; gap: 8px; min-width: 0; }
