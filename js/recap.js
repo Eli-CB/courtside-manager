@@ -12,13 +12,13 @@ keep('box league', id => dropKept(recaps, id));
 // weeks whose games are all played (a Fantrax week ends officially when the next locks, a day after its last games)
 const finishedPeriods = L => (L.periods || []).filter(p => periodOver(p) && ((L.matchups || {})[String(p.n)] || []).length);
 
-// A game's or a week's full line in the league's own categories (a week per game; shooting as makes-attempts, a
+// A game's or a week's full line in the league's own categories (a week per game; shooting as makes/attempts, a
 // week's with its %), minutes first
 function fullLine(s, perGame) {
   if (isFootball()) { const w = footballWords(s, perGame ? s.gp1 || 1 : 1); return w.length ? w : ['played, no stats']; }
   return lineTiles(s, perGame).map(t => (t.made != null ? `${t.made} ${t.k.replace('%', '')}${perGame && t.att ? ` (${fmtPct(t.pct)})` : ''}` : `${t.v} ${t.k}`));
 }
-// The same line as numbers and their labels (the share pictures' tiles): { v, k }, a percentage also { made: makes-attempts,
+// The same line as numbers and their labels (the share pictures' tiles): { v, k }, a percentage also { made: makes/attempts,
 // att, pct }; a points league's shooting pair one { v: "5/12", k: "FG" } (lineCats); null in football (its lines are words)
 function lineTiles(s, perGame) {
   if (isFootball()) return null;
@@ -31,7 +31,7 @@ function lineTiles(s, perGame) {
     else if (c.rate) out.push({ v: fmt(s[c.att] ? (s[c.made] || 0) / s[c.att] : 0, 2), k: c.label });
     else if (c.pct) {
       const m = s[c.made] || 0, a = s[c.att] || 0;
-      out.push({ v: a ? (m / a).toFixed(3).replace(/^0/, '') : '—', k: c.label, made: `${fmt(m / g, perGame ? 1 : 0)}-${fmt(a / g, perGame ? 1 : 0)}`, att: a, pct: a ? m / a : 0 });
+      out.push({ v: a ? (m / a).toFixed(3).replace(/^0/, '') : '—', k: c.label, made: `${fmt(m / g, perGame ? 1 : 0)}/${fmt(a / g, perGame ? 1 : 0)}`, att: a, pct: a ? m / a : 0 });
     } else out.push({ v: v(c.key, c.dec || 0), k: c.label });
   }
   return out;
@@ -519,7 +519,7 @@ function trendCardHtml() {
   const gameCell = (x, g) => {
     const s = g[1], sc = BOX.scores && BOX.scores.get(`${g[0]} ${g[3]}`);
     let txt, v;
-    if (st.pct) { const m = lineStat(s, st.pct.made), a = lineStat(s, st.pct.att); txt = `${m}-${a}`; v = a ? m / a : null; } else { v = get(s); txt = one(v); }
+    if (st.pct) { const m = lineStat(s, st.pct.made), a = lineStat(s, st.pct.att); txt = `${m}/${a}`; v = a ? m / a : null; } else { v = get(s); txt = one(v); }
     const cls = v == null || Math.abs(v - x.was) < 1e-9 ? '' : v > x.was ? ' hi' : ' lo';
     const tip = [fmtDay(g[0]), sc ? (sc.home === g[3] ? `vs ${sc.away}` : `@ ${sc.home}`) : '', `${Math.round(s.min || 0)} ${isHockey() ? 'min of ice time' : 'min'}`].filter(Boolean).join(' · ');
     return `<td class="sc tr-g" title="${esc(tip)}"><span class="tr-gv${cls}">${txt}</span></td>`;
@@ -682,7 +682,7 @@ function htmlRuns(html) {
   walk(new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html').body, '');
   return out;
 }
-// numbers as units: each number bold (hot: orange, red below zero), its label gray after it ("27.5 PTS", ".623 FG% 10.8-17.3")
+// numbers as units: each number bold (hot: orange, red below zero), its label gray after it ("27.5 PTS", ".623 FG% 10.8/17.3")
 const statUnits = tiles => tiles.map(t => [[t.v, t.hot ? (isBelowZero(t.v) ? 'r' : 'a') : 'b'], [` ${t.k}${t.made ? ` ${t.made}` : ''}`, 'm']]);
 const isBelowZero = v => /^[-−]/.test(String(v));
 

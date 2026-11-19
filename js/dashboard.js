@@ -54,7 +54,7 @@ function dashGame(p, d) {
   return nx && nx.date === d ? `${bubble(nx.home ? `vs ${nx.opp}` : `@${nx.opp}`)}${inGoal}` : `${bubble('Final')}${dnp}`;
 }
 
-// A line in the league's own categories: makes-attempts for the percentages (a points league's shooting "5/12 FG",
+// A line in the league's own categories: makes/attempts for the percentages and a points league's shooting ("5/12 FG",
 // lineCats), fantasy points first in points leagues; nothing for a stat he didn't put up (no attempts, 0 blocks)
 // flash(key, value, makes): a class for a bubble whose number just changed (a live update)
 function lineChips(line, flash = () => '') {
@@ -62,7 +62,7 @@ function lineChips(line, flash = () => '') {
   for (const c of lineCats()) {
     if (c.fp || !(c.pct || c.shot ? line[c.att] : Math.round(lineStat(line, c.key) * 100))) continue;
     const m = line[c.made] || 0, a = line[c.att] || 0;
-    out.push(c.pct || c.shot ? `<span class="mu-chip${flash(c.key, a, m)}"><b>${m}${c.shot ? '/' : '-'}${a}</b> ${c.label.replace('%', '')}</span>`
+    out.push(c.pct || c.shot ? `<span class="mu-chip${flash(c.key, a, m)}"><b>${m}/${a}</b> ${c.label.replace('%', '')}</span>`
       : `<span class="mu-chip${flash(c.key, lineStat(line, c.key))}"><b>${fmt(lineStat(line, c.key), c.dec || 0)}</b> ${c.label}</span>`);
   }
   return out.join('');

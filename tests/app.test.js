@@ -105,7 +105,7 @@ test('points leagues: unusual scoring codes and position-specific points', () =>
   assert.deepEqual([...r.pointsOther], ['TF', 'position-specific points']);
 });
 
-test("a points league's shooting is one bubble a pair (10/19 FG, not FGM and FGA apart); category leagues keep 10-19 FG", async () => {
+test("a points league's shooting is one bubble a pair (10/19 FG, not FGM and FGA apart); category leagues' too", async () => {
   const line = { min: 34, pts: 27, reb: 8, tpm: 3, tpa: 7, fgm: 10, fga: 19, ftm: 4, fta: 5, gp1: 1 };
   const text = html => ` ${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()} `;
   const L = await app.useLeague(ESPN); // scores FGM, FGA, FTM, FTA and 3PM (not 3PA)
@@ -126,7 +126,10 @@ test("a points league's shooting is one bubble a pair (10/19 FG, not FGM and FGA
     assert.ok(!text(app.lineChips({ ...line, ftm: 0, fta: 0 })).includes(' FT '));
   } finally { L.points = was; }
   await app.useLeague(CATS9);
-  assert.ok(text(app.lineChips(line)).includes(' 10-19 FG '));
+  const cats = text(app.lineChips(line));
+  for (const s of [' 10/19 FG ', ' 4/5 FT ']) assert.ok(cats.includes(s), `${s} in${cats}`);
+  assert.match(app.fullLine(line, false).join(' · '), /10\/19 FG · 4\/5 FT/);
+  assert.match(app.fullLine({ ...line, fgm: 20, fga: 38, gp1: 2 }, true).join(' · '), /10\.0\/19\.0 FG \(\.526\)/);
 });
 
 test('Fantrax slot names', () => {
@@ -1129,7 +1132,7 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     assert.deepEqual([...M.A.players.map(p => p.nbaId)].sort(), theirs.slice(0, 2).map(p => p.nbaId).sort());
     assert.deepEqual([...M.B.players.map(p => p.nbaId)], [mine[0].nbaId]);
     // (shooting with its makes and attempts a game, as the Recap's lines)
-    assert.match(app.dealLine(M.B.players[0]).join(' · '), /^[\d.]+ MIN · [\d.]+-[\d.]+ FG \((\.\d{3}|—)\) · [\d.]+-[\d.]+ FT \((\.\d{3}|—)\) · [\d.]+ 3PM · [\d.]+ PTS · /);
+    assert.match(app.dealLine(M.B.players[0]).join(' · '), /^[\d.]+ MIN · [\d.]+\/[\d.]+ FG \((\.\d{3}|—)\) · [\d.]+\/[\d.]+ FT \((\.\d{3}|—)\) · [\d.]+ 3PM · [\d.]+ PTS · /);
     // side by side: value over a waiver player (under each side's total), then each category's per-game total, the better marked
     const wv = app.waiverValue(), over = ps => ps.reduce((t, p) => t + app.gameWorth(p) - wv, 0);
     assert.deepEqual([M.rows[0].sa, M.rows[0].sb], [app.fmtValue(over(M.A.players)), app.fmtValue(over(M.B.players))]);
@@ -1200,11 +1203,11 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
       assert.ok(Q.started && Q.from === mid && [...Q.days].join() === poDays.filter(d => d >= mid).join(), 'the games still to play');
       assert.equal(app.playoffGames(M.A.players[0], Q), app.get('NBA').teams[M.A.players[0].team].dates.filter(d => d >= mid && poDays.includes(d)).length);
     });
-    // FG% and FT% count volume: makes-attempts a game under each side's %, and the better side adds more makes over the
+    // FG% and FT% count volume: makes/attempts a game under each side's %, and the better side adds more makes over the
     // league average on its attempts, so a few shots at a high % lose to many at a good one
     const avg = app.get('BASE').fgPct[0], madeOver = p => (p.fgPct - avg) * p.fga;
     const fgRow = M.rows.find(r => r.key === 'fgPct');
-    assert.equal(fgRow.va, `${app.fmt(M.A.tot.fgm, 1)}-${app.fmt(M.A.tot.fga, 1)}`);
+    assert.equal(fgRow.va, `${app.fmt(M.A.tot.fgm, 1)}/${app.fmt(M.A.tot.fga, 1)}`);
     assert.ok(card.includes(`<div class="tp-vol">${fgRow.va}</div>`));
     const all = app.nbaPlayers().filter(p => p.gp >= 3);
     const few = all.find(p => p.fga > 0.5 && p.fga < 2 && p.fgPct > avg + 0.05);
@@ -1213,7 +1216,7 @@ test('a trade proposal: both sides with photos and lines, compared per game, sha
     const V = app.tradeModel({ from: t1, to: t2, give: [String(few.nbaId)], get: [String(many.nbaId)] });
     const fg = V.rows.find(r => r.key === 'fgPct');
     assert.ok(+fg.sb > +fg.sa && fg.lead === 1, `${fg.sa} on volume beats ${fg.sb} on ${app.fmt(few.fga, 1)} shots`);
-    assert.match(fg.ta, /^[\d.]+-[\d.]+ a game: [\d.]+ more makes than the league's average of \.\d{3} would give$/);
+    assert.match(fg.ta, /^[\d.]+\/[\d.]+ a game: [\d.]+ more makes than the league's average of \.\d{3} would give$/);
     // shared: a picture (the same numbers), the text and a link
     const S = app.tradeShare(L, T);
     assert.ok(S.url.endsWith(`?league=${L.id}&from=${t1}&to=${t2}&give=${T.give.join(',')}&get=${T.get.join(',')}#trade`), S.url);
@@ -1569,7 +1572,7 @@ test('performances: everyone who played in one table, top 100 by the sorted colu
     const pts = rows.map(tr => +cell(tr, cats.indexOf('pts')));
     assert.ok(pts.every((v, i) => !i || v <= pts[i - 1]), `points, most first: ${pts.slice(0, 8)}`);
     const fg = rows.map(tr => tr.match(/<td class="sc"[^>]*title="FG%: ([^"]+)">(?:<span[^>]*>[^<]*<\/span>)?([^<]*)</));
-    assert.ok(fg.every(m => m && /^\d+-\d+$/.test(m[2]) && /%|no attempts/.test(m[1])), 'shooting shows makes-attempts, the percentage on hover');
+    assert.ok(fg.every(m => m && /^\d+\/\d+$/.test(m[2]) && /%|no attempts/.test(m[1])), 'shooting shows makes/attempts, the percentage on hover');
     assert.ok(rows.map(tr => +tr.match(/perf-rank">(\d+)/)[1]).some((v, i) => v !== i + 1), 'ranks still by value');
   } finally { app.ui.perfSort = { key: 'v', dir: -1 }; }
 });
@@ -1742,7 +1745,7 @@ test('Players: one table; Per game ranks every NBA player, with search and posit
     assert.ok(rows.length > 300 && rows.every(r => r.per));
     assert.ok(/\d+ GP · \d+ min\/g/.test(html), 'games played and minutes a game');
     if (app.state.fxTeam && app.fxOpponentFor(app.todayIso(), app.state.fxTeam)) { ui.perfFiltOpen = true; assert.ok(app.topPerformancesCard().includes('data-key="opp"'), "this week's opponent filter too"); ui.perfFiltOpen = false; }
-    assert.ok(/<td class="sc" title="FG%: [\d.]+-[\d.]+ a game">\.\d{3}<\/td>/.test(html), 'percentages per game');
+    assert.ok(/<td class="sc" title="FG%: [\d.]+\/[\d.]+ a game">\.\d{3}<\/td>/.test(html), 'percentages per game');
     // the top row is the best average game
     const best = rows.reduce((x, y) => (y.v > x.v ? y : x));
     assert.equal(ids(html)[0], best.raw.id);
@@ -2051,7 +2054,8 @@ test("performances: today's games from ESPN's box scores, read in the browser as
         assert.ok(p, "someone in this matchup is playing today");
         const pl = app.liveLines(day).get(p.nbaId);
         assert.ok(m.includes(`<b>${pl.pts}</b> PTS`), "a starter's line");
-        assert.ok(!/<b>0<\/b> |<b>0-0<\/b> /.test(m), "no bubble for a stat he didn't put up");
+        assert.ok(!/<b>0<\/b> |<b>0\/0<\/b> /.test(m), "no bubble for a stat he didn't put up");
+        assert.ok(/<b>\d+\/\d+<\/b> FG/.test(m) && !/<b>\d+-\d+<\/b>/.test(m), 'shooting as makes/attempts, "5/12 FG"');
         assert.ok(m.includes('lv-dot'), 'a game still on shows its clock');
         // a live update flashes the bubbles that moved: green for a basket, red for a turnover or a missed free throw
         const pl2 = app.liveLines(day).get(p.nbaId), was2 = { ...pl2 };
@@ -2208,7 +2212,7 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.ok(!X.games.some(g => text.includes(`${app.fxTeamName(g.a)} ${app.scoreLine(g.sc)} ${app.fxTeamName(g.b)}`)), 'no results');
     assert.ok(text.includes('Player of the week: ') && !/<[a-z]/.test(text), 'plain text, no markup');
     for (const c of app.scoreCats()) assert.ok(text.includes(` ${c.pct ? c.label.replace('%', '') : c.label}`), `${c.label} in the lines`);
-    assert.ok(text.includes(`${X.game.line.fgm}-${X.game.line.fga} FG`), 'shooting as makes-attempts');
+    assert.ok(text.includes(`${X.game.line.fgm}/${X.game.line.fga} FG`), 'shooting as makes/attempts');
     assert.ok(!/Biggest win|Closest/.test(text + html), 'not the biggest win or the closest');
     assert.ok(!html.includes('inl-p'), 'names without photos, in line with the text');
     assert.ok(app.recapUrl(L, 1).endsWith(`?league=${L.id}&week=1#recap`), app.recapUrl(L, 1));
@@ -2900,7 +2904,7 @@ test("a Trends list's name opens it in full: everyone in it, game by game, 25 at
     const fg = app.scoreCats().find(c => c.pct && c.made === 'fgm');
     app.actions['trend-cat']({ dataset: { key: fg.key } });
     assert.deepEqual(ids(), [P[0].id]);
-    assert.equal([...rows()[0].matchAll(/<td class="sc tr-g" title="[^"]+"><span class="tr-gv hi">8-10<\/span><\/td>/g)].length, 5);
+    assert.equal([...rows()[0].matchAll(/<td class="sc tr-g" title="[^"]+"><span class="tr-gv hi">8\/10<\/span><\/td>/g)].length, 5);
     assert.match(rows()[0], /\+3\.0<\/span><div class="tr-sub">makes<\/div>/);
     // by value, from Rostered: that list's players first
     app.actions['trend-cat']({ dataset: { key: 'value', whose: 'rostered' } });

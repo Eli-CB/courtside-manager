@@ -609,7 +609,7 @@ function pastWeekCard(start) {
   // each team's lineup that week: starters' games (what counted), the week total, then the bench's games
   const cols = scoreCats().filter(c => !c.fp);
   const cell = (s, c, cls = '') => {
-    if (c.pct) return `<td class="sc${cls}" title="${s[c.att] ? `${s[c.made] || 0}-${s[c.att]}` : 'no attempts'}">${s[c.att] ? fmtPct(s[c.made] / s[c.att]) : '—'}</td>`;
+    if (c.pct) return `<td class="sc${cls}" title="${s[c.att] ? `${s[c.made] || 0}/${s[c.att]}` : 'no attempts'}">${s[c.att] ? fmtPct(s[c.made] / s[c.att]) : '—'}</td>`;
     return `<td class="sc${cls}">${fmt(lineStat(s, c.key), 0)}</td>`;
   };
   const row = (x, bench) => `<tr class="${bench ? 'bench' : ''}"><td class="st-name"><div class="bplayer">${headshot(x.p, hsPx(30, 24))}<div class="bmain"><div class="bname">${playerName(x.p)}</div></div></div></td>

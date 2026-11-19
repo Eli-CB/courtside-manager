@@ -166,7 +166,7 @@ function teamCardHtml(tid) {
     if (!p.gp) return '<td class="sc muted">—</td>';
     if (!c.pct) return `<td class="sc">${fmt(statVal(p, c.key), c.dec || 1)}</td>`;
     const m = statVal(p, c.made), a = statVal(p, c.att);
-    return `<td class="sc"${c.rate ? '' : ` title="${c.label}: ${fmt(m, 1)}-${fmt(a, 1)} a game"`}>${!a ? '—' : c.rate ? fmt(m / a, 2) : fmtPct(m / a)}</td>`;
+    return `<td class="sc"${c.rate ? '' : ` title="${c.label}: ${fmt(m, 1)}/${fmt(a, 1)} a game"`}>${!a ? '—' : c.rate ? fmt(m / a, 2) : fmtPct(m / a)}</td>`;
   };
   // the player: photo, name, then his positions in their lineup-spot colors and his NBA team; any injury under it
   const who = p => {
@@ -537,10 +537,10 @@ function applyTradeLink() {
 const dealCats = () => { const cs = scoreCats(); return [...cs.filter(c => c.fp), ...cs.filter(c => !c.fp)]; };
 // a category's number as the site shows it; null (no attempts: a side without a goalie has no GAA) is a dash
 const dealShow = (c, v) => (v == null ? '—' : c.rate ? fmt(v, 2) : c.pct ? fmtPct(v) : fmt(v, c.dec || 1));
-// a shooting category's volume: makes and attempts a game ("7.2-14.5")
-const dealVol = (made, att) => `${fmt(made, 1)}-${fmt(att, 1)}`;
+// a shooting category's volume: makes and attempts a game ("7.2/14.5")
+const dealVol = (made, att) => `${fmt(made, 1)}/${fmt(att, 1)}`;
 // One player's average game in the league's categories (a goalie's in the goalie ones), minutes first; a percentage with
-// its makes and attempts, as the Recap's lines show them ("7.2-14.5 FG (.496)")
+// its makes and attempts, as the Recap's lines show them ("7.2/14.5 FG (.496)")
 function dealLine(p) {
   const goalie = isGoalie(p), parts = p.min ? [`${fmt(p.min, 1)} MIN`] : [];
   for (const c of dealCats()) {
@@ -556,7 +556,7 @@ function dealLine(p) {
 // them, best first), their value added up (sum) and over a waiver player (value, as the value line above the table counts it), and their
 // per-game totals, then the
 // comparison's rows: { key, label, sa, sb (as shown), lead: 1 (the first side's is better), -1, or 0 (even, or no number),
-// and for a shooting percentage va, vb (makes-attempts a game) and ta, tb (what the volume adds, for a tip) }
+// and for a shooting percentage va, vb (makes/attempts a game) and ta, tb (what the volume adds, for a tip) }
 function tradeModel(T) {
   const rawOf = id => nbaById.get(+id) || nbaById.get(id);
   const wv = waiverValue(), over = p => gameWorth(p) - wv;

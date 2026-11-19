@@ -355,8 +355,8 @@ function perfTable(rows, picked, shown, W, { opp, who, teamOf }) {
     const emo = b ? `<span class="pf-emo" aria-hidden="true">${b[0]}</span>` : '', tip = b ? ` · ${b[1]}` : '';
     if (c.pct) {
       const [m, a] = [r.tot[c.made] || 0, r.tot[c.att] || 0];
-      if (r.per) return `<td class="sc" title="${c.label}: ${fmt(m, 1)}-${fmt(a, 1)} a game${tip}">${emo}${a ? fmtPct(m / a) : '—'}</td>`;
-      return `<td class="sc" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}${tip}">${emo}${m}-${a}</td>`;
+      if (r.per) return `<td class="sc" title="${c.label}: ${fmt(m, 1)}/${fmt(a, 1)} a game${tip}">${emo}${a ? fmtPct(m / a) : '—'}</td>`;
+      return `<td class="sc" title="${c.label}: ${a ? `${fmt(m / a * 100, 1)}%` : 'no attempts'}${tip}">${emo}${m}/${a}</td>`;
     }
     return `<td class="sc"${b ? ` title="${b[1]}"` : ''}>${emo}${fmt(lineStat(r.tot, c.key), r.per ? 1 : 0)}</td>`;
   };
@@ -493,21 +493,21 @@ function cardStats(raw) {
   const two = (label, k) => [label, s => fmt(s[k], 2), o => o[k]];
   if (isGoalie(raw)) {
     return [['GS', s => fmt(s.gs, 2), o => o.gs], ['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], two('W', 'w'), two('L', 'l'), two('OTL', 'otl'), two('SO', 'so'), ['GA', s => fmt(s.ga, 2), o => o.ga],
-      ['SV%', s => fmtPct(s.sa ? s.sv / s.sa : 0), o => `${o.sv}-${o.sa}`, 'SV'], ['GAA', s => fmt(s.gt ? s.ga / s.gt : 0, 2), o => fmt(o.gt ? o.ga / o.gt : 0, 2)]];
+      ['SV%', s => fmtPct(s.sa ? s.sv / s.sa : 0), o => `${o.sv}/${o.sa}`, 'SV'], ['GAA', s => fmt(s.gt ? s.ga / s.gt : 0, 2), o => fmt(o.gt ? o.ga / o.gt : 0, 2)]];
   }
   if (isHockey()) {
     return [['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], two('G', 'g'), two('A', 'a'), two('PTS', 'pts'), ['+/−', s => fmt(s.pm, 2), o => o.pm], two('SOG', 'sog'), two('HIT', 'hit'), two('BLK', 'blk'),
       two('PIM', 'pim'), ['PPP', s => fmt(s.ppg + s.ppa, 2), o => (o.ppg || 0) + (o.ppa || 0)]];
   }
   return [['MIN', s => fmt(s.min, 1), o => Math.round(o.min)], n('pts'), n('reb'), n('ast'), n('stl'), n('blk'), ['3PM', s => fmt(s.tpm), o => o.tpm], n('to'),
-    ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0), o => `${o.fgm}-${o.fga}`, 'FG'], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0), o => `${o.ftm}-${o.fta}`, 'FT']];
+    ['FG%', s => fmtPct(s.fga ? s.fgm / s.fga : 0), o => `${o.fgm}/${o.fga}`, 'FG'], ['FT%', s => fmtPct(s.fta ? s.ftm / s.fta : 0), o => `${o.ftm}/${o.fta}`, 'FT']];
 }
 // A game's numbers as words: [the main ones, the ones in gray]
 function gameStats(raw, o) {
   if (isFootball()) return [footballWords(o), []];
   if (isGoalie(raw)) return [[`${o.sv || 0} saves on ${o.sa || 0}`, `${o.ga || 0} GA`], [o.w ? 'Win' : o.l ? 'Loss' : o.otl ? 'OT loss' : o.sol ? 'Shootout loss' : o.so ? 'Shutout' : ''].filter(Boolean)];
   if (isHockey()) return [[`${o.g || 0} G`, `${o.a || 0} A`, `${o.sog || 0} SOG`, `${o.hit || 0} HIT`, `${o.blk || 0} BLK`], [`${(o.pm > 0 ? '+' : '') + (o.pm || 0)}`, `${o.pim || 0} PIM`]];
-  return [[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`], [`${o.fgm}-${o.fga} FG`, `${o.ftm}-${o.fta} FT`]];
+  return [[`${o.pts} PTS`, `${o.reb} REB`, `${o.ast} AST`, `${o.stl} STL`, `${o.blk} BLK`, `${o.tpm} 3PM`, `${o.to} TO`], [`${o.fgm}/${o.fga} FG`, `${o.ftm}/${o.fta} FT`]];
 }
 
 let cardOpen = null; // the player whose card is showing

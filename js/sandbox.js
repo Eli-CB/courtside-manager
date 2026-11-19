@@ -171,7 +171,7 @@ function sbTeamTable(list) {
     if (!p.gp) return '<td class="sc muted">—</td>';
     if (!c.pct) return `<td class="sc">${fmt(statVal(p, c.key), 1)}</td>`;
     const m = statVal(p, c.made), a = statVal(p, c.att);
-    return `<td class="sc" title="${c.label}: ${fmt(m, 1)}-${fmt(a, 1)} a game">${a ? fmtPct(m / a) : '—'}</td>`;
+    return `<td class="sc" title="${c.label}: ${fmt(m, 1)}/${fmt(a, 1)} a game">${a ? fmtPct(m / a) : '—'}</td>`;
   };
   const row = p => {
     const raw = nbaById.get(p.nbaId) || {};
@@ -183,7 +183,7 @@ function sbTeamTable(list) {
   };
   // the team a game: every player's average game added up (a percentage from the makes and attempts)
   const played = list.filter(p => p.gp), t = totals(played);
-  const tot = c => (c.pct ? `<td class="sc" title="${c.label}: ${fmt(t[c.made], 1)}-${fmt(t[c.att], 1)} a game">${t[c.att] ? fmtPct(t[c.made] / t[c.att]) : '—'}</td>` : `<td class="sc">${fmt(lineStat(t, c.key), 1)}</td>`);
+  const tot = c => (c.pct ? `<td class="sc" title="${c.label}: ${fmt(t[c.made], 1)}/${fmt(t[c.att], 1)} a game">${t[c.att] ? fmtPct(t[c.made] / t[c.att]) : '—'}</td>` : `<td class="sc">${fmt(lineStat(t, c.key), 1)}</td>`);
   return `<div class="perf-wrap"><table class="perf-table sb-table"><thead><tr><th class="pf-name">Player</th><th class="sc" title="Games played">GP</th><th class="sc" title="Minutes a game">MIN</th>${cats.map(c => `<th class="sc">${c.label}</th>`).join('')}<th class="num pf-v" title="${esc(valueTip())}">${valueLabel()}</th></tr></thead>
     <tbody>${list.map(row).join('')}</tbody>
     ${played.length > 1 ? `<tfoot><tr class="sb-tot"><td class="pf-name"><b>My team</b> <span class="muted small">a game</span></td><td class="sc"></td><td class="sc">${fmt(t.min, 1)}</td>${cats.map(tot).join('')}<td class="num pf-v"><b>${fmtValue(sum(played.map(value)))}</b></td></tr></tfoot>` : ''}
