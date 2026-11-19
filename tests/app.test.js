@@ -3871,6 +3871,37 @@ test("box scores started for one sport and finishing after a switch stay out of 
   clearTimeout(live.timer); live.timer = null;
 });
 
+test("the sandbox Live's Today / Yesterday / Week pick holds over a reload, and gives way to the default once on a new day", async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  a.get('ui').tab = 'standings';
+  a.actions['land-browse']();
+  const best = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val);
+  a.actions['sb-watch']({ dataset: { id: String(best[0].nbaId) } });
+  a.actions['watch-range']({ dataset: { range: 'week' } });
+  // the page loads again: still the week, not the default (Yesterday before tip-off)
+  const saved = k => a.localStorage.getItem(k);
+  const b = loadApp({ 'league-layer-v1': saved('league-layer-v1'), 'league-layer-picks': saved('league-layer-picks') });
+  await b.ready();
+  await b.loadBoxes();
+  const ui = b.get('ui');
+  ui.tab = 'standings';
+  assert.equal(ui.watchRange, 'week');
+  assert.ok(b.viewSandboxWatch().includes('data-range="week" aria-pressed="true"'), 'Week shown after the reload');
+  b.dropOldPicks();
+  assert.equal(ui.watchRange, 'week', 'the same day: kept');
+  // a new day (new games in): the default once, and the next pick holds again
+  b.setClock('2026-10-27T20:00:00-04:00');
+  b.dropOldPicks();
+  assert.equal(ui.watchRange, null);
+  assert.ok(!JSON.parse(b.localStorage.getItem('league-layer-picks')).watch, 'forgotten');
+  b.actions['watch-range']({ dataset: { range: 'today' } });
+  assert.equal(JSON.parse(b.localStorage.getItem('league-layer-picks')).watch.at, '2026-10-27');
+  b.setClock();
+  for (const x of [a, b]) { x.get('ui').tab = 'standings'; const live = x.get('live'); clearTimeout(live.timer); live.timer = null; }
+});
+
 test('a reload in the sandbox on the other sport keeps the league underneath, its team pick included', async () => {
   const a = loadApp();
   await a.ready();

@@ -125,7 +125,7 @@ ui.clock24 = (() => {
 // at a new day (Yesterday is another night, This period may be another period), Plan Ahead at a new matchup week or in
 // another league. Each pick is kept on the device with that day or week (`at`); one from an earlier day or week is
 // dropped, there and then (`dropOldPicks`, render.js; `planAheadWeek`), and the tab opens on its default again.
-// (k: 'dash' { v: ui.dashRange }, 'perf' { v: ui.perfRange, per: ui.perfPer }, 'week' { v: ui.weekShift }; no pick = forget it)
+// (k: 'dash' { v: ui.dashRange }, 'perf' { v: ui.perfRange, per: ui.perfPer }, 'week' { v: ui.weekShift }, 'watch' { v: ui.watchRange }, the sandbox's Live; no pick = forget it)
 const picks = (p => (typeof p === 'object' ? p : {}))(store.json(PICKS_KEY, {}));
 function savePick(k, pick) {
   if (pick) picks[k] = pick; else delete picks[k];
@@ -133,6 +133,7 @@ function savePick(k, pick) {
 }
 if (picks.dash && typeof picks.dash.v === 'string') ui.dashRange = picks.dash.v;
 if (picks.perf) Object.assign(ui, { perfRange: typeof picks.perf.v === 'string' ? picks.perf.v : null, perfPer: !!picks.perf.per });
+if (picks.watch && typeof picks.watch.v === 'string') ui.watchRange = picks.watch.v;
 // A time of day ("7:30 PM" or "19:30"); more = other parts to show with it (weekday)
 const fmtTime = (t, more) => new Date(t).toLocaleString([], { ...more, hour: ui.clock24 ? '2-digit' : 'numeric', minute: '2-digit', hourCycle: ui.clock24 ? 'h23' : 'h12' });
 

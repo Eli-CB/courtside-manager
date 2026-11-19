@@ -62,7 +62,7 @@ async function sbSetSport(key) {
   ui.hold = true;
   try { await useSport(key); } catch (e) { toast(`Couldn't load ${SPORTS[key].name} data`); return false; } finally { ui.hold = false; }
   state.sandbox.sport = key;
-  ui.sbGive.clear(); ui.sbGet = []; ui.sbQ = {}; ui.watchRange = null;
+  ui.sbGive.clear(); ui.sbGet = []; ui.sbQ = {}; // (Live's Today / Yesterday / Week pick stays)
   clearLeaguePlayers(); // (no league's positions or rosters on this sport's players either)
   sbRescore(`${SPORTS[key].name} sandbox`);
   return true;

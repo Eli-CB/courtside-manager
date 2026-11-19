@@ -297,6 +297,7 @@ function dropOldPicks() {
   const today = todayIso();
   if (picks.dash && picks.dash.at !== today) { ui.dashRange = null; savePick('dash'); }
   if (picks.perf && picks.perf.at !== today) { Object.assign(ui, { perfRange: null, perfPer: false }); savePick('perf'); }
+  if (picks.watch && picks.watch.at !== today) { ui.watchRange = null; savePick('watch'); } // (the sandbox's Live: its default, once, for the new day's games)
 }
 
 function render() {
