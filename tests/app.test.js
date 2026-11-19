@@ -3545,6 +3545,61 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
   } finally { ui.tab = 'dashboard'; app.get('state').fxTeam = null; }
 }));
 
+// The fixture league made a dynasty league: a taxi squad on team 1, a 3-round rookie draft whose slots were traded
+test('a Sleeper dynasty league: its taxi squad never starts, and its rookie draft follows its own order and pool', async () => {
+  const fs = require('fs'), path = require('path');
+  const fx = name => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/sleeper', name), 'utf8'));
+  const DYN = '999000000000000002';
+  const lg = fx(`league_${SLEEPER}.json`), rosters = fx(`league_${SLEEPER}_rosters.json`);
+  const draft = fx(`draft_${lg.draft_id}.json`), picks = fx(`draft_${lg.draft_id}_picks.json`).filter(p => p.round <= 3);
+  const bySlp = new Map(app.NBA.players.filter(r => r.slp).map(r => [r.slp, r]));
+  const r1 = rosters[0], taxiSid = r1.players.find(s => !r1.starters.includes(s) && !(r1.reserve || []).includes(s) && bySlp.has(s));
+  r1.taxi = [taxiSid];
+  const answers = {
+    [`league/${DYN}`]: { ...lg, league_id: DYN, settings: { ...lg.settings, type: 2, draft_rounds: 3 } },
+    [`league/${DYN}/rosters`]: rosters, [`league/${DYN}/users`]: fx(`league_${SLEEPER}_users.json`),
+    [`draft/${lg.draft_id}`]: { ...draft, settings: { ...draft.settings, rounds: 3, player_type: 1 } }, [`draft/${lg.draft_id}/picks`]: picks,
+  };
+  for (const n of [1, 2, 3]) answers[`league/${DYN}/matchups/${n}`] = fx(`league_${SLEEPER}_matchups_${n}.json`);
+  const real = app.get('fetch');
+  app.set('fetch', (url, init) => {
+    const u = new URL(String(url)), k = u.hostname === 'api.sleeper.app' && u.pathname.replace(/^\/v1\//, '');
+    return k in answers ? Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(answers[k]) }) : real(url, init);
+  });
+  const saved = app.NBA.players.map(r => [r, r.fx, r.pos]);
+  try {
+    const L = await app.useLeague(DYN);
+    app.applyFantraxLeague(await app.getLeague(DYN, true));
+    // the taxi squad: with the IR (out of every lineup and projection), drawn as Taxi
+    assert.deepEqual([...L.taxi], [taxiSid]);
+    assert.equal(L.rosters[String(r1.roster_id)].find(x => x.fid === taxiSid).st, 'TAXI');
+    const side = app.fxTeamSide(String(r1.roster_id)), p = side.players.find(x => x.nbaId === bySlp.get(taxiSid).id);
+    assert.ok(side.il.includes(p.id) && !side.lineup.includes(p.id) && app.onTaxi(p));
+    assert.equal(side.players.filter(x => side.il.includes(x.id) && !app.onTaxi(x)).length, (r1.reserve || []).filter(s => bySlp.has(s)).length, 'the IR stays the IR');
+    assert.match(app.slotBadge('TAXI'), />Taxi</);
+    // past weeks: never a bench player to have started (bench regret, Benchwarmer Blues)
+    const weeks = await app.fetchRosterWeeks(L);
+    const o = weeks[0].owner.get(taxiSid);
+    assert.ok(o && !o.on && o.taxi);
+    // the rookie draft: everyone else on a roster was kept (off the board for Reach and Fall), and the board's columns are
+    // the draft's own slots
+    const drafted = new Set(picks.map(x => (bySlp.get(x.player_id) || {}).id));
+    assert.ok(L.draft.rostered.length > 100 && L.draft.rostered.every(id => !drafted.has(id)));
+    assert.deepEqual([...L.draft.slots], Array.from({ length: 12 }, (x, i) => String(draft.slot_to_roster_id[i + 1])));
+    assert.ok(L.draft.picks.every(x => x[6] >= 1 && x[6] <= 12), 'each pick in its slot');
+    const d = app.draftData();
+    assert.deepEqual([...d.rostered], [...L.draft.rostered]);
+    assert.ok(L.draft.rookies && d.rookies, 'a rookies-only draft (player_type 1)');
+    // a plain redraft league: no taxi, no pool
+    const R = await app.useLeague(SLEEPER);
+    assert.ok(!R.taxi && !R.draft.rostered && R.draft.slots);
+  } finally {
+    app.set('fetch', real);
+    for (const [r, fx0, pos] of saved) { if (fx0) r.fx = fx0; else delete r.fx; r.pos = pos; }
+    app.set('nbaCache', null);
+  }
+});
+
 test("the player card: how he came to his fantasy team", async () => {
   const L = await app.useLeague(CATS9);
   const [t1, t2] = L.teams.map(t => t.id);

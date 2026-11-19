@@ -83,9 +83,9 @@ function teamStrengths(tid) {
 }
 
 function slotBadge(slot) {
-  const pc = slot !== 'IL' && slotColor(slot);
-  const cls = slot === 'IL' ? 'il' : `slot-${slot}${pc ? ` pc pc-${pc}` : ''}`;
-  return `<span class="slot-label ${cls}">${slot === 'FLX' ? 'Flx' : slot === 'BN' ? 'Res' : slot === 'IL' ? 'IR' : slot}</span>`;
+  const out = slot === 'IL' || slot === 'TAXI', pc = !out && slotColor(slot);
+  const cls = out ? 'il' : `slot-${slot}${pc ? ` pc pc-${pc}` : ''}`;
+  return `<span class="slot-label ${cls}">${slot === 'FLX' ? 'Flx' : slot === 'BN' ? 'Res' : slot === 'IL' ? 'IR' : slot === 'TAXI' ? 'Taxi' : slot}</span>`;
 }
 
 // A sortable column header. down: whether this column is currently sorted biggest-first

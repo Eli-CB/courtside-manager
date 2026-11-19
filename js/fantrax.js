@@ -457,7 +457,8 @@ function fxRoster(teamId, period) {
     .filter(x => x.raw);
 }
 
-// A league team as players, with Fantrax starters in their own slots and IR players on IR
+// A league team as players, with Fantrax starters in their own slots and IR players on IR (a Sleeper taxi squad with them:
+// neither can play)
 function fxTeamSide(teamId, period) {
   const roster = fxRoster(teamId, period);
   const players = roster.map(x => playerFromRaw(x.raw));
@@ -475,7 +476,7 @@ function fxTeamSide(teamId, period) {
   }
   return {
     name: fxTeamName(teamId), players, lineup,
-    il: players.filter((p, i) => roster[i].st === 'INJURED_RESERVE').map(p => p.id),
+    il: players.filter((p, i) => roster[i].st === 'INJURED_RESERVE' || roster[i].st === 'TAXI').map(p => p.id),
     starters: players.filter((p, i) => roster[i].st === 'ACTIVE').map(p => p.id),
   };
 }

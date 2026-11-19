@@ -415,9 +415,11 @@ function matchupBoard(ctx) {
     const benchRows = Math.max(myBench.length, oppBench.length, ctx.hasOpp ? 0 : 1);
     const rows = state.slots.map((slot, i) => `<tr><th scope="row">${slotBadge(slot)}</th>${boardCell(mySlots[i], ctx, 'me', true)}${boardCell(oppById.get(oppSlotIds[i]), ctx, 'them', true)}</tr>`).join('');
     const bench = Array.from({ length: benchRows }, (_, i) => `<tr><th scope="row">${slotBadge('BN')}</th>${boardCell(myBench[i], ctx, 'me', false)}${boardCell(oppBench[i], ctx, 'them', false)}</tr>`).join('');
-    // injured reserve: yours and theirs, side by side
+    // injured reserve: yours and theirs, side by side; then a Sleeper taxi squad, the same way
     const myIr = ilPlayers(), oppIl = oppIlIds(), oppIr = ctx.hasOpp ? state.opp.players.filter(p => oppIl.has(p.id)) : [];
-    const irRows = Array.from({ length: Math.max(myIr.length, oppIr.length) }, (_, i) => `<tr><th scope="row">${slotBadge('IL')}</th>${boardCell(myIr[i], ctx, 'me', false)}${boardCell(oppIr[i], ctx, 'them', false)}</tr>`).join('');
+    const outRows = (slot, a, b) => Array.from({ length: Math.max(a.length, b.length) }, (_, i) => `<tr><th scope="row">${slotBadge(slot)}</th>${boardCell(a[i], ctx, 'me', false)}${boardCell(b[i], ctx, 'them', false)}</tr>`).join('');
+    const notTaxi = p => !onTaxi(p);
+    const irRows = outRows('IL', myIr.filter(notTaxi), oppIr.filter(notTaxi)) + outRows('TAXI', myIr.filter(onTaxi), oppIr.filter(onTaxi));
     body = `<div class="table-wrap"><table class="board">
         <colgroup><col class="c-slot"><col><col></colgroup>
         <thead><tr><th></th><th>${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</th><th>${state.opp.fxId ? teamLink(state.opp.fxId, esc(state.opp.name)) : esc(state.opp.name || 'Opponent')}</th></tr></thead>

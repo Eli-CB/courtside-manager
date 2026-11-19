@@ -252,6 +252,7 @@ function perfOwners() {
     const x = spot.get(id);
     // a small mark rather than a word: filled for the starting lineup, hollow for the bench; IR keeps its red badge
     if (x.st === 'ACTIVE') { const t = `In the starting lineup${x.slot ? ` at ${esc(x.slot)}` : ''}`; return `<span class="lu-ico active" role="img" aria-label="${t}" title="${t}"></span>`; }
+    if (x.st === 'TAXI') return '<span class="badge bench" title="On the taxi squad">Taxi</span>';
     return x.st === 'INJURED_RESERVE' ? '<span class="badge bad" title="On injured reserve">IR</span>' : '<span class="lu-ico bench" role="img" aria-label="On the bench" title="On the bench"></span>';
   };
   // your players and the opponent's are tinted rows instead (see the row classes), so they only need the lineup badge,
@@ -404,7 +405,7 @@ function cardOwner(raw) {
     const x = r.find(y => y.nba === raw.id);
     if (!x) continue;
     const how = cardHow(L, raw, tid, x.fid);
-    return `<p class="pc-owner"><b>${teamLink(tid)}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : 'Bench'}</span>${howBadge(how)}</p>`;
+    return `<p class="pc-owner"><b>${teamLink(tid)}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : x.st === 'TAXI' ? 'Taxi' : 'Bench'}</span>${howBadge(how)}</p>`;
   }
   return raw.fx ? `<p class="pc-owner"><span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span></p>` : '';
 }

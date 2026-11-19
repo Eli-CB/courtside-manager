@@ -62,11 +62,11 @@ function draftData() {
   const W = draftSeason(L, basis);
   if (W && W.loading) return { loading: true };
   const statsOf = raw => (W ? W.stats.get(raw.id) || null : nbaStats(raw, basis));
-  const picks = L.draft.picks.map(([round, pick, teamId, nba, name, at]) => {
+  const picks = L.draft.picks.map(([round, pick, teamId, nba, name, at, slot]) => {
     const raw = nba ? nbaById.get(nba) : null;
     const s = raw && basis ? statsOf(raw) : null;
     const gp = s ? Math.round(s.gp) : 0;
-    const p = { round, pick, teamId, team: fxTeamName(teamId), raw, nbaId: nba, name: raw ? raw.name : name, gp, val: null, s, at: at || null };
+    const p = { round, pick, teamId, team: fxTeamName(teamId), raw, nbaId: nba, name: raw ? raw.name : name, gp, val: null, s, at: at || null, slot: slot || null };
     if (s && gp) p.val = value({ ...s, pos: raw.pos });
     return p;
   });
@@ -107,7 +107,8 @@ function draftData() {
     }).sort((a, b) => a.rank - b.rank);
     keepers[tid].forEach((k, i) => { k.slot = KEEPER_SLOTS[i] || 25; k.gain = k.like == null ? null : k.slot - k.like; });
   }
-  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, start: L.draft.start || null, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals, season: W && W.win };
+  return { picks, played: played.length, maxGp, graded: !!basis, date: L.draft.date, start: L.draft.start || null, type: L.draft.type, perRound: L.draft.perRound || 10, keepers, totals, season: W && W.win,
+    slots: L.draft.slots || null, rostered: L.draft.rostered || null, rookies: !!L.draft.rookies }; // (Sleeper: its draft order; a dynasty rookie draft's kept players; rookies only)
 }
 
 // ----- Draft Retrospective (was Draft awards): this season's draft, for the league to share -----
@@ -215,8 +216,9 @@ function draftAwardKit() {
 
 // ----- against consensus ADP: Reach, Fall (Value Meal, the team whose typical pick went latest, is gone: the owner's ask) -----
 function draftAdpAwards(d, { out, plural, award, row, breakdown }) {
-  const kept = new Set(Object.values(d.keepers || {}).flat().map(k => k.nbaId));
-  const board = NBA.players.filter(r => adpOf(r) && !kept.has(r.id)).sort((a, b) => adpOf(a) - adpOf(b));
+  // (a dynasty rookie draft: everyone already on a roster, d.rostered)
+  const kept = new Set([...Object.values(d.keepers || {}).flat().map(k => k.nbaId), ...(d.rostered || [])]);
+  const board = NBA.players.filter(r => adpOf(r) && !kept.has(r.id) && (!d.rookies || isRookie(r))).sort((a, b) => adpOf(a) - adpOf(b));
   const spot = new Map(board.map((r, i) => [r.id, i + 1]));
   const rated = d.picks.filter(p => p.nbaId && spot.has(p.nbaId)).map(p => ({ p, adp: adpOf(p.raw), cons: spot.get(p.nbaId), early: spot.get(p.nbaId) - p.pick }));
   if (rated.length < d.picks.length / 2) return; // (too few picks with an ADP to say otherwise)
@@ -452,11 +454,12 @@ function viewDraft() {
     const rp = d.picks.filter(p => p.round === r);
     forward[r] = rp.filter(p => order[inRound(p) - 1] === p.teamId).length >= rp.filter(p => order[T - inRound(p)] === p.teamId).length;
   }
-  const colOf = p => (forward[p.round] ? inRound(p) - 1 : T - inRound(p));
+  const colOf = p => (p.slot ? p.slot - 1 : forward[p.round] ? inRound(p) - 1 : T - inRound(p)); // (Sleeper says each pick's slot)
   const grid = {};
   for (const p of d.picks) grid[`${p.round}|${colOf(p)}`] = p;
-  // each column belongs to the team that picked there most often, so a traded first-rounder doesn't move it
-  const cols = order.map((first, c) => {
+  // each column belongs to the team whose draft slot it is (Sleeper says), else the team that picked there most often,
+  // so a traded first-rounder doesn't move it
+  const cols = d.slots && d.slots.length === T ? d.slots : order.map((first, c) => {
     const n = {};
     for (let r = 1; r <= rounds; r++) { const p = grid[`${r}|${c}`]; if (p) n[p.teamId] = (n[p.teamId] || 0) + 1; }
     const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0];

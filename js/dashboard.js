@@ -100,7 +100,7 @@ function dashSide(tid, dates, range, D) {
   return {
     tid, name: S.name, starters, tot: total(dates, range === 'week'), week: total(D.week, true),
     bench: sortDesc(S.players.filter(p => !on.has(p.id) && !il.has(p.id)), value),
-    ir: S.players.filter(p => il.has(p.id)),
+    ir: S.players.filter(p => il.has(p.id) && !onTaxi(p)), taxi: S.players.filter(p => il.has(p.id) && onTaxi(p)),
   };
 }
 
@@ -200,9 +200,10 @@ function dashDayRows(C, A, B) {
   const byStage = list => list.map((p, i) => ({ p, i, s: stage(p) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.i - b.i).map(x => x.p);
   const plays = (list, out = false) => byStage(list.filter(p => p && playsOn(p, d) && sits(p) === out));
   const BENCH_TAG = ' <span class="badge bench">Bench</span>'; // (not beside Out: that says enough, and both crowd the name out)
+  const benchTag = p => (onTaxi(p) ? ' <span class="badge bench">Taxi</span>' : BENCH_TAG);
   const column = S => {
     if (!S) return [];
-    const bench = [...S.bench, ...S.ir];
+    const bench = [...S.bench, ...S.ir, ...S.taxi];
     const on = p => p && playsOn(p, d) && !sits(p);
     const playing = [...S.starters.filter(on).map(p => [p, 'start']), ...bench.filter(on).map(p => [p, 'bench'])]
       .map((x, i) => ({ x, i, s: stage(x[0]) }))
@@ -210,7 +211,7 @@ function dashDayRows(C, A, B) {
     return [...playing, ...plays(S.starters, true).map(p => [p, 'out']), ...plays(bench, true).map(p => [p, 'out bench'])];
   };
   const a = column(A), b = column(B);
-  const person = (x, right) => (x ? dashCell(C, x[0], right, x[1] === 'start', x[1].endsWith('bench') && x[0].status !== 'Out' ? BENCH_TAG : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
+  const person = (x, right) => (x ? dashCell(C, x[0], right, x[1] === 'start', x[1].endsWith('bench') && x[0].status !== 'Out' ? benchTag(x[0]) : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
   const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${person(a[i], false)}${person(b[i], true)}</div>`).join('');
   const none = rows ? '' : d === today && !D.today ? `<p class="muted small mu-none">No ${SPORT.name} games today.</p>`
     : `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>`;
@@ -221,10 +222,11 @@ function dashDayRows(C, A, B) {
 function dashWeekRows(C, A, B) {
   const row = (slot, a, b, counts) => `<div class="mu-row${counts ? '' : ' bench'}">${dashCell(C, a, false, counts)}<div class="mu-slot">${slotBadge(slot)}</div>${B ? dashCell(C, b, true, counts) : '<div></div>'}</div>`;
   const rows = state.slots.map((s, i) => row(s, A.starters[i], B && B.starters[i], true)).join('');
-  const nb = Math.max(A.bench.length, B ? B.bench.length : 0), ni = Math.max(A.ir.length, B ? B.ir.length : 0);
+  const nb = Math.max(A.bench.length, B ? B.bench.length : 0), ni = Math.max(A.ir.length, B ? B.ir.length : 0), nt = Math.max(A.taxi.length, B ? B.taxi.length : 0);
   const bench = ui.dashBench ? Array.from({ length: nb }, (x, i) => row('BN', A.bench[i], B && B.bench[i], false)).join('')
-    + Array.from({ length: ni }, (x, i) => row('IL', A.ir[i], B && B.ir[i], false)).join('') : '';
-  const benchBtn = nb + ni ? `<button type="button" class="link-btn mu-bench-btn" data-action="dash-bench" aria-expanded="${!!ui.dashBench}">${ui.dashBench ? 'Hide the bench' : `Show the bench (${nb + ni})`}</button>` : '';
+    + Array.from({ length: ni }, (x, i) => row('IL', A.ir[i], B && B.ir[i], false)).join('')
+    + Array.from({ length: nt }, (x, i) => row('TAXI', A.taxi[i], B && B.taxi[i], false)).join('') : '';
+  const benchBtn = nb + ni + nt ? `<button type="button" class="link-btn mu-bench-btn" data-action="dash-bench" aria-expanded="${!!ui.dashBench}">${ui.dashBench ? 'Hide the bench' : `Show the bench (${nb + ni + nt})`}</button>` : '';
   return `<div class="mu-rows">${rows}${bench}</div>${benchBtn}`;
 }
 

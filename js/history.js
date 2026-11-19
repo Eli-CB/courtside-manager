@@ -57,12 +57,13 @@ async function fetchRosterWeeks(L) {
     const keep = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, ROSTER_WEEKS_KEEP);
     store.setJson(ROSTER_WEEKS_KEY, Object.fromEntries(keep));
   }
+  const taxi = new Set(L.taxi || []);
   const weeks = periods.filter(p => have[p.n]).map(p => {
     const owner = new Map();
     // pts: Sleeper's points for him that week (one-game leagues: what tells which game counted)
     for (const [tid, items] of Object.entries(have[p.n])) {
       if (tid === '#m') { if (items.length && !(L.matchups || {})[p.n]) (L.matchups = L.matchups || {})[p.n] = items; continue; } // Sleeper's pairings
-      for (const [f, on, pts] of items) owner.set(f, { tid, on: !!on, pts: pts == null ? null : pts });
+      for (const [f, on, pts] of items) owner.set(f, { tid, on: !!on, pts: pts == null ? null : pts, ...(!on && taxi.has(f) ? { taxi: true } : {}) });
     }
     return { ...p, owner };
   });
@@ -309,7 +310,7 @@ function benchValue(L, G) {
   for (const w of L.weeks) {
     const wd = periodDays(G, w);
     for (const [f, o] of w.owner) {
-      if (o.on) continue;
+      if (o.on || o.taxi) continue; // (a taxi squad can't be started)
       const nba = L.fidNba(f);
       const games = ((nba && G.players.get(nba)) || []).filter(r => wd.has(r[0]));
       if (!games.length) continue;
@@ -437,7 +438,7 @@ function benchSwaps(L, G, weeks, period, tids) {
     const tot = {}, started = new Map(), sat = new Map();
     const per = rps.map(rp => {
       const on = [], off = [];
-      for (const [f, o] of rp.owner) if (o.tid === tid) (o.on ? on : off).push(f);
+      for (const [f, o] of rp.owner) if (o.tid === tid && !o.taxi) (o.on ? on : off).push(f); // (a taxi squad can't be started)
       for (const f of on) { add(tot, linesIn(f, rp, true), 1); if (!started.has(f)) started.set(f, {}); add(started.get(f), linesIn(f, rp, true), 1); }
       for (const f of off) { if (!sat.has(f)) sat.set(f, {}); add(sat.get(f), linesIn(f, rp, false), 1); }
       const starters = on.map(playerOf).filter(Boolean);
@@ -603,7 +604,7 @@ function viewPastRosters() {
     }
     if (gameLogs[L.season]) return pastStarters(L, gameLogs[L.season], tid, r, teams);
   }
-  const slotOfItem = it => (it.st === 'INJURED_RESERVE' ? 'IL' : it.st === 'RESERVE' ? 'BN' : FX_SLOT_MAP[it.slot] || it.slot || 'BN');
+  const slotOfItem = it => (it.st === 'INJURED_RESERVE' ? 'IL' : it.st === 'TAXI' ? 'TAXI' : it.st === 'RESERVE' ? 'BN' : FX_SLOT_MAP[it.slot] || it.slot || 'BN');
   const rows = (L.rosters[tid] || []).map(it => {
     const raw = it.nba ? nbaById.get(it.nba) : null;
     const s = raw && seasonCtx.basis ? nbaStats(raw, seasonCtx.basis) : null;

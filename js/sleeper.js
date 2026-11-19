@@ -125,10 +125,10 @@ async function fetchSleeperLeague(id) {
     const m = p.metadata || {};
     if (p.player_id && !names[p.player_id]) names[p.player_id] = `${m.first_name || ''} ${m.last_name || ''}`.trim();
   }
-  const rostered = new Set(rosters.flatMap(r => r.players || []));
+  const onRoster = new Set(rosters.flatMap(r => r.players || []));
   const fxPlayers = {};
   // Sleeper's own positions (its lineups follow them), else NBA.com's
-  for (const [sid, nba] of Object.entries(toNba)) fxPlayers[nba] = { id: sid, st: rostered.has(sid) ? 'T' : 'A', pos: (byId.get(nba) || {}).slpPos || [] };
+  for (const [sid, nba] of Object.entries(toNba)) fxPlayers[nba] = { id: sid, st: onRoster.has(sid) ? 'T' : 'A', pos: (byId.get(nba) || {}).slpPos || [] };
 
   const userOf = new Map((users || []).map(u => [u.user_id, u]));
   const teamName = r => {
@@ -148,11 +148,13 @@ async function fetchSleeperLeague(id) {
     maxTotalPlayers: startSlots.length + nBench + (+s.reserve_slots || 0),
   };
   const item = (sid, slot, st) => ({ fid: sid, nba: toNba[sid] || null, name: names[sid] || `Player ${sid}`, slot, st });
+  // a dynasty league's taxi squad (r.taxi, in r.players too): kept like IR, never in a lineup (Sleeper won't start them)
+  const taxi = rosters.flatMap(r => r.taxi || []);
   const leagueRosters = Object.fromEntries(rosters.map(r => {
-    const starters = r.starters || [], ir = new Set(r.reserve || []);
+    const starters = r.starters || [], ir = new Set(r.reserve || []), tx = new Set(r.taxi || []);
     const out = starters.map((sid, i) => (sid && sid !== '0' ? item(sid, sleeperSlot(startSlots[i] || 'UTIL', sport), 'ACTIVE') : null)).filter(Boolean);
     const seen = new Set(out.map(x => x.fid));
-    for (const sid of r.players || []) if (!seen.has(sid)) out.push(item(sid, '', ir.has(sid) ? 'INJURED_RESERVE' : 'RESERVE'));
+    for (const sid of r.players || []) if (!seen.has(sid)) out.push(item(sid, '', ir.has(sid) ? 'INJURED_RESERVE' : tx.has(sid) ? 'TAXI' : 'RESERVE'));
     return [String(r.roster_id), out];
   }));
 
@@ -186,7 +188,7 @@ async function fetchSleeperLeague(id) {
     playoffPeriod: +s.playoff_teams > 1 ? +s.playoff_week_start || null : null,
     matchups,
     rosterPeriod: null, rosterPeriods: [],
-    rosters: leagueRosters, openingRosters: null, rosterInfo,
+    rosters: leagueRosters, openingRosters: null, rosterInfo, ...(taxi.length ? { taxi } : {}),
     draft: null, draftAt, standings,
     slpWeek: { n: cur, pts: weekPts, at: Date.now() },
     // the waiver order (1 = first claim); a budget league (waiver_type 2, FAAB) also has each team's budget left
@@ -202,12 +204,24 @@ async function fetchSleeperLeague(id) {
     const keepers = {};
     for (const p of picks.filter(x => x.is_keeper)) { const nba = toNba[p.player_id], tid = String(p.roster_id); if (nba) (keepers[tid] = keepers[tid] || []).push(nba); }
     const drafted = picks.filter(p => !p.is_keeper);
+    const perRound = +((draft && draft.settings) || {}).teams || teams.length, rounds = Math.max(...drafted.map(p => p.round));
+    // the board's columns: whose each draft slot is (slot_to_roster_id), traded picks or not; each pick says its slot
+    const slotTeam = (draft && draft.slot_to_roster_id) || {};
+    const slots = Array.from({ length: perRound }, (x, i) => (slotTeam[i + 1] != null ? String(slotTeam[i + 1]) : null));
+    // a dynasty league's rookie draft (fewer rounds than lineup and bench spots): everyone else on a roster was kept, so
+    // Reach and Fall rank a pick among the players on no roster (today's rosters stand in for draft day's)
+    const taken = new Set(drafted.map(p => p.player_id));
+    const rostered = +s.type === 2 && rounds < startSlots.length + nBench
+      ? [...onRoster].filter(sid => !taken.has(sid) && toNba[sid]).map(sid => toNba[sid]) : null;
     league.draft = {
       date: (draftAt || '').slice(0, 10), type: String((draft && draft.type) || '').toLowerCase(), state: draft && draft.status === 'complete' ? 'completed' : '',
-      perRound: +((draft && draft.settings) || {}).teams || teams.length,
-      picks: drafted.map(p => [p.round, p.pick_no, String(p.roster_id), toNba[p.player_id] || null, names[p.player_id] || '']),
-      rounds: Math.max(...drafted.map(p => p.round)),
+      perRound,
+      picks: drafted.map(p => [p.round, p.pick_no, String(p.roster_id), toNba[p.player_id] || null, names[p.player_id] || '', null, +p.draft_slot || null]),
+      rounds,
       keepers,
+      ...(slots.every(Boolean) ? { slots } : {}),
+      ...(rostered ? { rostered } : {}),
+      ...(+((draft && draft.settings) || {}).player_type === 1 ? { rookies: true } : {}), // (a rookies-only draft)
     };
   }
   return { league, fxPlayers, idMap: { toNba, names } };
@@ -257,3 +271,8 @@ function oneGameLine(p, lines) {
   return i < 0 ? null : withBonus(lines[i]);
 }
 const isOneGame = () => !!(fxLeague() && fxLeague().oneGame);
+// On his team's taxi squad (a Sleeper dynasty league's; with the IR in a team's il, drawn as "Taxi")
+function onTaxi(p) {
+  const L = fxLeague(), raw = p && nbaById.get(p.nbaId);
+  return !!(L && L.taxi && raw && raw.slp && L.taxi.includes(raw.slp));
+}
