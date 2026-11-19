@@ -267,7 +267,9 @@ function viewRecap() {
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'recap') render(); }).catch(() => {});
   else fillWeekFromEspn(L); // (the night a week ends, its last games from ESPN before the daily job saves them)
   const done = finishedPeriods(L);
-  if (!done.length) return empty('No finished periods yet', 'The first recap appears once period 1 is over.');
+  // (a league that starts late begins at ESPN's matchup for that week, not 1; a roto league has no weekly matchups)
+  const first = Math.min(...(L.periods || []).map(p => p.n));
+  if (!done.length) return empty('No finished periods yet', isFinite(first) ? `The first recap appears once period ${first} is over.` : 'This league has no weekly matchups to recap.');
   const period = done.find(p => p.n === ui.recapWeek) || done[done.length - 1];
   const P = pastWeeksOf(L, period);
   if (P.state === 'loading') return loadingCard(`Period ${period.n} recap`, `Loading the period's lineups from ${sourceName(L)}…`);

@@ -9,6 +9,10 @@ real visitors, a renamed key needs its old copy moved first, or their saved leag
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
 8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26). The owner's Sleeper league (Nov 18, 2026), free to
 test with: "The IPA" `1336466264633135104` (16-team dynasty, points, Lock-In, 2 IR + 2 taxi spots, a 3-round rookie draft, picks traded through 2028).
+The owner's ESPN test leagues (Nov 19, 2026; public, the owner's team in both is "Eli's Excellent Team"; 10 teams, 8 cats without TO, daily lineups, 10 starters + 3 bench + 1 IR):
+"Utah Pro H2H Categories League" `1715452380` (starts Nov 23 as Matchup 6: a late league keeps ESPN's week numbers, as ESPN's own schedule page shows) and
+"Sacramento Beginner Roto League" `1299985004` (roto, which the site doesn't do: it loads with no periods, empty W-L standings and no opponent; ESPN's
+roto standings are each team's `points`/`pointsByStat`, and its one schedule entry lists `teams`, no home/away).
 
 ## Keeping this file up to date (the owner's standing rule, Nov 2026)
 Whenever you learn something that any Claude starting on this site for the first time would need, add it here in the
@@ -258,7 +262,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   keeps them per week). A day is 1.5 MB (270 KB compressed) and the filter header doesn't trim it, so only the shown week's
   days are asked for, once (`league-layer-espn-days-v1`). Checked on a real points league: 18 of 20 team-weeks matched
   ESPN's finals exactly, the other two within 4 points. Season totals, Awards and past seasons stay Fantrax/Sleeper-only
-  (`hasLineupHistory`): they'd need every day of the season (40 MB by spring). A category league and ESPN football aren't checked. ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
+  (`hasLineupHistory`): they'd need every day of the season (40 MB by spring). A category league loads on every tab (the Utah test league, Nov 19, 2026),
+  but no finished week of one is checked against ESPN's results yet; ESPN football isn't checked. ESPN doesn't say waivers vs free agent in the league data: unrostered = 'A'.
 - Escaping: a shared link opens any league on leaguelayer.com, so text a league's members type (its name, team names) goes through `esc()`
   wherever it's drawn. A `data-tip` is HTML put in the page again as HTML (`showTip`), so text inside one is escaped twice: `esc()` in the tip, `esc()` on the attribute.
   The full-draw test in app.test.js draws every tab and popup of nine leagues with names made to break out of HTML (audited Nov 17, 2026: none did); it also checks every position is in its color.
