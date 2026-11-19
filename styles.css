@@ -541,8 +541,8 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rc-t:last-child .rc-badge { margin-left: 6px; }
 .rc-badge.rc-top { background: var(--good-soft); color: var(--good); }
 .rc-badge.rc-bottom { background: var(--bad-soft); color: var(--bad); }
-/* its standouts as cards, as the share picture draws them: a player beside his photo on his team's color, the rest with
-   the faces of the players they name */
+/* its standouts as cards, each with the small round faces of the players it names on the right (.rx-round: a player's
+   own card); the Draft Retrospective's players beside a big photo on the team's color (.rx-ph), as the share picture */
 .rx-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); }
 .rx-card { display: flex; min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
 .rx-body { flex: 1; min-width: 0; padding: 14px 16px; }
@@ -560,7 +560,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
   background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 92%, #000), color-mix(in srgb, var(--tint) 40%, #000)); }
 .rx-ph .pc-logo { left: 50%; width: 112%; transform: translate(-50%, -50%); opacity: .2; }
 .rx-ph .pc-shot { inset: auto auto 0 50%; width: auto; height: 92%; max-width: none; transform: translateX(-50%); }
-.rx-note { align-items: center; }
+.rx-note, .rx-round { align-items: center; }
 .rx-text { margin-top: 3px; font-size: .92rem; line-height: 1.45; }
 .rx-text .pname { font-size: inherit; }
 .rx-faces { display: flex; flex: none; margin-right: 16px; }

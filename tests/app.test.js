@@ -2398,10 +2398,12 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.match(html, /Period 1 recap/);
     const X = app.get('recaps').get(`${L.id}|1`);
     assert.equal(X.games.length, L.matchups['1'].length, 'every matchup');
-    // no emoji anywhere in the recap (the owner's ask); each player standout a card with his photo, as the share picture draws it
+    // no emoji anywhere in the recap (the owner's ask); each player standout a card with his small round photo, as the
+    // other standouts' faces, never the big one (the owner's ask, Nov 2026)
     assert.ok(!/\p{Extended_Pictographic}/u.test(html), 'no emoji on the tab');
-    assert.equal((html.match(/class="rx-card rx-player"/g) || []).length, app.recapItems(X).filter(x => x.p).length);
-    assert.ok(html.includes('class="pc-photo rx-ph"') && html.includes(`data-photo="${X.mvp.p.nbaId}"`), "the player's photo, which opens his card");
+    assert.equal((html.match(/class="rx-card rx-player rx-round"/g) || []).length, app.recapItems(X).filter(x => x.p).length);
+    assert.ok(!html.includes('pc-photo'), 'no big photo on the tab');
+    assert.match(html, new RegExp(`class="rx-faces"><span class="hs[^"]*" style="width:44px;height:44px[^"]*" data-photo="${X.mvp.p.nbaId}"`), "the player's round photo, which opens his card");
     // the finals agree with Fantrax's standings (week 1 is the only finished week)
     for (const g of X.games) {
       const ra = L.standings.find(r => r.id === g.a);

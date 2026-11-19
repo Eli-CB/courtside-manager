@@ -353,10 +353,10 @@ function draftAwardsCard(d) {
     draftAwardDetails.set(x.label, x.detail);
     return `<button type="button" class="link-btn rx-label dr-award-btn" data-action="draft-award" data-key="${esc(x.label)}" title="${esc(x.label)}: the breakdown">${x.label}</button>`;
   };
-  // (drawn as the Recap's standouts and the share picture: the owner's ask)
+  // (drawn as the Recap's standouts and the share picture: the owner's ask; each player still beside his big photo)
   return `<div class="card dr-awards dr-gap">
     <div class="card-head"><h2>Draft Retrospective ${infoBtn('draftAwards')}</h2>${shareBtn('draft-share')}</div>
-    <div class="rx-grid">${items.map(x => standoutCard(x, label(x))).join('')}</div>
+    <div class="rx-grid">${items.map(x => standoutCard(x, label(x), true)).join('')}</div>
   </div>`;
 }
 // Sharing them (shareWith, recap.js): a picture, or the text and a link that opens the league's Draft tab
