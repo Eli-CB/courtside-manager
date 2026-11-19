@@ -951,7 +951,7 @@ test('ESPN roto: Standings, the Matchup tab, Plan Ahead and a team card, all wit
   assert.ok(/<b>10<\/b><span class="rt-who">.*?<span class="muted" title="[^"]*">\+8<\/span><\/span>/.test(m), 'BLK: 10 ahead of nine teams, the first named');
 
   const week = a.viewWeek();
-  assert.ok(week.includes('Roto has no weekly opponent') && week.includes('up to 680 games in all (68 a lineup spot)'));
+  assert.ok(week.includes('Season outlook') && /Projected <b>\d+(st|nd|rd|th)<\/b> of 10/.test(week), "the season's outlook where an opponent would be");
   assert.ok(!week.includes('Load your opponent') && !week.includes('>Opponent<') && !week.includes('compare against'), 'no opponent to load or pick');
   assert.ok(/<h1>(This|Next) week<\/h1>/.test(week));
 
@@ -971,6 +971,82 @@ test('ESPN roto: no one has played yet, so every team is tied', async () => {
   } finally { await app.useLeague(ESPN); }
   assert.ok(!app.isRoto(), 'a head-to-head league is not roto');
   assert.ok(app.viewStandings().includes('<th class="num">W</th>'), 'and keeps its win-loss standings');
+});
+
+test("ESPN roto: a player's value is the roto points his game adds over the season", async () => {
+  const { a, L } = await rotoApp();
+  const W = a.winWeights(), BASE = a.get('BASE'), c = a.scoreCats().find(x => x.key === 'pts');
+  // a team over 680 starter games spreads across 10 teams; a team passes (10 − 1) ÷ (2√π × that spread) of them per point
+  const spread = Math.sqrt(680 * 680 / 10 * BASE.pts[1] ** 2 + 680 * a.gameSd('pts', BASE.pts[0]) ** 2);
+  assert.ok(Math.abs(W.pts.per - 2 * Math.sqrt(Math.PI) * spread / 9) < 1e-9, 'standings gain points from the league\'s own size and games limit');
+  assert.ok(Math.abs(a.rotoSpread(c, 680, 1) - spread) < 1e-9);
+  const star = a.sortDesc(a.nbaPlayers().filter(p => p.gp > 2), p => a.value(p))[0];
+  const z = a.catWins(star);
+  assert.ok(Math.abs(z.pts - a.statVal(star, 'pts') / W.pts.per) < 1e-12, 'his points over the points one place takes');
+  assert.ok(Math.abs(a.value(star) - Object.values(z).reduce((s, x) => s + x, 0)) < 1e-12);
+  assert.ok(between(a.value(star), 0.1, 0.6), `the best game is a fraction of a roto point: ${a.value(star)}`);
+  // a season of more games makes each one worth less
+  const was = L.roto.gpMax;
+  try {
+    L.roto = { ...L.roto, gpMax: 2 * was };
+    assert.ok(a.winWeights().pts.per > 1.9 * W.pts.per, 'twice the games: each worth about half');
+  } finally { L.roto = { ...L.roto, gpMax: was }; }
+});
+
+test("ESPN roto: the projected finish adds each roster's games to come to the totals so far, within the games limit", async () => {
+  const { a, L } = await rotoApp();
+  const O = a.rotoOutlook(), n = 10, cats = a.scoreCats().filter(c => !c.fp);
+  assert.equal(O.size, n);
+  const all = [...O.values()];
+  // every category hands out 1 + 2 + ... + 10 points, so they add up to that whatever the chances
+  for (const c of cats) assert.ok(Math.abs(all.reduce((s, t) => s + t.pts[c.key], 0) - n * (n + 1) / 2) < 1e-9, c.key);
+  assert.ok(all.every(t => cats.every(c => between(t.pts[c.key], 1, n))));
+  assert.ok(all.every(t => t.rank === 1 + all.filter(u => u.total > t.total + 1e-9).length));
+  for (const r of L.standings) {
+    const t = O.get(r.id);
+    assert.ok(t.fin.pts >= r.tot.pts && t.fin.gp1 === r.tot.gp1 + t.rest.games, 'totals so far, plus the rest');
+    assert.ok(t.rest.games <= 680 - r.tot.gp1, 'never past the limit');
+  }
+  assert.ok(all.some(t => t.rest.full), 'teams that start everyone run out of games before the end');
+  assert.strictEqual(a.rotoOutlook(), O, 'worked out once a day');
+
+  // with 20 games left, a team keeps its 20 best, and says when it runs out
+  const side = a.fxTeamSide('3'), val = new Map(side.players.map(p => [p.id, a.value(p)]));
+  const rest = a.rotoRest(side.players, 680 - 20);
+  assert.equal(rest.games, 20);
+  assert.ok(rest.wanted > 20 && rest.full > '2026-11-19');
+  assert.match(a.rotoPace(L.roto, 660, rest), /past the limit of 680: it runs out around/);
+  // a player ruled out until after the season plays no part
+  const star = a.sortDesc(side.players, p => val.get(p.id))[0];
+  const hurt = side.players.map(p => (p === star ? { ...p, status: 'Out', inj: { status: 'Out', back: '2027-12-01' } } : p));
+  assert.ok(a.rotoRest(hurt, 0).tot.pts < a.rotoRest(side.players, 0).tot.pts);
+
+  // Standings' Projected view: best projected first, expected points to a tenth
+  a.get('ui').rotoView = 'proj';
+  const html = a.viewStandings();
+  assert.ok(html.includes("At the season's end") && /data-v="proj" aria-pressed="true"/.test(html));
+  const order = [...html.split('<tbody>')[1].matchAll(/<td class="rt-team"><b><button[^>]*?data-team="([^"]+)"/g)].map(m => m[1]);
+  assert.deepEqual(order, a.sortDesc(all, t => t.total).map(t => t.id), 'best projected first');
+  assert.ok(html.includes(`<b>${a.fmt(all.find(t => t.rank === 1).total, 1)}</b>`), 'expected points to a tenth');
+  a.get('ui').rotoView = 'now';
+  assert.ok(a.dashMatchupCard().includes(`Projected ${a.ordinal(O.get('3').rank)} · ${a.fmt(O.get('3').total, 1)} pts`));
+});
+
+test("ESPN roto: a trade's For your team is its change to your projected roto points", async () => {
+  const { a } = await rotoApp();
+  const ui = a.get('ui'), mine = a.fxTeamSide('3').players, theirs = a.fxTeamSide('4').players;
+  const byVal = list => a.sortDesc(list, p => a.value(p));
+  // your best player for their worst
+  const give = [byVal(mine)[0]], get = [byVal(theirs).pop()];
+  ui.tradeTeam = '4';
+  const Y = a.tradeForYou(give, get);
+  assert.ok(Y.roto, 'a roto league works out the projected finish');
+  assert.equal(Y.roto.before.total, a.rotoOutlook().get('3').total, 'before: the projection as it stands');
+  assert.ok(Y.roto.after.total < Y.roto.before.total, `worse without your best player: ${Y.roto.before.total} -> ${Y.roto.after.total}`);
+  const card = a.tradeCard({ from: '3', to: '4', give: give.map(p => String(p.nbaId)), get: get.map(p => String(p.nbaId)), givePicks: [], getPicks: [] }, Y);
+  assert.ok(card.includes('projected roto points'));
+  assert.ok(card.includes(`<b>${a.signed(Y.roto.after.total - Y.roto.before.total, 1)}</b>`), 'the change in all, in the Value column');
+  assert.equal(a.rotoOutlook().get('3').total, Y.roto.before.total, "working out the deal doesn't change the league's own projection");
 });
 
 test('ESPN roto: a copy kept on the device from before the site read roto is read again', () => {

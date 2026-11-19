@@ -148,54 +148,6 @@ function viewStandings() {
   ${L ? seasonTotalsCard(rows, S) : ''}`;
 }
 
-// ----- Roto (a league ranked over the season in each category: espnRoto) -----
-const fmtRotoPts = n => fmt(n, Number.isInteger(n) ? 0 : 1); // (a tie splits points: 5.5)
-// A team's season total in a category: a percentage from its makes and attempts (null before any), else the count
-const rotoValue = (r, c) => (c.pct ? (r.tot[c.att] ? r.tot[c.made] / r.tot[c.att] : null) : r.tot[c.key] || 0);
-const fmtRotoValue = (c, v) => (v == null ? '—' : c.pct ? fmtPct(v) : fmt(v, 0));
-// ESPN's points while no one has played: every team tied in every category
-const rotoUnplayed = L => L.standings.every(r => !r.tot.gp1);
-
-// Where a team stands, category by category: its total, its points, and the nearest teams above and below it with the gap to
-// them (fewer is better for turnovers) -> [{ c, v, pts, above, below }]; above / below: { gap, ids } (every team that close) or null
-function rotoStanding(tid) {
-  const rows = fxLeague().standings, me = rows.find(r => r.id === tid);
-  if (!me) return [];
-  return scoreCats().filter(c => !c.fp).map(c => {
-    const v = rotoValue(me, c), sign = c.neg ? -1 : 1;
-    // each other team's lead over this one (below 0: behind it)
-    const leads = v == null ? [] : rows.filter(r => r !== me && rotoValue(r, c) != null).map(r => ({ id: r.id, d: sign * (rotoValue(r, c) - v) }));
-    const nearest = list => {
-      if (!list.length) return null;
-      const gap = Math.min(...list.map(x => Math.abs(x.d)));
-      return { gap, ids: list.filter(x => Math.abs(x.d) - gap < 1e-9).map(x => x.id) };
-    };
-    return { c, v, pts: me.cats[c.key] || 0, above: nearest(leads.filter(x => x.d > 1e-9)), below: nearest(leads.filter(x => x.d < -1e-9)) };
-  });
-}
-
-// The standings: each team's points in all and in each category (its season total under them) and the games its starters have
-// played, against the league's limit
-function rotoStandingsCard(L) {
-  const rows = L.standings || [], cats = scoreCats().filter(c => !c.fp), { gpMax, gpSpot } = L.roto;
-  if (!rows.length) return `<div class="card"><div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div></div>`;
-  const gpTip = `Games your starters have played${gpMax ? `, of the league's limit of ${gpMax}${gpSpot ? ` (${gpSpot} a lineup spot)` : ''}` : ''}`;
-  const cell = (r, c) => {
-    const v = fmtRotoValue(c, rotoValue(r, c));
-    return `<td class="num rt-c" title="${c.label}: ${v}, ${fmtRotoPts(r.cats[c.key])} points"><b>${fmtRotoPts(r.cats[c.key])}</b><span class="rt-tot">${v}</span></td>`;
-  };
-  const row = r => `<tr${r.id === myTeamId() ? ' class="me-row"' : ''}><td class="num">${r.rank}</td><td class="rt-team"><b>${teamLink(r.id, esc(r.name))}</b>${r.id === myTeamId() ? ' <span class="muted small">(you)</span>' : ''}</td>
-    <td class="num"><b>${fmtRotoPts(r.pts)}</b></td><td class="num">${fmt(r.tot.gp1 || 0, 0)}</td>${cats.map(c => cell(r, c)).join('')}</tr>`;
-  return `<div class="card">
-    <div class="card-head"><h2>Roto standings ${infoBtn('roto')}</h2></div>
-    ${rotoUnplayed(L) ? '<p class="muted small" style="margin:0 0 10px">No games counted yet, so every team is tied.</p>' : ''}
-    <div class="table-wrap"><table class="rt-table">
-      <thead><tr><th class="num">#</th><th>Team</th><th class="num" title="Roto points: every category's added up">Pts</th><th class="num" title="${esc(gpTip)}">GP</th>${cats.map(c => `<th class="num">${c.label}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map(row).join('')}</tbody>
-    </table></div>${waiverLine()}
-  </div>`;
-}
-
 // ----- A fantasy team's card: its record and this week's opponent (the title), its category strengths (teamStrengths), its roster -----
 let teamCardOpen = null; // the fantasy team whose card is showing, for its table's sort (team-sort)
 function showTeamCard(tid, sorting) {
@@ -571,7 +523,8 @@ function tradeForYou(give, get) {
   const wv = waiverValue(), over = p => gameWorth(p) - wv;
   const vGive = sum(give.map(over)), vGet = sum(get.map(over)), diff = vGet - vGive, cats = scoreCats();
   const better = c => { const d = after[c.key] - before[c.key]; return c.neg ? d < -1e-9 : d > 1e-9; };
-  return { before, after, vGive, vGet, diff, won: cats.filter(better).length, n: cats.length, rosterAfter: activeCount() - give.length + get.length };
+  return { before, after, vGive, vGet, diff, won: cats.filter(better).length, n: cats.length, rosterAfter: activeCount() - give.length + get.length,
+    roto: isRoto() && ui.tradeTeam ? rotoTradeChange(give, get, ui.tradeTeam) : null }; // (roto: your projected finish, now and with the deal)
 }
 
 /* ---------- Trade proposal: both sides of a deal, with photos and per-game numbers, to share with the other team ---------- */
@@ -727,7 +680,8 @@ function tradeCard(T, Y) {
   const change = (c, d) => (c.rate ? signed(d, 2) : c.pct ? `${signed(d * 100, 1)}%` : signed(d, 1));
   const zero = shown => !+String(shown).replace(/[^\d.]/g, ''); // (a change that rounds to nothing is gray, not green)
   const poNet = P && M.A.po - M.B.po, poShown = P ? `${poNet > 0.05 ? '+' : poNet < -0.05 ? '−' : ''}${fmtGames(Math.abs(poNet))}` : '';
-  const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
+  const youRow = Y && Y.roto ? rotoTradeRow(Y.roto, cats, P ? poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad') : '')
+    : Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
     ${cats.map(c => {
       // a shooting pair: its makes and attempts a game, marked by the points they score
       if (c.shot) {

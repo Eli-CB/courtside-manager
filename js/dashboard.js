@@ -237,43 +237,6 @@ function dashWeekRows(C, A, B) {
   return `<div class="mu-rows${C.solo ? ' solo' : ''}">${rows}${bench}</div>${benchBtn}`;
 }
 
-// ----- A roto league's matchup: there's no opponent, so the head is where you stand in the league -----
-// The share of the league's season played: its NBA games before today, of all of them from its first day to its last
-function rotoSeasonShare(R) {
-  if (!R.start || !R.end) return null;
-  const today = todayIso();
-  let all = 0, done = 0;
-  for (const days of teamDates.values()) for (const d of days) if (d >= R.start && d <= R.end) { all++; if (d < today) done++; }
-  return all ? done / all : null;
-}
-// Your points and the week's starter games (as the matchup's score), your standing, and your games against the league's limit
-function rotoBoard(S, D) {
-  const L = fxLeague(), R = L.roto, r = standingOf(S.tid);
-  if (!r) return '';
-  const share = rotoSeasonShare(R), gp = r.tot.gp1 || 0;
-  const games = R.gpMax ? `<b>${fmt(gp, 0)}</b> of ${R.gpMax} games` : `<b>${fmt(gp, 0)}</b> games`;
-  const gamesTip = `Games your starters have played${R.gpMax ? `, of the league's limit of ${R.gpMax}${R.gpSpot ? ` (${R.gpSpot} a lineup spot)` : ''}` : ''}${share != null ? `. The league's season is ${Math.round(share * 100)}% played.` : ''}`;
-  return `<div class="mu-board">
-      <div class="mu-team"><div class="mu-name">${teamLink(S.tid, esc(S.name))}</div><div class="mu-line"><div class="mu-score" title="Roto points: every category's added up">${fmtRotoPts(r.pts)}</div>${dashPaceChips(S, D)}</div></div>
-      <div class="mu-mid"></div>
-      <div class="mu-team right"><div class="mu-name">${ordinal(r.rank)} <span class="muted">of ${fxPickable().length}</span></div>
-        <div class="mu-rt-games small" title="${esc(gamesTip)}">${games}${share != null ? `<span class="muted"> · ${Math.round(share * 100)}% of the season</span>` : ''}</div></div>
-    </div>`;
-}
-// Each category: your total, your points, and how far the nearest team above (to pass) and below (your lead) are
-function rotoStandTable(tid) {
-  const rows = rotoStanding(tid);
-  if (!rows.length) return '';
-  // (teams tied at that gap: the first named, the rest counted)
-  const who = ids => `${teamLink(ids[0])}${ids.length > 1 ? `<span class="muted" title="${esc(ids.slice(1).map(fxTeamName).join(', '))}">+${ids.length - 1}</span>` : ''}`;
-  const near = (x, c) => (x ? `<b>${c.pct ? fmtPct(x.gap) : fmt(x.gap, 0)}</b><span class="rt-who">${who(x.ids)}</span>` : '<span class="muted">—</span>');
-  return `<div class="table-wrap mu-rt"><table class="rt-table rt-stand">
-    <thead><tr><th>Cat</th><th class="num">You</th><th class="num">Pts</th><th class="num" title="How far behind the nearest team above you, and who">To pass</th><th class="num" title="How far ahead of the nearest team below you, and who">Lead</th></tr></thead>
-    <tbody>${rows.map(({ c, v, pts, above, below }) => `<tr><td><b>${c.label}</b></td><td class="num">${fmtRotoValue(c, v)}</td><td class="num"><b>${fmtRotoPts(pts)}</b></td>
-      <td class="num rt-near">${near(above, c)}</td><td class="num rt-near">${near(below, c)}</td></tr>`).join('')}</tbody>
-  </table></div>${rotoUnplayed(fxLeague()) ? '<p class="muted small mu-when">No games counted yet, so every team is tied.</p>' : ''}`;
-}
-
 // The matchup alone on the screen (the card's button, in place of its (i): the owner's ask, Nov 2026). While the card is
 // drawn `full` the CSS hides the head, the tabs and everything else, so a live update keeps it; where the browser
 // allows (not an iPhone) the browser's own full screen comes with it. Ends with the button, Esc or leaving the tab.

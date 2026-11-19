@@ -380,8 +380,8 @@ const shotPoints = c => { const sc = leaguePoints() || {}; return Object.fromEnt
 const shotFp = (line, c) => sum(Object.entries(shotPoints(c)).map(([k, v]) => lineStat(line, k) * v));
 const shotVol = (made, att, d = 1) => `${fmt(made, d)}/${fmt(att, d)}`;
 
-// Player value: what an average game of his adds to winning a week's categories, against not playing (catWins, the
-// same as a single game on the Dashboard), or fantasy points per game in points leagues
+// Player value: what an average game of his adds, against not playing (catWins, the same as a single game on the Dashboard):
+// categories won in a week (head-to-head), roto points over the season (roto), or fantasy points in points leagues
 function value(p) {
   return isPoints() ? fantasyPoints(p) : sum(Object.values(catWins(p)));
 }

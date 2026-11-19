@@ -447,6 +447,7 @@ const actions = {
     ui.dashBench = !ui.dashBench;
     render();
   },
+  'roto-view'(el) { ui.rotoView = el.dataset.v; render(); }, // a roto league's standings: now, or at the season's end (roto.js)
   'dash-full'() { dashFull(!ui.dashFull); },
   'perf-per'(el) {
     ui.perfPer = el.dataset.per === '1';

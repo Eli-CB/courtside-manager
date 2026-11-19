@@ -508,16 +508,24 @@ function computeBase(stats, n) {
   return out;
 }
 
-// What a game adds to winning each category of a week, against not playing: its change to an average team's week
-// (8 starters × 3.5 games: whatever the league starts), over how far apart two teams typically finish in that
-// category (game-to-game swings plus how much rostered players differ), times 0.4, how fast a close category's
-// win chance moves. The unit is categories won in an even matchup. Counting stats only add; turnovers and
-// shooting below the league's average take away.
+// What a game adds to each category, against not playing, in what decides the league: head-to-head, categories won in an
+// even week (h2hWeights); roto, standings points over the season (rotoWeights). Each category's weight: { per } (how much of
+// the stat is one unit), and for a percentage { p, A }: its league average and the attempts it's measured on (the % moves by
+// (makes − p × attempts) ÷ A). Counting stats only add; turnovers and shooting below the league's average take away.
 let winsMemo = null;
 keep('sport', () => { winsMemo = null; });
 function winWeights() {
   const cats = scoreCats(); // the league's categories, and their baselines
-  if (winsMemo && winsMemo.cats === cats && winsMemo.BASE === BASE && winsMemo.n === state.slots.length) return winsMemo.w;
+  const R = isRoto() ? fxLeague().roto : null, teams = fxPickable().length;
+  if (winsMemo && winsMemo.cats === cats && winsMemo.BASE === BASE && winsMemo.n === state.slots.length && winsMemo.R === R && winsMemo.teams === teams) return winsMemo.w;
+  const w = R ? rotoWeights(cats, R, teams) : h2hWeights(cats);
+  winsMemo = { cats, BASE, n: state.slots.length, R, teams, w };
+  return w;
+}
+// Head-to-head: its change to an average team's week (8 starters × 3.5 games: whatever the league starts), over how far
+// apart two teams typically finish in that category (game-to-game swings plus how much rostered players differ), times
+// 0.4, how fast a close category's win chance moves. The unit is categories won in an even matchup.
+function h2hWeights(cats) {
   const S = state.slots.length || 8, G = S * WEEK_GAMES;
   const w = {};
   for (const c of cats) {
@@ -526,14 +534,41 @@ function winWeights() {
     if (c.pct) {
       // a week's % moves by (makes − average % × attempts) ÷ the team's attempts; shot-making noise as in compareCats
       const p = BASE[c.key][0], A = G * ((BASE[c.att] || [0])[0] || 1);
-      w[c.key] = { p, A, sd: Math.sqrt(2 * (pctNoise(c, p) / A + G * G / S * b * b / (A * A))) };
+      w[c.key] = { p, A, per: Math.sqrt(2 * (pctNoise(c, p) / A + G * G / S * b * b / (A * A))) / 0.4 };
     } else {
       const m = BASE[c.key][0];
-      w[c.key] = { sd: Math.sqrt(2 * (G * gameSd(c.key, m) ** 2 + G * G / S * b * b)) };
+      w[c.key] = { per: Math.sqrt(2 * (G * gameSd(c.key, m) ** 2 + G * G / S * b * b)) / 0.4 };
     }
   }
-  winsMemo = { cats, BASE, n: state.slots.length, w };
   return w;
+}
+// Roto: standings points over the season ("standings gain points"). A team's season total spreads across the league
+// (rotoSpread); with the league's teams spread that way, a team anywhere in the standings passes on average (teams − 1)
+// ÷ (2√π × spread) of them for each unit of the stat it adds (the chance two such teams finish within it of each other).
+// A percentage counts makes over the league's average on the attempts, as head-to-head's.
+function rotoWeights(cats, R, teams) {
+  const G = rotoSeasonGames(R), w = {};
+  for (const c of cats) {
+    if (c.fp || !BASE[c.key]) continue;
+    const per = 2 * Math.sqrt(Math.PI) * rotoSpread(c, G, 1) / Math.max(teams - 1, 1);
+    w[c.key] = c.pct ? { p: BASE[c.key][0], A: 1, per } : { per };
+  }
+  return w;
+}
+// How a team's total over G starter games varies (a percentage: its makes over the league's average): with rho 1, across
+// the league's teams, by how much rostered players differ and game-to-game swings; with a smaller rho, how unsure a
+// projection of those games is (players' averages drift, injuries come)
+function rotoSpread(c, G, rho) {
+  const S = state.slots.length || 8, [m, b] = BASE[c.key];
+  const swing = c.pct ? G * ((BASE[c.att] || [0])[0] || 1) * pctNoise(c, m) : G * gameSd(c.key, m) ** 2;
+  return Math.sqrt(G * G / S * (rho * b) ** 2 + swing);
+}
+// A roto team's starter games in a season: its games limit, else every starting spot filled for each game an NBA team
+// plays in the league's season
+function rotoSeasonGames(R) {
+  if (R.gpMax) return R.gpMax;
+  const per = [...teamDates.values()].map(ds => [...ds].filter(d => (!R.start || d >= R.start) && (!R.end || d <= R.end)).length);
+  return (state.slots.length || 8) * (per.length ? sum(per) / per.length : 70);
 }
 // a player's per-game stats (FG% × attempts for makes) or a game's line (makes as they are)
 function catWins(s) {
@@ -543,7 +578,7 @@ function catWins(s) {
     const w = W[c.key];
     if (!w) continue;
     const d = (c.neg ? -1 : 1) * (c.pct ? (get(c.made) - w.p * get(c.att)) / w.A : get(c.key));
-    z[c.key] = 0.4 * d / w.sd;
+    z[c.key] = d / w.per;
   }
   return z;
 }

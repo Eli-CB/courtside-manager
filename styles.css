@@ -409,6 +409,8 @@ body:has(.mu-card.full) { background: var(--surface); }
 .rt-who .team-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rt-who > span { flex: none; margin-left: .3em; } /* (a space would be dropped at a flex item's start) */
 .stat-boards.solo { grid-template-columns: minmax(0, 1fr); min-width: max(460px, calc(var(--cols, 0) * 50px)); }
+.rt-finish { margin: 0 0 4px; }
+.rt-pace { margin: 0 0 12px; }
 @media (max-width: 640px) {
   .mu-rows.solo .mu-row { grid-template-columns: 30px minmax(0, 1fr); }
   .rt-who { max-width: 5.75rem; } /* (the five columns fit a 375 px phone) */

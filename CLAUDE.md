@@ -27,7 +27,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
   scope; they must load in the order index.html lists: sports, core, nba, info, fantrax, espn, sleeper, football, yahoo, render, history, views,
-  dashboard, players, matchups, recap, trends, share, live, draft, leagues, sandbox, actions. Shared builders (Nov 18, 2026): every row of on/off buttons is `segBtns` (core.js), every sortable table's order `sortRows` (views.js: empty cells last), whose a player is `rosterOwners`/`ownerTag`/`faBadge` (players.js, the sandbox's My team included). Top-level code may only use things defined in earlier files (no hoisting across files), and no two files may declare the same function: a later file's silently replaces the earlier one everywhere (history.js's `periodDays` once broke every week's dates; a test checks).
+  dashboard, players, matchups, roto, recap, trends, share, live, draft, leagues, sandbox, actions. Shared builders (Nov 18, 2026): every row of on/off buttons is `segBtns` (core.js), every sortable table's order `sortRows` (views.js: empty cells last), whose a player is `rosterOwners`/`ownerTag`/`faBadge` (players.js, the sandbox's My team included). Top-level code may only use things defined in earlier files (no hoisting across files), and no two files may declare the same function: a later file's silently replaces the earlier one everywhere (history.js's `periodDays` once broke every week's dates; a test checks).
   - sports: `SPORTS` (each sport's positions, slots, stats, categories, team colors, data folder, ESPN feed) and `setSport`, which
     points the plain names the site reads (`POSITIONS`, `ELIG`, `STAT_LABEL`, `COUNT_KEYS`, `TEAM_COLORS`...) at a sport's tables.
     "NBA", `nbaId`, `nbaPlayers` and the like mean "the sport's data" (as "fx" names mean "the league's site")
@@ -41,7 +41,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     model (`scoreCats`, `catZ`, `BASE`: each stat's mean/spread from the data via `baseNow`, the league's teams × roster
     spots by minutes, smart blend, or a past season's archive inside `withSeason`), lineup optimizer. Player value
     (`value`, `lineValue` for a game) everywhere = categories won per game against not playing (`catWins`: each
-    category's share of an average team's week over the spread of weekly margins); trades count it over a waiver
+    category's share of an average team's week over the spread of weekly margins; roto: roto points over the season, `rotoWeights`); trades count it over a waiver
     player (`waiverValue`). `catZ` (vs an average rostered player) is only for shading
   - info: `INFO` texts for every (i) button (`infoBtn(key)`)
   - fantrax: `fxGet` (retries/backoff), `fxGetAll`, `fetchFantraxLeague`, league cache (`getLeague`, 6h), shared
@@ -56,11 +56,15 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     and `def_fum_rec` (special teams' included) to a defense's lines (`espn_defense`). Checked on a real league: 1,169 of 1,170 player-weeks matched ESPN's
     points (the one: a sack counted differently). Live points: ESPN's per week, in `L.slpWeek` like Sleeper's (`espnWeekFresh`, `leagueWeekFresh`, every 30 s).
     Category football isn't read. No Recap, Awards or Season totals.
-    ESPN roto (`scoringType` 'ROTO', stage 1 of 2, Nov 19, 2026; `espnRoto`, `L.roto`, `isRoto()` in core.js): no periods or matchups (ESPN's one matchup is the
-    season; a roto "week" is the calendar's, `spanWord()`); `L.standings` are ESPN's own points (`pointsByStat`, `points`) with each team's totals (`tot`, from
-    `valuesByStat`, games as `gp1`), ranked by points, ties sharing; `gpMax`/`gpSpot` from `lineupSlotStatLimits`. Standings is `rotoStandingsCard`, the Matchup tab's
-    head `rotoBoard` + `rotoStandTable` (gaps from `rotoStanding`, views.js), Plan Ahead and the Matchup rows have no opponent's column (`solo`), no Recap tab.
-    Not checked against a real season's numbers yet (the league hadn't played). Stage 2, the owner's call: values, projected final standings, trades in roto points.
+    ESPN roto (`scoringType` 'ROTO', Nov 19, 2026, both stages; `espnRoto`, `L.roto`, `isRoto()` in core.js, the rest in roto.js): no periods or matchups (ESPN's one
+    matchup is the season; a roto "week" is the calendar's, `spanWord()`); `L.standings` are ESPN's own points (`pointsByStat`, `points`) with each team's totals (`tot`,
+    from `valuesByStat`, games as `gp1`), ranked by points, ties sharing; `gpMax`/`gpSpot` from `lineupSlotStatLimits`. Value (`rotoWeights`, nba.js): a game's
+    standings gain points, the stat over 2√π × a team's season spread (`rotoSpread`: G²/S × b² + game swings, G = the games limit) ÷ (teams − 1). The projected
+    finish (`rotoOutlook`, a day's memo): totals so far + each roster's games from tomorrow (`rotoRest`: daily best lineups, Out until ESPN's `inj.back` or 2 weeks,
+    past the limit only the best games), expected points = 1 + chances of finishing ahead (unsure by `ROTO_DRIFT` 0.5: a judgment, not checked on a real season).
+    Standings (Now / Projected, `ui.rotoView`), the Matchup head, Plan Ahead's Season outlook (`rotoOutlookCard`, games pace `rotoPace`) and Trades' For your team
+    (`rotoTradeChange`, `rotoTradeRow`) read it. No opponent's column on Plan Ahead or the Matchup rows (`solo`), no Recap tab. ESPN's real roto numbers aren't
+    checked yet (the test league hadn't played).
   - sleeper: `fetchSleeperLeague` (api.sleeper.app, CORS-open, no sign-in; IDs are 15-20 digits, `source: 'sleeper'`).
     Sleeper basketball is points only and counts ONE game a week per lineup slot (Lock-In: the game locked in after it's
     played, else the last of the week; Game Pick: the one picked): `L.oneGame`, `isOneGame()`. Projections (`oneGameSide`

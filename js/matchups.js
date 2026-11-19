@@ -743,11 +743,6 @@ function viewWeek() {
   const noOpp = () => `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${real
     ? `${when[0].toUpperCase() + when.slice(1)} you play <b>${esc(real.name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(real.name)} from ${sourceName()}</button>`
     : `${sourceName()} has no matchup for you ${when}.`}${fxLeague() && state.fxTeam ? `<div class="sb-pick">Or compare against ${fxOppPicker(ctx)}</div>` : ''}</div></div>`;
-  // roto: no one to face, so the week is your games (each one adds to your season totals, up to the league's games limit)
-  const rotoNote = () => {
-    const R = fxLeague().roto;
-    return `<div class="card"><p class="muted small" style="margin:0">Roto has no weekly opponent: every game your starters play adds to your season totals${R.gpMax ? `, up to ${R.gpMax} games in all${R.gpSpot ? ` (${R.gpSpot} a lineup spot)` : ''}` : ''}. ${infoBtn('roto')}</p></div>`;
-  };
   const asSetLine = () => `<div class="sb-foot"><span class="muted">Lineup as set</span> <span class="sb-foot-n"><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${unit} · <b>${pctTxt(oSet.win)}</b> to win${isFootball() ? '' : ` · <b>${asSet.games}</b> starter games`}</span></div>`;
   const scoreboard = hasOpp ? `
     <div class="card scoreboard">
@@ -759,7 +754,7 @@ function viewWeek() {
       <div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
       <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>
       ${changed ? asSetLine() : ''}
-    </div>` : isRoto() ? rotoNote() : noOpp();
+    </div>` : isRoto() ? rotoOutlookCard() : noOpp(); // (roto: no one to face; the season's outlook instead, roto.js)
 
   // Daily-lineup leagues keep the day-by-day swap list (not one-game leagues: more games don't count there)
   let dailyCards = '';
