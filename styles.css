@@ -953,12 +953,12 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .sb-opp-note { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 8px; margin-top: 4px; font-size: .78rem; }
 .sb-pick { margin-top: 14px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
 .sb-score { font-size: 2.6rem; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
-.sb-vs { text-align: center; color: var(--muted); font-size: .78rem; padding-bottom: 8px; }
+.sb-vs { text-align: center; color: var(--muted); font-size: .8rem; white-space: nowrap; padding-bottom: 12px; }
 .odds { height: 8px; border-radius: 999px; background: var(--bad); opacity: .9; overflow: hidden; margin-top: 16px; }
 .odds-you { display: block; height: 100%; background: var(--good); }
 .odds-legend { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); margin-top: 6px; }
 .odds-legend b { color: var(--text); }
-.sb-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
+.sb-foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .85rem; font-variant-numeric: tabular-nums; }
 .pbar-cell { display: flex; align-items: center; gap: 8px; min-width: 150px; }
 .pbar { flex: 1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
 .pbar span { display: block; height: 100%; border-radius: 4px; }
@@ -972,7 +972,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .check { display: flex; align-items: center; gap: 8px; font-size: .9rem; margin-bottom: 8px; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 @media (max-width: 900px) { .week-grid { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 640px) { .sb-score { font-size: 2rem; } .sb-foot { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .sb-score { font-size: 2rem; } }
 
 /* ---------- Matchup board + lineup analysis ---------- */
 .fx-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: .9rem; }
@@ -1033,7 +1033,6 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .tag.down { background: var(--bad-soft); color: var(--bad); }
 .board-sep td { background: var(--surface-2); color: var(--muted); font-size: .75rem; font-weight: 600; padding: 4px 8px; }
 .board-tot td, .board-tot th { font-size: .85rem; }
-.sb-foot.one { grid-template-columns: 1fr; }
 .swap { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 .swap + .swap { margin-top: 10px; }
 .swap.suggested { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good-soft) 40%, transparent); }
@@ -1406,7 +1405,7 @@ a.lm-item { text-decoration: none; }
   .fx-strip .actions { width: 100%; }
   .fx-strip .actions .btn { flex: 1 1 auto; }
   /* scoreboard */
-  .sb-vs { font-size: .62rem; padding-bottom: 6px; }
+  .sb-vs { font-size: .62rem; padding-bottom: 6px; white-space: normal; width: min-content; } /* (projected / cats on two short lines) */
   .sb-vs-extra { display: none; }
   /* schedule board: short names on one line, compact opponent controls */
   .board .n-full, .stab .n-full { display: none; }
