@@ -28,20 +28,22 @@ function shotImg(raw) {
   if (!shotImgs.has(src)) shotImgs.set(src, canvasImg(src, true).then(im => { if (!im) shotImgs.delete(src); return im; }));
   return shotImgs.get(src);
 }
-// A team's logo for the pictures: the site's own (an SVG), given a size first (Firefox won't draw an SVG without one)
+// A team's logo for the pictures: the site's own (an SVG), given a square size first (Firefox won't draw an SVG without
+// one, and Chrome would stretch it from 300 x 150). Both forms: as images.json has it (base64), and as cropLogos (core.js)
+// leaves it on the page, cut to its drawing and with its size taken off (utf-8)
 const logoImgs = new Map();
+const SVG_B64 = /^data:image\/svg\+xml;base64,(.*)$/, SVG_UTF8 = /^data:image\/svg\+xml;charset=utf-8,(.*)$/;
 function logoImg(team) {
   const src = IMG && team && IMG.logos[team];
   if (!src) return Promise.resolve(null);
   if (!logoImgs.has(src)) {
     let url = src;
-    const m = /^data:image\/svg\+xml;base64,(.*)$/.exec(src);
-    if (m) {
-      try {
-        const svg = atob(m[1]);
-        if (!/<svg[^>]*\swidth=/.test(svg)) url = `data:image/svg+xml;base64,${btoa(svg.replace('<svg', '<svg width="400" height="400"'))}`;
-      } catch (e) { url = src; }
-    }
+    const sized = svg => (/<svg[^>]*\swidth=/.test(svg) ? null : svg.replace('<svg', '<svg width="400" height="400"'));
+    try {
+      const b = SVG_B64.exec(src), u = !b && SVG_UTF8.exec(src);
+      const svg = b ? sized(atob(b[1])) : u ? sized(decodeURIComponent(u[1])) : null;
+      if (svg) url = b ? `data:image/svg+xml;base64,${btoa(svg)}` : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    } catch (e) { url = src; }
     logoImgs.set(src, canvasImg(url));
   }
   return logoImgs.get(src);
@@ -128,24 +130,25 @@ async function sharePad(tall = 5000) {
   const text = (t, x, y, color = C.text, align = 'left') => { ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(t, x, y); };
   const round = (x, y, w, h, r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
   const clip = (x, y, w, h, r) => { ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.clip(); };
-  // a player's round photo in a ring of his NBA team's colors (as on the site); his initials without one
-  const photo = (p, x, y, d) => {
-    const raw = nbaById.get(p.nbaId), tc = TEAM_COLORS[raw && raw.team], cx = x + d / 2, cy = y + d / 2, i = IMG_INDEX.get(p.nbaId);
+  // the cutouts and logos of the players a picture shows, loaded before it's drawn (prep, 8 s at most each)
+  const shots = new Map(), logos = new Map();
+  // a circle's edge: `ring` (6 px, so faces that overlap stand apart), else a thin gray line, as on the site
+  const edge = (cx, cy, d, ring) => {
+    ctx.lineWidth = ring ? 6 : Math.max(2, d / 45); ctx.strokeStyle = ring || C.line;
+    ctx.beginPath(); ctx.arc(cx, cy, d / 2 - (ring ? 0 : ctx.lineWidth / 2), 0, Math.PI * 2); ctx.stroke();
+  };
+  // a player's round photo as the site draws it (core.js headshot): his team's logo faded behind his face, on gray, a thin
+  // gray edge (no ring in team colors: dropped on the site, the owner's ask, Nov 2026); his initials without a photo
+  const photo = (p, x, y, d, ring) => {
+    const raw = nbaById.get(p.nbaId) || {}, logo = logos.get(raw.team), cx = x + d / 2, cy = y + d / 2, i = IMG_INDEX.get(p.nbaId);
     ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = C.line; ctx.fill(); ctx.clip();
+    ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = C.card2; ctx.fill(); ctx.clip();
+    if (logo) { ctx.globalAlpha = 0.4; ctx.drawImage(logo, x, y, d, d); ctx.globalAlpha = 1; }
     if (sheet && i !== undefined) ctx.drawImage(sheet, (i % IMG.cols) * IMG.size, Math.floor(i / IMG.cols) * IMG.size, IMG.size, IMG.size, x, y, d, d);
     else { font(d * 0.36, 700); ctx.textBaseline = 'middle'; text(initials(p.name), cx, cy, C.muted, 'center'); ctx.textBaseline = 'top'; }
     ctx.restore();
-    if (tc) {
-      ctx.lineWidth = Math.max(4, d / 22);
-      const a0 = (240 - 90) * Math.PI / 180;
-      for (const [c, from, to] of [[tc[0], 0, 2 / 3], [tc[1], 2 / 3, 1]]) {
-        ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(cx, cy, d / 2 - ctx.lineWidth / 2, a0 + from * Math.PI * 2, a0 + to * Math.PI * 2); ctx.stroke();
-      }
-    }
+    edge(cx, cy, d, ring);
   };
-  // the cutouts and logos of the players a picture shows, loaded before it's drawn (8 s at most each)
-  const shots = new Map(), logos = new Map();
   const prep = ps => Promise.all(ps.filter(p => p && p.nbaId != null).map(async p => {
     const raw = nbaById.get(p.nbaId);
     const [shot, logo] = await Promise.all([shotImg(raw), logoImg(raw && raw.team)]);
@@ -171,17 +174,18 @@ async function sharePad(tall = 5000) {
     const d = Math.min(w, h) * 0.62;
     photo(p, x + (w - d) / 2, y + (h - d) / 2, d);
   };
-  // a player's face in a circle on his team's color (his cutout's head and shoulders), ringed in `ring` so faces that
-  // overlap stand apart
+  // a player's face in a circle on his team's color, its logo faint behind his cutout's head and shoulders (his round
+  // photo where there's no cutout), ringed in `ring` so faces that overlap stand apart
   const face = (p, cx, cy, d, ring) => {
-    const raw = nbaById.get(p.nbaId) || {}, shot = shots.get(p.nbaId);
-    if (!shot) { photo(p, cx - d / 2, cy - d / 2, d); return; }
+    const raw = nbaById.get(p.nbaId) || {}, shot = shots.get(p.nbaId), logo = logos.get(raw.team);
+    if (!shot) { photo(p, cx - d / 2, cy - d / 2, d, ring); return; }
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = hexA(teamTint(raw.team), 1, 0.3); ctx.fill(); ctx.clip();
+    if (logo) { ctx.globalAlpha = 0.45; ctx.drawImage(logo, cx - d / 2, cy - d / 2, d, d); ctx.globalAlpha = 1; }
     const s = shot.height * 0.84;
     ctx.drawImage(shot, (shot.width - s) / 2, shot.height * 0.04, s, s, cx - d / 2, cy - d / 2, d, d);
     ctx.restore();
-    ctx.lineWidth = 6; ctx.strokeStyle = ring; ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.stroke();
+    edge(cx, cy, d, ring);
   };
   // styled units (wordUnits, statUnits) in lines that fit maxW at px, `gap` apart (a space by default); then drawn from
   // (x, y), lh apart, returning the y under them
@@ -339,9 +343,22 @@ const canvasBlob = cv => new Promise(res => cv.toBlob(res, 'image/png'));
 // ----- Sharing: the Recap's week and the Draft tab's awards, as a picture in a popup, or as text and a link -----
 // S: { title (the popup's), name (the share sheet's), what ('Recap': the toast's), text, url, link ('Full recap': before
 // the url), file, alt, draw: () => its canvas }
+// The Share button (the Recap's, the Draft Retrospective's, a trade's): a spinner in it while its picture is drawn, which
+// takes a moment (photos and logos load first): shareWith. A redraw meanwhile draws it turning again; a second tap waits
+const shareBtn = (action, attrs = '') => `<button type="button" class="btn sm primary${ui.sharing ? ' busy' : ''}" data-action="${action}"${attrs}${ui.sharing ? ' disabled aria-busy="true"' : ''}>Share</button>`;
+function shareBusy(on, el) {
+  ui.sharing = on;
+  for (const b of new Set([el, ...document.querySelectorAll('.btn.busy')])) {
+    if (!b) continue;
+    b.classList.toggle('busy', on); b.disabled = on;
+    if (on) b.setAttribute('aria-busy', 'true'); else b.removeAttribute('aria-busy');
+  }
+}
 // The picture in the popup; the text and link (copied, or the share sheet) where a picture can't be made
 async function shareWith(el, S) {
-  if (el) el.disabled = true;
+  if (ui.sharing) return;
+  shareBusy(true, el);
+  let shown = false;
   try {
     const blob = await canvasBlob(await S.draw());
     if (!blob) throw new Error('no image');
@@ -351,7 +368,9 @@ async function shareWith(el, S) {
     $('#infoBody').innerHTML = sharePopup(ui.share);
     const d = $('#infoDialog');
     if (!d.open) d.showModal();
-  } catch (e) { ui.share = S; await shareText(S); } finally { if (el) el.disabled = false; }
+    shown = true;
+  } catch (e) { ui.share = S; } finally { shareBusy(false, el); }
+  if (!shown) await shareText(S);
 }
 // The popup: the picture, then Share (the share sheet, with the picture, where the browser can), Copy, Save, or the
 // text and link

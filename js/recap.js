@@ -288,7 +288,7 @@ function viewRecap() {
   const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.won ? ' won' : ''}">${mark(g.a)}${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}${mark(g.b)}</span></li>`).join('');
   const items = recapItems(X).map(x => standoutCard(x)).join('');
   return `<div class="card">
-    <div class="card-head"><h2>Period ${period.n} recap ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
+    <div class="card-head"><h2>Period ${period.n} recap ${infoBtn('recap')}</h2>${picker}${items ? shareBtn('recap-share', ` data-week="${period.n}"`) : ''}</div>
     ${items ? `<div class="rx-grid">${items}</div>` : '<p class="muted small" style="margin:0">Nothing stood out.</p>'}
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>

@@ -626,6 +626,11 @@ button.dr-award-btn:hover { text-decoration: underline; text-underline-offset: 2
 .btn.danger { color: var(--bad); }
 .btn.sm { padding: 4px 10px; font-size: .8rem; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+/* a button at work (Share while its picture is drawn: shareBtn): a small ring turning before its words */
+.btn.busy { display: inline-flex; align-items: center; gap: 6px; }
+.btn.busy::before { content: ''; flex: none; width: .9em; height: .9em; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: btn-spin .7s linear infinite; }
+.btn.busy:disabled { opacity: .85; cursor: progress; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
 .icon-btn {
   font: inherit; background: transparent; border: 1px solid var(--border); color: var(--text);
   width: 34px; height: 34px; border-radius: 6px; cursor: pointer; flex: none; box-shadow: var(--shadow);

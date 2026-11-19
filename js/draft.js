@@ -355,7 +355,7 @@ function draftAwardsCard(d) {
   };
   // (drawn as the Recap's standouts and the share picture: the owner's ask)
   return `<div class="card dr-awards dr-gap">
-    <div class="card-head"><h2>Draft Retrospective ${infoBtn('draftAwards')}</h2><button type="button" class="btn sm primary" data-action="draft-share">Share</button></div>
+    <div class="card-head"><h2>Draft Retrospective ${infoBtn('draftAwards')}</h2>${shareBtn('draft-share')}</div>
     <div class="rx-grid">${items.map(x => standoutCard(x, label(x))).join('')}</div>
   </div>`;
 }
