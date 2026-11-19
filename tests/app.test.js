@@ -3781,6 +3781,48 @@ test("Plan Ahead in a points league: each shooting pair is one column, 8.2/17.1 
   });
 });
 
+test("a points league's shooting pairs are one column on the Players tab, the team card and Trades too; DD and TD to one decimal", async () => {
+  const text = html => ` ${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  const head = (html, cls) => text((html.match(new RegExp(`<table class="${cls}">\\s*<thead>([\\s\\S]*?)</thead>`)) || [])[1] || '');
+  const together = t => t.includes(' FG ') && t.includes(' FT ') && !/FGM|FGA|FTM|FTA/.test(t);
+  const L = await app.useLeague(ESPN); // scores FGM, FGA, FTM, FTA and 3PM
+  const was = L.points, ui = app.get('ui'), range = ui.perfRange;
+  L.points = { ...was, dd: 1, td: 2 };
+  const [t1, t2] = app.fxPickable().map(t => t.id);
+  useTeam(t1);
+  try {
+    // the Players tab, over the season: one "FG" column of makes/attempts, sorted by the points they score
+    ui.perfRange = 'year';
+    const perf = app.topPerformancesCard(), ph = head(perf, 'perf-table');
+    assert.ok(together(ph), ph);
+    assert.match(perf, /<td class="sc" title="FG: [+−]?\d+\.\d FP[^"]*">(<span[^>]*>[^<]*<\/span>)?\d+\/\d+<\/td>/, 'makes/attempts in one cell');
+    // a team's card: its roster and By category
+    const tc = app.teamCardHtml(t2), roster = head(tc, 'perf-table tc-roster');
+    assert.ok(together(roster), roster);
+    assert.match(tc, /<td class="sc" title="FG: [+−]?\d+\.\d FP a game">\d+\.\d\/\d+\.\d<\/td>/);
+    const cs = (tc.match(/<table class="cs-table">[\s\S]*?<\/table>/) || [''])[0];
+    assert.ok(cs.includes('<b>FG</b>') && cs.includes('<b>FT</b>') && !/<b>(FGM|FGA|FTM|FTA)<\/b>/.test(cs), 'By category: one FG row');
+    assert.match(cs, /<td class="num"><b>\d+\.\d\/\d+\.\d<\/b><span class="cs-avg">avg \d+\.\d\/\d+\.\d<\/span>/);
+    // Trades: the deal's rows, the table, each player's line
+    const mine = app.fxTeamSide(t1).players.filter(p => p.nbaId), theirs = app.fxTeamSide(t2).players.filter(p => p.nbaId);
+    const T = { from: t1, to: t2, give: [String(mine[0].nbaId)], get: theirs.slice(0, 2).map(p => String(p.nbaId)) };
+    const M = app.tradeModel(T), fg = M.rows.find(r => r.key === 'fgm');
+    assert.ok(fg && fg.shot && /^\d+\.\d\/\d+\.\d$/.test(fg.sa) && / FP$/.test(fg.va), JSON.stringify(fg));
+    assert.deepEqual([...M.rows.filter(r => r.shot).map(r => r.key)], ['fgm', 'ftm']);
+    assert.ok(!M.rows.some(r => ['fga', 'fta'].includes(r.key)), 'no attempts row of their own');
+    const card = app.tradeCard(T, app.tradeForYou(mine.slice(0, 1), theirs.slice(0, 2))), th = head(card, 'tp-table');
+    assert.ok(together(th), th);
+    assert.match(app.dealLine(M.A.players[0]).join(' · '), / · \d+\.\d\/\d+\.\d FG · \d+\.\d\/\d+\.\d FT · /);
+    // DD and TD: one decimal where they're averages, whole in a game's line
+    assert.equal(app.catDef('dd').dec, 1);
+    ui.perfPer = true;
+    const per = app.topPerformancesCard(), cols = head(per, 'perf-table').trim().split(' ');
+    const dd = [...per.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].slice(1, 4).map(m => [...m[1].matchAll(/<td class="sc"[^>]*>(?:<span[^>]*>[^<]*<\/span>)?([^<]*)<\/td>/g)].map(x => x[1])[cols.indexOf('DD') - 1]);
+    assert.ok(dd.length && dd.every(v => /^\d+\.\d$/.test(v)), `DD a game to one decimal: ${dd}`);
+    assert.ok(text(app.lineChips({ min: 30, pts: 20, reb: 11, fgm: 8, fga: 15, dd: 1, gp1: 1 })).includes(' 1 DD '), 'a game: "1 DD", not "1.00"');
+  } finally { L.points = was; ui.perfRange = range; ui.perfPer = false; }
+});
+
 test("the player card: how he came to his fantasy team", async () => {
   const L = await app.useLeague(CATS9);
   const [t1, t2] = L.teams.map(t => t.id);

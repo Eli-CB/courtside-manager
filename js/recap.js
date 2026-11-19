@@ -32,7 +32,7 @@ function lineTiles(s, perGame) {
     else if (c.pct) {
       const m = s[c.made] || 0, a = s[c.att] || 0;
       out.push({ v: a ? (m / a).toFixed(3).replace(/^0/, '') : '—', k: c.label, made: `${fmt(m / g, perGame ? 1 : 0)}/${fmt(a / g, perGame ? 1 : 0)}`, att: a, pct: a ? m / a : 0 });
-    } else out.push({ v: v(c.key, c.dec || 0), k: c.label });
+    } else out.push({ v: v(c.key, 0), k: c.label });
   }
   return out;
 }

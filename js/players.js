@@ -312,7 +312,9 @@ function perfPicked(rows, { owner, statusOf, teamOf }, otherPick) {
 function perfShown(picked, { range, perWeek, avg, dates }, { mine }, otherPick) {
   const pts = leaguePoints(), so = ui.perfSort;
   // a column sorts by what it adds: its category contribution, or its fantasy points, so best-first works for TO too
-  const sortVal = (r, key) => (key === 'name' ? r.raw.name.toLowerCase() : key === 'v' ? r.v : pts ? lineStat(r.tot, key) * (pts[key] || 0) : r.z[key] || 0);
+  // (a shooting pair, "10/19 FG": its own points, lineCats)
+  const pair = lineCats().find(c => c.shot && c.key === so.key);
+  const sortVal = (r, key) => (key === 'name' ? r.raw.name.toLowerCase() : key === 'v' ? r.v : pair ? shotFp(r.tot, pair) : pts ? lineStat(r.tot, key) * (pts[key] || 0) : r.z[key] || 0);
   const sorted = sortRows(picked, r => sortVal(r, so.key), so.dir);
   const sig = [range, perWeek, dates.join(), so.key, so.dir, JSON.stringify(ui.perfWhose), otherPick.join(), ui.perfSpot, mine, ui.perfQ, ui.perfPos.join(), ui.perfTeam.join(), JSON.stringify(ui.perfOnly)].join('|');
   if (ui.perfMore.sig !== sig) ui.perfMore = { sig, n: 0 };
@@ -356,7 +358,7 @@ function perfTable(rows, picked, shown, W, { opp, who, teamOf }) {
     return `<p class="muted small" style="margin:0">${live.at || live.error ? `No games have started yet.${first ? ` First tip-off ${fmtTime(first.start)}.` : ''}` : "Loading today's games…"}</p>`;
   }
   if (!shown.length) return '<p class="muted small" style="margin:0">No players match these filters.</p>';
-  const pts = leaguePoints(), cats = scoreCats().filter(c => !c.fp);
+  const pts = leaguePoints(), cats = lineCats().filter(c => !c.fp); // (a points league's shooting pair is one "10/19 FG")
   const badges = perfBadges(rows, W);
   const rank = new Map([...rows].sort((a, b) => b.v - a.v).map((r, i) => [r, i + 1]));
   const value = perfValueScale(W);
@@ -365,6 +367,7 @@ function perfTable(rows, picked, shown, W, { opp, who, teamOf }) {
   const cell = (r, c) => {
     const b = badges.get(`${r.raw.id}|${c.key}`);
     const emo = b ? `<span class="pf-emo" aria-hidden="true">${b[0]}</span>` : '', tip = b ? ` · ${b[1]}` : '';
+    if (c.shot) return `<td class="sc" title="${c.label}: ${signed(shotFp(r.tot, c), 1)} FP${r.per ? ' a game' : ''}${tip}">${emo}${shotVol(lineStat(r.tot, c.made), lineStat(r.tot, c.att), r.per ? 1 : 0)}</td>`;
     if (c.pct) {
       const [m, a] = [r.tot[c.made] || 0, r.tot[c.att] || 0];
       if (r.per) return `<td class="sc" title="${c.label}: ${fmt(m, 1)}/${fmt(a, 1)} a game${tip}">${emo}${a ? fmtPct(m / a) : '—'}</td>`;

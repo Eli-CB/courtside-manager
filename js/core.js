@@ -333,7 +333,7 @@ function fantasyPoints(p, sc = leaguePoints()) {
 // The columns a matchup is decided on: the league's categories, or each scored stat plus total fantasy points
 function catDef(key) {
   if (PCT_CATS[key]) { const [label, made, att, more] = PCT_CATS[key]; return { key, label, pct: true, made, att, ...more }; }
-  return { key, label: STAT_LABEL[key] || key.toUpperCase(), neg: NEG_CATS.has(key), dec: key === 'dd' || key === 'td' ? 2 : null };
+  return { key, label: STAT_LABEL[key] || key.toUpperCase(), neg: NEG_CATS.has(key), dec: key === 'dd' || key === 'td' ? 1 : null };
 }
 let catsMemo = { L: undefined, cats: CATS };
 keep('sport', () => { catsMemo = { L: undefined, cats: CATS }; });
@@ -341,7 +341,7 @@ function scoreCats() {
   const L = fxLeague(), sc = leaguePoints(); // (the sandbox's scoring can change with no league: its points are part of the key)
   if (catsMemo.L !== L || catsMemo.sc !== sc) {
     catsMemo = { L, sc, cats: sc
-      ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0, dec: k === 'dd' || k === 'td' ? 2 : null })), { key: 'fp', label: 'FP', fp: true }]
+      ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ key: k, label: STAT_LABEL[k], neg: sc[k] < 0, dec: k === 'dd' || k === 'td' ? 1 : null })), { key: 'fp', label: 'FP', fp: true }]
       : L && L.cats && L.cats.length ? L.cats.map(catDef) : CATS };
     BASE = baseNow(); // and on the league's size (and, for a past season, that season's stats)
     changed('players'); // player values depend on the categories
@@ -373,6 +373,9 @@ function lineCats() {
 }
 // a shooting pair's own points (lineCats): its makes, attempts and misses as the league scores them
 const shotPoints = c => { const sc = leaguePoints() || {}; return Object.fromEntries([c.made, c.att, c.miss].filter(k => sc[k]).map(k => [k, sc[k]])); };
+// those points for a stat line or a total (makes as they are, misses from attempts: lineStat); and a pair's numbers, "11.9/25.6"
+const shotFp = (line, c) => sum(Object.entries(shotPoints(c)).map(([k, v]) => lineStat(line, k) * v));
+const shotVol = (made, att, d = 1) => `${fmt(made, d)}/${fmt(att, d)}`;
 
 // Player value: what an average game of his adds to winning a week's categories, against not playing (catWins, the
 // same as a single game on the Dashboard), or fantasy points per game in points leagues

@@ -68,7 +68,7 @@ function lineChips(line, flash = () => '') {
     if (c.fp || !(c.pct || c.shot ? line[c.att] : Math.round(lineStat(line, c.key) * 100))) continue;
     const m = line[c.made] || 0, a = line[c.att] || 0;
     out.push(c.pct || c.shot ? `<span class="mu-chip${flash(c.key, a, m)}"><b>${m}/${a}</b> ${c.label.replace('%', '')}</span>`
-      : `<span class="mu-chip${flash(c.key, lineStat(line, c.key))}"><b>${fmt(lineStat(line, c.key), c.dec || 0)}</b> ${c.label}</span>`);
+      : `<span class="mu-chip${flash(c.key, lineStat(line, c.key))}"><b>${fmt(lineStat(line, c.key), 0)}</b> ${c.label}</span>`);
   }
   return out.join('');
 }
@@ -151,7 +151,7 @@ function dashPaceChips(S, D) {
 // who leads each category over these days
 function dashCatTable(A, B, sc) {
   const cats = scoreCats().filter(c => !c.fp);
-  const catVal = (t, c) => (c.pct ? (t[c.att] ? fmtPct(t[c.made] / t[c.att]) : '—') : fmt(lineStat(t, c.key), c.dec || 0));
+  const catVal = (t, c) => (c.pct ? (t[c.att] ? fmtPct(t[c.made] / t[c.att]) : '—') : fmt(lineStat(t, c.key), 0));
   // the row's color says whose it is (orange: the left team, as in the scoreboard); the toggle says which days
   const catRow = (S, i) => `<tr class="${S === A ? 'pf-me' : 'mu-opp'}" title="${esc(S.name)}">${cats.map((c, j) => `<td class="${sc.lead[j] === i ? 'mu-lead' : ''}">${catVal(S.tot, c)}</td>`).join('')}</tr>`;
   return `<div class="mu-cats-wrap"><table class="mu-cats"><thead><tr>${cats.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>

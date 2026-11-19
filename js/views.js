@@ -18,10 +18,18 @@ function teamRaw(players) {
       out[c.key] = att ? sum(players.map(p => statVal(p, c.made))) / att : 0;
     } else out[c.key] = sum(players.map(p => statVal(p, c.key))) / n;
   }
+  // a points league's shooting pair (lineCats): makes and attempts per player, and its points (what it's ranked on) under `fgm:fp`
+  for (const c of lineCats()) {
+    if (!c.shot) continue;
+    for (const k of [c.made, c.att]) out[k] = sum(players.map(p => statVal(p, k))) / n;
+    out[`${c.key}:fp`] = sum(players.map(p => fantasyPoints(p, shotPoints(c)))) / n;
+  }
   return out;
 }
 
 const fmtRaw = (c, v) => (c.pct ? fmtPct(v) : fmt(v, 1));
+// a category's number in a team's per-player line (teamRaw): a shooting pair's as "4.8/10.2"
+const rawShown = (c, raw) => (c.shot ? shotVol(raw[c.made], raw[c.att]) : fmtRaw(c, raw[c.key]));
 
 // ----- A fantasy team's card: category strengths (was a card on Standings, for your own team only) -----
 // Each team's best players by their season's value (seasonTotal), as many as the league starts (injured reserve left out):
@@ -33,18 +41,20 @@ function teamStrengths(tid) {
   const teams = fxPickable().map(t => { const ps = top(t.id); return { id: t.id, name: t.name, ps, raw: teamRaw(ps) }; }).filter(t => t.ps.length);
   const me = teams.find(t => t.id === tid), n = teams.length;
   if (!me || n < 2) return '';
-  const rows = scoreCats().map(c => {
-    const vals = teams.map(t => t.raw[c.key]);
+  const rows = lineCats().map(c => {
+    const key = c.shot ? `${c.key}:fp` : c.key; // (a shooting pair by its points)
+    const vals = teams.map(t => t.raw[key]);
     const mean = sum(vals) / n;
     const sd = Math.sqrt(sum(vals.map(v => (v - mean) ** 2)) / n) || 1e-9;
     // how far each team is from the league average, in team-to-team spreads (fewer TO is better)
     const gap = v => (c.neg ? -1 : 1) * (v - mean) / sd;
-    const z = gap(me.raw[c.key]);
-    const rank = teams.filter(t => gap(t.raw[c.key]) - z > 1e-9).length + 1;
+    const z = gap(me.raw[key]);
+    const rank = teams.filter(t => gap(t.raw[key]) - z > 1e-9).length + 1;
     // who helps or hurts: each player's own number against the league average shown in this row.
     // For FG%/FT% that's makes above or below average at the player's volume.
     const att = c.att;
-    const num = p => (c.fp ? fantasyPoints(p) : statOf(p, c));
+    const num = p => (c.fp ? fantasyPoints(p) : c.shot ? fantasyPoints(p, shotPoints(c)) : statOf(p, c));
+    const vol = p => shotVol(statVal(p, c.made), statVal(p, c.att));
     const impact = p => (c.neg ? -1 : 1) * (c.pct ? (pctOf(p, c) - mean) * statVal(p, att) : num(p) - mean);
     const byImpact = sortDesc(me.ps.map(p => ({ p, d: impact(p) })), x => x.d);
     const big = c.pct ? 0.1 : Math.max(0.1, Math.abs(mean) * 0.1);
@@ -52,20 +62,23 @@ function teamStrengths(tid) {
     const drag = byImpact.filter(x => x.d < -big).slice(-1);
     const tip = x => c.pct
       ? `${x.p.name}: ${fmtPct(pctOf(x.p, c))} on ${fmt(statVal(x.p, att), 1)} attempts a game, ${fmt(Math.abs(x.d), 1)} ${x.d > 0 ? 'more' : 'fewer'} makes a game than the league average of ${fmtPct(mean)} would give`
+      : c.shot ? `${x.p.name}: ${vol(x.p)} ${c.label} a game, ${signed(num(x.p), 1)} FP, vs the league average of ${signed(mean, 1)} per player`
       : `${x.p.name}: ${fmt(num(x.p), 1)} ${c.label} a game vs the league average of ${fmt(mean, 1)} per player`;
     const csName = x => `<button type="button" class="link-btn cs-name" data-action="player-detail" data-nba="${x.p.nbaId}">${inlinePlayer(x.p, esc(lastName(x.p.name)))}</button>`;
-    const csNum = x => `<b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(pctOf(x.p, c)) : fmt(num(x.p), 1)}</b>`;
+    const csNum = x => `<b class="${x.d > 0 ? 'pos-good' : 'pos-bad'}">${c.pct ? fmtPct(pctOf(x.p, c)) : c.shot ? vol(x.p) : fmt(num(x.p), 1)}</b>`;
     const csAtt = x => (c.pct ? `<span class="muted small"> on ${fmt(statVal(x.p, att), 1)} ${att.toUpperCase()}</span>` : '');
     const who = list => list.map(x => `<span class="cs-p" title="${esc(tip(x))}">${csName(x)}${csNum(x)}${csAtt(x)}</span>`).join('');
     const w = Math.min(Math.abs(z) / 2, 1) * 50; // bar edge = 2 spreads from the league average
     const pos = v => ((Math.max(-2.5, Math.min(2.5, gap(v))) + 2.5) / 5) * 100;
     const open = ui.csOpen.has(c.key);
+    // the league's average (a shooting pair's: its makes and attempts, averaged over the teams)
+    const avgShown = c.shot ? shotVol(sum(teams.map(t => t.raw[c.made])) / n, sum(teams.map(t => t.raw[c.att])) / n) : fmtRaw(c, mean);
     // every team on one line: this card's team the big dot, your own team orange (orange is only ever your team)
-    const dot = t => `<span class="sdot${t.id === tid ? ' this' : ''}${t.id === state.fxTeam ? ' me' : ''}" style="left:${pos(t.raw[c.key]).toFixed(1)}%" title="${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}: ${fmtRaw(c, t.raw[c.key])}"></span>`;
+    const dot = t => `<span class="sdot${t.id === tid ? ' this' : ''}${t.id === state.fxTeam ? ' me' : ''}" style="left:${pos(t.raw[key]).toFixed(1)}%" title="${esc(t.name)}${t.id === state.fxTeam ? ' (you)' : ''}: ${rawShown(c, t.raw)}"></span>`;
     return `<tr class="cs-row" data-action="cs-toggle" data-cat="${c.key}" aria-expanded="${open}" title="Show who helped (green) and hurt (red) most">
       <td><span class="cs-chev" aria-hidden="true">▸</span><b>${c.label}</b></td>
-      <td class="num"><b>${fmtRaw(c, me.raw[c.key])}</b><span class="cs-avg">avg ${fmtRaw(c, mean)}</span></td>
-      <td class="num muted cs-lavg">${fmtRaw(c, mean)}</td>
+      <td class="num"><b>${rawShown(c, me.raw)}</b><span class="cs-avg">avg ${avgShown}</span></td>
+      <td class="num muted cs-lavg">${avgShown}</td>
       <td class="cs-bar" title="${signed(z, 2)} spreads from the league average"><span class="track"><span class="fill ${z >= 0 ? 'up' : 'down'}" style="width:${w}%"></span></span></td>
       <td class="num cs-rank ${rank <= 3 ? 'pos-good' : rank > n - 3 ? 'pos-bad' : ''}"><b>${ordinal(rank)}</b><span class="muted hide-sm"> / ${n}</span></td>
       <td class="cs-strip"><div class="strip">${teams.map(dot).join('')}</div></td>
@@ -169,10 +182,12 @@ function teamCardHtml(tid) {
   const worth = p => (football ? (gamesIn(p, week) ? `${fmt(footballPts(p, week), 1)}` : '<span class="muted">Bye</span>') : tot.get(p.id).gp ? fmtTotal(tot.get(p.id).v) : '—');
   const unit = football ? 'Proj' : totalLabel();
   // each player's season a game, as the Players tab's Per game shows it (the stats chosen under Stats used): games, minutes,
-  // then the league's categories (a points league: every stat it scores); football shows its projection alone
-  const cols = football ? [] : scoreCats().filter(c => !c.fp);
+  // then the league's categories (a points league: every stat it scores, a shooting pair as one "11.9/25.6 FG": lineCats);
+  // football shows its projection alone
+  const cols = football ? [] : lineCats().filter(c => !c.fp);
   const cell = (p, c) => {
     if (!p.gp) return '<td class="sc muted">—</td>';
+    if (c.shot) return `<td class="sc" title="${c.label}: ${signed(fantasyPoints(p, shotPoints(c)), 1)} FP a game">${shotVol(statVal(p, c.made), statVal(p, c.att))}</td>`;
     if (!c.pct) return `<td class="sc">${fmt(statVal(p, c.key), c.dec || 1)}</td>`;
     const m = statVal(p, c.made), a = statVal(p, c.att);
     return `<td class="sc"${c.rate ? '' : ` title="${c.label}: ${fmt(m, 1)}/${fmt(a, 1)} a game"`}>${!a ? '—' : c.rate ? fmt(m / a, 2) : fmtPct(m / a)}</td>`;
@@ -194,7 +209,7 @@ function teamCardHtml(tid) {
   const so = ui.teamSort;
   const pctOf = (p, c) => { const a = statVal(p, c.att); return a ? statVal(p, c.made) / a : null; };
   const sortVal = p => (so.key === 'v' ? ((football ? gamesIn(p, week) : tot.get(p.id).gp) ? order(p) : null) : so.key === 'name' ? p.name.toLowerCase() : so.key === 'gp' ? tot.get(p.id).gp || null
-    : !p.gp || (so.key !== 'min' && !cols[so.key]) ? null : so.key === 'min' ? p.min : cols[so.key].pct ? pctOf(p, cols[so.key]) : statVal(p, cols[so.key].key));
+    : !p.gp || (so.key !== 'min' && !cols[so.key]) ? null : so.key === 'min' ? p.min : cols[so.key].shot ? fantasyPoints(p, shotPoints(cols[so.key])) : cols[so.key].pct ? pctOf(p, cols[so.key]) : statVal(p, cols[so.key].key));
   const rows = sortRows(sortDesc(side.players, order), sortVal, so.dir).map(row).join(''); // (ties stay best first)
   const th = (key, label, cls, tip, attrs) => sortTh('team-sort', key, label, so, { cls, tip, attrs, down: so.dir < 0 });
   const cats = football ? '' : teamStrengths(tid);
@@ -539,8 +554,8 @@ function applyTradeLink() {
   if (gone) toast(`${gone === 1 ? 'A player' : `${gone} players`} in the shared trade ${gone === 1 ? 'is' : 'are'} on another team now`);
 }
 
-// The league's categories, fantasy points first in a points league
-const dealCats = () => { const cs = scoreCats(); return [...cs.filter(c => c.fp), ...cs.filter(c => !c.fp)]; };
+// The league's categories, fantasy points first in a points league (a shooting pair it scores both halves of as one, "8.2/17.1 FG": lineCats)
+const dealCats = () => { const cs = lineCats(); return [...cs.filter(c => c.fp), ...cs.filter(c => !c.fp)]; };
 // a category's number as the site shows it; null (no attempts: a side without a goalie has no GAA) is a dash
 const dealShow = (c, v) => (v == null ? '—' : c.rate ? fmt(v, 2) : c.pct ? fmtPct(v) : fmt(v, c.dec || 1));
 // a shooting category's volume: makes and attempts a game ("7.2/14.5")
@@ -551,6 +566,7 @@ function dealLine(p) {
   const goalie = isGoalie(p), parts = p.min ? [`${fmt(p.min, 1)} MIN`] : [];
   for (const c of dealCats()) {
     if (isHockey() && SPORT.goalieCats.includes(c.key) !== goalie) continue;
+    if (c.shot) { parts.push(`${dealVol(statVal(p, c.made), statVal(p, c.att))} ${c.label}`); continue; }
     const m = c.pct && statVal(p, c.made), a = c.pct && statVal(p, c.att);
     if (c.pct && !c.rate) parts.push(`${dealVol(m, a)} ${c.label.replace('%', '')} (${a ? fmtPct(m / a) : '—'})`);
     else parts.push(`${dealShow(c, c.pct ? (a ? pctOf(p, c) : null) : statOf(p, c))} ${c.label}`);
@@ -589,11 +605,18 @@ function tradeModel(T) {
     return { ...r, pct: true, va: A.tot[c.att] ? dealVol(A.tot[c.made], A.tot[c.att]) : '', vb: B.tot[c.att] ? dealVol(B.tot[c.made], B.tot[c.att]) : '', ta: tip(A.tot), tb: tip(B.tot),
       lead: oa == null || ob == null ? r.lead : Math.abs(oa - ob) < 0.05 ? 0 : oa > ob ? 1 : -1 };
   };
+  // a points league's shooting pair (lineCats): makes/attempts a game, the points they score under them, and the side
+  // they score more for marked (a, b: those points)
+  const pairRow = c => {
+    const a = shotFp(A.tot, c), b = shotFp(B.tot, c), vol = t => dealVol(lineStat(t, c.made), lineStat(t, c.att));
+    return { key: c.key, label: c.label, a, b, sa: vol(A.tot), sb: vol(B.tot), va: `${signed(a, 1)} FP`, vb: `${signed(b, 1)} FP`, pct: true, shot: true,
+      lead: Math.abs(a - b) < 0.05 ? 0 : a > b ? 1 : -1 };
+  };
   // a league with playoffs to come: each side's games in them (more is better: they decide the title)
   const P = playoffDays();
   if (P) for (const S of [A, B]) S.po = sum(S.players.map(p => playoffGames(p, P)));
   const rows = [row('value', valueLabel(), A.value, B.value, v => fmtValue(v)), ...(P ? [row('po', 'Playoff games', A.po, B.po, fmtGames)] : []),
-    ...dealCats().map(c => (c.pct && !c.rate ? shotRow(c) : row(c.key, c.label, catOf(A.tot, c), catOf(B.tot, c), v => dealShow(c, v), c.neg)))];
+    ...dealCats().map(c => (c.shot ? pairRow(c) : c.pct && !c.rate ? shotRow(c) : row(c.key, c.label, catOf(A.tot, c), catOf(B.tot, c), v => dealShow(c, v), c.neg)))];
   return { A, B, rows, P };
 }
 // The playoffs in words, for tips and notes: "weeks 19–23 (Mar 1 – Apr 11)"
@@ -621,6 +644,7 @@ function tradeCard(T, Y) {
   // a category's cell: a player's average game, or a side's total (marked when it's the better side's)
   const gameCell = (p, c) => {
     if (skip(p, c)) return '<td class="num"></td>';
+    if (c.shot) return `<td class="num">${dealVol(statVal(p, c.made), statVal(p, c.att))}${vol(`${signed(fantasyPoints(p, shotPoints(c)), 1)} FP`)}</td>`;
     const m = c.pct && statVal(p, c.made), a = c.pct && statVal(p, c.att);
     if (c.pct && !c.rate) return `<td class="num">${a ? fmtPct(m / a) : '—'}${a ? vol(dealVol(m, a)) : ''}</td>`;
     return `<td class="num">${dealShow(c, c.pct ? (a ? pctOf(p, c) : null) : statOf(p, c))}</td>`;
@@ -652,7 +676,13 @@ function tradeCard(T, Y) {
   const zero = shown => !+String(shown).replace(/[^\d.]/g, ''); // (a change that rounds to nothing is gray, not green)
   const poNet = P && M.A.po - M.B.po, poShown = P ? `${poNet > 0.05 ? '+' : poNet < -0.05 ? '−' : ''}${fmtGames(Math.abs(poNet))}` : '';
   const youRow = Y ? `<tr class="tp-you"><td class="tp-pl"><b>For your team</b></td><td></td><td></td>${poCell(poShown, zero(poShown) ? ' muted' : poNet > 0 ? ' pos-good' : ' pos-bad')}<td></td>
-    ${cats.map(c => { const b = Y.before[c.key], a = Y.after[c.key], d = a - b, shown = change(c, d); return `<td class="num ${zero(shown) ? 'muted' : (c.neg ? d < 0 : d > 0) ? 'pos-good' : 'pos-bad'}" title="${c.label}: ${dealShow(c, b)} now, ${dealShow(c, a)} after">${shown}</td>`; }).join('')}
+    ${cats.map(c => {
+      // a shooting pair: its makes and attempts a game, marked by the points they score
+      if (c.shot) {
+        const d = shotFp(Y.after, c) - shotFp(Y.before, c), vb = dealVol(Y.before[c.made], Y.before[c.att]), va = dealVol(Y.after[c.made], Y.after[c.att]);
+        return `<td class="num ${Math.abs(d) < 0.05 ? 'muted' : d > 0 ? 'pos-good' : 'pos-bad'}" title="${c.label}: ${vb} now, ${va} after; ${signed(d, 1)} FP">${signed(Y.after[c.made] - Y.before[c.made], 1)}/${signed(Y.after[c.att] - Y.before[c.att], 1)}</td>`;
+      }
+      const b = Y.before[c.key], a = Y.after[c.key], d = a - b, shown = change(c, d); return `<td class="num ${zero(shown) ? 'muted' : (c.neg ? d < 0 : d > 0) ? 'pos-good' : 'pos-bad'}" title="${c.label}: ${dealShow(c, b)} now, ${dealShow(c, a)} after">${shown}</td>`; }).join('')}
     <td class="num tp-v ${zero(fmtValue(Y.diff)) ? 'muted' : Y.diff > 0 ? 'pos-good' : 'pos-bad'}" title="Net ${valueLabel().toLowerCase()} over a waiver player"><b>${fmtValue(Y.diff)}</b></td></tr>` : '';
   return `<div class="card tp">
     <div class="card-head"><div class="tp-head"><h2>Trade proposal ${infoBtn('trade')}</h2></div>
@@ -778,7 +808,9 @@ async function tradeCanvas(L, M) {
     // (short: the picture has no (i), and the site's own card says the rest)
     notes.push(`${valueLabel()}: per game, over a waiver player for each roster spot`);
     if (M.P) notes.push(`playoff games: ${playoffWeeks(M.P)}${M.P.started ? ', still to play' : ''}`);
-    if (M.rows.some(r => r.va || r.vb)) notes.push('FG% and FT% marked by makes over the league average');
+    if (M.rows.some(r => (r.va || r.vb) && !r.shot)) notes.push('FG% and FT% marked by makes over the league average');
+    const pairs = M.rows.filter(r => r.shot).map(r => r.label);
+    if (pairs.length) notes.push(`${pairs.join(', ')}: makes/attempts, marked by the points they score`);
   }
   if (picks) notes.push("draft picks aren't valued");
   y += 24;
