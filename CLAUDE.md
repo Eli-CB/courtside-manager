@@ -206,8 +206,12 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   what's on main in its `test` job, and publishes exactly that commit only if they pass (`site.yml`; `tests.yml` covers pull requests).
 
 ## Rules settled with the owner (keep them)
-- How the owner works (Nov 17, 2026): several sessions at once, each in its own worktree and branch, and the owner doesn't read code. No pull requests: a session lands
+- How the owner works (Nov 17, 2026): several sessions at once, and the owner doesn't read code. No pull requests: a session lands
   its own work on main once it's tested and checked, rebasing onto origin/main and fixing any conflict itself, keeping both sides' changes (Deploy, under Gotchas).
+- Every session that changes files works in a worktree of its own (the owner's rule, Nov 18, 2026): the app starts sessions in the main folder, so before
+  its first edit a session there calls EnterWorktree (named for the task; it branches from origin/main) and keeps every edit, test, preview and commit,
+  this request's and later ones', in it. Only reading and answering stay in the main folder. Sessions sharing the main folder tested each other's
+  half-done code and couldn't commit apart in a file both had changed (core.js and actions.js take most changes).
 - Everything follows each league's own settings on Fantrax or ESPN (category list or point values, slots, daily
   vs weekly lineups, playoffs). Never hard-code the owner's league.
 - Weekly lineups lock when the week starts, so the lineup people are setting is next week's: Fantrax leagues with weekly
@@ -268,7 +272,8 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   runs apart; one that fails (or NFL projections failing) fails the run at the end, so GitHub says so, and the rest still publishes.
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`. In a worktree (its own branch) the push is
   `git push -q origin HEAD:main` (plain `main` there is the stale local branch, not the work), and the tests run again after the rebase, before it.
-  In the main folder other sessions' unfinished edits may sit beside yours: commit only your own files (`git commit <files>`), and never `git stash`
+  Then bring the main folder up to it (`git -C <main folder> merge --ff-only -q origin/main`, which never overwrites uncommitted edits): new sessions read this file from there.
+  A session that edited in the main folder anyway may find other sessions' unfinished edits beside its own: commit only your own files (`git commit <files>`), and never `git stash`
   theirs (or `--autostash`): every session shares one stash list, and another's pop or drop took a stashed Trends edit (Nov 18, 2026; got back from
   `git fsck --unreachable`). There: `git fetch`; origin/main already in HEAD (`git merge-base --is-ancestor origin/main HEAD`): push; else rebase in a temporary worktree.
   Commit messages end with the Co-Authored-By line.
