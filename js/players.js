@@ -188,7 +188,7 @@ function perfFilters(owner, opp, rows) {
   const foot = `<div class="pp-foot">${n ? '<button type="button" class="link-btn pp-clear" data-action="perf-clear">Clear filters</button>' : ''}<button type="button" class="btn sm" data-action="perf-filt">Done</button></div>`;
   const panel = `<div class="perf-panel" id="perfPanel" role="group" aria-label="Filters">
     ${league ? row('Show', `${toggle('me', 'My team')}${opp ? toggle('opp', 'Opponent', opp.name) : ''}${sb ? '' : perfOtherMenu()}${sb ? toggle('fa', 'Everyone else', 'Not on My team') : toggle('fa', 'Waivers', 'Not on a roster in your league')}`) : ''}
-    ${league && !sb ? row('Lineup', `<div class="seg seg-sm" role="group" aria-label="Where in the lineup">${spots.map(([k, l, t]) => `<button type="button" class="${ui.perfSpot === k ? 'on' : ''}" data-action="perf-spot" data-spot="${k}" aria-pressed="${ui.perfSpot === k}"${t ? ` title="${t}"` : ''}${rostered ? '' : ' disabled'}>${l}</button>`).join('')}</div>`) : ''}
+    ${league && !sb ? row('Lineup', segBtns('Where in the lineup', 'perf-spot', 'spot', spots, ui.perfSpot, rostered ? '' : ' disabled')) : ''}
     ${row('Player', `${perfMenu('perfPos', 'Position', 'positions', POSITIONS)}${perfMenu('perfTeam', `${SPORT.name} team`, 'teams', [...new Set(NBA.players.map(p => p.team).filter(Boolean))].sort())}${only('rookie', 'Rookies', 'Only first-year players')}${only('inj', 'Injured', 'Only players on the injury report')}`, foot)}
   </div>`;
   return find + btn + info + panel;
@@ -227,7 +227,7 @@ function perfWhen(P) {
 // The When menu, and Totals / Per game beside it for a period or the season
 function perfWhenPick({ opts, chosen, many, per }) {
   return `<div class="perf-when-pick"><select class="ctx-team perf-range" data-change="perf-range" aria-label="Show games from">${opts.map(([k, l]) => `<option value="${k}" ${k === chosen ? 'selected' : ''}>${l}</option>`).join('')}</select>${many
-    ? `<div class="seg seg-sm" role="group" aria-label="Totals or per game">${[['0', 'Totals'], ['1', 'Per game']].map(([v, l]) => `<button type="button" class="${String(+per) === v ? 'on' : ''}" data-action="perf-per" data-per="${v}" aria-pressed="${String(+per) === v}">${l}</button>`).join('')}</div>` : ''}</div>`;
+    ? segBtns('Totals or per game', 'perf-per', 'per', [['0', 'Totals'], ['1', 'Per game']], String(+per)) : ''}</div>`;
 }
 // What's shown, in words: its days (or the stats used, or the projections), and when the live scores were last read
 function perfWhenLine({ football, range, proj, avg, weekly, perWeek, dates, day }) {
@@ -237,13 +237,26 @@ function perfWhenLine({ football, range, proj, avg, weekly, perWeek, dates, day 
   return proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${basisLabel()} stats ${infoBtn('projection')}` : (weekly || perWeek ? `${fmtDay(dates[0])}${dates.length > 1 ? ` – ${fmtDay(dates[dates.length - 1])}` : ''}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
 }
 
+// Who has each player now (today's rosters): owner, data id -> team id; spot, data id -> his roster item (st, slot). A
+// league's teams, or with no league the sandbox's My team (sandbox.js; no lineup, so no spot)
+function rosterOwners(L = fxLeague()) {
+  const owner = new Map(), spot = new Map();
+  for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) { owner.set(x.nba, tid); spot.set(x.nba, x); }
+  if (!L && state.browse) for (const id of sbState().roster) owner.set(id, SB_ME);
+  return { owner, spot };
+}
+// A player on no team: his status on the league's site (free agent, waivers) as a badge; nothing with no league
+const faBadge = raw => (raw && raw.fx ? `<span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '');
+// Whose he is, in a list: his fantasy team (yours in orange), else faBadge. owner: rosterOwners' map
+const ownerTag = (owner, id, mine = myTeamId()) => {
+  const tid = owner.get(id);
+  return tid ? `<span class="perf-owner${tid === mine ? ' mine' : ''}">${teamLink(tid)}</span>` : faBadge(nbaById.get(id));
+};
+
 // Who rosters each player, and where in that team's lineup he is now (active or on the bench); yours, and this matchup's
 // opponent (the Dashboard's, whatever days are shown: the rosters are today's)
 function perfOwners() {
-  const owner = new Map(), spot = new Map();
-  const L = fxLeague();
-  for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) { owner.set(x.nba, tid); spot.set(x.nba, x); }
-  if (!L && state.browse) for (const id of sbState().roster) owner.set(id, SB_ME); // the sandbox: My team's (sandbox.js)
+  const L = fxLeague(), { owner, spot } = rosterOwners(L);
   const mine = !L ? myTeamId() : ui.viewing ? ui.viewA : state.fxTeam;
   const opp = L && owner.size && mine ? fxOpponentFor(weekStartAt(0), mine) : null;
   // where a player is: in a team's starting lineup (active), on its bench (IR included), or on no roster (waivers)
@@ -262,8 +275,7 @@ function perfOwners() {
     // every rostered player names his team: yours in orange, this matchup's opponent in bold (a long name is cut short
     // with "…": its whole name is its tip). The sandbox's My team has no lineup
     if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : opp && tid === opp.id ? ' opp' : ''}" title="${esc(fxTeamName(tid))}">${teamLink(tid)}</span>${spot.has(id) ? ` ${lineupBadge(id)}` : ''}`;
-    const raw = nbaById.get(id);
-    return raw && raw.fx ? `<span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
+    return faBadge(nbaById.get(id));
   };
   // whose a row's player is: yours ('me'), the opponent's, another team's, or nobody's (null: waivers)
   const teamOf = r => { const tid = owner.get(r.raw.id); return !tid ? null : tid === mine ? 'me' : opp && tid === opp.id ? 'opp' : 'other'; };
@@ -301,7 +313,7 @@ function perfShown(picked, { range, perWeek, avg, dates }, { mine }, otherPick) 
   const pts = leaguePoints(), so = ui.perfSort;
   // a column sorts by what it adds: its category contribution, or its fantasy points, so best-first works for TO too
   const sortVal = (r, key) => (key === 'name' ? r.raw.name.toLowerCase() : key === 'v' ? r.v : pts ? lineStat(r.tot, key) * (pts[key] || 0) : r.z[key] || 0);
-  const sorted = [...picked].sort((a, b) => { const x = sortVal(a, so.key), y = sortVal(b, so.key); return (x < y ? -1 : x > y ? 1 : 0) * so.dir; });
+  const sorted = sortRows(picked, r => sortVal(r, so.key), so.dir);
   const sig = [range, perWeek, dates.join(), so.key, so.dir, JSON.stringify(ui.perfWhose), otherPick.join(), ui.perfSpot, mine, ui.perfQ, ui.perfPos.join(), ui.perfTeam.join(), JSON.stringify(ui.perfOnly)].join('|');
   if (ui.perfMore.sig !== sig) ui.perfMore = { sig, n: 0 };
   const cap = (avg || range === 'year' ? 300 : 100) + ui.perfMore.n;
@@ -407,7 +419,8 @@ function cardOwner(raw) {
     const how = cardHow(L, raw, tid, x.fid);
     return `<p class="pc-owner"><b>${teamLink(tid)}</b> <span class="badge ${x.st === 'ACTIVE' ? 'active' : x.st === 'INJURED_RESERVE' ? 'bad' : 'bench'}">${x.st === 'ACTIVE' ? 'Active' : x.st === 'INJURED_RESERVE' ? 'IR' : x.st === 'TAXI' ? 'Taxi' : 'Bench'}</span>${howBadge(how)}</p>`;
   }
-  return raw.fx ? `<p class="pc-owner"><span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span></p>` : '';
+  const fa = faBadge(raw);
+  return fa ? `<p class="pc-owner">${fa}</p>` : '';
 }
 
 // The card's line for it: the Roster tab's badge (same colors; Drafted blue, as grey is a free agent's), then the rest in grey
@@ -536,14 +549,8 @@ function teamRecord(tri) {
 // team on the Players tab from its foot.
 function showSportTeamCard(tri) {
   if (!NBA || !tri) return;
-  const t = teamInfo(tri), L = fxLeague(), mine = myTeamId();
-  const owner = new Map();
-  for (const [tid, r] of Object.entries((L && L.rosters) || {})) for (const x of r) if (x.nba) owner.set(x.nba, tid);
-  const whose = p => {
-    const tid = owner.get(p.nbaId), raw = nbaById.get(p.nbaId);
-    if (tid) return `<span class="perf-owner${tid === mine ? ' mine' : ''}">${teamLink(tid)}</span>`;
-    return raw && raw.fx ? `<span class="badge fa">${FX_STATUS[raw.fx.st] || 'Free agent'}</span>` : '';
-  };
+  const t = teamInfo(tri), { owner } = rosterOwners();
+  const whose = p => ownerTag(owner, p.nbaId);
   const tot = new Map(nbaPlayers().filter(p => p.team === tri).map(p => [p, seasonTotal(nbaById.get(p.nbaId))]));
   const list = sortDesc([...tot.keys()], p => (tot.get(p).gp ? tot.get(p).v : -1e9 + (p.inj ? 0 : 1)));
   const next = weekShifts().filter(x => x > 0)[0], nextDates = next ? matchDates(weekStartAt(next)) : [];
@@ -613,9 +620,9 @@ function showPlayerDetail(nbaId) {
   const rows = lines.map(([l, , s]) => [l, s])
     .map(([l, s]) => `<tr><td><b>${l}</b></td>${AVG.map(([, f]) => `<td class="num">${f(s)}</td>`).join('')}${valCell(perGameVal(s))}</tr>`).join('');
   // his games, by the column picked (Games' headers; newest first until then). A made-attempted stat sorts by the makes.
-  const so = ui.cardSort, num = v => { const m = String(v).match(/^(-?[\d.]+)-(\d+)$/); return m ? +m[1] + +m[2] / 1e4 : parseFloat(v) || 0; };
+  const so = ui.cardSort, num = v => { const m = String(v).match(/^(-?[\d.]+)\/(\d+)$/); return m ? +m[1] + +m[2] / 1e4 : parseFloat(v) || 0; };
   const sortVal = o => (so.key === 'date' ? o.date : so.key === 'val' ? lineValue(o) : num(CS[+so.key][2](o)));
-  const games = cardGames(raw).sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? -1 : x > y ? 1 : 0) * so.dir || (a.date < b.date ? 1 : -1); });
+  const games = sortRows(cardGames(raw).sort((a, b) => (a.date < b.date ? 1 : -1)), sortVal, so.dir); // (ties newest first)
   // phones: each game as a short block
   const preBadge = o => (o.type === 'PRE' ? ' <span class="badge">Pre</span>' : '');
   const wlBadge = o => (o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : '');

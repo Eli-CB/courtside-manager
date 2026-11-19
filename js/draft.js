@@ -482,7 +482,7 @@ function viewDraft() {
       <span class="dr-pick">#${p.pick}</span> ${nameBtn(p.nbaId, p.name)} ${gainTag(p.gain, p.gp)}${via}</td>`;
   }).join('')}</tr>`).join('');
 
-  const modeSeg = !d.graded ? '' : `<div class="seg seg-sm" role="group" aria-label="Rank picks by">${[['game', 'Per game'], ['total', 'Season totals']].map(([k, l]) => `<button type="button" class="${ui.draftMode === k ? 'on' : ''}" data-action="draft-mode" data-mode="${k}" aria-pressed="${ui.draftMode === k}">${l}</button>`).join('')}</div>`;
+  const modeSeg = !d.graded ? '' : segBtns('Rank picks by', 'draft-mode', 'mode', [['game', 'Per game'], ['total', 'Season totals']], ui.draftMode);
   const kind = d.type ? d.type[0].toUpperCase() + d.type.slice(1) + ' draft' : 'Draft';
   const gradedBy = !d.graded ? `not graded: the site has no ${SPORT.name} stats for that season`
     : d.season ? `graded by the games of the league's season, ${fmtDay(d.season.from)} – ${fmtDay(d.season.to)}`

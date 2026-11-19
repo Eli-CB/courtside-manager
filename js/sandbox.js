@@ -214,10 +214,8 @@ function viewSandboxWatch() {
   startLive(); // (today's games, as they're played)
   const W = sbState().watch, P = perfDays(), today = todayIso(), yesterday = addDays(today, -1);
   const all = matchDates(mondayOf(today)), soFar = all.filter(x => x <= today); // (this week, and its days so far)
-  const opts = [P.today && ['today', 'Today'], P.day && ['day', P.day === yesterday ? 'Yesterday' : fmtDay(P.day)], ['week', 'Week', `${fmtDay(all[0])} – ${fmtDay(all[all.length - 1])}`]].filter(Boolean);
-  const range = opts.some(([k]) => k === ui.watchRange) ? ui.watchRange : P.today && (P.started || !P.day) ? 'today' : P.day ? 'day' : 'today';
+  const { range, toggle } = dayToggle({ D: P, hasToday: !!P.today, week: ['Week', all], picked: ui.watchRange, fallback: 'today', action: 'watch-range' });
   const week = range === 'week', d = range === 'day' ? P.day : today;
-  const toggle = `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l, tip]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="watch-range" data-range="${k}" aria-pressed="${k === range}"${tip ? ` title="${tip}"` : ''}>${l}</button>`).join('')}</div>`;
   const room = WATCH_MAX - W.length, unwatched = sortDesc(sbRoster().filter(p => !sbWatching(p.nbaId)), sbWorth);
   const addTeam = room > 0 && unwatched.length ? `<button type="button" class="btn sm" data-action="sb-watch-team">Follow my team${unwatched.length > room ? ` (best ${room})` : ''}</button>` : '';
   const find = room > 0 ? sbSearch('watch', new Set(W)) : '';

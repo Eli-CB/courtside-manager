@@ -255,8 +255,19 @@ for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEve
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.dashFull && !document.querySelector('dialog[open]')) dashFull(false); });
 window.addEventListener('hashchange', () => { if (ui.dashFull) dashFull(false, false); }); // (route draws the new tab)
 
+// The When toggle of the Matchup tab and the sandbox's Live: Today, the last game day before it, the week. D: { today (when
+// it has games), started, day } (dashDays, perfDays); hasToday: Today on the toggle; week: [its label, its days]; picked: the
+// pick kept (ui.dashRange, ui.watchRange). Until one is picked: today once its games have started, else the last game
+// day, else fallback -> { range, toggle }
+function dayToggle({ D, hasToday, week: [label, days], picked, fallback, action }) {
+  const opts = [hasToday && ['today', 'Today'], D.day && ['day', D.day === addDays(todayIso(), -1) ? 'Yesterday' : fmtDay(D.day)],
+    ['week', label, `${fmtDay(days[0])} – ${fmtDay(days[days.length - 1])}`]].filter(Boolean);
+  const range = opts.some(([k]) => k === picked) ? picked : D.today && (D.started || !D.day) ? 'today' : D.day ? 'day' : fallback;
+  return { range, toggle: segBtns('Show games from', action, 'range', opts, range) };
+}
+
 function dashMatchupCard() {
-  const L = fxLeague(), today = todayIso(), yesterday = addDays(today, -1);
+  const L = fxLeague(), today = todayIso();
   const fullBtn = `<button type="button" class="mu-full-btn" data-action="dash-full" aria-pressed="${!!ui.dashFull}" aria-label="Full screen" title="${ui.dashFull ? 'Exit full screen (Esc)' : 'Full screen'}">${lineIcon(FULL_ICON[ui.dashFull ? 'on' : 'off'], 'mu-full-ico')}</button>`;
   const card = (head, body, full) => `<div class="card mu-card${full && ui.dashFull ? ' full' : ''}"><div class="card-head">${head || '<span></span>'}${full ? fullBtn : ''}</div>${body}</div>`;
   const me = ui.viewing ? ui.viewA : state.fxTeam;
@@ -266,12 +277,10 @@ function dashMatchupCard() {
   leagueWeekFresh(L);
   footballLines(L);
   const D = dashDays();
-  // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Until one is picked: today once its games have started,
-  // else the last game day. Today stays on the toggle on a day without NBA games (Election Day), to say so.
-  const opts = [D.all.includes(today) && ['today', 'Today'], D.day && ['day', D.day === yesterday ? 'Yesterday' : fmtDay(D.day)], ['week', 'This period', `${fmtDay(D.all[0])} – ${fmtDay(D.all[D.all.length - 1])}`]].filter(Boolean);
-  const range = opts.some(([k]) => k === ui.dashRange) ? ui.dashRange : D.today && (D.started || !D.day) ? 'today' : D.day ? 'day' : 'week';
+  // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Today stays on the
+  // toggle on a day without NBA games (Election Day), to say so.
+  const { range, toggle } = dayToggle({ D, hasToday: D.all.includes(today), week: ['This period', D.all], picked: ui.dashRange, fallback: 'week', action: 'dash-range' });
   const dates = range === 'week' ? D.week : [range === 'today' ? today : D.day];
-  const toggle = `<div class="seg seg-sm" role="group" aria-label="Show games from">${opts.map(([k, l, tip]) => `<button type="button" class="${k === range ? 'on' : ''}" data-action="dash-range" data-range="${k}" aria-pressed="${k === range}"${tip ? ` title="${tip}"` : ''}>${l}</button>`).join('')}</div>`;
 
   const opp = ui.viewing && ui.viewB ? { id: ui.viewB } : fxOpponentFor(weekStartAt(0), me);
   const A = dashSide(me, dates, range, D), B = opp ? dashSide(opp.id, dates, range, D) : null;

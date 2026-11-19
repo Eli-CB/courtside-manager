@@ -594,6 +594,11 @@ function linkTeams(html) {
 // A player's name as the button that opens his card (label: HTML in place of his plain name)
 const playerBtn = (id, name, label = esc(name)) => `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${id}">${label}</button>`;
 
+// A row of buttons with one of them on (Today / Yesterday, Totals / Per game...): opts [value, label, tip?], on: the value
+// that's on. Each button's data-action is action, its value in data-<attr>; extra: more attributes on every button
+const segBtns = (label, action, attr, opts, on, extra = '') => `<div class="seg seg-sm" role="group" aria-label="${label}">${opts.map(([k, l, tip]) =>
+  `<button type="button" class="${k === on ? 'on' : ''}" data-action="${action}" data-${attr}="${k}" aria-pressed="${k === on}"${tip ? ` title="${tip}"` : ''}${extra}>${l}</button>`).join('')}</div>`;
+
 // a small photo and name for use inside a line of text
 const inlinePlayer = (p, text, px = 20) => `<span class="inl-p">${headshot(p, px)}${text}</span>`;
 

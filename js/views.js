@@ -98,6 +98,15 @@ function nextSort(sort, key, firstDir) {
   if (sort.key === key) sort.dir *= -1;
   else { sort.key = key; sort.dir = firstDir; }
 }
+// A sortable table's rows in the column's order: by valueOf (asked once a row), dir 1 smallest first, -1 biggest first;
+// an empty cell (null) always last, and ties in the order the rows came in
+function sortRows(rows, valueOf, dir) {
+  const vals = new Map(rows.map(r => [r, valueOf(r)]));
+  return [...rows].sort((a, b) => {
+    const x = vals.get(a), y = vals.get(b);
+    return x == null || y == null ? (x == null) - (y == null) : (x < y ? -1 : x > y ? 1 : 0) * dir;
+  });
+}
 
 function statCells(p) {
   return `${SPORT.tableStats.map(([k], i) => `<td class="num">${fmt(p[k] || 0, i ? 1 : 0)}</td>`).join('')}
@@ -186,11 +195,7 @@ function teamCardHtml(tid) {
   const pctOf = (p, c) => { const a = statVal(p, c.att); return a ? statVal(p, c.made) / a : null; };
   const sortVal = p => (so.key === 'v' ? ((football ? gamesIn(p, week) : tot.get(p.id).gp) ? order(p) : null) : so.key === 'name' ? p.name.toLowerCase() : so.key === 'gp' ? tot.get(p.id).gp || null
     : !p.gp || (so.key !== 'min' && !cols[so.key]) ? null : so.key === 'min' ? p.min : cols[so.key].pct ? pctOf(p, cols[so.key]) : statVal(p, cols[so.key].key));
-  const vals = new Map(side.players.map(p => [p, sortVal(p)]));
-  const rows = sortDesc(side.players, order).sort((a, b) => { // (ties and empty cells stay best first)
-    const x = vals.get(a), y = vals.get(b);
-    return x == null || y == null ? (x == null) - (y == null) : (x < y ? -1 : x > y ? 1 : 0) * so.dir;
-  }).map(row).join('');
+  const rows = sortRows(sortDesc(side.players, order), sortVal, so.dir).map(row).join(''); // (ties stay best first)
   const th = (key, label, cls, tip, attrs) => sortTh('team-sort', key, label, so, { cls, tip, attrs, down: so.dir < 0 });
   const cats = football ? '' : teamStrengths(tid);
   // (each part 16 px below the one before: .tc-body)
@@ -355,8 +360,7 @@ function catsWonCard(standings, cw) {
   if (so.key === 't' && !ties) so.key = null;
   const sortVal = x => (so.key === 'team' ? (fxTeamName(x.tid) || '').toLowerCase() : so.key === 'w' ? x.R.w : so.key === 'l' ? -x.R.l
     : so.key === 't' ? x.R.t : so.key === 'pct' ? share(x.R) : share(x.R.by[so.key]));
-  const rows = [...list];
-  if (so.key != null) rows.sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? 1 : x > y ? -1 : 0) * so.dir; });
+  const rows = so.key != null ? sortRows(list, sortVal, -so.dir) : [...list];
   const th = (key, label, cls = 'num', tip = '') => sortTh('cw-sort', key, label, so, { cls, tip, down: so.dir > 0 });
   const weeks = Math.max(...list.map(x => x.R.weeks));
   return `<div class="card" style="margin-top:16px">
@@ -423,8 +427,7 @@ function seasonTotalsCard(standings, S) {
   if (so.key != null && !['team', 'gp', 'rank'].includes(so.key) && !cols[so.key]) so.key = null;
   const sortVal = i => (so.key === 'team' ? (fxTeamName(list[i].tid) || '').toLowerCase() : so.key === 'gp' ? list[i].T.gp
     : so.key === 'rank' ? -avgRank(i) : (cols[so.key].neg ? -1 : 1) * stats[so.key].vals[i]);
-  const idx = list.map((x, i) => i);
-  if (so.key != null) idx.sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? 1 : x > y ? -1 : 0) * so.dir; });
+  const idx = so.key != null ? sortRows(list.map((x, i) => i), sortVal, -so.dir) : list.map((x, i) => i);
   const th = (key, label, cls = 'num', tip = '') => sortTh('tot-sort', key, label, so, { cls, tip, down: so.dir > 0 });
   return `<div class="card" style="margin-top:16px">
     ${head}

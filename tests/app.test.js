@@ -5664,6 +5664,44 @@ test("a league's own name and its teams' names are shown as text on every tab an
   assert.deepEqual([...plain].slice(0, 20), [], 'positions drawn without their colors');
 });
 
+test('shared helpers: the toggles, a table sorted with empty cells last, whose a player is (the sandbox too), a card sorted by makes then attempts', async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  const ui = a.get('ui');
+  ui.tab = 'standings'; // (no live box scores in the background)
+  // a toggle: one button on, a tip where given, more attributes on every button
+  const seg = a.segBtns('Show', 'x-pick', 'v', [['a', 'A'], ['b', 'B', 'Tip']], 'b', ' disabled');
+  assert.ok(seg.startsWith('<div class="seg seg-sm" role="group" aria-label="Show">'));
+  assert.ok(seg.includes('class="" data-action="x-pick" data-v="a" aria-pressed="false" disabled>A<'));
+  assert.ok(seg.includes('class="on" data-action="x-pick" data-v="b" aria-pressed="true" title="Tip" disabled>B<'));
+  // a table's rows: either way, an empty cell last and ties in the order given
+  const rows = [{ n: 'p', v: 2 }, { n: 'q', v: null }, { n: 'r', v: 5 }, { n: 's', v: 2 }];
+  assert.deepEqual([...a.sortRows(rows, r => r.v, 1)].map(r => r.n), ['p', 's', 'r', 'q']);
+  assert.deepEqual([...a.sortRows(rows, r => r.v, -1)].map(r => r.n), ['r', 'p', 's', 'q']);
+  assert.deepEqual(rows.map(r => r.n), ['p', 'q', 'r', 's'], 'the list itself untouched');
+  const doc = a.document, realQuery = doc.querySelector, els = {};
+  doc.querySelector = sel => (['#detailBody', '#detailTitle', '#detailDialog'].includes(sel) ? (els[sel] = els[sel] || { innerHTML: '', textContent: '', open: false, showModal() { this.open = true; }, close() { this.open = false; } }) : realQuery(sel));
+  try {
+    // the sandbox: an NBA team's card marks My team's players, as the Players tab and Trends do (one lookup: rosterOwners)
+    a.actions['land-browse']();
+    const p = a.sortDesc(a.nbaPlayers().filter(x => x.gp && x.team), x => x.val)[0];
+    a.actions['sb-add']({ dataset: { id: String(p.nbaId) } });
+    a.actions['sport-team']({ dataset: { team: p.team } });
+    assert.ok(els['#detailBody'].innerHTML.includes('<span class="perf-owner mine"><span class="team-mine">My team</span></span>'), 'My team on his NBA team card');
+    // a player's games sorted by FG%: by makes, then attempts ("8/15")
+    const raw = a.NBA.players.find(r => { const g = a.cardGames(r); return g.some((x, i) => g.some((y, j) => i !== j && x.fgm === y.fgm && x.fga !== y.fga)); });
+    assert.ok(raw, 'a player with two games of the same makes');
+    a.showPlayerDetail(raw.id);
+    ui.cardSort = { key: String(a.cardStats(raw).findIndex(c => c[0] === 'FG%')), dir: -1 };
+    a.showPlayerDetail(raw.id);
+    const log = els['#detailBody'].innerHTML.split('class="pc-log"')[1];
+    const fg = [...log.matchAll(/<td class="num">(\d+)\/(\d+)<\/td><td class="num">\d+\/\d+<\/td>/g)].map(m => [+m[1], +m[2]]);
+    assert.equal(fg.length, a.cardGames(raw).length, 'every game');
+    assert.ok(fg.every((x, i) => !i || fg[i - 1][0] > x[0] || (fg[i - 1][0] === x[0] && fg[i - 1][1] >= x[1])), 'most makes first, then most attempts');
+  } finally { doc.querySelector = realQuery; }
+});
+
 test('the js files share one scope: no two declare the same function (a later file\'s would silently replace the earlier)', () => {
   const fs = require('fs'), path = require('path'), dir = path.join(__dirname, '..', 'js'), seen = new Map(), twice = [];
   for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.js'))) {

@@ -255,8 +255,7 @@ function contribZ(p, key, g, week) {
 }
 
 function boardModes() {
-  const opts = [['sched', 'Schedule'], ['game', 'Per game'], ['week', 'Week total']];
-  return `<div class="seg seg-sm" role="group" aria-label="Lineup view">${opts.map(([k, l]) => `<button type="button" class="${ui.boardMode === k ? 'on' : ''}" data-action="board-mode" data-mode="${k}" aria-pressed="${ui.boardMode === k}">${l}</button>`).join('')}</div>`;
+  return segBtns('Lineup view', 'board-mode', 'mode', [['sched', 'Schedule'], ['game', 'Per game'], ['week', 'Week total']], ui.boardMode);
 }
 
 // How many active NBA players share each short form of a name, so short names never hide who's who
@@ -584,7 +583,7 @@ function pastWeekCard(start) {
   const [A, B] = R;
   // Sleeper basketball: the result is Sleeper's own; a week whose real scores the site hasn't seen is estimated from its
   // final lineups (benchSwaps): marked ≈, and no bench swaps (they'd hang on the estimate)
-  const est = A.res !== undefined && !(A.exact && B.exact);
+  const est = weekEstimated(R);
   const scoreTxt = sc => (est ? '≈ ' : '') + (pts ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
   const outcome = sc => Math.sign(Math.round((sc.me - sc.opp) * 10));
   const verb = o => (o > 0 ? 'won' : o < 0 ? 'lost' : 'tied');

@@ -480,6 +480,8 @@ function benchSwaps(L, G, weeks, period, tids) {
     return out;
   });
 }
+// Whether benchSwaps' scores for these teams (R) are estimates: Sleeper basketball, a team's real score not yet seen
+const weekEstimated = R => R.some(x => x.res !== undefined && !x.exact);
 
 // One team's week against another's: categories won, lost and tied (or fantasy points), and who led each
 function weekScore(a, b) {
@@ -654,12 +656,12 @@ function pastStarters(L, G, tid, r, teams) {
     : so.key === 'weeks' || so.key === 'gp' || so.key === 'missed' ? P[so.key]
     : PCTS.some(x => x[0] === so.key) ? (([, , m, a]) => (P.s[a] ? P.s[m] / P.s[a] : -1))(PCTS.find(x => x[0] === so.key))
     : so.key === 'value' ? (total ? P.v : P.gp ? P.v / P.gp : -1e9) : per(P, so.key));
-  const list = [...activeStints(L, G, tid).values()].sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? 1 : x > y ? -1 : 0) * so.dir; });
+  const list = sortRows([...activeStints(L, G, tid).values()], sortVal, -so.dir);
   const th = (key, label, cls = 'num', tip = '') => sortTh('past-roster-sort', key, label, so, { cls, tip, down: so.dir > 0 });
   const num = (P, k) => (P.gp ? (total ? Math.round(per(P, k)) : fmt(per(P, k), 1)) : '—');
   const pct = (P, m, a) => (P.s[a] ? fmtPct(P.s[m] / P.s[a]) : '—');
   const val = P => (!P.gp ? '—' : isPoints() ? fmt(total ? P.v : P.v / P.gp, total ? 0 : 1) : signed(total ? P.v : P.v / P.gp, total ? 1 : 2));
-  const seg = `<div class="seg seg-sm" role="group" aria-label="Show stats as">${[['total', 'Totals'], ['game', 'Per game']].map(([k, l]) => `<button type="button" class="${ui.pastRosterMode === k ? 'on' : ''}" data-action="past-roster-mode" data-mode="${k}" aria-pressed="${ui.pastRosterMode === k}">${l}</button>`).join('')}</div>`;
+  const seg = segBtns('Show stats as', 'past-roster-mode', 'mode', [['total', 'Totals'], ['game', 'Per game']], ui.pastRosterMode);
   const STATS = SPORT.tableStats;
   return `
   <div class="page-sub-row">${seg}<p class="page-sub">${esc(fxTeamName(tid))}${r ? ` · ${r.w}-${r.l}${r.t ? '-' + r.t : ''}, ${ordinal(r.rank)} of ${teams.length}` : ''} · everyone who started, and what he did while starting ${infoBtn('pastRoster')}</p></div>
