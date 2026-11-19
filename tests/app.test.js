@@ -6028,3 +6028,14 @@ test('positions are drawn by one helper, always in their colors (the page and th
     assert.ok(!/class="pt\b|\bpos\.join\(|slotColors\[/.test(src), `${f} draws positions or their colors itself: use posTags (or slotColor / slotInk)`);
   }
 });
+
+test('the notes: CLAUDE.md stays small, and its map names every notes file and every js file', () => {
+  const fs = require('fs'), path = require('path'), root = path.join(__dirname, '..');
+  const md = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8').replace(/\r/g, ''); // (a Windows checkout's line ends count once, as on GitHub)
+  assert.ok(md.length <= 20000, `CLAUDE.md is ${md.length} characters, over 20,000 (the owner's limit): move area detail into its docs/ file (CLAUDE.md, "These notes")`);
+  const docs = fs.readdirSync(path.join(root, 'docs')).filter(f => f.endsWith('.md'));
+  for (const f of docs) assert.ok(md.includes(`docs/${f}`), `docs/${f} isn't in CLAUDE.md's map ("Where the notes are")`);
+  for (const [, f] of md.matchAll(/docs\/([\w-]+\.md)/g)) assert.ok(docs.includes(f), `CLAUDE.md names docs/${f}, which doesn't exist`);
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  for (const [, f] of html.matchAll(/src="js\/([\w-]+\.js)/g)) assert.ok(md.includes(f), `js/${f} has no row in CLAUDE.md's map ("Where the notes are")`);
+});

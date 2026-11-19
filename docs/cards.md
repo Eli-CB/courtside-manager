@@ -1,0 +1,13 @@
+# Player and team cards
+
+Part of the repo's notes: CLAUDE.md says which file covers what and how to keep them current. Read this before changing the player card or a team's card (core.js, players.js, views.js).
+
+## The player card
+- The player card: `pc-side` (the photo, `cardBio` under it: height, weight, college or club, draft, hockey's shooting hand; the daily jobs' `ht`/`wt`/`col`/`dft`/`sh` from NBA.com's player list, NHL.com, Sleeper), `pc-who` (fantasy team and how he got there, then `catProfile`, the owner's ask, Nov 2026: a bar a category against an average rostered player, goalies against goalies, in spreads over BASE's own players `BASE.stats`; points leagues each scored stat's FP; not football), `pc-tiles`, `pc-log` (averages and games on one column grid), games sortable (`card-sort`, `ui.cardSort`), picture `playerPhoto` (the full cutout, NBA.com's for basketball, ESPN's by `espn` id otherwise, in front of the team logo; the round photo if it won't load).
+- Player card: under his fantasy team, how he got there (`cardHow`: Keeper / Drafted round, pick / Pickup / Traded from, with the week, from the weekly rosters; ESPN: the draft only)
+
+## A sport team's card
+- `teamBtn(tri)` / `linkTeams(html)` open it ('sport-team', `showSportTeamCard` in players.js; its record from `teamRecord`: the box scores' finals, then today's once over on ESPN's scoreboard; hockey W-L-OT from each final's `last`; checked against ESPN's records; then, the owner's ask, "Playoff Games: 3-4-4-3-4", its games in each of the league's playoff periods still to play, `playoffSlate` in nba.js, a row of its own on phones; its foot links to the Players tab filtered by the team, 'team-players').
+
+## A fantasy team's card
+- A fantasy team's name anywhere (`teamLink`, core.js; plain in past seasons and inside menus) opens its card in the player card's dialog (`showTeamCard`/`teamCardHtml`, `teamCardTitle`): Category strengths in full (`teamStrengths`, any team's, points leagues too, not football; moved from Standings Nov 2026, the owner's ask: number, league average, bar, rank, every team's dot, the card's team the big one and yours orange, a row opening to who helped and hurt), counting each team's top N (N = its lineup's spots, IR left out: an end-of-bench player or a one-off start doesn't move them), then the roster as the Players tab's table, one list, sortable by any column (`team-sort`, `ui.teamSort`; back to best first each time a card opens). Both team cards (this one and an NBA team's) rank and show each player's value over the season, `seasonTotal` (nba.js: this season's average game × its games), not a game's, so a game or two can't top them.
