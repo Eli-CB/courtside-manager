@@ -355,7 +355,9 @@ body:has(.mu-card.full) { background: var(--surface); }
 .mu-card.full .mu-row { border-bottom: 0; }
 .mu-card.full .mu-cats th, .mu-card.full .mu-cats td { border-bottom: 0; }
 .mu-card.full .mu-cats tbody td { padding-block: 5px; }
-.mu-card.full .mu-p { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 4px 12px; align-items: start; padding: 6px 0; }
+/* (align-self: start: a player's box as tall as he needs, not stretched to the one beside him, whose extra height would
+   go to the empty row under his name and game and push his line down to the bottom on a phone) */
+.mu-card.full .mu-p { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 4px 12px; align-items: start; align-self: start; padding: 6px 0; }
 .mu-card.full .mu-p > .bplayer { display: contents; }
 .mu-card.full .mu-p > .bplayer > :first-child { grid-row: 1 / -1; grid-column: 1; }
 .mu-card.full .mu-p > :not(.bplayer), .mu-card.full .mu-p .bmain { grid-column: 2; min-width: 0; }
