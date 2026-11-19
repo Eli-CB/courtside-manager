@@ -7,8 +7,8 @@ compatibility_date = "2026-10-01"
 routes = [{ pattern = "api.leaguelayer.com", custom_domain = true }]
 
 [vars]
-# the pages allowed to use it: the site, and the local preview
-SITE_ORIGINS = "https://leaguelayer.com,http://localhost:5173"
+# the pages allowed to use it: the site, and the local previews (5173, and 5174-5179 for sessions working in worktrees)
+SITE_ORIGINS = "https://leaguelayer.com,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179"
 
 # YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET are secrets: npx wrangler secret put YAHOO_CLIENT_ID (and _SECRET)
 

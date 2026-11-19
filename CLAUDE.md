@@ -264,8 +264,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 - `python serve.py [port]` (preview config "site", port 5173) refreshes `data/` locally: never commit
   `data/players.json` / `data/boxscores.json` from a local run (`git checkout -- data/players.json data/boxscores.json`).
   `.claude/` is git-ignored, so a worktree has no `launch.json` (and the preview tool reads the main folder's, which a worktree session may not edit: its "site" serves the main folder's code; if so, run the worktree's `python serve.py 5176` in the background and open its URL): write one there whose port no other session uses (5174, 5175...: `runtimeArgs` `["serve.py", "5174"]`;
-  serve.py refuses a port in use, as Windows would otherwise let two servers share one). Another port is another origin: connect the league again there, and the Worker
-  answers only localhost:5173 (`SITE_ORIGINS`), so the page there falls back to ESPN directly: check changes to the Worker's routes (live feed, `/espn/`) on 5173.
+  serve.py refuses a port in use, as Windows would otherwise let two servers share one; keep to 5174-5179). Another port is another origin, with its own empty storage: open it as
+  `http://localhost:<port>/?league=my19c8mwmoipvhon#dashboard` (`openSharedLink` connects the league; pick "Eli's SGAteam" if it asks), not by typing the ID in the form. The Worker
+  answers localhost:5173-5179 (`SITE_ORIGINS`, worker/wrangler.toml; 5174-5179 added Nov 18, 2026, live once the owner deploys the Worker: until then those ports fall back to ESPN directly).
 - cdn.nba.com answers GitHub runners 403: `get_json` falls back to the same files on NBA's S3 storage (`CDN_MIRROR`), so box
   scores stay NBA.com's (official; ESPN keeps stats the NBA later takes away, Fantrax follows the NBA). The last 3 days'
   games are downloaded again each run for stat corrections; ESPN copies are dropped once the NBA copy is cached.
