@@ -473,7 +473,6 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .pc-bio > span { display: block; }
 .pc-prof { margin-top: 10px; }
 .pc-who > .pc-prof:first-child { margin-top: 0; }
-.cp-head { display: flex; align-items: center; gap: 5px; margin: 0 0 3px; font-size: .78rem; }
 .cp-row { display: grid; grid-template-columns: 3.3em minmax(0, 1fr); align-items: center; gap: 6px; height: 14px; font-size: .72rem; }
 .cp-k { color: var(--muted); font-weight: 600; }
 .cp-bar { position: relative; height: 8px; background: var(--surface-2); border-radius: 3px; }

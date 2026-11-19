@@ -483,7 +483,7 @@ function catProfile(raw) {
       : `${fmt(statVal(p, c.key), c.dec || 1)} ${label} a game; ${who}: ${fmt(avg, c.dec || 1)}`;
     return `<div class="cp-row" data-tip="${esc(tip)}"><span class="cp-k">${label}</span><span class="cp-bar"><span class="cp-fill ${z >= 0 ? 'up' : 'down'}" style="width:${w.toFixed(1)}%"></span></span></div>`;
   }).join('');
-  return `<div class="pc-prof"><p class="cp-head" title="Against ${who}"><b>${pts ? 'By stat' : 'By category'}</b></p>${bars}</div>`;
+  return `<div class="pc-prof">${bars}</div>`;
 }
 
 // The card's line for it: the Roster tab's badge (same colors; Drafted blue, as grey is a free agent's), then the rest in grey

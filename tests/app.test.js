@@ -1579,7 +1579,7 @@ test('player card: who he is under the photo, and each category against an avera
     // a points league: the fantasy points each scored stat gives him a game (no FP row)
     await app.useLeague(POINTS);
     html = card(r.id);
-    assert.match(html, /<b>By stat<\/b>/);
+    assert.ok(!html.includes('cp-head'), 'no heading over the bars');
     assert.ok(bars(html).length >= 5 && !bars(html).some(b => b[0] === 'FP'), JSON.stringify(bars(html)));
     assert.match(html, /data-tip="[\d.-]+ FP a game from [^"]+; an average rostered player: [\d.-]+"/);
   } finally { doc.querySelector = before; for (const k of ['ht', 'wt', 'col', 'dft']) delete r[k]; }
