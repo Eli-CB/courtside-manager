@@ -16,7 +16,7 @@ function weekContext(start = weekStart()) {
   const weekly = state.lineupMode === 'weekly' || !!SPORT.weekLineup; // (football: one lineup for the week, locking player by player)
   const mine = state.players.filter(p => !state.il.includes(p.id));
   const opp = oppActive(); // (their injured reserve apart, as yours)
-  const hasOpp = state.opp.players.length > 0;
+  const hasOpp = !isRoto() && state.opp.players.length > 0; // (roto: never an opponent, whatever was loaded before)
   const setIds = new Set(state.lineup.filter(Boolean));
   const oppIds = weekly ? oppStarterIds(dates) : null;
   const them = projectSide(opp, dates, oppIds);
@@ -415,18 +415,19 @@ function boardTotals(ctx) {
   });
 }
 
-function statsBoard(ctx, myStarters, myBench, oppStarters, oppBench) {
+// solo: your tables alone, where there's never an opponent (roto)
+function statsBoard(ctx, myStarters, myBench, oppStarters, oppBench, solo = false) {
   const cats = ctx.hasOpp ? boardTotals(ctx) : [];
   const mine = cats.map(c => `<td class="sc" style="${shadeProb(c.p)}" title="${totalTip(c, c.a, c.p, 'to win')}">${fmtCat(c, c.a)}</td>`).join('');
   const theirs = ctx.hasOpp ? cats.map(c => `<td class="sc" style="${shadeProb(1 - c.p)}" title="${totalTip(c, c.b, 1 - c.p, 'for them')}">${fmtCat(c, c.b)}</td>`).join('') : '';
-  const oppName = state.opp.name || 'Opponent', cols = `style="--cols:${colShares(lineCats())}"`;
-  return `<div class="table-wrap"><div class="stat-boards" ${cols}>
+  const oppName = state.opp.name || 'Opponent', cols = `style="--cols:${colShares(lineCats())}"`, boards = `stat-boards${solo ? ' solo' : ''}`;
+  return `<div class="table-wrap"><div class="${boards}" ${cols}>
     ${statTable(ctx, 'me', state.teamName, myStarters, { totals: mine, games: ctx.asSet.games })}
-    ${statTable(ctx, 'them', oppName, oppStarters, { totals: theirs, games: ctx.them.games })}
+    ${solo ? '' : statTable(ctx, 'them', oppName, oppStarters, { totals: theirs, games: ctx.them.games })}
   </div>
-  <div class="stat-boards bench-boards" ${cols}>
+  <div class="${boards} bench-boards" ${cols}>
     ${statTable(ctx, 'me', state.teamName, myBench, { bench: true })}
-    ${ctx.hasOpp ? statTable(ctx, 'them', oppName, oppBench, { bench: true }) : '<div></div>'}
+    ${solo ? '' : ctx.hasOpp ? statTable(ctx, 'them', oppName, oppBench, { bench: true }) : '<div></div>'}
   </div></div>`;
 }
 
@@ -447,26 +448,30 @@ function matchupBoard(ctx) {
     : ui.statSort.key !== 'slot' ? '<button class="link-btn quiet" data-action="stat-sort" data-key="slot">Back to lineup order</button>' : ''; // (green helps, red hurts: plain to see)
 
   let body;
+  const solo = isRoto(); // (no opponent's column at all, where there's never one)
   if (sched) {
     const benchRows = Math.max(myBench.length, oppBench.length, ctx.hasOpp ? 0 : 1);
-    const rows = state.slots.map((slot, i) => `<tr><th scope="row">${slotBadge(slot)}</th>${boardCell(mySlots[i], ctx, 'me', true)}${boardCell(oppById.get(oppSlotIds[i]), ctx, 'them', true)}</tr>`).join('');
-    const bench = Array.from({ length: benchRows }, (_, i) => `<tr><th scope="row">${slotBadge('BN')}</th>${boardCell(myBench[i], ctx, 'me', false)}${boardCell(oppBench[i], ctx, 'them', false)}</tr>`).join('');
+    // a row: the slot, your player, theirs
+    const tr = (slot, a, b, counts) => `<tr><th scope="row">${slotBadge(slot)}</th>${boardCell(a, ctx, 'me', counts)}${solo ? '' : boardCell(b, ctx, 'them', counts)}</tr>`;
+    const rows = state.slots.map((slot, i) => tr(slot, mySlots[i], oppById.get(oppSlotIds[i]), true)).join('');
+    const bench = Array.from({ length: benchRows }, (_, i) => tr('BN', myBench[i], oppBench[i], false)).join('');
     // injured reserve: yours and theirs, side by side; then a Sleeper taxi squad, the same way
     const myIr = ilPlayers(), oppIl = oppIlIds(), oppIr = ctx.hasOpp ? state.opp.players.filter(p => oppIl.has(p.id)) : [];
-    const outRows = (slot, a, b) => Array.from({ length: Math.max(a.length, b.length) }, (_, i) => `<tr><th scope="row">${slotBadge(slot)}</th>${boardCell(a[i], ctx, 'me', false)}${boardCell(b[i], ctx, 'them', false)}</tr>`).join('');
+    const outRows = (slot, a, b) => Array.from({ length: Math.max(a.length, b.length) }, (_, i) => tr(slot, a[i], b[i], false)).join('');
     const notTaxi = p => !onTaxi(p);
     const irRows = outRows('IL', myIr.filter(notTaxi), oppIr.filter(notTaxi)) + outRows('TAXI', myIr.filter(onTaxi), oppIr.filter(onTaxi));
-    body = `<div class="table-wrap"><table class="board">
-        <colgroup><col class="c-slot"><col><col></colgroup>
-        <thead><tr><th></th><th>${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</th><th>${state.opp.fxId ? teamLink(state.opp.fxId, esc(state.opp.name)) : esc(state.opp.name || 'Opponent')}</th></tr></thead>
+    const theirs = html => (solo ? '' : `<td>${ctx.hasOpp ? html : ''}</td>`);
+    body = `<div class="table-wrap"><table class="board${solo ? ' solo' : ''}">
+        <colgroup><col class="c-slot"><col>${solo ? '' : '<col>'}</colgroup>
+        <thead><tr><th></th><th>${teamLink(ui.viewing ? ui.viewA : state.fxTeam, esc(state.teamName))}</th>${solo ? '' : `<th>${state.opp.fxId ? teamLink(state.opp.fxId, esc(state.opp.name)) : esc(state.opp.name || 'Opponent')}</th>`}</tr></thead>
         <tbody>${rows}
-          ${SPORT.oneNumber ? `<tr class="board-tot"><th scope="row"></th><td><b>${fmt(fpTotals(ctx.asSet).a, 1)}</b> projected</td><td>${ctx.hasOpp ? `<b>${fmt(fpTotals(ctx.them).a, 1)}</b> projected` : ''}</td></tr>`
-    : `<tr class="board-tot"><th scope="row"></th><td><b>${ctx.asSet.games}</b> starter games${ctx.bestIds && ctx.best.games !== ctx.asSet.games ? ` <span class="muted">(${ctx.best.games} suggested)</span>` : ''}</td><td>${ctx.hasOpp ? `<b>${ctx.them.games}</b> starter games` : ''}</td></tr>`}
-          <tr class="board-sep"><td colspan="3">Bench</td></tr>${bench}${irRows}
+          ${SPORT.oneNumber ? `<tr class="board-tot"><th scope="row"></th><td><b>${fmt(fpTotals(ctx.asSet).a, 1)}</b> projected</td>${theirs(`<b>${fmt(fpTotals(ctx.them).a, 1)}</b> projected`)}</tr>`
+    : `<tr class="board-tot"><th scope="row"></th><td><b>${ctx.asSet.games}</b> starter games${ctx.bestIds && ctx.best.games !== ctx.asSet.games ? ` <span class="muted">(${ctx.best.games} suggested)</span>` : ''}</td>${theirs(`<b>${ctx.them.games}</b> starter games`)}</tr>`}
+          <tr class="board-sep"><td colspan="${solo ? 2 : 3}">Bench</td></tr>${bench}${irRows}
         </tbody>
       </table></div>`;
   } else {
-    body = statsBoard(ctx, mySlots.filter(Boolean), myBench, oppSlotIds.map(id => oppById.get(id)).filter(Boolean), oppBench);
+    body = statsBoard(ctx, mySlots.filter(Boolean), myBench, oppSlotIds.map(id => oppById.get(id)).filter(Boolean), oppBench, solo);
   }
   return `
     <div class="card board-card">
@@ -690,7 +695,7 @@ function weekPicker() {
   const opts = shifts.map(s => {
     const p = fxLeague() && fxLeague().periods ? fxPeriodFor(weekStartAt(s)) : null;
     const playoffs = p && fxLeague().playoffPeriod && p.n >= fxLeague().playoffPeriod;
-    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${phone ? '' : s === 0 ? ' (this period)' : playoffs ? ' (playoffs)' : ''}</option>`;
+    return `<option value="${s}" ${s === ui.weekShift ? 'selected' : ''}>${p ? `Week ${p.n}` : `Week of ${fmtMonthDay(weekStartAt(s))}`}${phone ? '' : s === 0 ? ` (this ${spanWord()})` : playoffs ? ' (playoffs)' : ''}</option>`;
   });
   return stepper('week-shift', 'week', `<select class="ctx-team" data-change="week-pick" aria-label="Week">${opts.join('')}</select>`,
     { first: ui.weekShift <= shifts[0], last: ui.weekShift >= shifts[shifts.length - 1] });
@@ -725,7 +730,8 @@ function viewWeek() {
   if (over && BOX) fillWeekFromEspn(fxLeague());
   const pastNote = () => {
     const L = fxLeague(), period = L && fxPeriodFor(start);
-    const msg = !L || !hasWeekLineups(L) ? `That week is over, so there's nothing to project.${L ? ` Past weeks' results come from each week's real lineups, which the site doesn't read from ${esc(sourceName(L))}${isFootball() ? ' football' : ''} leagues yet.` : ''}`
+    const msg = isRoto() ? "That week is over, so there's nothing to project. Roto counts the whole season: see Standings."
+      : !L || !hasWeekLineups(L) ? `That week is over, so there's nothing to project.${L ? ` Past weeks' results come from each week's real lineups, which the site doesn't read from ${esc(sourceName(L))}${isFootball() ? ' football' : ''} leagues yet.` : ''}`
       : period && !periodOver(period) ? `That week's games are over. Its result and lineups show here once the last night's box scores are in.`
       : `That week is over, and ${ui.viewing ? 'this team' : 'you'} had no matchup in it.`;
     return `<div class="card"><p class="muted small" style="margin:0">${msg}</p></div>`;
@@ -737,6 +743,11 @@ function viewWeek() {
   const noOpp = () => `<div class="card"><div class="empty"><strong>Load your opponent to see who's favored</strong>${real
     ? `${when[0].toUpperCase() + when.slice(1)} you play <b>${esc(real.name)}</b>.<br><br><button class="btn primary" data-action="fx-load-opp">Load ${esc(real.name)} from ${sourceName()}</button>`
     : `${sourceName()} has no matchup for you ${when}.`}${fxLeague() && state.fxTeam ? `<div class="sb-pick">Or compare against ${fxOppPicker(ctx)}</div>` : ''}</div></div>`;
+  // roto: no one to face, so the week is your games (each one adds to your season totals, up to the league's games limit)
+  const rotoNote = () => {
+    const R = fxLeague().roto;
+    return `<div class="card"><p class="muted small" style="margin:0">Roto has no weekly opponent: every game your starters play adds to your season totals${R.gpMax ? `, up to ${R.gpMax} games in all${R.gpSpot ? ` (${R.gpSpot} a lineup spot)` : ''}` : ''}. ${infoBtn('roto')}</p></div>`;
+  };
   const asSetLine = () => `<div class="sb-foot"><span class="muted">Lineup as set</span> <span class="sb-foot-n"><b>${fmt(oSet.expected, isPoints() ? 0 : 1)}</b> ${unit} · <b>${pctTxt(oSet.win)}</b> to win${isFootball() ? '' : ` · <b>${asSet.games}</b> starter games`}</span></div>`;
   const scoreboard = hasOpp ? `
     <div class="card scoreboard">
@@ -748,7 +759,7 @@ function viewWeek() {
       <div class="odds" role="img" aria-label="Win chance ${winPct}%"><span class="odds-you" style="width:${winPct}%"></span></div>
       <div class="odds-legend"><span><b>${winPct}%</b> to win the week ${infoBtn('win')}</span><span>${100 - winPct}%</span></div>
       ${changed ? asSetLine() : ''}
-    </div>` : noOpp();
+    </div>` : isRoto() ? rotoNote() : noOpp();
 
   // Daily-lineup leagues keep the day-by-day swap list (not one-game leagues: more games don't count there)
   let dailyCards = '';
@@ -770,7 +781,7 @@ function viewWeek() {
   return `
   <div class="page-head">
     <div>
-      <h1>${ui.weekShift === 0 ? 'This period' : ui.weekShift === 1 ? 'Next period' : ui.weekShift === -1 ? 'Last period' : 'Week of ' + fmtDay(start)}</h1>
+      <h1>${ui.weekShift === 0 ? `This ${spanWord()}` : ui.weekShift === 1 ? `Next ${spanWord()}` : ui.weekShift === -1 ? `Last ${spanWord()}` : 'Week of ' + fmtDay(start)}</h1>
       <p>${range}${fxWeekNotes(ctx)}</p>
     </div>
     <div class="week-nav">${weekPicker()}</div>

@@ -391,6 +391,29 @@ body:has(.mu-card.full) { background: var(--surface); }
   .mu-card.full .mu-p { column-gap: 8px; }
   .mu-card.full .mu-p > .mu-chips, .mu-card.full .mu-p.right > .mu-chips { grid-column: 1 / -1; }
 }
+/* roto (a league ranked over the season, no opponent: rotoStandingsCard, rotoBoard, rotoStandTable). After the full screen's
+   rules, which the one-column rows must win over */
+.mu-rows.solo .mu-row.day, .mu-card.full .mu-rows.solo .mu-row.day { grid-template-columns: minmax(0, 1fr); }
+.mu-rows.solo .mu-row, .mu-card.full .mu-rows.solo .mu-row { grid-template-columns: 40px minmax(0, 1fr); }
+.mu-rows.solo .mu-slot { order: -1; } /* (the lineup spot first, as a lineup reads) */
+.mu-rt-games { margin-top: 4px; font-variant-numeric: tabular-nums; }
+.mu-rt { margin-bottom: 12px; }
+.rt-table th, .rt-table td { padding: 7px 6px; font-variant-numeric: tabular-nums; }
+.rt-table thead th { font-size: .78rem; font-weight: 600; color: var(--muted); }
+.rt-table .rt-team { white-space: nowrap; }
+.rt-table .rt-team .team-link { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.rt-c b, .rt-near b { display: block; }
+.rt-tot { display: block; font-size: .72rem; color: var(--muted); }
+/* the team that close: its own ellipsis, as a cut can't go into a button (teamLink), with any "+2" beside it whole */
+.rt-who { display: flex; justify-content: flex-end; max-width: 9rem; margin-left: auto; font-size: .72rem; color: var(--muted); white-space: nowrap; }
+.rt-who .team-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rt-who > span { flex: none; margin-left: .3em; } /* (a space would be dropped at a flex item's start) */
+.stat-boards.solo { grid-template-columns: minmax(0, 1fr); min-width: max(460px, calc(var(--cols, 0) * 50px)); }
+@media (max-width: 640px) {
+  .mu-rows.solo .mu-row { grid-template-columns: 30px minmax(0, 1fr); }
+  .rt-who { max-width: 5.75rem; } /* (the five columns fit a 375 px phone) */
+  .rt-table .rt-team .team-link { max-width: 8.5rem; } /* (more categories in view before the table scrolls) */
+}
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: 0 0 0 auto; text-align: right; }

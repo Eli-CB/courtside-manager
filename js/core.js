@@ -302,6 +302,9 @@ const pctOf = (p, c) => { const att = statVal(p, c.att); return att ? statVal(p,
 // (the sandbox: its points scoring, when one's picked: sbPoints, sandbox.js)
 const leaguePoints = () => { const L = fxLeague(); if (!L && state && state.browse) return sbPoints(); return L && L.points && /POINTS/.test(L.scoring || '') ? L.points : null; };
 const isPoints = () => !!leaguePoints();
+// A roto league (ESPN's, so far: espnRoto): categories ranked over the whole season, no weekly opponents; its "week" is the calendar's
+const isRoto = () => { const L = fxLeague(); return !!(L && L.roto); };
+const spanWord = () => (isRoto() ? 'week' : 'period'); // (a matchup's span is a "period" in labels: a roto league has none)
 // Real fantasy points, as the league counts them: a league whose every point value is a whole number only ever scores whole
 // points, so its scores show no ".0" (projections and averages keep their decimal everywhere)
 const wholePoints = () => { const P = leaguePoints(); return !!P && Object.values(P).every(v => typeof v === 'number' && Number.isInteger(v)); };

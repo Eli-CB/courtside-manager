@@ -218,7 +218,8 @@ function dashDayRows(C, A, B) {
   };
   const a = column(A), b = column(B);
   const person = (x, right) => (x ? dashCell(C, x[0], right, x[1] === 'start', x[1].endsWith('bench') && x[0].status !== 'Out' ? benchTag(x[0]) : '', x[1].startsWith('out') ? ' out' : '') : '<div></div>');
-  const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${person(a[i], false)}${person(b[i], true)}</div>`).join('');
+  // (no second column when there's never an opponent: C.solo)
+  const rows = Array.from({ length: Math.max(a.length, b.length) }, (x, i) => `<div class="mu-row day">${person(a[i], false)}${C.solo ? '' : person(b[i], true)}</div>`).join('');
   const none = rows ? '' : d === today && !D.today ? `<p class="muted small mu-none">No ${SPORT.name} games today.</p>`
     : `<p class="muted small mu-none">No games ${d === today ? 'today' : 'that day'} for either team.</p>`;
   return { rows, none };
@@ -226,14 +227,51 @@ function dashDayRows(C, A, B) {
 
 // The period: every lineup spot, slot by slot, with the bench below on request
 function dashWeekRows(C, A, B) {
-  const row = (slot, a, b, counts) => `<div class="mu-row${counts ? '' : ' bench'}">${dashCell(C, a, false, counts)}<div class="mu-slot">${slotBadge(slot)}</div>${B ? dashCell(C, b, true, counts) : '<div></div>'}</div>`;
+  const row = (slot, a, b, counts) => `<div class="mu-row${counts ? '' : ' bench'}">${dashCell(C, a, false, counts)}<div class="mu-slot">${slotBadge(slot)}</div>${B ? dashCell(C, b, true, counts) : C.solo ? '' : '<div></div>'}</div>`;
   const rows = state.slots.map((s, i) => row(s, A.starters[i], B && B.starters[i], true)).join('');
   const nb = Math.max(A.bench.length, B ? B.bench.length : 0), ni = Math.max(A.ir.length, B ? B.ir.length : 0), nt = Math.max(A.taxi.length, B ? B.taxi.length : 0);
   const bench = ui.dashBench ? Array.from({ length: nb }, (x, i) => row('BN', A.bench[i], B && B.bench[i], false)).join('')
     + Array.from({ length: ni }, (x, i) => row('IL', A.ir[i], B && B.ir[i], false)).join('')
     + Array.from({ length: nt }, (x, i) => row('TAXI', A.taxi[i], B && B.taxi[i], false)).join('') : '';
   const benchBtn = nb + ni + nt ? `<button type="button" class="link-btn mu-bench-btn" data-action="dash-bench" aria-expanded="${!!ui.dashBench}">${ui.dashBench ? 'Hide the bench' : `Show the bench (${nb + ni + nt})`}</button>` : '';
-  return `<div class="mu-rows">${rows}${bench}</div>${benchBtn}`;
+  return `<div class="mu-rows${C.solo ? ' solo' : ''}">${rows}${bench}</div>${benchBtn}`;
+}
+
+// ----- A roto league's matchup: there's no opponent, so the head is where you stand in the league -----
+// The share of the league's season played: its NBA games before today, of all of them from its first day to its last
+function rotoSeasonShare(R) {
+  if (!R.start || !R.end) return null;
+  const today = todayIso();
+  let all = 0, done = 0;
+  for (const days of teamDates.values()) for (const d of days) if (d >= R.start && d <= R.end) { all++; if (d < today) done++; }
+  return all ? done / all : null;
+}
+// Your points and the week's starter games (as the matchup's score), your standing, and your games against the league's limit
+function rotoBoard(S, D) {
+  const L = fxLeague(), R = L.roto, r = standingOf(S.tid);
+  if (!r) return '';
+  const share = rotoSeasonShare(R), gp = r.tot.gp1 || 0;
+  const games = R.gpMax ? `<b>${fmt(gp, 0)}</b> of ${R.gpMax} games` : `<b>${fmt(gp, 0)}</b> games`;
+  const gamesTip = `Games your starters have played${R.gpMax ? `, of the league's limit of ${R.gpMax}${R.gpSpot ? ` (${R.gpSpot} a lineup spot)` : ''}` : ''}${share != null ? `. The league's season is ${Math.round(share * 100)}% played.` : ''}`;
+  return `<div class="mu-board">
+      <div class="mu-team"><div class="mu-name">${teamLink(S.tid, esc(S.name))}</div><div class="mu-line"><div class="mu-score" title="Roto points: every category's added up">${fmtRotoPts(r.pts)}</div>${dashPaceChips(S, D)}</div></div>
+      <div class="mu-mid"></div>
+      <div class="mu-team right"><div class="mu-name">${ordinal(r.rank)} <span class="muted">of ${fxPickable().length}</span></div>
+        <div class="mu-rt-games small" title="${esc(gamesTip)}">${games}${share != null ? `<span class="muted"> · ${Math.round(share * 100)}% of the season</span>` : ''}</div></div>
+    </div>`;
+}
+// Each category: your total, your points, and how far the nearest team above (to pass) and below (your lead) are
+function rotoStandTable(tid) {
+  const rows = rotoStanding(tid);
+  if (!rows.length) return '';
+  // (teams tied at that gap: the first named, the rest counted)
+  const who = ids => `${teamLink(ids[0])}${ids.length > 1 ? `<span class="muted" title="${esc(ids.slice(1).map(fxTeamName).join(', '))}">+${ids.length - 1}</span>` : ''}`;
+  const near = (x, c) => (x ? `<b>${c.pct ? fmtPct(x.gap) : fmt(x.gap, 0)}</b><span class="rt-who">${who(x.ids)}</span>` : '<span class="muted">—</span>');
+  return `<div class="table-wrap mu-rt"><table class="rt-table rt-stand">
+    <thead><tr><th>Cat</th><th class="num">You</th><th class="num">Pts</th><th class="num" title="How far behind the nearest team above you, and who">To pass</th><th class="num" title="How far ahead of the nearest team below you, and who">Lead</th></tr></thead>
+    <tbody>${rows.map(({ c, v, pts, above, below }) => `<tr><td><b>${c.label}</b></td><td class="num">${fmtRotoValue(c, v)}</td><td class="num"><b>${fmtRotoPts(pts)}</b></td>
+      <td class="num rt-near">${near(above, c)}</td><td class="num rt-near">${near(below, c)}</td></tr>`).join('')}</tbody>
+  </table></div>${rotoUnplayed(fxLeague()) ? '<p class="muted small mu-when">No games counted yet, so every team is tied.</p>' : ''}`;
 }
 
 // The matchup alone on the screen (the card's button, in place of its (i): the owner's ask, Nov 2026). While the card is
@@ -277,12 +315,13 @@ function dashMatchupCard() {
   leagueWeekFresh(L);
   footballLines(L);
   const D = dashDays();
-  // Today, the last game day before it, the matchup period (the league's, from its schedule) so far. Today stays on the
-  // toggle on a day without NBA games (Election Day), to say so.
-  const { range, toggle } = dayToggle({ D, hasToday: D.all.includes(today), week: ['This period', D.all], picked: ui.dashRange, fallback: 'week', action: 'dash-range' });
+  // Today, the last game day before it, the matchup period (the league's, from its schedule; a roto league's calendar week)
+  // so far. Today stays on the toggle on a day without NBA games (Election Day), to say so.
+  const { range, toggle } = dayToggle({ D, hasToday: D.all.includes(today), week: [`This ${spanWord()}`, D.all], picked: ui.dashRange, fallback: 'week', action: 'dash-range' });
   const dates = range === 'week' ? D.week : [range === 'today' ? today : D.day];
 
-  const opp = ui.viewing && ui.viewB ? { id: ui.viewB } : fxOpponentFor(weekStartAt(0), me);
+  const roto = isRoto(); // (no opponent ever: the head is your standing, and your players get the whole width)
+  const opp = roto ? null : ui.viewing && ui.viewB ? { id: ui.viewB } : fxOpponentFor(weekStartAt(0), me);
   const A = dashSide(me, dates, range, D), B = opp ? dashSide(opp.id, dates, range, D) : null;
   const pts = isPoints();
   // a tied category counts half to each side: 7.5–1.5
@@ -290,23 +329,23 @@ function dashMatchupCard() {
   // the big numbers are the matchup's: the period so far; the table and the players, the days picked
   const sc = B ? weekScore(A.tot, B.tot) : null, wk = B ? weekScore(A.week, B.week) : null;
   const big = (S, n) => `<div class="mu-team${S === B ? ' right' : ''}"><div class="mu-name">${teamLink(S.tid, esc(S.name))}</div><div class="mu-line"><div class="mu-score">${B ? (pts ? fmtFp(n) : n) : ''}</div>${dashPaceChips(S, D)}</div></div>`;
-  const head = `<div class="mu-board">
+  const head = `${roto ? rotoBoard(A, D) : `<div class="mu-board">
       ${big(A, wk && (pts ? wk.me : half(wk, 'me')))}
       <div class="mu-mid"></div>
       ${B ? big(B, pts ? wk.opp : half(wk, 'opp')) : `<div class="mu-team right"><div class="mu-name muted">No opponent this week</div></div>`}
-    </div>
+    </div>`}
     ${range !== 'day' && live.error ? `<p class="small pos-bad mu-when">ESPN: ${esc(live.error)}</p>` : ''}`;
 
-  const catTable = B && !pts ? dashCatTable(A, B, sc) : '';
+  const catTable = roto ? rotoStandTable(me) : B && !pts ? dashCatTable(A, B, sc) : '';
 
   // Today: each bubble flashes when a live update moves it
   const isToday = range === 'today', chipNext = new Map();
   const chipsNow = (p, tot) => { const f = chipFlash(p.nbaId, tot); chipNext.set(p.nbaId, f.now); return f.flash; };
-  const C = { D, dates, range, today, hasOpp: !!B, flash: isToday ? chipsNow : undefined };
+  const C = { D, dates, range, today, hasOpp: !!B, solo: roto, flash: isToday ? chipsNow : undefined };
   if (range !== 'week') {
     const { rows, none } = dashDayRows(C, A, B);
     chipWas = isToday ? chipNext : new Map();
-    return card(toggle, `${head}${catTable}<div class="mu-rows">${rows}</div>${none}`, true);
+    return card(toggle, `${head}${catTable}<div class="mu-rows${roto ? ' solo' : ''}">${rows}</div>${none}`, true);
   }
   chipWas = new Map();
   return card(toggle, `${head}${catTable}${dashWeekRows(C, A, B)}`, true);

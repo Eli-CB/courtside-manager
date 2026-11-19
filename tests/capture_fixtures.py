@@ -24,7 +24,8 @@ PAST_PERIODS = {'my19c8mwmoipvhon': [1], 'czqgnyozmf2tbr93': list(range(1, 22))}
 
 # ESPN: the same requests js/espn.js makes (public leagues only)
 ESPN = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/2027'
-ESPN_LEAGUES = {'794342666': 'H2H points, daily lineups, starts in week 3'}
+ESPN_LEAGUES = {'794342666': 'H2H points, daily lineups, starts in week 3', '1299985004': 'roto, 8 cats, games limits, starts Nov 19'}
+ESPN_ANONYMOUS = {'1299985004'}  # team names made up: the owner's test league, whose other members' names stay out of the repo
 ESPN_LEAGUE_VIEWS = 'view=mSettings&view=mTeam&view=mRoster&view=mMatchupScore&view=mDraftDetail&view=mStatus'
 
 
@@ -40,6 +41,20 @@ def strip_espn_stats(league):
         for e in t.get('roster', {}).get('entries', []):
             e.get('playerPoolEntry', {}).get('player', {}).pop('stats', None)
     return league
+
+
+def anonymize_espn(league):
+    """Each team as Team <id>, without its logo."""
+    for t in league.get('teams', []):
+        t.update(name=f"Team {t['id']}", abbrev=f"T{t['id']}")
+        for k in ('location', 'nickname', 'logo'):
+            t.pop(k, None)
+    return league
+
+
+def save_espn(lid):
+    league = strip_espn_stats(get(f'/segments/0/leagues/{lid}?{ESPN_LEAGUE_VIEWS}', ESPN))
+    save(f'espn/{lid}/league.json', anonymize_espn(league) if lid in ESPN_ANONYMOUS else league)
 
 
 def save(name, data):
@@ -60,7 +75,7 @@ def main():
             save(f'fantrax/{lid}/getTeamRosters-{n}.json', get(f'getTeamRosters?leagueId={lid}&period={n}'))
     save('espn/players.json', get('/players?scoringPeriodId=0&view=players_wl', ESPN, {'X-Fantasy-Filter': json.dumps({'filterActive': {'value': True}})}))
     for lid in ESPN_LEAGUES:
-        save(f'espn/{lid}/league.json', strip_espn_stats(get(f'/segments/0/leagues/{lid}?{ESPN_LEAGUE_VIEWS}', ESPN)))
+        save_espn(lid)
     for name in ('players.json', 'boxscores.json', 'seasons/2025-26.json', 'seasons/2025-26-games.json'):
         os.makedirs(os.path.dirname(os.path.join(OUT, name)), exist_ok=True)
         shutil.copy(os.path.join(ROOT, 'data', name), os.path.join(OUT, name))

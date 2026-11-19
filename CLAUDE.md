@@ -11,8 +11,7 @@ real visitors, a renamed key needs its old copy moved first, or their saved leag
 test with: "The IPA" `1336466264633135104` (16-team dynasty, points, Lock-In, 2 IR + 2 taxi spots, a 3-round rookie draft, picks traded through 2028).
 The owner's ESPN test leagues (Nov 19, 2026; public, the owner's team in both is "Eli's Excellent Team"; 10 teams, 8 cats without TO, daily lineups, 10 starters + 3 bench + 1 IR):
 "Utah Pro H2H Categories League" `1715452380` (starts Nov 23 as Matchup 6: a late league keeps ESPN's week numbers, as ESPN's own schedule page shows) and
-"Sacramento Beginner Roto League" `1299985004` (roto, which the site doesn't do: it loads with no periods, empty W-L standings and no opponent; ESPN's
-roto standings are each team's `points`/`pointsByStat`, and its one schedule entry lists `teams`, no home/away).
+"Sacramento Beginner Roto League" `1299985004` (roto, a 68-game limit a lineup spot; the tests' fixture, team names made up: roto under the espn bullet).
 
 ## Keeping this file up to date (the owner's standing rule, Nov 2026)
 Whenever you learn something that any Claude starting on this site for the first time would need, add it here in the
@@ -57,6 +56,11 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     and `def_fum_rec` (special teams' included) to a defense's lines (`espn_defense`). Checked on a real league: 1,169 of 1,170 player-weeks matched ESPN's
     points (the one: a sack counted differently). Live points: ESPN's per week, in `L.slpWeek` like Sleeper's (`espnWeekFresh`, `leagueWeekFresh`, every 30 s).
     Category football isn't read. No Recap, Awards or Season totals.
+    ESPN roto (`scoringType` 'ROTO', stage 1 of 2, Nov 19, 2026; `espnRoto`, `L.roto`, `isRoto()` in core.js): no periods or matchups (ESPN's one matchup is the
+    season; a roto "week" is the calendar's, `spanWord()`); `L.standings` are ESPN's own points (`pointsByStat`, `points`) with each team's totals (`tot`, from
+    `valuesByStat`, games as `gp1`), ranked by points, ties sharing; `gpMax`/`gpSpot` from `lineupSlotStatLimits`. Standings is `rotoStandingsCard`, the Matchup tab's
+    head `rotoBoard` + `rotoStandTable` (gaps from `rotoStanding`, views.js), Plan Ahead and the Matchup rows have no opponent's column (`solo`), no Recap tab.
+    Not checked against a real season's numbers yet (the league hadn't played). Stage 2, the owner's call: values, projected final standings, trades in roto points.
   - sleeper: `fetchSleeperLeague` (api.sleeper.app, CORS-open, no sign-in; IDs are 15-20 digits, `source: 'sleeper'`).
     Sleeper basketball is points only and counts ONE game a week per lineup slot (Lock-In: the game locked in after it's
     played, else the last of the week; Game Pick: the one picked): `L.oneGame`, `isOneGame()`. Projections (`oneGameSide`

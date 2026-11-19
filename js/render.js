@@ -117,7 +117,8 @@ function teamMenu() {
 const TABS_NOW = [['dashboard', 'Matchup'], ['week', 'Plan Ahead'], ['recap', 'Recap'], ['players', 'Players'], ['trends', 'Trends'], ['draft', 'Draft'], ['standings', 'Standings'], ['awards', 'Awards'], ['trade', 'Trades']];
 const TABS_PAST = [['standings', 'Standings'], ['awards', 'Awards'], ['draft', 'Draft'], ['rosters', 'Rosters']];
 const TABS_BROWSE = [['team', 'My team'], ['watch', 'Live'], ['players', 'Players'], ['trends', 'Trends'], ['trade', 'Trades']]; // the sandbox: no league (sandbox.js)
-const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k)));
+// (a roto league has no weekly matchups, so no Recap of one)
+const tabList = () => (ui.season ? TABS_PAST : state.browse ? TABS_BROWSE : TABS_NOW.filter(([k]) => !SPORT.soonTabs.includes(k) && !(k === 'recap' && isRoto())));
 const seasonLabel = y => `${y}-${String(y + 1).slice(2)}`;
 const pastCache = {};
 let seasonCtx = null; // set while a past season renders: { basis, label }
@@ -318,11 +319,12 @@ function render() {
   refreshInjuries(); // (ESPN's injury report as it is now: at most every 15 minutes)
   if (ui.pendingSeason) { $('#view').innerHTML = loadingCard('Loading that season…'); return; }
   const nav = $('#tabs');
-  const mode = ui.season ? 'past:' + ui.season : state.browse ? 'browse' : `now:${SPORT.key}`;
+  // (drawn again whenever its tabs change: a past season, the sandbox, a sport's or a league's own, as a roto league's lack of a Recap)
+  const list = tabList(), mode = `${ui.season || ''}|${list.map(([k]) => k).join()}`;
   if (nav.dataset.mode !== mode) {
     const x = nav.scrollLeft || 0;
     // (phones: a bar along the bottom, each section with its icon; past 5, the rest under More)
-    const list = tabList(), link = ([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${lineIcon(TAB_ICONS[k] || TAB_ICONS.more, 'tab-ico')}<span>${l}</span></a>`;
+    const link = ([k, l]) => `<a href="${seasonHash(k, ui.season)}" data-tab="${k}">${lineIcon(TAB_ICONS[k] || TAB_ICONS.more, 'tab-ico')}<span>${l}</span></a>`;
     nav.innerHTML = list.length <= TABS_SHOWN + 1 ? list.map(link).join('')
       : `${list.slice(0, TABS_SHOWN).map(link).join('')}<div class="tabs-extra">${list.slice(TABS_SHOWN).map(link).join('')}</div><button type="button" class="tab-more" data-action="nav-toggle" aria-expanded="false">${lineIcon(TAB_ICONS.more, 'tab-ico')}<span>More</span></button>`;
     nav.dataset.mode = mode;

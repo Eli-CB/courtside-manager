@@ -511,6 +511,7 @@ const readLeagueCache = () => store.json(FX_CACHE_KEY, {});
 function cachedLeague(id) {
   const c = readLeagueCache()[id];
   if (!c) return null;
+  if (c.res.league.scoring === 'ROTO' && !c.res.league.roto) return null; // (an ESPN roto league kept before the site read roto: read again)
   const site = NBA && NBA.siteLeague && NBA.siteLeague.id === id;
   return (site ? c.at > Date.parse(NBA.updated || 0) : Date.now() - c.at < LEAGUE_FRESH_MS) ? c.res : null;
 }

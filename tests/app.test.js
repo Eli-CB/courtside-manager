@@ -8,6 +8,7 @@ const CATS9 = 'my19c8mwmoipvhon'; // 9-cat H2H, most categories wins, weekly lin
 const POINTS = 'la2a76bkmt6aqekb'; // H2H points, weekly lineups
 const DAILY = 'frapfs43mutrff0g'; // H2H points with double/triple-doubles, daily lineups, not drafted yet
 const ESPN = '794342666'; // public ESPN league: H2H points, daily lineups, starts in week 3 (Nov 2)
+const ESPN_ROTO = '1299985004'; // public ESPN roto league (team names made up): 8 cats, a 68-game limit a lineup spot, starts Nov 19
 const YAHOO = 'nba.l.777'; // a made-up Yahoo league in Yahoo's JSON layout (tests/make_yahoo_fixtures.py): 9-cat H2H, 4 teams
 
 let app;
@@ -864,6 +865,123 @@ test('ESPN matchups project, and unrostered players are available', async () => 
     for (const [r, fx, pos] of saved) { if (fx) r.fx = fx; else delete r.fx; r.pos = pos; }
     app.set('nbaCache', null);
   }
+});
+
+// ----- Roto: ESPN's standings and games limits, and every tab without an opponent -----
+// The saved league hasn't played a game (it starts Nov 19), so each test season is made up here in ESPN's layout: each team's
+// season totals by ESPN stat id, and its roto points from them as ESPN gives them (in each category the best team gets 10,
+// the worst 1, ties splitting). Team 3 is "you".
+function rotoSeason() {
+  const j = JSON.parse(readFixture(`espn/${ESPN_ROTO}/league.json`));
+  const ids = j.teams.map(t => t.id); // 1..10
+  const totals = Object.fromEntries(ids.map(k => [k, {
+    0: k === 2 ? 960 : k === 6 ? 975 : 900 + 25 * k, // PTS: Team 3 (975) tied with Team 6, 25 behind Team 4, 15 ahead of Team 2
+    6: 500 - 10 * k, // REB: Team 3 third, 10 behind Team 2 and 10 ahead of Team 4
+    1: k === 3 ? 60 : 50, // BLK: Team 3 alone on top, 10 ahead of the other nine
+    13: 350 + k, 14: 750, // FG: higher teams shoot better, a make (.001) apart
+    15: 150, 16: 200, // FT: all .750
+    2: 0, 3: 0, 17: 0, // STL, AST, 3PM: no one yet
+    42: 100 + k, // games played
+  }]));
+  const value = (k, sid) => (sid === 19 ? totals[k][13] / totals[k][14] : sid === 20 ? totals[k][15] / totals[k][16] : totals[k][sid]);
+  const points = {};
+  for (const sid of [0, 1, 2, 3, 6, 17, 19, 20]) {
+    for (const k of ids) {
+      const better = ids.filter(x => value(x, sid) > value(k, sid)).length, tied = ids.filter(x => value(x, sid) === value(k, sid)).length;
+      (points[k] = points[k] || {})[sid] = ids.length - better - (tied - 1) / 2; // (tied teams share their places' points)
+    }
+  }
+  for (const t of j.teams) {
+    t.valuesByStat = { ...totals[t.id], 19: value(t.id, 19), 20: value(t.id, 20) };
+    t.pointsByStat = points[t.id];
+    t.points = Object.values(points[t.id]).reduce((a, b) => a + b, 0);
+  }
+  return j;
+}
+// A page with the roto league loaded from the made-up season, as your team (its own page: the league stays out of other tests)
+async function rotoApp() {
+  const a = loadApp();
+  await a.ready();
+  const body = JSON.stringify(rotoSeason()), realFetch = a.fetch;
+  a.fetch = (url, init) => (String(url).includes(`/leagues/${ESPN_ROTO}?`) ? Promise.resolve({ ok: true, status: 200, headers: { get: () => null }, text: async () => body, json: async () => JSON.parse(body) }) : realFetch(url, init));
+  await a.loadBoxes();
+  const L = await a.useLeague(ESPN_ROTO);
+  const side = a.fxTeamSide('3');
+  Object.assign(a.get('state'), { fxTeam: '3', players: side.players, il: side.il, lineup: side.lineup, teamName: side.name });
+  return { a, L };
+}
+
+test("ESPN roto: the standings are ESPN's points by category, ties sharing, with each team's season totals and games limit", async () => {
+  const { a, L } = await rotoApp();
+  assert.ok(a.isRoto() && L.scoring === 'ROTO');
+  assert.deepEqual([L.periods.length, Object.keys(L.matchups).length], [0, 0], 'no weekly matchups');
+  assert.deepEqual({ ...L.roto }, { gpMax: 680, gpSpot: 68, start: '2026-11-19', end: a.addDays('2026-11-19', 143) }, '7 spots of 68 and three Util spots sharing 204; ESPN days 31 to 174');
+  const me = L.standings.find(r => r.id === '3');
+  assert.equal(me.pts, 46.5, 'PTS 3.5 (tied 7th), REB 8, BLK 10, FG% 3, and 5.5 in each category no one leads');
+  assert.deepEqual({ ...me.cats }, { fgPct: 3, ftPct: 5.5, tpm: 5.5, pts: 3.5, reb: 8, ast: 5.5, stl: 5.5, blk: 10 });
+  assert.equal(me.tot.fgm, 353);
+  assert.equal(me.tot.gp1, 103);
+  // ranked by points, best first; a tie shares the better rank
+  assert.ok(L.standings.every((r, i) => !i || L.standings[i - 1].pts >= r.pts));
+  assert.ok(L.standings.every(r => r.rank === 1 + L.standings.filter(x => x.pts > r.pts).length));
+
+  // where you stand: the nearest teams above and below, every team at that gap
+  const at = key => a.rotoStanding('3').find(x => x.c.key === key);
+  const near = x => x && [x.gap, [...x.ids].sort((p, q) => p - q)]; // (they come best placed first: the one the table names)
+  assert.deepEqual([near(at('pts').above), near(at('pts').below)], [[25, ['4']], [15, ['2']]], 'the team tied with you is neither');
+  assert.deepEqual([near(at('reb').above), near(at('reb').below)], [[10, ['2']], [10, ['4']]]);
+  assert.deepEqual([at('blk').above, near(at('blk').below)], [null, [10, ['1', '2', '4', '5', '6', '7', '8', '9', '10']]], 'first: no one to pass');
+  assert.ok(Math.abs(at('fgPct').v - 353 / 750) < 1e-12 && Math.abs(at('fgPct').above.gap - 1 / 750) < 1e-12, 'a percentage from makes and attempts');
+  assert.deepEqual([at('ftPct').above, at('ftPct').below, at('stl').above], [null, null, null], 'everyone tied');
+});
+
+test('ESPN roto: Standings, the Matchup tab, Plan Ahead and a team card, all without an opponent; no Recap', async () => {
+  const { a } = await rotoApp();
+  const standings = a.viewStandings();
+  assert.ok(standings.includes('Roto standings') && standings.includes('<b>46.5</b>'));
+  assert.ok(!/<th class="num">W<\/th>|Win %/.test(standings), 'no win-loss record');
+  assert.ok(!standings.includes('Season totals'), "ESPN's totals are the table");
+  assert.ok(!standings.includes('No games counted yet'));
+
+  const m = a.dashMatchupCard();
+  assert.ok(m.includes('To pass') && m.includes('Lead'), 'where you stand, by category');
+  assert.ok(m.includes('<b>103</b> of 680 games'), 'your games against the limit');
+  assert.ok(m.includes('This week') && !m.includes('This period'), 'a roto week is the calendar\'s');
+  assert.ok(m.includes('mu-rows solo') && !m.includes('No opponent this week'));
+  assert.ok(/<b>10<\/b><span class="rt-who">.*?<span class="muted" title="[^"]*">\+8<\/span><\/span>/.test(m), 'BLK: 10 ahead of nine teams, the first named');
+
+  const week = a.viewWeek();
+  assert.ok(week.includes('Roto has no weekly opponent') && week.includes('up to 680 games in all (68 a lineup spot)'));
+  assert.ok(!week.includes('Load your opponent') && !week.includes('>Opponent<') && !week.includes('compare against'), 'no opponent to load or pick');
+  assert.ok(/<h1>(This|Next) week<\/h1>/.test(week));
+
+  const title = a.teamCardTitle('4');
+  assert.ok(title.includes('roto points') && !/This week vs|No matchup this week/.test(title));
+  assert.ok(!a.teamCardHtml('4').includes('Compare on Plan Ahead'));
+  assert.ok(!a.tabList().some(([k]) => k === 'recap'), 'no weekly matchups to recap');
+  assert.ok(a.INFO.roto, 'the (i) explains roto');
+});
+
+test('ESPN roto: no one has played yet, so every team is tied', async () => {
+  const L = await app.useLeague(ESPN_ROTO); // (the saved league as ESPN sent it, before its first night)
+  try {
+    assert.ok(L.standings.every(r => r.pts === 44 && r.rank === 1), '5.5 in each of 8 categories');
+    assert.ok(app.viewStandings().includes('No games counted yet, so every team is tied.'));
+    assert.ok(app.rotoStanding(L.teams[0].id).every(x => !x.above && !x.below));
+  } finally { await app.useLeague(ESPN); }
+  assert.ok(!app.isRoto(), 'a head-to-head league is not roto');
+  assert.ok(app.viewStandings().includes('<th class="num">W</th>'), 'and keeps its win-loss standings');
+});
+
+test('ESPN roto: a copy kept on the device from before the site read roto is read again', () => {
+  const key = app.get('FX_CACHE_KEY'), was = app.localStorage.getItem(key);
+  const keep = league => app.localStorage.setItem(key, JSON.stringify({ [ESPN_ROTO]: { at: Date.now(), res: { league, fxPlayers: {} } } }));
+  try {
+    keep({ id: ESPN_ROTO, scoring: 'ROTO' });
+    assert.equal(app.cachedLeague(ESPN_ROTO), null);
+    keep({ id: ESPN_ROTO, scoring: 'ROTO', roto: { gpMax: 680 } });
+    assert.ok(app.cachedLeague(ESPN_ROTO), 'one with its roto standings is kept');
+  } finally { if (was == null) app.localStorage.removeItem(key); else app.localStorage.setItem(key, was); }
 });
 
 test('ESPN: weekly lineup history stays Fantrax-only, and nothing asks Fantrax for it', async () => {
@@ -5745,7 +5863,7 @@ async function xssPass(a, id, label) {
 }
 
 test("a league's own name and its teams' names are shown as text on every tab and popup, never as HTML; positions always in their colors", async () => {
-  const runs = [['Fantrax categories', CATS9], ['Fantrax points', POINTS], ['Fantrax daily, not drafted', DAILY], ['ESPN', ESPN], ['Sleeper', SLEEPER], ['Yahoo', YAHOO], ['hockey', HOCKEY], ['football', FOOTBALL], ['ESPN football', ESPN_FOOTBALL]];
+  const runs = [['Fantrax categories', CATS9], ['Fantrax points', POINTS], ['Fantrax daily, not drafted', DAILY], ['ESPN', ESPN], ['ESPN roto', ESPN_ROTO], ['Sleeper', SLEEPER], ['Yahoo', YAHOO], ['hockey', HOCKEY], ['football', FOOTBALL], ['ESPN football', ESPN_FOOTBALL]];
   const problems = [], plain = new Set();
   let drawn = 0;
   for (const [label, id] of runs) {

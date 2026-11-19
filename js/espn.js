@@ -217,17 +217,48 @@ async function fetchEspnLeague(id) {
   }
 
   const dayOne = nbaGameDays()[0] || addDays(todayIso(), 1 - (j.scoringPeriodId || 1));
-  const ss = s.scoringSettings || {};
+  const ss = s.scoringSettings || {}, roto = ss.scoringType === 'ROTO';
+  const scoring = espnScoring(ss);
   const league = {
     ...espnLeagueShape(j, {
-      id, periods: espnPeriods(j, dayOne), toNba, names, lineup: { slots: ESPN_SLOTS, bench: ESPN_BENCH, ir: ESPN_IR },
+      // (a roto league's one matchup is the whole season: no weekly periods)
+      id, periods: roto ? [] : espnPeriods(j, dayOne), toNba, names, lineup: { slots: ESPN_SLOTS, bench: ESPN_BENCH, ir: ESPN_IR },
       points: /POINTS/.test(ss.scoringType || ''),
     }),
     year: j.seasonId ? j.seasonId - 1 : null,
-    ...espnScoring(ss),
+    ...scoring,
     lockDays: /WEEK/i.test(rs.lineupLocktimeType || '') ? 7 : 1, // lineups lock game by game: daily
   };
+  if (roto) Object.assign(league, espnRoto(j, dayOne, scoring.cats || []));
   return { league, fxPlayers, idMap: { toNba, names } };
+}
+
+// ----- Roto (rotisserie) -----
+// No weekly opponents: in each category every team is ranked by its season total (its starters' games only), the best getting
+// as many points as there are teams and the worst 1, ties splitting them, and the most points in all wins. ESPN keeps it on
+// each team: valuesByStat (its totals, with the makes, attempts and games played behind them), pointsByStat (its points in each
+// category) and points (their sum). A starting spot may have a games limit (lineupSlotStatLimits on games played).
+// -> { roto: { gpMax, gpSpot, start, end }, standings }: the standings ranked by points, ties sharing a rank, in place of W-L ones
+function espnRoto(j, dayOne, cats) {
+  const rs = j.settings.rosterSettings || {}, st = j.status || {};
+  // ESPN's stat ids -> our stat keys (only the stats the site knows)
+  const byKey = byStat => Object.fromEntries(Object.entries(byStat || {}).filter(([sid]) => ESPN_STATS[sid]).map(([sid, v]) => [ESPN_STATS[sid], +v || 0]));
+  // each limited starting spot: [its games limit, how many such spots share it] (Util's 204 is three spots of 68)
+  const limits = Object.entries(rs.lineupSlotStatLimits || {})
+    .filter(([slot, x]) => ESPN_SLOTS[slot] && x && ESPN_STATS[x.statId] === 'gp1' && +x.limitValue > 0)
+    .map(([slot, x]) => [+x.limitValue, +(rs.lineupSlotCounts || {})[slot] || 1]);
+  const perSpot = new Set(limits.map(([n, k]) => n / k));
+  const standings = j.teams.map(t => {
+    const won = byKey(t.pointsByStat);
+    return { id: String(t.id), name: espnTeamName(t), pts: +t.points || 0, cats: Object.fromEntries(cats.map(k => [k, won[k] || 0])), tot: byKey(t.valuesByStat) };
+  });
+  const ranked = sortDesc(standings, r => r.pts);
+  for (const r of ranked) r.rank = 1 + ranked.filter(x => x.pts > r.pts + 1e-9).length;
+  const day = n => (n ? addDays(dayOne, n - 1) : null);
+  return {
+    roto: { gpMax: limits.length ? sum(limits.map(([n]) => n)) : null, gpSpot: perSpot.size === 1 ? [...perSpot][0] : null, start: day(st.firstScoringPeriod), end: day(st.finalScoringPeriod) },
+    standings: ranked,
+  };
 }
 
 const espnStandings = (j, points) => j.teams.map(t => {
