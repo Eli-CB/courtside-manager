@@ -442,6 +442,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .detail-title:has(> .dt-name) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 1px; white-space: normal; }
 .detail-title .dt-name { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-title .dt-bio { font-size: .82rem; font-weight: 400; color: var(--muted); }
+.detail-title .dt-bit { white-space: nowrap; } /* (a player's: the line breaks between pieces, never inside one) */
 .detail-title .dt-name .tlogo { vertical-align: -4px; margin-right: 2px; }
 .detail-title .dt-rec { color: var(--text); font-weight: 600; } /* a team's record, after its code */
 /* a fantasy team's "This week vs …": one piece, onto the next line whole where the line is full (a long name ends in …) */
@@ -481,7 +482,19 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .cp-fill.up { left: 50%; background: var(--good); border-radius: 0 3px 3px 0; }
 .cp-fill.down { right: 50%; background: var(--bad); border-radius: 3px 0 0 3px; }
 .proj-grid.pc-tiles { flex: 1 1 300px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 640px) { .pc-who { flex: 1 1 0; } .proj-grid.pc-tiles { flex-basis: 100%; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); } }
+.pc-tiles .v .small { white-space: nowrap; } /* ("in 14 G" whole) */
+/* phones: the game tiles three to a row (football's two), the value tiles two to the next, so no row has a hole; labels on
+   two lines so the numbers line up */
+@media (max-width: 640px) {
+  .pc-who { flex: 1 1 0; }
+  .proj-grid.pc-tiles { flex-basis: 100%; display: flex; flex-wrap: wrap; }
+  .pc-tiles > .proj { flex: 1 1 28%; min-width: 0; padding: 8px 9px; }
+  .pc-tiles > .proj:first-child { flex-basis: 34%; } /* (Next game: "Sat vs LAC" on one line) */
+  .pc-tiles > .proj.pc-val { flex-basis: 45%; }
+  .pc-tiles > .proj .k { font-size: .64rem; line-height: 1.25; } /* (> .proj: past .proj .k, further down) */
+  .pc-tiles > .proj:not(.pc-val) .k { min-height: 2.5em; }
+  .pc-tiles > .proj .v { font-size: .98rem; white-space: nowrap; }
+}
 .link-btn.pp-clear:hover, .link-btn.quiet:hover { color: var(--text); text-decoration: underline; }
 .seg button:disabled { opacity: .45; cursor: default; }
 @media (max-width: 640px) { .pp-row { gap: 6px; } .pp-label { width: 100%; } .pp-foot { flex: 1 0 100%; } } /* (phones: Done under the filters) */
@@ -974,11 +987,12 @@ button.link-btn.pname:hover { color: var(--accent); text-decoration: underline; 
 .pc-games li { padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
 .pc-games li span { white-space: nowrap; }
 .pc-g-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
-.pc-g-min { margin-left: auto; font-weight: 700; }
+.pc-g-val { margin-left: auto; font-weight: 700; white-space: nowrap; }
 @media (max-width: 640px) {
   .show-sm { display: block; }
   table.show-sm { display: table; }
   ul.pc-games { display: grid; }
+  ul.pc-games.pc-games-wrap { max-height: none; overflow: visible; } /* (the card scrolls them: no box scrolling inside it) */
   .modal-lg { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
   .modal-lg .modal-body { padding: 14px; }
   .detail-id h2 { font-size: 1.15rem; }

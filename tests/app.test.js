@@ -1523,7 +1523,9 @@ test("player profile: value per game (each game, each season's averages) and thi
     // the title: his name, then his age and flag; beside the photo, whose he is in the league
     const title = els['#detailTitle'].innerHTML;
     assert.match(title, /^<span class="dt-name">[^<]+<\/span><span class="dt-bio">/);
-    if (raw.born) assert.match(title, / · age \d\d/);
+    if (raw.born) assert.match(title, / · <span class="dt-bit">age \d\d<\/span>/, 'each piece whole (a phone breaks the line between them)');
+    assert.doesNotMatch(title, /<span class="dt-bio"> · /, 'no separator before the first piece');
+    if (raw.exp) assert.ok(title.includes(raw.exp === 1 ? '>1 yr in league<' : `>${raw.exp} yrs in league<`));
     if (raw.nat) assert.ok(title.includes(`flagcdn.com/w20/${raw.nat.toLowerCase()}.png`));
     assert.ok(!/ · age /.test(html), 'not again in the card');
     assert.ok(html.includes('<div class="pc-who"><p class="pc-owner">'), 'his fantasy team, or free agent, beside the photo');

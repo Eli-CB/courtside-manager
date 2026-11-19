@@ -402,7 +402,7 @@ function viewPlayers() {
   return topPerformancesCard(); // (ideas for pickups: the Matchups tab's, made against this week's matchup)
 }
 
-// A country's flag (ISO code from the daily data job), named on hover: flagImg alone, flag after a " · " (the player card)
+// A country's flag (ISO code from the daily data job), named on hover
 const flagImg = iso => {
   if (!iso) return '';
   let name = iso;
@@ -410,7 +410,6 @@ const flagImg = iso => {
   const c = iso.toLowerCase();
   return `<img class="flag" src="https://flagcdn.com/w20/${c}.png" srcset="https://flagcdn.com/w40/${c}.png 2x" width="20" height="15" alt="${esc(name)}" title="${esc(name)}" loading="lazy">`;
 };
-const flag = iso => (iso ? ` · ${flagImg(iso)}` : '');
 // Whose he is in the league: the fantasy team and where in its lineup, else free agent or waivers
 function cardOwner(raw) {
   const L = fxLeague();
@@ -691,8 +690,8 @@ function showPlayerDetail(nbaId) {
   const wlBadge = o => (o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : '');
   const gameWorthTxt = v => `<span class="${v < 0 && !isPoints() ? 'pos-bad' : ''}" data-tip="${valTip}">${fmtValue(v)} ${isPoints() ? 'FP' : 'value'}</span>`;
   const gamesNarrow = games.length ? `<ul class="pc-games show-sm pc-games-wrap">${games.map(o => { const v = lineValue(o); return `<li>
-      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${preBadge(o)} <span class="muted">${linkTeams(esc(o.matchup))}</span>${o.wl ? ' ' + wlBadge(o) : ''}<span class="pc-g-min">${Math.round(o.min)} min · ${gameWorthTxt(v)}</span></div>
-      <div>${gameStats(raw, o)[0].map(x => `<span>${x}</span>`).join(' · ')}</div>
+      <div class="pc-g-top"><b>${esc(fmtDay(o.date))}</b>${preBadge(o)} <span class="muted">${linkTeams(esc(o.matchup))}</span>${o.wl ? ' ' + wlBadge(o) : ''}<span class="pc-g-val">${gameWorthTxt(v)}</span></div>
+      <div>${[...(o.min != null ? [`${Math.round(o.min)} min`] : []), ...gameStats(raw, o)[0]].map(x => `<span>${x}</span>`).join(' · ')}</div>
       <div class="muted">${gameStats(raw, o)[1].join(' · ')}</div></li>`; }).join('')}</ul>` : '';
   const logs = games.map(o => `<tr><td>${esc(fmtDay(o.date))}${o.type === 'PRE' ? ' <span class="badge">Pre</span>' : ''}</td><td>${linkTeams(esc(o.matchup))}</td><td>${o.wl ? `<span class="badge ${o.wl === 'W' ? 'good' : 'bad'}">${o.wl}</span>` : ''}</td>${CS.map(([, , g]) => `<td class="num">${g(o)}</td>`).join('')}${valCell(lineValue(o))}</tr>`).join('');
   // the tile after Next game: a goalie's starts still to come, football's projected week (the rest: games left, below)
@@ -720,8 +719,8 @@ function showPlayerDetail(nbaId) {
           // his value, and under it his rank among every NBA player this season (per game: regulars only)
           const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
           const rank = (n, of, tip) => `<div class="pc-rank" data-tip="${esc(tip)}">${n ? `#${n} of ${of}` : season ? `ranked with ${R.minGp}+ G` : ''}</div>`;
-          return `<div class="proj" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div>${rank(per, R.perN, `Among the ${R.perN} ${SPORT.name} players with ${R.minGp}+ games this season, keepers and free agents included (the Draft tab ranks only the league's draft picks)`)}</div>
-        <div class="proj" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div>${tot ? rank(tot, R.totN, `Among the ${R.totN} ${SPORT.name} players who've played this season, by ${VAL.toLowerCase()} added up`) : ''}</div>`;
+          return `<div class="proj pc-val" data-tip="${valTip}"><div class="k">${VAL} per game</div><div class="v${season && season.per < 0 && !isPoints() ? ' pos-bad' : ''}">${season ? fmtValue(season.per) : '—'}</div>${rank(per, R.perN, `Among the ${R.perN} ${SPORT.name} players with ${R.minGp}+ games this season, keepers and free agents included (the Draft tab ranks only the league's draft picks)`)}</div>
+        <div class="proj pc-val" data-tip="${valTip}"><div class="k">${VAL} this season</div><div class="v">${season ? `${fmtValue(season.per * season.gp, 1)} <span class="muted small">in ${season.gp} G</span>` : '—'}</div>${tot ? rank(tot, R.totN, `Among the ${R.totN} ${SPORT.name} players who've played this season, by ${VAL.toLowerCase()} added up`) : ''}</div>`;
         })()}
       </div>
     </div>
@@ -735,6 +734,10 @@ function showPlayerDetail(nbaId) {
   sportCardOpen = null;
   // his name, and who he is: team, number, positions, age, country, years in the league (his injury, if any, is the note
   // under the photo, its word first)
-  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${raw.team ? teamBtn(raw.team) : ''}${raw.jersey ? ' · #' + esc(raw.jersey) : ''} · ${posTags(raw.pos)}${raw.born ? ` · age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : ''}${flag(raw.nat)}${raw.pos[0] === 'DEF' ? '' : ` · ${raw.exp ? raw.exp + ' yrs in league' : 'Rookie'}`}</span>`;
+  // (each piece kept whole: a phone breaks the line only between them, never "1 yr in / league")
+  const bio = [raw.team ? teamBtn(raw.team) : '', raw.jersey ? '#' + esc(raw.jersey) : '', posTags(raw.pos),
+    raw.born ? `age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : '', flagImg(raw.nat),
+    raw.pos[0] === 'DEF' ? '' : raw.exp ? `${raw.exp} ${raw.exp === 1 ? 'yr' : 'yrs'} in league` : 'Rookie'];
+  $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${bio.filter(Boolean).map(x => `<span class="dt-bit">${x}</span>`).join(' · ')}</span>`;
   if (!d.open) d.showModal();
 }
