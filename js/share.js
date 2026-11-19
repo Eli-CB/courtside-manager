@@ -143,7 +143,7 @@ async function sharePad(tall = 5000) {
     const raw = nbaById.get(p.nbaId) || {}, logo = logos.get(raw.team), cx = x + d / 2, cy = y + d / 2, i = IMG_INDEX.get(p.nbaId);
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = C.card2; ctx.fill(); ctx.clip();
-    if (logo) { ctx.globalAlpha = 0.4; ctx.drawImage(logo, x, y, d, d); ctx.globalAlpha = 1; }
+    if (logo) { ctx.globalAlpha = 0.52; ctx.drawImage(logo, x, y, d, d); ctx.globalAlpha = 1; }
     if (sheet && i !== undefined) ctx.drawImage(sheet, (i % IMG.cols) * IMG.size, Math.floor(i / IMG.cols) * IMG.size, IMG.size, IMG.size, x, y, d, d);
     else { font(d * 0.36, 700); ctx.textBaseline = 'middle'; text(initials(p.name), cx, cy, C.muted, 'center'); ctx.textBaseline = 'top'; }
     ctx.restore();
