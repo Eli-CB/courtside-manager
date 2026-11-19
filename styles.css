@@ -302,9 +302,12 @@ body:has(.mu-card.full) .container { padding-top: max(12px, env(safe-area-inset-
 .mu-row.bench .mu-p, .mu-p.bench, .mu-p.out { opacity: .62; }
 .mu-game { font-size: .78rem; color: var(--muted); }
 .mu-game b { color: var(--bad); }
-/* the game itself, in a bubble as on Fantrax: "DET 144 @ WAS 140 F", the clock while it's on, the tip-off before */
+/* the game itself, in a bubble as on Fantrax: "DET 144 @ WAS 140", the clock while it's on, the tip-off before; a final
+   faintly green or red for his team's win or loss */
 .game-pill { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); color: var(--text);
   font-variant-numeric: tabular-nums; }
+.game-pill.gp-w { background: var(--good-soft); }
+.game-pill.gp-l { background: var(--bad-soft); }
 .game-pill .gp-part { white-space: nowrap; }
 .mu-chips { display: flex; flex-wrap: wrap; gap: 3px; }
 .mu-p.right .mu-chips { justify-content: flex-end; }

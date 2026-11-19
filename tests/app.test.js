@@ -2952,7 +2952,7 @@ test("a team's code opens its card in the popup: its schedule, then its players 
   } finally { doc.querySelector = realQuery; }
 });
 
-test("a player's game on the Matchup tab is in a bubble, as on Fantrax: DET 144 @ WAS 140 F", async () => {
+test("a player's game on the Matchup tab is in a bubble, as on Fantrax: DET 144 @ WAS 140, a final green or red for his team", async () => {
   await app.useLeague(CATS9);
   await app.loadBoxes();
   const box = app.get('BOX'), live = app.get('live'), ui = app.get('ui'), was = live.games;
@@ -2961,8 +2961,13 @@ test("a player's game on the Matchup tab is in a bubble, as on Fantrax: DET 144 
   const d = box.byPlayer.get(p.nbaId).find(g => g[3] === p.team)[0], s = box.scores.get(`${d} ${p.team}`);
   try {
     live.games = [];
-    assert.equal(app.dashGame(p, d), `<span class="game-pill">${s.away} ${s.as} @ ${s.home} ${s.hs} F</span>`);
-    ui.hideScores = true;
+    // no "F": a final is tinted for his team's win or loss
+    const won = s.home === p.team ? s.hs > s.as : s.as > s.hs;
+    assert.equal(app.dashGame(p, d), `<span class="game-pill ${won ? 'gp-w' : 'gp-l'}">${s.away} ${s.as} @ ${s.home} ${s.hs}</span>`);
+    box.scores.set(`${d} ${p.team}`, { ...s, hs: s.as, as: s.hs });
+    try { assert.match(app.dashGame(p, d), new RegExp(`^<span class="game-pill ${won ? 'gp-l' : 'gp-w'}">`), 'the other result, the other color'); }
+    finally { box.scores.set(`${d} ${p.team}`, s); }
+    ui.hideScores = true; // no color either: it would give the result away
     assert.equal(app.dashGame(p, d), `<span class="game-pill">${s.home === p.team ? `vs ${s.away}` : `@${s.home}`} · Final</span>`, 'scores hidden: the opponent');
     ui.hideScores = false;
     // on now: the score in one piece, then the clock (on a phone only the clock goes to a second line)

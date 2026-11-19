@@ -43,13 +43,18 @@ function dashGame(p, d) {
   if (!playsOn(p, d)) return '<span class="muted">No game</span>';
   const g = liveGame(p, d), s = g || (BOX.scores && BOX.scores.get(`${d} ${p.team}`));
   const vs = x => (x.home === p.team ? `vs ${x.away}` : `@${x.home}`);
-  const bubble = x => `<span class="game-pill">${x}</span>`, whole = x => `<span class="gp-part">${x}</span>`;
+  const bubble = (x, cls = '') => `<span class="game-pill${cls}">${x}</span>`, whole = x => `<span class="gp-part">${x}</span>`;
   const inGoal = isGoalie(p) && !lineOn(p, d) ? ` · ${startWords(p, d)}` : '';
   if (g && g.state === 'pre') return `${bubble(`${vs(g)} ${fmtTime(g.start)}`)}${inGoal}`;
   const score = !s ? '' : ui.hideScores ? vs(s) : `${s.away} ${s.as} @ ${s.home} ${s.hs}`;
   if (g && g.state === 'in') return bubble(`${whole(score)} ${whole(liveStatus(p, d))}`); // (its dot: on the floor or not)
   const dnp = gameFinal(p, d) || (g && g.state === 'post') ? (lineOn(p, d) ? '' : ' · <b>DNP</b>') : '';
-  if (s) return `${bubble(`${score}${ui.hideScores ? ' · Final' : ' F'}`)}${dnp}`;
+  // a final needs no "F": the bubble is tinted green or red for his team's win or loss (none for a tie, or with scores hidden)
+  if (s && ui.hideScores) return `${bubble(`${score} · Final`)}${dnp}`;
+  if (s) {
+    const us = +(s.home === p.team ? s.hs : s.as), them = +(s.home === p.team ? s.as : s.hs);
+    return `${bubble(score, us > them ? ' gp-w' : us < them ? ' gp-l' : '')}${dnp}`;
+  }
   const nx = NBA.teams && NBA.teams[p.team] && NBA.teams[p.team].next;
   return nx && nx.date === d ? `${bubble(nx.home ? `vs ${nx.opp}` : `@${nx.opp}`)}${inGoal}` : `${bubble('Final')}${dnp}`;
 }
