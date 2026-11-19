@@ -253,11 +253,14 @@ function draftImpact(L, G, picks) {
 // matchups won (ties half), added up; in leagues where each category counts, the share of categories.
 // Team id -> { exp, pct, weeks, list: [{ n, opp, res, exp, wa, wb, beat, of }] }: each week, the result against the
 // real opponent (res: 1, 0.5 or 0, or the share of categories; wa-wb: categories, or 1-0 on points) and the
-// all-play share expected (beat: teams beaten, ties half, of of)
+// all-play share expected (beat: teams beaten, ties half, of of). Sleeper basketball: only the weeks whose real scores
+// are known (slpWeekPts, sleeper.js), with those scores: its lineups can't give them
 function allPlayRecords(L, G, each) {
   if (!L.weeks || !G) return null;
   const now = Date.now();
-  const weeks = L.weeks.filter(w => (!L.playoffPeriod || w.n < L.playoffPeriod) && periodOver(w) && (L.matchups[String(w.n)] || []).length);
+  const realOf = new Map(slpEstimated(L) ? L.weeks.map(w => [w.n, slpWeekPts(L, w.n)]) : []);
+  const weeks = L.weeks.filter(w => (!L.playoffPeriod || w.n < L.playoffPeriod) && periodOver(w) && (L.matchups[String(w.n)] || []).length
+    && (!slpEstimated(L) || realOf.get(w.n)));
   if (!weeks.length) return null;
   const cats = scoreCats();
   const sc = leaguePoints();
@@ -265,15 +268,16 @@ function allPlayRecords(L, G, each) {
   const ids = fxPickable().map(t => t.id);
   const out = Object.fromEntries(ids.map(id => [id, { exp: 0, won: 0, games: 0, weeks: weeks.length, list: [] }]));
   for (const w of weeks) {
-    const tot = pastSeasonTotals({ ...L, weeks: [w] }, G);
+    const tot = pastSeasonTotals({ ...L, weeks: [w] }, G), real = realOf.get(w.n);
+    const fpOf = t => (real ? real[t] || 0 : val(tot[t], { fp: true }));
     const face = (a, b) => {
       let wa = 0, wb = 0;
       for (const c of sc ? [{ fp: true }] : cats) {
-        const x = val(tot[a], c), y = val(tot[b], c);
+        const x = c.fp ? fpOf(a) : val(tot[a], c), y = c.fp ? fpOf(b) : val(tot[b], c);
         if (Math.abs(x - y) < 1e-9) { wa += 0.5; wb += 0.5; } else if (c.neg ? x < y : x > y) wa++; else wb++;
       }
       // edge: categories won minus lost, or the fantasy points margin
-      const fa = sc ? val(tot[a], { fp: true }) : 0, fb = sc ? val(tot[b], { fp: true }) : 0;
+      const fa = sc ? fpOf(a) : 0, fb = sc ? fpOf(b) : 0;
       const edge = sc ? fa - fb : wa - wb;
       return { wa, wb, edge, fb, share: each && !sc ? wa : wa > wb ? 1 : wa < wb ? 0 : 0.5 };
     };
@@ -410,6 +414,9 @@ function startersMissed(L, G) {
 // where one started and the other sat, as long as the lineup could still be filled from their positions.
 // period: the matchup period; tids: its two teams. Returns [{ tid, tot, swaps: [{ inP, outP, tot }], starters, bench }]
 // or null; starters and bench: [{ p, line }], a player's games while starting (bench: his games that week).
+// Sleeper basketball (its lineups can't give Lock-In's real scores: slpWeekPts, sleeper.js) also: res, Sleeper's own result
+// ('W', 'L', 'T'); exact, whether its real score is known, and then fix, what it adds to the lineups' games (as 'bonus'
+// points on tot and on every swap's, so each says the real score and a swap changes it by the two players' games)
 function benchSwaps(L, G, weeks, period, tids) {
   // the lineup periods that start within it (by time: the next one starts the evening this one ends)
   const rps = weeks.filter(w => fxTime(w.start) >= fxTime(period.lock) && fxTime(w.start) < fxTime(period.endAt));
@@ -434,6 +441,7 @@ function benchSwaps(L, G, weeks, period, tids) {
   };
   const add = (tot, line, sign) => { for (const [k, v] of Object.entries(line)) tot[k] = (tot[k] || 0) + sign * v; };
   const filled = ps => fillSlots(ps, state.slots).filter(Boolean).length;
+  const res = (L.results || {})[period.n] || null, real = res && slpWeekPts(L, period.n);
   return tids.map(tid => {
     const tot = {}, started = new Map(), sat = new Map();
     const per = rps.map(rp => {
@@ -461,7 +469,15 @@ function benchSwaps(L, G, weeks, period, tids) {
       }
     }
     const list = m => [...m].map(([f, line]) => ({ p: playerOf(f), line })).filter(x => x.p);
-    return { tid, tot, swaps: [...swaps.values()], starters: list(started), bench: list(sat).filter(x => !started.has(x.p.fid)) };
+    const out = { tid, tot, swaps: [...swaps.values()], starters: list(started), bench: list(sat).filter(x => !started.has(x.p.fid)) };
+    if (res) {
+      Object.assign(out, { res: res[tid] || null, exact: !!(real && real[tid] != null) });
+      if (out.exact) {
+        out.fix = Math.round((real[tid] - lineFp(tot)) * 100) / 100;
+        for (const t of [tot, ...out.swaps.map(w => w.tot)]) t.bonus = (t.bonus || 0) + out.fix;
+      }
+    }
+    return out;
   });
 }
 
@@ -782,7 +798,9 @@ function seasonAwards() {
   // Best manager: actual wins against an all-play record
   const allPlay = allPlayRecords(L, G, each);
   for (const T of teams) {
-    const A = allPlay && allPlay[T.id], r = standingOf(T.id);
+    const A = allPlay && allPlay[T.id];
+    // (Sleeper basketball: the record over the weeks all-play counts, those whose real scores are known)
+    const r = slpEstimated(L) ? (A && A.list.length ? { w: A.list.filter(x => x.res === 1).length, l: A.list.filter(x => x.res === 0).length, t: A.list.filter(x => x.res === 0.5).length } : null) : standingOf(T.id);
     if (!A || !r) continue;
     T.record = `${r.w}-${r.l}${r.t ? '-' + r.t : ''}`;
     T.expW = A.exp;
@@ -900,7 +918,9 @@ function viewAwardsSoFar() {
   const L2 = { ...L, weeks: C.weeks, season: 'cur', fidNba: C.fidNba };
   const done = C.weeks.filter(periodOver).length;
   return viewingLeague(L2, state.fxTeam, () => {
-    return `<p class="page-sub">So far: ${done} finished week${done === 1 ? '' : 's'}${done < 3 ? ', so these will move a lot' : ''} (the week underway counts toward everything but Best manager)</p>${viewAwards()}`;
+    const known = slpEstimated(L) ? C.weeks.filter(w => periodOver(w) && slpWeekPts(L2, w.n)).length : done;
+    const slp = known < done ? ` Best manager, Week of the Year and Heartbreak Hotel count ${known ? `the ${known} week${known === 1 ? '' : 's'} whose Sleeper scores the site has seen` : 'only weeks whose Sleeper scores the site has seen: none yet'} ${infoBtn('slpScores')}` : '';
+    return `<p class="page-sub">So far: ${done} finished week${done === 1 ? '' : 's'}${done < 3 ? ', so these will move a lot' : ''} (the week underway counts toward everything but Best manager).${slp}</p>${viewAwards()}`;
   });
 }
 

@@ -392,7 +392,10 @@ function pastSeasonTotals(L, G) {
 
 // S: seasonLineups' answer (its message while the lineups and games aren't in)
 function seasonTotalsCard(standings, S) {
-  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${leagueLineupMode(fxLeague()) === 'daily' && !isFootball() ? "day's" : "week's"} starting lineups</span></div>`;
+  // Sleeper basketball: its lineups can't give Lock-In's real scores (slpWeekPts, sleeper.js), so these are estimates and
+  // its fantasy points are the standings' Pts for, Sleeper's own
+  const est = slpEstimated(fxLeague());
+  const head = `<div class="card-head"><h2>Season totals ${infoBtn(est ? 'slpScores' : 'totals')}</h2><span class="muted small">${est ? "estimated from each week's final lineups" : `from each ${leagueLineupMode(fxLeague()) === 'daily' && !isFootball() ? "day's" : "week's"} starting lineups`}</span></div>`;
   if (S.msg) return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">${S.msg}</p></div>`;
   const teams = S.teams;
 
@@ -401,7 +404,7 @@ function seasonTotalsCard(standings, S) {
   const sc = leaguePoints();
   const cols = sc
     ? [...Object.keys(STAT_LABEL).filter(k => sc[k]).map(k => ({ label: STAT_LABEL[k], neg: sc[k] < 0, val: T => tot(T, k), fmt: v => fmt(v, 0) })),
-      { label: 'FP', val: T => sum(Object.entries(sc).map(([k, v]) => tot(T, k) * v)), fmt: v => fmtFp(v) }]
+      ...(est ? [] : [{ label: 'FP', val: T => sum(Object.entries(sc).map(([k, v]) => tot(T, k) * v)), fmt: v => fmtFp(v) }])]
     : scoreCats().map(c => ({ label: c.label, neg: c.neg,
       val: c.pct ? (T => (tot(T, c.att) ? tot(T, c.made) / tot(T, c.att) : 0)) : T => tot(T, c.key),
       fmt: c.pct ? fmtPct : v => fmt(v, c.dec ? 1 : 0) }));

@@ -331,12 +331,17 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   long team names did). Give the button its own ellipsis and the room left over, as `.pmeta:has(> .perf-owner)` in styles.css does.
 - Sleeper basketball's past weeks (Nov 18, 2026): the matchups API's points don't add up to Sleeper's own standings (rosters'
   `fpts`, `wins`, `metadata.record`), in the owner's league and the fixtures' (every team off, 5 of 12 records differ), and the
-  same week's answer varies between requests (some show a locked-in game, some the last one). Recap finals, Awards, Season totals
-  and past-week cards come from it; Standings come from the rosters, so they can disagree: it names the wrong winner in 8 of 32 matchups
+  same week's answer varies between requests (some show a locked-in game, some the last one): it names the wrong winner in 8 of 32 matchups
   (The IPA, weeks 1-4) and 3 of 24 (fixtures). Each roster's `metadata.record` ("WLLW") is its real result week by week, from `start_week`
   (both sides of every matchup agree). The owner's team r00k5 really scored 112.5, 166, 95, 126: week 4 matched the API, weeks 1-3 were one
   starter off each (an earlier game the API shows counted as his last, or as 0). Likely (not confirmed): Lock-In scores a lineup slot day by
   day, and a slot's game can come from a player moved out since; the public API has only the week's final starters (Sleeper's GraphQL has more, sign-in only).
+  So (the owner's choice, Nov 18, 2026): `L.results` (week -> team -> 'W'/'L'/'T', `sleeperResults`) decides every winner; `L.totals` (season
+  total through week n) is saved per device each read (`slpTotalsSave`, `league-layer-slp-totals`, first seen kept), so a week's real score is
+  the growth (`slpWeekPts`; regular season only). `benchSwaps` carries `res`/`exact`/`fix` (real minus the lineups' games, added as `bonus`).
+  A week without it (`slpEstimated`, before the site saw it end) is marked ≈, without Tough luck/Lucky win/Nail-biter/Carried/bench regret/Best-Worst
+  or Plan Ahead's bench swaps; Best manager, Week of the Year and Heartbreak Hotel count only real-score weeks; Season totals drop FP. (i): `slpScores`.
+  The Matchup tab's live score still comes from the matchups API.
 - Fantrax names can differ from NBA.com ("Nicolas"/"Nic"): `matchNicknames` (initial + last name + team).
 - The preview browser sometimes loses localStorage on restart (back to the landing page): reconnect the
   league by ID in the form, then pick "Eli's SGAteam".

@@ -43,11 +43,15 @@ function buildRecap(L, P, period) {
   if (!R) return null;
   const by = new Map(R.map(x => [x.tid, x]));
   const outcome = sc => Math.sign(Math.round((sc.me - sc.opp) * 10));
+  // Sleeper basketball: the winners are Sleeper's own, and a week whose real scores the site hasn't seen is estimated
+  // from its final lineups (benchSwaps): its scores marked, and nothing that hangs on a close score told
+  const est = R.some(x => x.res !== undefined && !x.exact);
   // the finals, winner first
   const games = pairs.map(([a, b]) => {
     let sc = weekScore(by.get(a).tot, by.get(b).tot);
-    if (outcome(sc) < 0) { [a, b] = [b, a]; sc = weekScore(by.get(a).tot, by.get(b).tot); }
-    return { a, b, sc, margin: sc.me - sc.opp };
+    const res = by.get(a).res;
+    if (res ? res === 'L' : outcome(sc) < 0) { [a, b] = [b, a]; sc = weekScore(by.get(a).tot, by.get(b).tot); }
+    return { a, b, sc: est ? { ...sc, est: true } : sc, margin: sc.me - sc.opp, won: res ? res !== 'T' : !!outcome(sc) };
   });
   const order = [...games].sort((x, y) => y.margin - x.margin);
   // every starter's week and every game he started, valued as Performances values them
@@ -120,8 +124,9 @@ function buildRecap(L, P, period) {
   const mvp = best(weeks, x => x.v);
   // Football: the best team defense started
   const defense = isFootball() ? best(weeks.filter(x => x.p.pos[0] === 'DEF'), x => x.v) : null;
+  if (est) { pointsBits = {}; regret = null; rank = null; }
   return {
-    ...pointsBits,
+    ...pointsBits, est,
     goalie: goalie && goalie !== mvp ? goalie : null,
     hats: isHockey() ? single.filter(x => !isGoalie(x.line) && lineStat(x.line, 'g') >= 3) : [],
     defense: defense && defense !== mvp ? defense : null,
@@ -151,7 +156,8 @@ function recapMarkTip(X, tid) {
   return `${top ? 'Best' : 'Worst'} week in the league: ${a.w}-${a.l}${a.t ? `-${a.t}` : ''} against every other team`;
 }
 
-const scoreLine = sc => (isPoints() ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
+// (≈: a Sleeper week the site could only estimate, buildRecap)
+const scoreLine = sc => (sc.est ? '≈ ' : '') + (isPoints() ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
 
 // The standouts as { label, html, text for sharing } (no emoji, the owner's ask); a player's instead { label, text, p, tid,
 // stats (his line in words), tiles (lineTiles), per (the games a week's line is a game of), score: [value or points, unit] },
@@ -277,7 +283,7 @@ function viewRecap() {
     { first: period.n === done[0].n, last: period.n === done[done.length - 1].n }) : '';
   // the finals, the week's top and bottom teams marked on the row's outer edge (before the left team, after the right)
   const mark = tid => { const k = recapMark(X, tid); return k ? `<span class="rc-badge rc-${k}" title="${esc(recapMarkTip(X, tid))}">${RECAP_MARK[k]}</span>` : ''; };
-  const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.margin ? ' won' : ''}">${mark(g.a)}${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}${mark(g.b)}</span></li>`).join('');
+  const finals = X.games.map(g => `<li class="rc-final${g.a === me || g.b === me ? ' me' : ''}"><span class="rc-t${g.won ? ' won' : ''}">${mark(g.a)}${teamLink(g.a)}</span><span class="rc-score">${scoreLine(g.sc)}</span><span class="rc-t">${teamLink(g.b)}${mark(g.b)}</span></li>`).join('');
   const items = recapItems(X).map(x => standoutCard(x)).join('');
   return `<div class="card">
     <div class="card-head"><h2>Period ${period.n} recap ${infoBtn('recap')}</h2>${picker}${items ? `<button type="button" class="btn sm primary" data-action="recap-share" data-week="${period.n}">Share</button>` : ''}</div>
@@ -285,6 +291,7 @@ function viewRecap() {
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>
     <ul class="rc-finals">${finals}</ul>
+    ${X.est ? `<p class="muted small" style="margin:8px 0 0">≈ estimated: Sleeper doesn't share this week's scores. The winners are Sleeper's. ${infoBtn('slpScores')}</p>` : ''}
   </div>`;
 }
 
@@ -912,7 +919,7 @@ async function shareCanvas(H) {
       }
       font(30, weight); text(fitText(ctx, fxTeamName(tid), colW - room), left ? edge + room : edge - room, y + 26, color, left ? 'left' : 'right');
     };
-    side(g.a, true, g.margin ? 700 : 500, C.text);
+    side(g.a, true, g.won ? 700 : 500, C.text);
     side(g.b, false, 500, C.muted);
     y += 96;
   }

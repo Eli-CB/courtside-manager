@@ -171,7 +171,7 @@ async function fetchSleeperLeague(id) {
   const weekPts = {};
   for (const m of thisWeek) Object.assign(weekPts, m.players_points || {});
 
-  const pf = r => (+r.settings.fpts || 0) + (+r.settings.fpts_decimal || 0) / 100;
+  const pf = slpPf;
   const rows = rosters.map(r => ({ r, w: +r.settings.wins || 0, l: +r.settings.losses || 0, t: +r.settings.ties || 0 }))
     .sort((a, b) => (b.w + b.t / 2) - (a.w + a.t / 2) || pf(b.r) - pf(a.r));
   const top = rows[0] || { w: 0, l: 0 };
@@ -199,6 +199,11 @@ async function fetchSleeperLeague(id) {
     // what its future picks need (fetchSleeperPicks): its type (0 redraft, 1 keeper, 2 dynasty), rounds, season, drafted yet
     pickInfo: { type: +s.type || 0, rounds: +s.draft_rounds || 0, season: +lg.season || 0, drafted: !['pre_draft', 'drafting'].includes(lg.status) },
   };
+  // basketball: each finished week's real result, and the season totals that give its real score (sleeperResults)
+  if (sport === 'nba' && periods.length) {
+    Object.assign(league, sleeperResults(rosters, periods[0].n, league.playoffPeriod));
+    if (league.totals) slpTotalsSave(id, league.totals);
+  }
   const picks = (draftPicks || []).filter(p => p.player_id);
   if (picks.length) {
     const keepers = {};
@@ -226,6 +231,48 @@ async function fetchSleeperLeague(id) {
   }
   return { league, fxPlayers, idMap: { toNba, names } };
 }
+
+// ----- Sleeper basketball's real weekly results -----
+// Its matchups (the weekly lineups the site counts) can't give Lock-In's real scores: they show only the week's final
+// lineups, and a lineup spot's game can come from a player moved out since (CLAUDE.md, Gotchas). Its standings can: each
+// team's record, week by week from the league's first week ('WLLW'), and its season total so far, which the site keeps on
+// the device each time it reads the league, so a finished week's real score is how much the total grew. Regular season
+// only (the playoffs' aren't known to be in either).
+const SLP_TOTALS_KEY = 'league-layer-slp-totals', SLP_TOTALS_KEEP = 8;
+const slpPf = r => (+r.settings.fpts || 0) + (+r.settings.fpts_decimal || 0) / 100;
+// { results: week -> team id -> 'W' | 'L' | 'T', totals: { n: the weeks they cover, through week n; pts: team id -> } }
+function sleeperResults(rosters, first, playoff) {
+  const recs = rosters.map(r => [String(r.roster_id), String((r.metadata || {}).record || '')]);
+  if (!recs.length || !recs.every(([, x]) => /^[WLT]*$/.test(x))) return {};
+  const reg = playoff ? playoff - first : Infinity;
+  const n = Math.min(reg, ...recs.map(([, x]) => x.length));
+  if (!n) return {};
+  const results = {};
+  for (let i = 0; i < n; i++) results[first + i] = Object.fromEntries(recs.map(([tid, x]) => [tid, x[i]]));
+  // a total covers exactly the weeks every record has, all of them regular-season ones
+  const len = recs[0][1].length, whole = recs.every(([, x]) => x.length === len) && len <= reg;
+  return { results, ...(whole ? { totals: { n: first - 1 + len, pts: Object.fromEntries(rosters.map(r => [String(r.roster_id), slpPf(r)])) } } : {}) };
+}
+// Kept per league: week n -> the totals through it, the first ones seen (a later read can't move a finished week; the
+// 8 leagues used most recently)
+function slpTotalsSave(id, T) {
+  const all = store.json(SLP_TOTALS_KEY, {}), mine = all[id] = all[id] && all[id].w ? all[id] : { w: {} };
+  if (!mine.w[T.n]) mine.w[T.n] = T.pts;
+  mine.at = Date.now();
+  store.setJson(SLP_TOTALS_KEY, Object.fromEntries(Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, SLP_TOTALS_KEEP)));
+}
+// A finished week's real score for each team (team id -> points), once the totals after it and before it are known; else null
+function slpWeekPts(L, n) {
+  if (!L || !L.results || !L.results[n]) return null;
+  const w = { ...((store.json(SLP_TOTALS_KEY, {})[L.id] || {}).w || {}) };
+  if (L.totals && !w[L.totals.n]) w[L.totals.n] = L.totals.pts;
+  const first = Math.min(...Object.keys(L.results).map(Number));
+  const after = w[n], before = n === first ? {} : w[n - 1];
+  if (!after || !before) return null;
+  return Object.fromEntries(Object.keys(after).map(tid => [tid, Math.round(((after[tid] || 0) - (before[tid] || 0)) * 100) / 100]));
+}
+// A league whose weekly scores the site can only estimate unless Sleeper's totals say them (Sleeper basketball)
+const slpEstimated = L => !!(L && L.source === 'sleeper' && L.sport === 'nba');
 
 // ----- Weekly lineups (Awards, Recap, Season totals) -----
 // Each week's matchups carry every team's players, its starters and each player's points that week (for a starter,

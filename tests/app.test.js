@@ -3628,6 +3628,122 @@ test('a Sleeper dynasty league: its taxi squad never starts, and its rookie draf
   }
 });
 
+// The fixture league under its own id with Sleeper's own results: records week by week ('WL') and season totals (fpts),
+// as Sleeper's standings have them. Week 1's first matchup goes to the team the lineups say lost (as happens in Lock-In)
+async function sleeperWithResults(id, weeks, fn) {
+  const fs = require('fs'), path = require('path');
+  const fx = name => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/sleeper', name), 'utf8'));
+  const lg = fx(`league_${SLEEPER}.json`), rosters = fx(`league_${SLEEPER}_rosters.json`);
+  const ms = [1, 2, 3].map(n => fx(`league_${SLEEPER}_matchups_${n}.json`));
+  // each week: winner by Sleeper's matchup points, but week 1's first pair flipped; real scores 10 over the lineups' for a winner
+  const rec = {}, fpts = {}, real = {};
+  let flipWin = null;
+  for (let n = 1; n <= weeks; n++) {
+    const by = {};
+    for (const m of ms[n - 1]) (by[m.matchup_id] = by[m.matchup_id] || []).push(m);
+    Object.values(by).forEach(([a, b], i) => {
+      let [w, l] = a.points >= b.points ? [a, b] : [b, a];
+      if (n === 1 && i === 0) { [w, l] = [l, w]; flipWin = String(w.roster_id); }
+      rec[w.roster_id] = (rec[w.roster_id] || '') + 'W'; rec[l.roster_id] = (rec[l.roster_id] || '') + 'L';
+      real[n] = { ...real[n], [w.roster_id]: Math.max(w.points, l.points) + 10, [l.roster_id]: l.points };
+      if (n === 1 && i === 0) real[n][l.roster_id] = Math.min(w.points, l.points) + 0.5; // (the loser's real score: under the winner's)
+      for (const r of [w, l]) fpts[r.roster_id] = (fpts[r.roster_id] || 0) + real[n][r.roster_id];
+    });
+  }
+  for (const r of rosters) {
+    r.metadata = { record: rec[r.roster_id] || '' };
+    const v = fpts[r.roster_id] || 0;
+    r.settings = { ...r.settings, fpts: Math.floor(v), fpts_decimal: Math.round((v - Math.floor(v)) * 100) };
+  }
+  const answers = { [`league/${id}`]: { ...lg, league_id: id }, [`league/${id}/rosters`]: rosters, [`league/${id}/users`]: fx(`league_${SLEEPER}_users.json`) };
+  ms.forEach((m, i) => { answers[`league/${id}/matchups/${i + 1}`] = m; });
+  const realFetch = app.get('fetch');
+  app.set('fetch', (url, init) => {
+    const u = new URL(String(url)), k = u.hostname === 'api.sleeper.app' && u.pathname.replace(/^\/v1\//, '');
+    return k in answers ? Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(answers[k]) }) : realFetch(url, init);
+  });
+  const saved = app.NBA.players.map(r => [r, r.fx, r.pos]), ui = app.get('ui');
+  try {
+    await app.loadBoxes();
+    await app.useLeague(id);
+    app.applyFantraxLeague(await app.getLeague(id, true));
+    return await fn(app.fxLeague(), { real, flipWin });
+  } finally {
+    app.set('fetch', realFetch);
+    for (const [r, fx0, pos] of saved) { if (fx0) r.fx = fx0; else delete r.fx; r.pos = pos; }
+    app.set('nbaCache', null);
+    ui.tab = 'dashboard'; ui.recapWeek = null; app.get('state').fxTeam = null;
+  }
+}
+// the recap of a week, once its lineups have loaded
+async function recapOf(L, n) {
+  const ui = app.get('ui');
+  ui.tab = 'recap'; ui.recapWeek = n;
+  app.viewRecap();
+  await new Promise(r => setTimeout(r, 30));
+  return { html: app.viewRecap(), X: app.get('recaps').get(`${L.id}|${n}`) };
+}
+
+test("Sleeper basketball: its own winners and, once the site has seen a week end, its real scores", () => sleeperWithResults('999000000000000003', 1, async (L, { real, flipWin }) => {
+  // the records, week by week, and the season total, which says week 1's real score (the first week: all of it)
+  assert.deepEqual(Object.keys(L.results).map(Number), [1]);
+  assert.equal(L.totals.n, 1);
+  const pts = app.slpWeekPts(L, 1);
+  for (const [tid, v] of Object.entries(real[1])) assert.ok(Math.abs(pts[tid] - v) < 0.01, `team ${tid}: ${pts[tid]} is Sleeper's ${v}`);
+  useTeam(L.teams[0].id);
+  const { html, X } = await recapOf(L, 1);
+  assert.ok(X && !X.est && !html.includes('≈'), 'a week the site saw end: real scores');
+  for (const g of X.games) {
+    assert.ok(Math.abs(g.sc.me - real[1][g.a]) < 0.01 && Math.abs(g.sc.opp - real[1][g.b]) < 0.01, 'the scores are Sleeper\'s');
+    assert.equal(L.results[1][g.a], 'W', 'the winner first');
+  }
+  // the matchup the lineups get wrong: Sleeper's winner, by Sleeper's score
+  assert.ok(X.games.some(g => g.a === flipWin), "the lineups' loser won, as Sleeper says");
+  // Best manager counts the weeks with real scores, its record theirs
+  app.get('ui').tab = 'awards';
+  app.viewAwardsSoFar();
+  await new Promise(r => setTimeout(r, 30));
+  const aw = app.viewAwardsSoFar();
+  assert.match(aw, /aw-title">Best manager/);
+  assert.ok(!aw.includes('none yet') && !aw.includes('whose Sleeper scores'), 'every finished week has its real scores: no note');
+}));
+
+test("Sleeper basketball: weeks before the site saw one end are estimates, marked, with Sleeper's winners", async () => {
+  app.setClock('2026-11-03T12:00:00-05:00'); // week 2 over: the first read, so week 1's own total was never seen
+  try {
+    await sleeperWithResults('999000000000000004', 2, async (L, { flipWin }) => {
+      assert.equal(L.totals.n, 2);
+      assert.equal(app.slpWeekPts(L, 1), null);
+      assert.equal(app.slpWeekPts(L, 2), null, 'week 2 needs the total after week 1 too');
+      useTeam(L.teams[0].id);
+      const { html, X } = await recapOf(L, 1);
+      assert.ok(X && X.est);
+      assert.ok(X.games.every(g => L.results[1][g.a] === 'W' && g.won && g.sc.est && app.scoreLine(g.sc).startsWith('≈')), "Sleeper's winners, scores marked");
+      const flipped = X.games.find(g => g.a === flipWin);
+      assert.ok(flipped && flipped.sc.me < flipped.sc.opp, 'the winner as Sleeper has it, though the lineups give him less');
+      assert.ok(!X.unlucky && !X.lucky && !X.close && !X.carry && !X.regret && !X.rank, 'nothing that hangs on an estimated score');
+      assert.ok(html.includes('≈ estimated') && !html.includes('rc-badge'));
+      // the finished-week card: Sleeper's result, no bench swaps
+      app.get('ui').tab = 'week';
+      const card = await onDay('2026-11-03', () => app.pastWeekCard('2026-10-20'));
+      assert.ok(card.includes('≈') && card.includes('no bench swaps'), 'marked, without swaps');
+      // Awards: no week with real scores yet, so no Best manager, Week of the Year or Heartbreak Hotel
+      app.get('ui').tab = 'awards';
+      app.viewAwardsSoFar();
+      await new Promise(r => setTimeout(r, 30));
+      const aw = app.viewAwardsSoFar();
+      assert.ok(!/aw-title">(Best manager|Week of the Year|Heartbreak Hotel)/.test(aw) && aw.includes('none yet'), 'none of the three, and the page says why');
+      assert.match(aw, /aw-title">(Street Clothes|Unc Status|Fan Boy)/, "the lineups' awards stay");
+      // once the site has the total through week 1 (a read the week before), week 2's real score is the difference
+      const t1 = Object.fromEntries(L.teams.map(t => [t.id, 100]));
+      app.slpTotalsSave(L.id, { n: 1, pts: t1 });
+      const w2 = app.slpWeekPts(L, 2);
+      assert.ok(L.teams.every(t => Math.abs(w2[t.id] - (L.totals.pts[t.id] - 100)) < 0.01));
+      assert.deepEqual({ ...app.slpWeekPts(L, 1) }, t1, 'and week 1 is that total');
+    });
+  } finally { app.setClock(); }
+});
+
 test("the player card: how he came to his fantasy team", async () => {
   const L = await app.useLeague(CATS9);
   const [t1, t2] = L.teams.map(t => t.id);

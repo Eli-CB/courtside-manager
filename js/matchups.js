@@ -581,10 +581,14 @@ function pastWeekCard(start) {
   const pts = leaguePoints();
   const cats = pts ? [{ label: 'FP' }] : scoreCats();
   const name = tid => teamLink(tid);
-  const scoreTxt = sc => (pts ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
+  const [A, B] = R;
+  // Sleeper basketball: the result is Sleeper's own; a week whose real scores the site hasn't seen is estimated from its
+  // final lineups (benchSwaps): marked ≈, and no bench swaps (they'd hang on the estimate)
+  const est = A.res !== undefined && !(A.exact && B.exact);
+  const scoreTxt = sc => (est ? '≈ ' : '') + (pts ? `${fmtFp(sc.me)}–${fmtFp(sc.opp)}` : `${sc.me}–${sc.opp}${sc.ties ? `–${sc.ties}` : ''}`);
   const outcome = sc => Math.sign(Math.round((sc.me - sc.opp) * 10));
   const verb = o => (o > 0 ? 'won' : o < 0 ? 'lost' : 'tied');
-  const [A, B] = R;
+  const RES_VERB = { W: 'won', L: 'lost', T: 'tied' };
   const final = weekScore(A.tot, B.tot);
   const side = (S, O) => {
     const base = weekScore(S.tot, O.tot), o = outcome(base);
@@ -602,7 +606,7 @@ function pastWeekCard(start) {
       return `<li class="alert${flip ? ' good' : ''}"><span class="dot"></span><span class="grow">Start ${inlinePlayer(x.w.inP, `<b>${esc(x.w.inP.name)}</b>`)} for ${inlinePlayer(x.w.outP, esc(x.w.outP.name))}<br>
         <span class="small">${flip ? `<b>Would have ${verb(outcome(x.sc))} ${scoreTxt(x.sc)}</b>` : `${scoreTxt(x.sc)}`}${pts ? '' : ` · ${changed(x)}`}</span></span></li>`;
     };
-    return `<h3 class="sub">${name(S.tid)} <span class="muted small">${verb(o)} ${scoreTxt(base)}</span></h3>
+    return `<h3 class="sub">${name(S.tid)} <span class="muted small">${RES_VERB[S.res] || verb(o)} ${scoreTxt(base)}</span></h3>
       ${top.length ? `<ul class="alerts">${top.map(item).join('')}</ul>` : `<p class="muted small" style="margin:0 0 4px">No bench swap would have done better.</p>`}`;
   };
 
@@ -621,7 +625,8 @@ function pastWeekCard(start) {
     return `<table class="stab pw-table">
       <thead><tr><th class="st-name">${name(S.tid)}</th><th class="num">G</th>${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}${pts ? '<th class="sc">FP</th>' : ''}</tr></thead>
       <tbody>${byG(S.starters).map(x => row(x, false)).join('')}</tbody>
-      <tbody class="pw-total"><tr><td class="st-name"><b>Week total</b></td><td class="num st-g"><b>${S.tot.gp1 || 0}</b></td>${cols.map((c, i) => cell(S.tot, c, pts ? '' : lead(i))).join('')}${pts ? `<td class="sc${lead(0)}">${fmtFp(lineFp(S.tot))}</td>` : ''}</tr></tbody>
+      <tbody class="pw-total">${S.fix && Math.abs(S.fix) >= 0.05 ? `<tr class="bench"><td class="st-name" title="Sleeper's own score for the week, less these lineups' games: Lock-In counts a lineup spot's game day by day, and these are the week's final lineups">Rest of Sleeper's score</td><td class="num st-g"></td>${cols.map(() => '<td class="sc"></td>').join('')}<td class="sc">${signed(S.fix, 1)}</td></tr>` : ''}
+        <tr><td class="st-name"><b>Week total</b></td><td class="num st-g"><b>${S.tot.gp1 || 0}</b></td>${cols.map((c, i) => cell(S.tot, c, pts ? '' : lead(i))).join('')}${pts ? `<td class="sc${lead(0)}">${est ? '≈ ' : ''}${fmtFp(lineFp(S.tot))}</td>` : ''}</tr></tbody>
       ${S.bench.length ? `<tbody>${byG(S.bench).map(x => row(x, true)).join('')}</tbody>` : ''}
     </table>`;
   };
@@ -631,7 +636,7 @@ function pastWeekCard(start) {
     <p class="muted small" style="margin:8px 0 0">Bench rows (muted) are games that didn't count.</p>
   </div>
   <div class="card"><div class="card-head"><h2>Bench swaps ${infoBtn('benchswaps')}</h2><span class="muted small">one bench player for one starter</span></div>
-    ${side(A, B)}${side(B, A)}
+    ${est ? `<p class="muted small" style="margin:0">≈ estimated: Sleeper doesn't share this week's scores, so no bench swaps. ${RES_VERB[A.res] ? `${name(A.tid)} ${RES_VERB[A.res]}, as Sleeper has it.` : ''} ${infoBtn('slpScores')}</p>` : `${side(A, B)}${side(B, A)}`}
   </div>`;
 }
 
