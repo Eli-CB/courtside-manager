@@ -1133,7 +1133,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .seg-sm button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px var(--border); }
 .board-legend { margin: -4px 0 10px; }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; }
-.stat-boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; min-width: 920px; }
+.stat-boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; min-width: max(920px, calc(var(--cols, 0) * 100px + 18px)); }
 .stab { table-layout: fixed; width: 100%; }
 .bench-boards { margin-top: 20px; }
 .stab th, .stab td { padding: 6px 3px; }

@@ -3749,6 +3749,38 @@ test("Sleeper basketball: weeks before the site saw one end are estimates, marke
   } finally { app.setClock(); }
 });
 
+test("Plan Ahead in a points league: each shooting pair is one column, 8.2/17.1 FG, never FGM and FGA apart", async () => {
+  const text = html => ` ${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  const heads = html => [...html.matchAll(/<table class="stab[^"]*">\s*<thead>([\s\S]*?)<\/thead>/g)].map(m => text(m[1]));
+  const apart = /FGM|FGA|FTM|FTA|3PA/;
+  const L = await app.useLeague(ESPN); // scores FGM, FGA, FTM, FTA and 3PM (not 3PA)
+  useTeam(L.teams[0].id);
+  const ui = app.get('ui'), was = ui.boardMode;
+  try {
+    for (const mode of ['game', 'week']) {
+      ui.boardMode = mode;
+      const html = app.viewWeek(), h = heads(html);
+      assert.ok(h.length && h.every(t => t.includes(' FG ') && t.includes(' FT ') && t.includes(' 3PM ') && !apart.test(t)), `${mode}: ${h.join(' | ')}`);
+      assert.match(html, /title="FG: \d+\.\d\/\d+\.\d (per game|over \d+ games?) · [+−]?\d+\.\d FP">\d+(\.\d)?\/\d+(\.\d)?<\/td>/, `${mode}: makes/attempts in one cell`);
+      if (html.includes('<tfoot>')) assert.match(html, /title="FG: \d+\.\d\/\d+\.\d · \d+% to win">\d+\/\d+<\/td>/, `${mode}: the projected week too`);
+    }
+  } finally { ui.boardMode = was; }
+  // a finished week's tables (Sleeper's, its scoring given both halves of each pair)
+  await sleeperWithResults('999000000000000005', 1, async S => {
+    const pts = S.points;
+    S.points = { ...pts, fgm: 1, fga: -1, ftm: 1, ftmi: -1, tpm: 1, tpa: -0.5 };
+    try {
+      useTeam(S.teams[0].id);
+      ui.tab = 'week';
+      await onDay('2026-11-03', async () => { app.pastWeekCard('2026-10-20'); await new Promise(r => setTimeout(r, 30)); });
+      const card = await onDay('2026-11-03', () => app.pastWeekCard('2026-10-20'));
+      const h = heads(card);
+      assert.ok(h.length === 2 && h.every(t => t.includes(' FG ') && t.includes(' FT ') && t.includes(' 3PM ') && !apart.test(t) && !/miss/.test(t)), h.join(' | '));
+      assert.match(card, /<td class="sc">\d+\/\d+<\/td>/, 'makes/attempts in one cell');
+    } finally { S.points = pts; }
+  });
+});
+
 test("the player card: how he came to his fantasy team", async () => {
   const L = await app.useLeague(CATS9);
   const [t1, t2] = L.teams.map(t => t.id);

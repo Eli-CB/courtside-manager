@@ -381,11 +381,16 @@ function statRow(p, ctx, side, starter) {
     <td class="num st-g">${weekGames(p, ctx.dates)}</td>${stabCells(p, ctx)}</tr>`;
 }
 
+// A stat table's room: its stat columns share what the name (31%) and G (6%) leave, a shooting pair's "11.9/25.6" taking 2.5
+// shares; two tables side by side are at least 100 px a share wide together (.stat-boards, --cols), so 12 columns don't run into each other
+const colShares = cols => sum(cols.map(c => (c.shot ? 2.5 : 1)));
+const colWidth = (c, shares) => (c.shot ? ` style="width:${(63 * 2.5 / shares).toFixed(1)}%"` : '');
+
 function statTable(ctx, side, title, rows, { bench = false, totals = '', games = 0 } = {}) {
-  const s = ui.statSort;
-  const th = (key, label, cls = '') => sortTh('stat-sort', key, label, s, { cls, down: s.dir < 0, arrow: key !== 'slot' });
+  const s = ui.statSort, shares = colShares(lineCats());
+  const th = (key, label, cls = '', attrs = '') => sortTh('stat-sort', key, label, s, { cls, attrs, down: s.dir < 0, arrow: key !== 'slot' });
   return `<table class="stab">
-    <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num')}${lineCats().map(c => th(c.key, c.label, 'sc')).join('')}</tr></thead>
+    <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num st-g')}${lineCats().map(c => th(c.key, c.label, 'sc', colWidth(c, shares))).join('')}</tr></thead>
     <tbody>${sortStatRows(rows, ctx).map(p => statRow(p, ctx, side, !bench)).join('') || `<tr><td colspan="11" class="muted small">${bench ? 'Nobody on the bench' : side === 'them' ? 'No opponent loaded' : 'No starters'}</td></tr>`}</tbody>
     ${totals ? `<tfoot><tr><td class="st-name"><b>Projected week</b></td><td class="num st-g"><b>${games}</b></td>${totals}</tr></tfoot>` : ''}
   </table>`;
@@ -411,12 +416,12 @@ function statsBoard(ctx, myStarters, myBench, oppStarters, oppBench) {
   const cats = ctx.hasOpp ? boardTotals(ctx) : [];
   const mine = cats.map(c => `<td class="sc" style="${shadeProb(c.p)}" title="${totalTip(c, c.a, c.p, 'to win')}">${fmtCat(c, c.a)}</td>`).join('');
   const theirs = ctx.hasOpp ? cats.map(c => `<td class="sc" style="${shadeProb(1 - c.p)}" title="${totalTip(c, c.b, 1 - c.p, 'for them')}">${fmtCat(c, c.b)}</td>`).join('') : '';
-  const oppName = state.opp.name || 'Opponent';
-  return `<div class="table-wrap"><div class="stat-boards">
+  const oppName = state.opp.name || 'Opponent', cols = `style="--cols:${colShares(lineCats())}"`;
+  return `<div class="table-wrap"><div class="stat-boards" ${cols}>
     ${statTable(ctx, 'me', state.teamName, myStarters, { totals: mine, games: ctx.asSet.games })}
     ${statTable(ctx, 'them', oppName, oppStarters, { totals: theirs, games: ctx.them.games })}
   </div>
-  <div class="stat-boards bench-boards">
+  <div class="stat-boards bench-boards" ${cols}>
     ${statTable(ctx, 'me', state.teamName, myBench, { bench: true })}
     ${ctx.hasOpp ? statTable(ctx, 'them', oppName, oppBench, { bench: true }) : '<div></div>'}
   </div></div>`;
@@ -642,7 +647,8 @@ function pastWeekCard(start) {
 
   // each team's lineup that week: starters' games (what counted), the week total, then the bench's games
   // (a points league's shooting pair is one "8/17 FG": lineCats)
-  const cols = lineCats().filter(c => !c.fp);
+  // (the FP column two shares: a week's total, "≈ 160.5")
+  const cols = lineCats().filter(c => !c.fp), shares = colShares(cols) + (pts ? 2 : 0);
   const cell = (s, c, cls = '') => {
     if (c.shot) return `<td class="sc${cls}">${fmt(lineStat(s, c.made), 0)}/${fmt(lineStat(s, c.att), 0)}</td>`;
     if (c.pct) return `<td class="sc${cls}" title="${s[c.att] ? `${s[c.made] || 0}/${s[c.att]}` : 'no attempts'}">${s[c.att] ? fmtPct(s[c.made] / s[c.att]) : '—'}</td>`;
@@ -655,7 +661,7 @@ function pastWeekCard(start) {
     const lead = i => (sc.lead[i] > 0 ? ' pos-good' : sc.lead[i] < 0 ? ' pos-bad' : '');
     const byG = list => [...list].sort((a, b) => (b.line.gp1 || 0) - (a.line.gp1 || 0) || lineFp(b.line) - lineFp(a.line));
     return `<table class="stab pw-table">
-      <thead><tr><th class="st-name">${name(S.tid)}</th><th class="num">G</th>${cols.map(c => `<th class="sc">${c.label}</th>`).join('')}${pts ? '<th class="sc">FP</th>' : ''}</tr></thead>
+      <thead><tr><th class="st-name">${name(S.tid)}</th><th class="num st-g">G</th>${cols.map(c => `<th class="sc"${colWidth(c, shares)}>${c.label}</th>`).join('')}${pts ? `<th class="sc" style="width:${(63 * 2 / shares).toFixed(1)}%">FP</th>` : ''}</tr></thead>
       <tbody>${byG(S.starters).map(x => row(x, false)).join('')}</tbody>
       <tbody class="pw-total">${S.fix && Math.abs(S.fix) >= 0.05 ? `<tr class="bench"><td class="st-name" title="Sleeper's own score for the week, less these lineups' games: Lock-In counts a lineup spot's game day by day, and these are the week's final lineups">Rest of Sleeper's score</td><td class="num st-g"></td>${cols.map(() => '<td class="sc"></td>').join('')}<td class="sc">${signed(S.fix, 1)}</td></tr>` : ''}
         <tr><td class="st-name"><b>Week total</b></td><td class="num st-g"><b>${S.tot.gp1 || 0}</b></td>${cols.map((c, i) => cell(S.tot, c, pts ? '' : lead(i))).join('')}${pts ? `<td class="sc${lead(0)}">${est ? '≈ ' : ''}${fmtFp(lineFp(S.tot))}</td>` : ''}</tr></tbody>
@@ -664,7 +670,7 @@ function pastWeekCard(start) {
   };
   return `<div class="card">${head}
     <p class="pw-final"><b>${name(A.tid)}</b> ${scoreTxt(final)} <b>${name(B.tid)}</b></p>
-    <div class="table-wrap"><div class="stat-boards">${table(A, B)}${table(B, A)}</div></div>
+    <div class="table-wrap"><div class="stat-boards" style="--cols:${shares}">${table(A, B)}${table(B, A)}</div></div>
     <p class="muted small" style="margin:8px 0 0">Bench rows (muted) are games that didn't count.</p>
   </div>
   <div class="card"><div class="card-head"><h2>Bench swaps ${infoBtn('benchswaps')}</h2><span class="muted small">one bench player for one starter</span></div>
