@@ -3281,18 +3281,29 @@ test("a Fantrax league of a sport the site doesn't read (golf) says so, instead 
   assert.equal(app.leagueError('golffixture0001', err).message, "That's a Fantrax golf league. League Layer covers basketball and hockey leagues on Fantrax (and football on Sleeper) for now.");
 });
 
-test("Plan Ahead's schedule bubble of a game on now is red; your own team's name is orange wherever it's drawn", async () => {
+test("Plan Ahead's schedule bubble of a game on now flashes green while he's in it; your own team's name is orange wherever it's drawn", async () => {
   const L = await app.useLeague(CATS9);
   await app.loadBoxes();
-  const live = app.get('live'), was = live.games;
-  const p = app.nbaPlayers().find(x => x.team && app.get('teamDates').get(x.team) && app.get('teamDates').get(x.team).has('2026-10-28'));
+  const live = app.get('live'), was = live.games, wasLines = live.lines.get('2026-10-28');
+  const p = app.nbaPlayers().find(x => x.team && x.status !== 'Out' && app.get('teamDates').get(x.team) && app.get('teamDates').get(x.team).has('2026-10-28'));
+  const dots = () => onDay('2026-10-28', () => app.dayDots(p, { dates: ['2026-10-27', '2026-10-28', '2026-10-29'] }, true));
   try {
     live.games = [{ id: 'x', d: '2026-10-28', home: p.team, away: 'ZZZ', state: 'in', detail: '4:12 - 3rd', start: 0 }];
-    const html = await onDay('2026-10-28', () => app.dayDots(p, { dates: ['2026-10-27', '2026-10-28', '2026-10-29'] }, true));
-    assert.match(html, /<i class="live" data-tip="Playing now: 4:12 - 3rd"><\/i>/, 'the game on now: red');
+    live.lines.delete('2026-10-28');
+    assert.match(await dots(), /<i class="live wait" data-tip="Game on now: 4:12 - 3rd&lt;div class=&quot;tip-dim&quot;&gt;He hasn&#39;t played yet/, "his team's game on, he hasn't played yet: a flashing green ring");
+    live.lines.set('2026-10-28', new Map([[p.nbaId, { min: 14, pts: 6 }]]));
+    assert.match(await dots(), /<i class="live" data-tip="Playing now: 4:12 - 3rd"><\/i>/, 'in the box score: flashing green');
+    live.lines.delete('2026-10-28');
+    const wasStatus = p.status;
+    p.status = 'Out';
+    assert.match(await dots(), /<i class="out" data-tip="Game on now: 4:12 - 3rd&lt;div class=&quot;tip-dim&quot;&gt;He&#39;s listed Out/, "listed Out: the red ring of a game he'll miss");
+    p.status = wasStatus;
     live.games = [];
     assert.doesNotMatch(await onDay('2026-10-28', () => app.dayDots(p, { dates: ['2026-10-28'] }, true)), /class="live/, 'not once ESPN has nothing on');
-  } finally { live.games = was; }
+  } finally {
+    live.games = was;
+    if (wasLines) live.lines.set('2026-10-28', wasLines); else live.lines.delete('2026-10-28');
+  }
   const me = L.teams[0].id, other = L.teams[1].id;
   useTeam(me);
   assert.match(app.teamLink(me), /class="link-btn team-link mine"/, 'yours: orange');

@@ -187,8 +187,15 @@ function dayDots(p, ctx, counts) {
   return `<span class="dots">${ctx.dates.map(d => {
     if (!playsOn(p, d)) return dot('none', 'No game');
     const bench = counts ? '' : ' bench';
+    // a game on now pulses green while he's in it (a line in tonight's box score, or on the floor), a green ring until he
+    // checks in; listed Out, the red ring of a game he'll miss (the owner's ask: not red while he's playing)
     const on = liveGame(p, d);
-    if (on && on.state === 'in' && !gameFinal(p, d)) return dot(`live${bench}`, `Playing now: ${esc(String(on.detail || ''))}${bench ? '<div class="tip-dim">On the bench, so it won&rsquo;t count</div>' : ''}`);
+    if (on && on.state === 'in' && !gameFinal(p, d)) {
+      const clock = esc(String(on.detail || '')), benchTip = bench ? '<div class="tip-dim">On the bench, so it won&rsquo;t count</div>' : '';
+      if (lineOn(p, d) || onFloor(p, d)) return dot(`live${bench}`, `Playing now: ${clock}${benchTip}`);
+      if (p.status === 'Out') return dot('out', `Game on now: ${clock}<div class="tip-dim">He's listed Out</div>`);
+      return dot(`live wait${bench}`, `Game on now: ${clock}<div class="tip-dim">He hasn't played yet</div>${benchTip}`);
+    }
     if (gameFinal(p, d)) {
       const line = actualLine(p, d);
       if (!line) return dot('dnp', "His team played, but he didn't");

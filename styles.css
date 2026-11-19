@@ -1007,7 +1007,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
 .dots i.up.b2b { box-shadow: inset 0 0 0 1.5px var(--b2b-ring); }
 .dots i.dnp { background: var(--bad); opacity: .75; }
 .dots i.out { box-shadow: inset 0 0 0 1.5px var(--bad); }
-.dots i.live { background: var(--bad); animation: lv-pulse 1.6s ease-in-out infinite; } /* a game on now */
+.dots i.live { background: var(--good); animation: lv-pulse 1.6s ease-in-out infinite; } /* a game on now, he's in it */
+.dots i.live.wait { background: none; box-shadow: inset 0 0 0 1.5px var(--good); } /* (he hasn't played yet) */
 @media (prefers-reduced-motion: reduce) { .dots i.live { animation: none; } }
 .dots i.none { background: var(--border); }
 /* tooltips (data-tip) */

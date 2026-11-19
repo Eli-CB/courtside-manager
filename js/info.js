@@ -30,6 +30,7 @@ const INFO = {
     <ul><li><b>Green:</b> a game. A bench player's games look the same, in his shaded row; they count only if he starts.</li>
     <li><b>Yellow:</b> a regular (20+ minutes a game) played well under his usual minutes: under 70% of his average and at least 8 fewer. Hover it for his minutes and the likely reason: an <b>injury</b> (he's been on the ESPN injury report since that game), a <b>blowout</b> (decided by 20 or more), <b>foul trouble</b> (5 or more fouls), or none of those, which usually means the coach's call.</li>
     <li><b>Light green ring:</b> an upcoming back-to-back night (the team also plays the day before or after). Players sometimes rest one of those nights.</li>
+    <li><b>Flashing green:</b> a game on now he's playing in; a flashing ring, his team's game is on and he hasn't played yet.</li>
     <li><b>Red:</b> filled, his team played but he didn't; a ring, he's listed Out.</li></ul>
     <p>Hover any played game for his minutes and stat line. The number on the right is games this week; hover it for played and left. Projections use the real box score for games already played and project only the rest.</p>`],
   benchswaps: ['How the week ended', `
