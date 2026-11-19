@@ -29,6 +29,33 @@ Cloudflare's plan. It stores nothing: each visitor's tokens stay in their browse
 3. **Turn it on in the site**: in `js/yahoo.js`, set `proxy: 'https://api.leaguelayer.com'` and deploy the site.
    The "Sign in with Yahoo" button appears on the league form.
 
+## When Yahoo approves
+
+Since July 2026 Yahoo lets only approved apps read fantasy data: until then every Fantasy API call answers 403 "This
+application is not authorized", whatever the code does. Apply at https://sports.yahoo.com/developer/access/ (sign the
+agreement, confirm the Client ID; some apps had to be made again). Yahoo turned the first application down (Nov 10, 2026)
+for missing details: every field filled in, a full first and last name, and a clear description of the use (read-only
+`fspt-r`, tokens only in the visitor's browser, the Worker stores nothing, reads kept 6 hours on the device). The owner
+applied again. Once Yahoo approves, in order:
+
+1. The owner sets the Worker's secrets (it has none yet: its sign-in sends `client_id=undefined`), from this folder:
+   `npx wrangler secret put YAHOO_CLIENT_ID`, then `npx wrangler secret put YAHOO_CLIENT_SECRET`, from the Yahoo app's page.
+   If Yahoo made a new app on approval, use its ID and check its redirect URI is `https://api.leaguelayer.com/yahoo/callback`.
+   Claude never asks for or handles the secret and never runs wrangler.
+2. Check https://api.leaguelayer.com/yahoo/login?return=https://leaguelayer.com/ sends you to Yahoo with a real `client_id`.
+3. The owner signs in on leaguelayer.com/?yahoo=1 with their real Yahoo league. Test every tab against it (the fixtures
+   were made up in Yahoo's layout, `tests/make_yahoo_fixtures.py`), fix what maps differently, and remake the fixtures
+   from the real answers, names anonymized.
+4. Only basketball is read (`game_keys=nba`); hockey would need adding.
+5. Before everyone gets it, fix the two sign-in weaknesses from the Nov 15, 2026 security review (harmless while the
+   Worker has no Yahoo secrets; both need the owner's Worker deploy):
+   - The OAuth `state` is only the return address, and the page keeps whatever comes after `#yahoo=`, so a made-up link
+     can sign a visitor into someone else's Yahoo account. Add a random value kept in sessionStorage, sent in `state`
+     and checked on the way back.
+   - `SITE_ORIGINS` (wrangler.toml) lists localhost ports for testing the live feed, and the sign-in accepts each of
+     them as a return address for tokens. The deployed sign-in should return only to https://leaguelayer.com.
+6. Then drop `yahoo.beta` in `js/yahoo.js` so everyone sees the sign-in, and update CLAUDE.md.
+
 ## Error log
 
 The same Worker keeps the site's error log: when a page breaks in someone's browser on leaguelayer.com, the site sends

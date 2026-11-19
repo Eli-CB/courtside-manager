@@ -7,11 +7,13 @@ GitHub redirects the old name as long as no new repo takes it. The site was Cour
 `courtside-*` until Nov 16, 2026 and are `league-layer-*` now, renamed with nothing carried over, as the owner was the only visitor: with
 real visitors, a renamed key needs its old copy moved first, or their saved leagues are gone). Owner's league:
 "Keepers and Creepers" `my19c8mwmoipvhon` (9-cat H2H, most categories wins the week, weekly lineups,
-8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26). The owner's Sleeper league (Nov 18, 2026), free to
+8 starters + 5 bench + 1 IR, 2 keepers). Last season: `czqgnyozmf2tbr93` (2025-26; Fantrax's public API can't list a league's past seasons, so their IDs come from the owner). The owner's Sleeper league (Nov 18, 2026), free to
 test with: "The IPA" `1336466264633135104` (16-team dynasty, points, Lock-In, 2 IR + 2 taxi spots, a 3-round rookie draft, picks traded through 2028).
 The owner's ESPN test leagues (Nov 19, 2026; public, the owner's team in both is "Eli's Excellent Team"; 10 teams, 8 cats without TO, daily lineups, 10 starters + 3 bench + 1 IR):
 "Utah Pro H2H Categories League" `1715452380` (starts Nov 23 as Matchup 6: a late league keeps ESPN's week numbers, as ESPN's own schedule page shows) and
 "Sacramento Beginner Roto League" `1299985004` (roto, a 68-game limit a lineup spot; the tests' fixture, team names made up: roto under the espn bullet).
+The real leagues hockey and football were built on: "Bar Down Fantasy Hockey 2" `bbuqfr8gmuanycdo` (Fantrax, 12 teams, H2H points, weekly) and
+"RidgeFootball" `1388378031520772096` (Sleeper, 10 teams, half PPR, keepers).
 
 ## Keeping this file up to date (the owner's standing rule, Nov 2026)
 Whenever you learn something that any Claude starting on this site for the first time would need, add it here in the
@@ -23,6 +25,8 @@ one, and keep it short and specific. Not for here: what only matters to the task
 Most changes add nothing: a one-off tweak to how something looks (a bigger player card, a moved button, a new size or
 spacing) isn't site knowledge unless the owner states it as a rule to keep. The file must stay small enough to read whole,
 so when unsure, leave it out, and an addition should be a line or two, not a paragraph.
+Never in Claude's own memory folder instead: it belongs to one PC and one folder path (renaming the folder, Nov 19, 2026, left it behind). This file is
+the one notebook; a long how-to goes in the README beside its code (worker/README.md), with a line here pointing to it.
 
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
@@ -90,7 +94,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
     CORS-open); tokens stay in the browser (`league-layer-yahoo`). `yahoo.proxy` empty = Yahoo hidden; while `yahoo.beta`, the sign-in shows only on a device that opened `?yahoo=1` (or is signed in). `yflat` turns Yahoo's
     JSON ("0","1"…+count objects, arrays of one-key objects) into plain lists/objects; `fetchYahooLeague` maps to the league
     shape (`source: 'yahoo'`, ids = league keys `nba.l.N`). Test fixtures are made up in Yahoo's layout
-    (`tests/make_yahoo_fixtures.py`): check against a real league once signed in.
+    (`tests/make_yahoo_fixtures.py`): check against a real league once signed in. Blocked on Yahoo, not code: since July 2026 Yahoo
+    answers unapproved apps 403, and the owner applied again Nov 10, 2026. Don't work on it until the owner says it's approved, then
+    follow worker/README.md "When Yahoo approves" (two sign-in weaknesses to fix before everyone gets it).
   - render: `render()`, the head above the tabs (`.head`, Nov 2026, the owner's ask: `leagueMenu` on the left, leagues and seasons only; on the right `teamMenu`, a jersey icon (+ the team's name on a computer; `team-pick`), and `gearMenu`, which also holds Stats used, Copy league ID (`copy-league-id`, for a friend to connect the same league), Backup and Reset), the tabs (`.topbar`: on phones a bar along the bottom, each with its `TAB_ICONS` icon, the first `TABS_SHOWN` and the rest under More, `.tabs-extra`; the head scrolls away there), notes under the tabs (`ctxBar`: past season, Viewing only, demo), past-season switching (`withSeason`,
     address `#tab/<seasonLeagueId>`), `viewLeague`/`myTeamId()` override
   - history: weekly rosters (`loadRosterWeeks`, cached per league), arrivals (start/trade/pickup), season
@@ -172,7 +178,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com). `scripts/build_images.py`: headshot sprite (80px)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 - NFL (Sleeper leagues only; stages 1-3 of 5 done: data; Standings, Dashboard scores, Recap, Awards, past weeks; then projections on Matchups, Roster and
-  Players. `soonTabs` hides Draft and Trades. Next: Draft, Trades, past seasons, then Fantrax). `scripts/update_nfl.py` (own step in the daily job, as hockey's) builds `data/nfl/`: players from Sleeper's list (too big for a browser: 14 MB), schedule
+  Players. `soonTabs` hides Draft and Trades. Next: Draft, Trades, past seasons, then Fantrax; not announced, the landing page doesn't mention football: ask the owner before stage 4 or announcing it). `scripts/update_nfl.py` (own step in the daily job, as hockey's) builds `data/nfl/`: players from Sleeper's list (too big for a browser: 14 MB), schedule
   from ESPN, stats by week from Sleeper's undocumented `api.sleeper.com/stats`. A game counts only with its `gp`: `gms_active` is on for anyone on an active roster, injured starters included. A line's stats keep Sleeper's names, the same as a league's `scoring_settings`, so
   `L.points` is simply those settings and `lineFp` gives the league's exact points, bonuses and defense brackets included: 80 team-weeks of a real league matched Sleeper's
   to the hundredth. `statKeys` come from the file (`fetchSport` fills `countKeys`, `playerKeys`). A league is `oneGame`, which already means one game a week per slot, with no
@@ -192,7 +198,7 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   75%). `projectSide`, `weeklyPriority`, `weekGames` (to a tenth) and the Dashboard's pace use it; value stays per game played
   (`gameWorth` for a trade or lineup: value × share). Street Clothes and Missed skip goalies: a healthy backup sits most games. Checked on 48
   real team-weeks: goalies scored 4.7 a week, every-game projected 8.1, this 5.2 (average miss 3.8 to 2.0). Category leagues were
-  only tested on a made-up scoring setup: no real hockey category league yet. A Fantrax league's sport comes from its scoring groups (`fxSport`:
+  only tested on a made-up scoring setup: no real hockey category league yet, nor a real past hockey season (only a simulated one). A Fantrax league's sport comes from its scoring groups (`fxSport`:
   `HOCKEY_SKATING`, Fantrax doesn't name it; `BASKETBALL_PLAYER` or no groups is basketball, any other sport, e.g. `GOLF_GOLFER`,
   is refused with a plain message, `FANTRAX_SPORTS`, and logged as tried, never loaded as basketball). `fetchFantraxLeague` reads a league against that sport's data file
   (`fetchSport`) without changing the page; `switchLeague` then swaps sports (`useSport`, with `ui.hold` stopping `render` until the
@@ -224,7 +230,10 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 
 ## Rules settled with the owner (keep them)
 - How the owner works (Nov 17, 2026): several sessions at once, and the owner doesn't read code. No pull requests: a session lands
-  its own work on main once it's tested and checked, rebasing onto origin/main and fixing any conflict itself, keeping both sides' changes (Deploy, under Gotchas).
+  its own work on main once it's tested and checked, without asking (only force pushes, rewriting history or deleting things need a yes), rebasing onto origin/main and fixing any conflict itself, keeping both sides' changes (Deploy, under Gotchas).
+- Where the site is going (Oct 31, 2026): grow it, not keep it a personal tool. Its niche: head-to-head category leagues (Fantrax, weekly lineups), matchup odds,
+  league-wide fun (recaps, awards, past seasons), free with no account. Favor what a whole league shares and what spreads through league chats (share links and
+  pictures that open with no setup); not what needs staff or a backend (articles, expert rankings, a draft extension, push notifications).
 - Every session that changes files works in a worktree of its own (the owner's rule, Nov 18, 2026): the app starts sessions in the main folder, so before
   its first edit a session there calls EnterWorktree (named for the task; it branches from origin/main) and keeps every edit, test, preview and commit,
   this request's and later ones', in it. Only reading and answering stay in the main folder. Sessions sharing the main folder tested each other's
