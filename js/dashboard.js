@@ -54,14 +54,15 @@ function dashGame(p, d) {
   return nx && nx.date === d ? `${bubble(nx.home ? `vs ${nx.opp}` : `@${nx.opp}`)}${inGoal}` : `${bubble('Final')}${dnp}`;
 }
 
-// A line in the league's own categories: makes-attempts for the percentages, fantasy points first in points leagues;
-// nothing for a stat he didn't put up (no attempts, 0 blocks)
+// A line in the league's own categories: makes-attempts for the percentages (a points league's shooting "5/12 FG",
+// lineCats), fantasy points first in points leagues; nothing for a stat he didn't put up (no attempts, 0 blocks)
 // flash(key, value, makes): a class for a bubble whose number just changed (a live update)
 function lineChips(line, flash = () => '') {
   const out = isPoints() ? [`<span class="mu-chip fp${flash('fp', lineFp(line))}"><b>${fmtFp(lineFp(line))}</b> FP</span>`] : [];
-  for (const c of scoreCats()) {
-    if (c.fp || !(c.pct ? line[c.att] : Math.round(lineStat(line, c.key) * 100))) continue;
-    out.push(c.pct ? `<span class="mu-chip${flash(c.key, line[c.att] || 0, line[c.made] || 0)}"><b>${line[c.made] || 0}-${line[c.att] || 0}</b> ${c.label.replace('%', '')}</span>`
+  for (const c of lineCats()) {
+    if (c.fp || !(c.pct || c.shot ? line[c.att] : Math.round(lineStat(line, c.key) * 100))) continue;
+    const m = line[c.made] || 0, a = line[c.att] || 0;
+    out.push(c.pct || c.shot ? `<span class="mu-chip${flash(c.key, a, m)}"><b>${m}${c.shot ? '/' : '-'}${a}</b> ${c.label.replace('%', '')}</span>`
       : `<span class="mu-chip${flash(c.key, lineStat(line, c.key))}"><b>${fmt(lineStat(line, c.key), c.dec || 0)}</b> ${c.label}</span>`);
   }
   return out.join('');
@@ -73,11 +74,11 @@ let chipWas = new Map();
 function chipFlash(id, line) {
   const was = chipWas.get(id);
   const now = { fp: [isPoints() ? lineFp(line) : 0, 0] };
-  for (const c of scoreCats()) if (!c.fp) now[c.key] = c.pct ? [line[c.att] || 0, line[c.made] || 0] : [lineStat(line, c.key), 0];
+  for (const c of lineCats()) if (!c.fp) now[c.key] = c.pct || c.shot ? [line[c.att] || 0, line[c.made] || 0] : [lineStat(line, c.key), 0];
   const flash = (k, v, made = 0) => {
     if (!live.hold || !was || !was[k] || Math.abs(was[k][0] - v) < 1e-9) return '';
-    const c = scoreCats().find(x => x.key === k);
-    const good = c && c.pct ? made > was[k][1] : c && c.neg ? v < was[k][0] : v > was[k][0];
+    const c = lineCats().find(x => x.key === k);
+    const good = c && (c.pct || c.shot) ? made > was[k][1] : c && c.neg ? v < was[k][0] : v > was[k][0];
     return good ? ' flash-good' : ' flash-bad';
   };
   return { now, flash };

@@ -19,15 +19,16 @@ function fullLine(s, perGame) {
   return lineTiles(s, perGame).map(t => (t.made != null ? `${t.made} ${t.k.replace('%', '')}${perGame && t.att ? ` (${fmtPct(t.pct)})` : ''}` : `${t.v} ${t.k}`));
 }
 // The same line as numbers and their labels (the share pictures' tiles): { v, k }, a percentage also { made: makes-attempts,
-// att, pct }; null in football (its lines are words)
+// att, pct }; a points league's shooting pair one { v: "5/12", k: "FG" } (lineCats); null in football (its lines are words)
 function lineTiles(s, perGame) {
   if (isFootball()) return null;
   const g = perGame ? s.gp1 || 1 : 1, v = (k, d) => fmt(lineStat(s, k) / g, perGame ? 1 : d);
   const out = [{ v: v('min', 0), k: 'MIN' }];
   const goalie = isHockey() && !!(s.sa || s.gs); // hockey: a skater's line or a goalie's, not both
-  for (const c of scoreCats()) {
+  for (const c of lineCats()) {
     if (c.fp || (isHockey() && SPORT.goalieCats.includes(c.key) !== goalie)) continue;
-    if (c.rate) out.push({ v: fmt(s[c.att] ? (s[c.made] || 0) / s[c.att] : 0, 2), k: c.label });
+    if (c.shot) out.push({ v: `${v(c.made, 0)}/${v(c.att, 0)}`, k: c.label });
+    else if (c.rate) out.push({ v: fmt(s[c.att] ? (s[c.made] || 0) / s[c.att] : 0, 2), k: c.label });
     else if (c.pct) {
       const m = s[c.made] || 0, a = s[c.att] || 0;
       out.push({ v: a ? (m / a).toFixed(3).replace(/^0/, '') : '—', k: c.label, made: `${fmt(m / g, perGame ? 1 : 0)}-${fmt(a / g, perGame ? 1 : 0)}`, att: a, pct: a ? m / a : 0 });

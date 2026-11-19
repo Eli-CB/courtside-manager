@@ -105,6 +105,30 @@ test('points leagues: unusual scoring codes and position-specific points', () =>
   assert.deepEqual([...r.pointsOther], ['TF', 'position-specific points']);
 });
 
+test("a points league's shooting is one bubble a pair (10/19 FG, not FGM and FGA apart); category leagues keep 10-19 FG", async () => {
+  const line = { min: 34, pts: 27, reb: 8, tpm: 3, tpa: 7, fgm: 10, fga: 19, ftm: 4, fta: 5, gp1: 1 };
+  const text = html => ` ${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  const L = await app.useLeague(ESPN); // scores FGM, FGA, FTM, FTA and 3PM (not 3PA)
+  const was = L.points;
+  try {
+    const chips = text(app.lineChips(line));
+    for (const s of [' 10/19 FG ', ' 4/5 FT ', ' 3 3PM ']) assert.ok(chips.includes(s), `${s} in${chips}`);
+    assert.ok(!/FGM|FGA|FTM|FTA|3PA/.test(chips), chips);
+    assert.match(app.fullLine(line, false).join(' · '), /10\/19 FG · 4\/5 FT/, 'the recap and its picture too');
+    assert.match(app.fullLine({ ...line, fgm: 20, fga: 38, gp1: 2 }, true).join(' · '), /10\.0\/19\.0 FG/, 'a week: per game');
+    // makes with misses are a pair too; a pair's two halves are never shown apart
+    const { fga, ...rest } = was;
+    L.points = { ...rest, tpa: -0.5, fgmi: -fga };
+    const pairs = text(app.lineChips(line));
+    for (const s of [' 10/19 FG ', ' 3/7 3PM ']) assert.ok(pairs.includes(s), `${s} in${pairs}`);
+    assert.ok(!/miss|3PA|FGA/.test(pairs), pairs);
+    // no attempts, no bubble
+    assert.ok(!text(app.lineChips({ ...line, ftm: 0, fta: 0 })).includes(' FT '));
+  } finally { L.points = was; }
+  await app.useLeague(CATS9);
+  assert.ok(text(app.lineChips(line)).includes(' 10-19 FG '));
+});
+
 test('Fantrax slot names', () => {
   assert.deepEqual(['Flx', 'Util', 'UT', 'PG', 'G/F', 'F/C'].map(s => app.fxSlot(s)), ['FLX', 'FLX', 'FLX', 'PG', 'G/F', 'F/C']);
 });

@@ -349,6 +349,29 @@ function scoreCats() {
   return catsMemo.cats;
 }
 
+// The categories as a game's line draws them (bubbles, the recap's numbers): in a points league each shooting pair it scores
+// both halves of (SPORT.shotPairs) is one { shot: true, made, att, label } at the first one's place, "5/12 FG" (the owner's
+// ask, Nov 2026: not a bubble each)
+let lineCatsMemo = { cats: null, out: null };
+function lineCats() {
+  const cats = scoreCats();
+  if (lineCatsMemo.cats === cats) return lineCatsMemo.out;
+  const has = new Set(cats.map(c => c.key)), pairOf = new Map();
+  for (const [made, att, miss, label] of isPoints() ? SPORT.shotPairs || [] : []) {
+    if (!has.has(made) || !(has.has(att) || has.has(miss))) continue;
+    const pair = { key: made, label, shot: true, made, att };
+    for (const k of [made, att, miss]) pairOf.set(k, pair);
+  }
+  const out = [];
+  for (const c of cats) {
+    const pair = pairOf.get(c.key);
+    if (!pair) out.push(c);
+    else if (!out.includes(pair)) out.push(pair);
+  }
+  lineCatsMemo = { cats, out };
+  return out;
+}
+
 // Player value: what an average game of his adds to winning a week's categories, against not playing (catWins, the
 // same as a single game on the Dashboard), or fantasy points per game in points leagues
 function value(p) {

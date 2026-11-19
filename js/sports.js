@@ -46,6 +46,9 @@ const SPORTS = {
     // stats a league can score that are combinations of ones we project
     derived: { fgmi: { fga: 1, fgm: -1 }, ftmi: { fta: 1, ftm: -1 }, tpmi: { tpa: 1, tpm: -1 }, fg2m: { fgm: 1, tpm: -1 }, fg2a: { fga: 1, tpa: -1 } },
     pctCats: { fgPct: ['FG%', 'fgm', 'fga'], ftPct: ['FT%', 'ftm', 'fta'], tpPct: ['3P%', 'tpm', 'tpa'] },
+    // a points league scoring both halves of a pair (makes, and attempts or misses) shows them as one "5/12 FG" (lineCats):
+    // [makes, attempts, misses, label]
+    shotPairs: [['fgm', 'fga', 'fgmi', 'FG'], ['ftm', 'fta', 'ftmi', 'FT'], ['tpm', 'tpa', 'tpmi', '3PM']],
     negCats: ['to', 'pf', 'fgmi', 'ftmi', 'tpmi'], // fewer is better
     catOrder: ['fgPct', 'ftPct', 'tpPct', 'tpm', 'tpa', 'pts', 'reb', 'oreb', 'dreb', 'ast', 'stl', 'blk', 'to', 'dd', 'td'],
     // Per-game stats we project. The first 11 have spreads from game logs (raw.sd, same order); the rest are
