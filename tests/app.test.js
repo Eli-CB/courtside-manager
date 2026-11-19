@@ -605,6 +605,45 @@ test('a past season\'s weekly totals replay its final standings', async () => {
   assert.ok(exact >= 8, `${exact} of ${L.standings.length} records match Fantrax exactly`);
 });
 
+test("Standings' Categories won: each team's categories against its opponents, in all and one by one", async () => {
+  const P = await app.loadSeason('czqgnyozmf2tbr93');
+  const L = P.league, G = await app.loadGameLog('2025-26');
+  const ui = app.get('ui');
+  ui.season = 'czqgnyozmf2tbr93';
+  let cw, cats, html;
+  const was = { ...ui.cwSort };
+  try {
+    app.withSeason(() => {
+      cats = app.scoreCats();
+      cw = app.catsWonRecords(L, G);
+      ui.tab = 'standings';
+      html = app.viewStandings();
+      ui.cwSort.key = 'pct';
+      const card = app.viewStandings().split('class="cats-won"')[1].split('</table>')[0];
+      const at = t => card.indexOf(`<b>${app.esc(t.name)}</b>`);
+      const order = L.teams.filter(t => at(t) > 0).sort((a, b) => at(a) - at(b)).map(t => t.id);
+      const pct = id => (cw[id].w + cw[id].t / 2) / (cw[id].w + cw[id].l + cw[id].t);
+      assert.ok(order.length === L.teams.length && order.every((id, i) => !i || pct(order[i - 1]) >= pct(id) - 1e-9), 'sorted by Win %, best first');
+    });
+  } finally { Object.assign(ui.cwSort, was); ui.season = null; ui.tab = 'dashboard'; }
+  const weeks = L.periods.filter(p => p.n < L.playoffPeriod).length;
+  const teams = Object.values(cw);
+  assert.equal(teams.length, L.teams.length, 'every team');
+  for (const R of teams) {
+    assert.equal(R.weeks, weeks, 'every regular-season week, no playoffs');
+    assert.equal(R.w + R.l + R.t, weeks * cats.length, 'every category of every week');
+    assert.ok(R.by.every(b => b.w + b.l + b.t === weeks), 'each category once a week');
+    assert.equal(app.sum(R.by.map(b => b.w)), R.w);
+  }
+  assert.equal(app.sum(teams.map(R => R.w)), app.sum(teams.map(R => R.l)), "one team's category won is its opponent's lost");
+  // the categories won add up to what decided the weeks: the champion of the regular season won more than he lost
+  const top = L.standings.find(s => s.rank === 1).id;
+  assert.ok(cw[top].w > cw[top].l);
+  assert.match(html, /Categories won/);
+  assert.match(html, /data-action="cw-sort"/);
+  assert.ok(html.indexOf('Categories won') < html.indexOf('Season totals'), 'under the standings, before Season totals');
+});
+
 test('past Rosters list only starters, with games and misses that match the awards', async () => {
   const P = await app.loadSeason('czqgnyozmf2tbr93');
   const L = P.league, G = await app.loadGameLog('2025-26');

@@ -109,7 +109,7 @@ const themeNow = () => document.documentElement.dataset.theme || (typeof matchMe
    State + persistence
    ========================================================= */
 let state = null;
-const ui = { weekShift: 0, weekChosen: false, tab: 'dashboard', recapWeek: null, afterPick: null, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, tradeLink: null, tradeSeen: null, tradeGivePicks: new Set(), tradeGetPicks: new Set(), totSort: { key: null, dir: 1 }, csOpen: new Set(),
+const ui = { weekShift: 0, weekChosen: false, tab: 'dashboard', recapWeek: null, afterPick: null, tradeGive: new Set(), tradeGet: new Set(), tradeTeam: null, tradeLink: null, tradeSeen: null, tradeGivePicks: new Set(), tradeGetPicks: new Set(), totSort: { key: null, dir: 1 }, cwSort: { key: null, dir: 1 }, csOpen: new Set(),
   dashRange: null, dashBench: false, trendDir: 'up', trendCard: null, trendSort: { key: 'move', dir: -1 }, cardSort: { key: 'date', dir: -1 }, teamSort: { key: 'v', dir: -1 }, perfRange: null, perfPer: false, perfMore: { sig: '', n: 0 }, rollOpen: new Set(), perfQ: '', perfPos: [], perfTeam: [], perfMenu: null, perfOnly: { rookie: false, inj: false }, perfSort: { key: 'v', dir: -1 },
   perfWhose: { me: true, opp: true, other: true, fa: true }, perfOthers: [], perfSpot: 'all', perfFiltOpen: false,
   sbQ: {}, sbGive: new Set(), sbGet: [], watchRange: null }; // (the sandbox's searches, its trade, its Live tab's day: sandbox.js)

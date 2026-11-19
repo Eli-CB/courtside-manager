@@ -109,6 +109,7 @@ function statCells(p) {
 function viewStandings() {
   const L = fxLeague();
   const rows = (L && L.standings) || [];
+  const S = L ? seasonLineups(L) : null; // (the season's lineups and games: Categories won and Season totals)
   return `
   <div class="card">
     ${rows.length ? `<div class="table-wrap"><table>
@@ -120,7 +121,8 @@ function viewStandings() {
       }).join('')}</tbody>
     </table></div>${waiverLine()}` : `<div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div>`}
   </div>
-  ${L ? seasonTotalsCard(L, rows) : ''}`;
+  ${S && S.cw ? catsWonCard(rows, S.cw) : ''}
+  ${L ? seasonTotalsCard(rows, S) : ''}`;
 }
 
 // ----- A fantasy team's card: its record and this week's opponent (the title), its category strengths (teamStrengths), its roster -----
@@ -279,8 +281,93 @@ function boxWait(tab, title, text) {
 const currentFidNba = () => { const m = new Map(NBA.players.filter(r => r.fx).map(r => [r.fx.id, r.id])); return f => m.get(f) || null; };
 async function buildSeasonTotals(L) {
   const [weeks, G] = await Promise.all([loadRosterWeeks(L), loadGameLog('cur')]);
-  if (!weeks || !G) return {};
-  return pastSeasonTotals({ ...L, weeks, fidNba: currentFidNba() }, G);
+  if (!weeks || !G) return { teams: {}, cw: null };
+  const LL = { ...L, weeks, fidNba: currentFidNba() };
+  return { teams: pastSeasonTotals(LL, G), LL, G }; // (Categories won is counted when drawn: seasonLineups)
+}
+
+// The Standings tab's season so far, for Categories won and Season totals: { teams, cw } once its lineups and games are in
+// (teams: pastSeasonTotals; cw: catsWonRecords, null in a points league or before a week is over), else { msg } meanwhile.
+// A past season: its weekly lineups and its saved game log; this season: the weekly lineups and box scores, loaded once
+function seasonLineups(L) {
+  if (seasonCtx) {
+    if (!L.weeks) return { msg: "Fantrax didn't return this season's weekly rosters." };
+    if (!L.season || !(L.season in gameLogs)) {
+      if (L.season) loadGameLog(L.season).then(() => { if (ui.tab === 'standings' && ui.season) render(); });
+      return { msg: L.season ? `${loaderMark('sm')}Loading the season’s games…` : `No ${SPORT.name} game logs are saved for this season.` };
+    }
+    const G = gameLogs[L.season];
+    if (!G) return { msg: `No ${SPORT.name} game logs are saved for this season (the site has 2016-17 on).` };
+    return { teams: pastSeasonTotals(L, G), cw: catsWonRecords(L, G) };
+  }
+  if (!hasLineupHistory(L)) return { msg: `Season totals need every day's lineups, which the site reads from Fantrax and Sleeper only for now, not ${sourceName(L)}.` };
+  const id = L.id, S = seasonTot[id];
+  if (!S) {
+    seasonTot[id] = { state: 'loading' };
+    buildSeasonTotals(L).then(t => { seasonTot[id] = { state: 'ready', ...t }; })
+      .catch(e => { seasonTot[id] = { state: 'error', msg: e.message }; })
+      .finally(() => { if (ui.tab === 'standings' && !ui.season) render(); });
+  }
+  if (!S || S.state === 'loading') return { msg: `${loaderMark('sm')}Loading every lineup from Fantrax…` };
+  if (S.state === 'error') return { msg: `Couldn't load season totals (${esc(S.msg)}).` };
+  // (counted here, with the league on the page: its categories, and the weeks over by now)
+  if (!('cw' in S)) S.cw = catsWonRecords(S.LL, S.G);
+  return S;
+}
+
+// ----- Categories won: each team's categories won, lost and tied against its opponents, in all and one by one -----
+// Every finished regular-season matchup, counted from the week's real lineups and box scores as the Recap counts a final
+// (weekScore). Team id -> { w, l, t, weeks, by: [{ w, l, t }] in scoreCats' order }, or null: a points league, or no week
+// over yet. L: with its weekly lineups (weeks) and fidNba, as pastSeasonTotals takes it
+function catsWonRecords(L, G) {
+  if (isPoints() || isFootball() || !L || !L.weeks || !G) return null;
+  const cats = scoreCats(), out = {};
+  for (const p of (L.periods || []).filter(x => (!L.playoffPeriod || x.n < L.playoffPeriod) && periodOver(x))) {
+    const pairs = ((L.matchups || {})[String(p.n)] || []).filter(m => m.length === 2);
+    // the lineup periods that start within it (the week, or each of its days in a daily league), as benchSwaps finds them
+    const rps = L.weeks.filter(w => fxTime(w.start) >= fxTime(p.lock) && fxTime(w.start) < fxTime(p.endAt));
+    if (!pairs.length || !rps.length) continue;
+    const tot = pastSeasonTotals({ ...L, weeks: rps }, G);
+    for (const [a, b] of pairs) {
+      const sc = weekScore((tot[a] || {}).s || {}, (tot[b] || {}).s || {});
+      for (const [tid, sign] of [[a, 1], [b, -1]]) {
+        const R = out[tid] = out[tid] || { w: 0, l: 0, t: 0, weeks: 0, by: cats.map(() => ({ w: 0, l: 0, t: 0 })) };
+        R.weeks++;
+        sc.lead.forEach((x, i) => { const k = x * sign > 0 ? 'w' : x * sign < 0 ? 'l' : 't'; R[k]++; R.by[i][k]++; });
+      }
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// The card: categories won, lost and tied and the share won, then each category's weeks won-lost (-tied), shaded by how
+// often the team takes it; standings order until a column is picked (ui.cwSort, as Season totals)
+function catsWonCard(standings, cw) {
+  const cats = scoreCats();
+  const order = standings.length ? standings.map(r => r.id) : fxPickable().map(t => t.id);
+  const list = order.filter(tid => cw[tid]).map(tid => ({ tid, R: cw[tid] }));
+  if (!list.length) return '';
+  const share = x => (x.w + x.l + x.t ? (x.w + x.t / 2) / (x.w + x.l + x.t) : 0);
+  const rec = x => `${x.w}-${x.l}${x.t ? '-' + x.t : ''}`;
+  const ties = list.some(x => x.R.t);
+  const so = ui.cwSort;
+  if (so.key != null && !['team', 'w', 'l', 't', 'pct'].includes(so.key) && !cats[so.key]) so.key = null;
+  if (so.key === 't' && !ties) so.key = null;
+  const sortVal = x => (so.key === 'team' ? (fxTeamName(x.tid) || '').toLowerCase() : so.key === 'w' ? x.R.w : so.key === 'l' ? -x.R.l
+    : so.key === 't' ? x.R.t : so.key === 'pct' ? share(x.R) : share(x.R.by[so.key]));
+  const rows = [...list];
+  if (so.key != null) rows.sort((a, b) => { const x = sortVal(a), y = sortVal(b); return (x < y ? 1 : x > y ? -1 : 0) * so.dir; });
+  const th = (key, label, cls = 'num', tip = '') => sortTh('cw-sort', key, label, so, { cls, tip, down: so.dir > 0 });
+  const weeks = Math.max(...list.map(x => x.R.weeks));
+  return `<div class="card" style="margin-top:16px">
+    <div class="card-head"><h2>Categories won ${infoBtn('catsWon')}</h2><span class="muted small">${weeks} week${weeks === 1 ? '' : 's'}, against each week's opponent</span></div>
+    <div class="table-wrap"><table class="cats-won">
+      <thead><tr>${th('team', 'Team', '')}${th('w', 'W', 'num', 'Categories won')}${th('l', 'L', 'num', 'Categories lost')}${ties ? th('t', 'T', 'num', 'Categories tied') : ''}${th('pct', 'Win %', 'num', 'Share of categories won, a tie counting half')}${cats.map((c, i) => th(i, c.label, 'num', `Weeks won-lost in ${c.label}`)).join('')}</tr></thead>
+      <tbody>${rows.map(x => `<tr${x.tid === myTeamId() ? ' class="me-row"' : ''}><td><b>${teamLink(x.tid, esc(fxTeamName(x.tid) || ''))}</b></td>
+        <td class="num"><b>${x.R.w}</b></td><td class="num">${x.R.l}</td>${ties ? `<td class="num">${x.R.t}</td>` : ''}<td class="num">${fmt(share(x.R) * 100, 0)}%</td>
+        ${cats.map((c, i) => { const b = x.R.by[i]; return `<td class="num" style="${shadeProb(share(b))}" title="${c.label}: won ${b.w}, lost ${b.l}${b.t ? `, tied ${b.t}` : ''} of ${x.R.weeks} week${x.R.weeks === 1 ? '' : 's'}">${rec(b)}</td>`; }).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
 }
 
 // A season's totals: every game each starter played in a week he was in the lineup, from the weekly
@@ -303,34 +390,11 @@ function pastSeasonTotals(L, G) {
   return teams;
 }
 
-function seasonTotalsCard(L, standings) {
-  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${leagueLineupMode(L) === 'daily' && !isFootball() ? "day's" : "week's"} starting lineups</span></div>`;
-  const note = msg => `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">${msg}</p></div>`;
-  let teams;
-  if (seasonCtx) {
-    // a past season: its weekly lineups and its game log (loaded the first time it's needed)
-    if (!L.weeks) return note("Fantrax didn't return this season's weekly rosters.");
-    if (!L.season || !(L.season in gameLogs)) {
-      if (L.season) loadGameLog(L.season).then(() => { if (ui.tab === 'standings' && ui.season) render(); });
-      return L.season ? note(`${loaderMark('sm')}Loading the season’s games…`) : note(`No ${SPORT.name} game logs are saved for this season.`);
-    }
-    if (!gameLogs[L.season]) return note(`No ${SPORT.name} game logs are saved for this season (the site has 2016-17 on).`);
-    teams = pastSeasonTotals(L, gameLogs[L.season]);
-  } else if (!hasLineupHistory(L)) {
-    return note(`Season totals need every day's lineups, which the site reads from Fantrax and Sleeper only for now, not ${sourceName(L)}.`);
-  } else {
-    const id = L.id;
-    const S = seasonTot[id];
-    if (!S) {
-      seasonTot[id] = { state: 'loading' };
-      buildSeasonTotals(L).then(t => { seasonTot[id] = { state: 'ready', teams: t }; })
-        .catch(e => { seasonTot[id] = { state: 'error', msg: e.message }; })
-        .finally(() => { if (ui.tab === 'standings' && !ui.season) render(); });
-    }
-    if (!S || S.state === 'loading') return note(`${loaderMark('sm')}Loading every lineup from Fantrax…`);
-    if (S.state === 'error') return note(`Couldn't load season totals (${esc(S.msg)}).`);
-    teams = S.teams;
-  }
+// S: seasonLineups' answer (its message while the lineups and games aren't in)
+function seasonTotalsCard(standings, S) {
+  const head = `<div class="card-head"><h2>Season totals ${infoBtn('totals')}</h2><span class="muted small">from each ${leagueLineupMode(fxLeague()) === 'daily' && !isFootball() ? "day's" : "week's"} starting lineups</span></div>`;
+  if (S.msg) return `<div class="card" style="margin-top:16px">${head}<p class="muted small" style="margin:0">${S.msg}</p></div>`;
+  const teams = S.teams;
 
   // totals of any scored stat, derived ones included
   const tot = (T, k) => (DERIVED[k] ? sum(Object.entries(DERIVED[k]).map(([b, c]) => (T.s[b] || 0) * c)) : T.s[k] || 0);

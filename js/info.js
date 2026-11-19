@@ -98,6 +98,11 @@ const INFO = {
     <p><b>Totals.</b> Counting stats are added up from this season's box scores (a past season uses its saved NBA game logs, back to 2016-17). FG% and FT% are total makes ÷ total attempts.</p>
     <p><b>Colors.</b> Each column is shaded from best in the league (green) to worst (red); fewer turnovers counts as better. Hover a number for its rank. <b>Avg rank</b> is a team's average rank across the categories.</p>
     <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
+  catsWon: ['Categories won', `
+    <p><b>What it counts.</b> Every finished regular-season week, each team against its opponent that week: the categories it won, lost and tied, added up. <b>Win %</b> is the share it won, a tie counting half. Playoff weeks aren't counted.</p>
+    <p><b>Each category.</b> The weeks the team won and lost that category (and tied, when it has). Green: it usually takes that category; red: it usually gives it up. Hover a cell for the detail.</p>
+    <p><b>Where it comes from.</b> Each week's starting lineups and that week's box scores, counted as the Recap counts a final, so now and then a category can come out differently from your league site's (a stat correction, a category decided by one rebound).</p>
+    <p><b>Sorting.</b> Click a column to sort it best first, and again to flip it. Until then, teams follow the standings.</p>`],
   pastRoster: ['Past rosters', `
     <p>Everyone the team had in its <b>starting lineup</b> for at least one week, from Fantrax's weekly rosters. Players who only sat on the bench or IR aren't listed.</p>
     <ul><li><b>How:</b> kept, drafted, picked up or traded for, by how he joined the team the first time he started for it. Keepers are players on the team's opening-week roster that it didn't draft.</li>

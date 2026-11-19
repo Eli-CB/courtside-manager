@@ -539,6 +539,12 @@ const actions = {
     nextSort(ui.totSort, key, key === 'team' ? -1 : 1);
     render();
   },
+  'cw-sort'(el) { // (Categories won, on Standings: as Season totals)
+    const k = el.dataset.key;
+    const key = /^\d+$/.test(k) ? +k : k;
+    nextSort(ui.cwSort, key, key === 'team' ? -1 : 1);
+    render();
+  },
   export() {
     const box = $('#backupText');
     box.value = JSON.stringify(state);
