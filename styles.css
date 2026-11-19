@@ -541,8 +541,8 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rc-t:last-child .rc-badge { margin-left: 6px; }
 .rc-badge.rc-top { background: var(--good-soft); color: var(--good); }
 .rc-badge.rc-bottom { background: var(--bad-soft); color: var(--bad); }
-/* its standouts as cards, each with the small round faces of the players it names on the right (.rx-round: a player's
-   own card); the Draft Retrospective's players beside a big photo on the team's color (.rx-ph), as the share picture */
+/* its standouts as cards (the Draft Retrospective's awards too), each with the small round faces of the players it names
+   on the right, a player's own card too */
 .rx-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); }
 .rx-card { display: flex; min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
 .rx-body { flex: 1; min-width: 0; padding: 14px 16px; }
@@ -556,17 +556,13 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rx-stats > .rx-words { white-space: normal; }
 .rx-stats b { color: var(--text); font-weight: 700; }
 .rx-stats b.pos-bad { color: var(--bad); }
-.pc-photo.rx-ph { width: 168px; min-height: 172px; aspect-ratio: auto; border-radius: 0; box-shadow: none; align-self: stretch; cursor: pointer;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 92%, #000), color-mix(in srgb, var(--tint) 40%, #000)); }
-.rx-ph .pc-logo { left: 50%; width: 112%; transform: translate(-50%, -50%); opacity: .2; }
-.rx-ph .pc-shot { inset: auto auto 0 50%; width: auto; height: 92%; max-width: none; transform: translateX(-50%); }
-.rx-note, .rx-round { align-items: center; }
+.rx-note, .rx-player { align-items: center; }
 .rx-text { margin-top: 3px; font-size: .92rem; line-height: 1.45; }
 .rx-text .pname { font-size: inherit; }
 .rx-faces { display: flex; flex: none; margin-right: 16px; }
 .rx-faces > .hs { outline: 3px solid var(--surface); }
 .rx-faces > .hs + .hs { margin-left: -10px; }
-@media (max-width: 640px) { .pc-photo.rx-ph { width: 112px; min-height: 150px; } .rx-body { padding: 12px 14px; } .rx-name { font-size: 1.04rem; } }
+@media (max-width: 640px) { .rx-body { padding: 12px 14px; } .rx-name { font-size: 1.04rem; } }
 .rc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .rc-item { display: flex; gap: 12px; align-items: flex-start; font-size: .92rem; }
 .rc-e { font-size: 1.4rem; line-height: 1.2; width: 1.6rem; text-align: center; flex: none; }

@@ -236,11 +236,11 @@ function recapText(L, X) {
 
 // A standout on the Recap tab or the Draft Retrospective: a player award the award, his name, his fantasy team, his NBA team
 // and positions, his numbers (his value or points first) or the award's words; any other the award and its line, with the
-// faces of the players it names. Every face the small round photo on the right (the Recap's players too, the owner's ask,
-// Nov 2026); bigPhoto: the player beside his big photo on his team's color instead, as the share picture draws him (the
-// player card's playerPhoto; the Draft tab's). label: the award's title as HTML (the Draft tab's opens its breakdown)
+// faces of the players it names. Every face the small round photo on the right, a player award's too (the owner's ask, Nov
+// 2026: the big photo on his team's color is the share picture's alone). label: the award's title as HTML (the Draft tab's
+// opens its breakdown)
 const standoutFaces = faces => `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>`;
-function standoutCard(x, label = `<div class="rx-label">${x.label}</div>`, bigPhoto = false) {
+function standoutCard(x, label = `<div class="rx-label">${x.label}</div>`) {
   if (!x.p) {
     const faces = (x.faces || []).filter(f => f && f.nbaId != null).slice(0, 3);
     return `<article class="rx-card rx-note"><div class="rx-body">${label}<div class="rx-text">${x.html}</div></div>`
@@ -251,13 +251,13 @@ function standoutCard(x, label = `<div class="rx-label">${x.label}</div>`, bigPh
     ? [[x.score[0], x.score[1], isBelowZero(x.score[0]) ? 'pos-bad' : ''], ...x.tiles.map(t => [t.v, `${t.k}${t.made ? ` ${t.made}` : ''}`, ''])]
       .map(([v, k, cls]) => `<span><b${cls ? ` class="${cls}"` : ''}>${esc(v)}</b> ${esc(k)}</span>`).join('')
     : `<span class="rx-words">${esc(x.stats)}</span>`; // (football's line, a draft award's: words)
-  return `<article class="rx-card rx-player${bigPhoto ? '' : ' rx-round'}">${bigPhoto ? playerPhoto(raw, 'rx-ph') : ''}<div class="rx-body">
+  return `<article class="rx-card rx-player"><div class="rx-body">
     ${label}
     <div class="rx-name">${playerBtn(x.p.nbaId, x.p.name)}</div>
     <div class="rx-team">${teamLink(x.tid)}</div>
     <div class="rx-meta">${raw.team ? teamBtn(raw.team) : 'FA'}${pos.length ? ` · ${posTags(pos)}` : ''}${x.per ? ` · ${x.per} G, per game` : ''}</div>
     <div class="rx-stats">${stats}</div>
-  </div>${bigPhoto ? '' : standoutFaces([x.p])}</article>`;
+  </div>${standoutFaces([x.p])}</article>`;
 }
 
 function viewRecap() {

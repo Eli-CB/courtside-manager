@@ -403,11 +403,10 @@ function viewPlayers() {
 }
 
 // A country's flag (ISO code from the daily data job), named on hover
+const countryName = iso => { try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(iso); } catch (e) { return iso; } };
 const flagImg = iso => {
   if (!iso) return '';
-  let name = iso;
-  try { name = new Intl.DisplayNames(['en'], { type: 'region' }).of(iso); } catch (e) { /* the code, then */ }
-  const c = iso.toLowerCase();
+  const name = countryName(iso), c = iso.toLowerCase();
   return `<img class="flag" src="https://flagcdn.com/w20/${c}.png" srcset="https://flagcdn.com/w40/${c}.png 2x" width="20" height="15" alt="${esc(name)}" title="${esc(name)}" loading="lazy">`;
 };
 // Whose he is in the league: the fantasy team and where in its lineup, else free agent or waivers

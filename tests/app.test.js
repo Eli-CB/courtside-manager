@@ -2401,7 +2401,7 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     // no emoji anywhere in the recap (the owner's ask); each player standout a card with his small round photo, as the
     // other standouts' faces, never the big one (the owner's ask, Nov 2026)
     assert.ok(!/\p{Extended_Pictographic}/u.test(html), 'no emoji on the tab');
-    assert.equal((html.match(/class="rx-card rx-player rx-round"/g) || []).length, app.recapItems(X).filter(x => x.p).length);
+    assert.equal((html.match(/class="rx-card rx-player"/g) || []).length, app.recapItems(X).filter(x => x.p).length);
     assert.ok(!html.includes('pc-photo'), 'no big photo on the tab');
     assert.match(html, new RegExp(`class="rx-faces"><span class="hs[^"]*" style="width:44px;height:44px[^"]*" data-photo="${X.mvp.p.nbaId}"`), "the player's round photo, which opens his card");
     // the finals agree with Fantrax's standings (week 1 is the only finished week)
@@ -3278,7 +3278,7 @@ test("Draft awards: Reach is the pick taken furthest ahead of consensus ADP, kee
     assert.match(card, /data-action="draft-share"/);
     assert.ok(card.includes(`data-nba="${reacher.nbaId}"`));
     // drawn as the Recap's standouts: a player award a card with his photo, a team award a card of its line; no emoji
-    assert.ok(card.includes('class="rx-card rx-player"') && card.includes(`class="pc-photo rx-ph" data-photo="${reacher.nbaId}"`));
+    assert.ok(card.includes('class="rx-card rx-player"') && !card.includes('pc-photo') && new RegExp(`class="rx-faces"><span class="hs[^"]*" style="[^"]*" data-photo="${reacher.nbaId}"`).test(card), 'his small round photo, never the big one');
     assert.equal((card.match(/class="rx-card rx-player"/g) || []).length, awards.filter(x => x.p).length);
     assert.ok(!/\p{Extended_Pictographic}/u.test(card), 'no emoji');
     // each award's title opens its breakdown: the 10 biggest reaches
@@ -3363,8 +3363,9 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     assert.equal(get('Fall').text, `${b3.name} (${app.fxTeamName(B)}): taken #9, 8 picks late: consensus #1 (ADP 0.5)`);
     assert.equal(get('Fall').p.nbaId, b3.id);
     assert.ok(get('Fall').detail.html.includes('>8 late</b>'));
-    // Glass: B's picks missed (42 + 42 + 82 + 82 + 0 + 0) / 6 = 41 a season; its most, the one out both years
-    assert.equal(get('Glass').text, `${app.fxTeamName(B)}: their players missed 41 games a season, the last two seasons`);
+    // Glass: B's picks missed (42 + 42 + 82 + 82 + 0 + 0) / 6 = 41 a season; its most, the one out both years, named and on its card
+    assert.equal(get('Glass').text, `${app.fxTeamName(B)}: their players missed 41 games a season, the last two seasons; most: ${app.lastName(b2.name)} (82 a season)`);
+    assert.deepEqual(Array.from(get('Glass').faces, p => p.nbaId), [b2.id]);
     const glassRows = get('Glass').detail.html.split('<li>').slice(1);
     assert.deepEqual(Array.from(glassRows, x => x.match(/data-team="([^"]+)"/)[1]), [B, C, A], 'B 41, C 6 (its rookie left out), A 2');
     assert.match(glassRows[0], new RegExp(`most: <button[^>]*data-nba="${b2.id}"[^>]*>[^<]+</button>, 82 a season`));
@@ -3377,7 +3378,9 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     // Homer: three Thunder, their faces on its card; Passport: three countries (players' nationalities, not their teams)
     assert.deepEqual(Array.from(get('Homer').faces, p => p.nbaId).sort(), [a1, a2, a3].map(x => x.id).sort(), "Homer's card: the faces of the players it names");
     assert.equal(get('Homer').text, `${app.fxTeamName(A)} has 3 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1')}`);
-    assert.equal(get('Passport').text, `${app.fxTeamName(B)}: their players came from 3 countries`);
+    // (its first player taken from outside the league's most common country, the US, named and on its card)
+    assert.equal(get('Passport').text, `${app.fxTeamName(B)}: their players came from 3 countries; first taken from abroad: ${app.lastName(b2.name)} (France)`);
+    assert.deepEqual(Array.from(get('Passport').faces, p => p.nbaId), [b2.id]);
     const globeRows = get('Passport').detail.html.split('<li>').slice(1);
     assert.match(globeRows[0], />3 countries<\/b>/);
     assert.equal((globeRows[0].match(/<img class="flag"/g) || []).length, 3, "B's three flags");
@@ -3392,9 +3395,11 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     assert.match(getK('Passport').detail.html.split('<li>').slice(1).find(x => x.includes(`data-team="${A}"`)), />2 countries<\/b>/);
     assert.equal(getK('Fall').text, get('Fall').text, 'never in the ADP awards');
     d.keepers = {};
-    // a tie names each team (with its real team on Homer)
+    // a tie names each team (with its real team and its players on Homer, the first of each taken on its card)
     c3.team = 'BOS';
-    assert.equal(app.draftAwards(d).find(x => x.label === 'Homer').text, `${app.fxTeamName(A)} (OKC) and ${app.fxTeamName(C)} (BOS) tied: 3 players each from one team`);
+    const tied = app.draftAwards(d).find(x => x.label === 'Homer'), names = xs => xs.map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1');
+    assert.equal(tied.text, `${app.fxTeamName(A)} (OKC: ${names([a1, a2, a3])}) and ${app.fxTeamName(C)} (BOS: ${names([c1, c2, c3])}) tied: 3 players each from one team`);
+    assert.deepEqual(Array.from(tied.faces, p => p.nbaId), [a1.id, c1.id]);
     // the seasons' archives not in yet (on their way): no Glass until they are
     const loading = app.get('glassLoading');
     for (const s of seasons) { delete archives[s]; loading.add(s); }
