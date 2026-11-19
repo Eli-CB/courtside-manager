@@ -216,6 +216,9 @@ function dayDots(p, ctx, counts) {
 // ----- Tooltips: any element with data-tip (trusted HTML) shows a readable box on hover, focus or tap -----
 const tipEl = $('#tip');
 function showTip(el) {
+  // (inside a popup the box goes in it: an open dialog is drawn above everything else on the page, any z-index included)
+  const host = el.closest('dialog[open]') || document.body;
+  if (tipEl.parentNode !== host) host.append(tipEl);
   tipEl.innerHTML = el.dataset.tip;
   tipEl.hidden = false;
   const r = el.getBoundingClientRect(), t = tipEl.getBoundingClientRect();

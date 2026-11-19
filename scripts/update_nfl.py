@@ -315,6 +315,15 @@ def main():
             out['born'] = p['birth_date']
         if p.get('espn_id'):
             out['espn'] = int(p['espn_id'])
+        # the player card's bio: height (inches; Sleeper's are "74", a few "6'2\""), weight (pounds), college
+        ht = str(p.get('height') or '').strip()
+        m = re.match(r'^(\d+)\'\s*(\d+)', ht)
+        if ht.isdigit() or m:
+            out['ht'] = int(m[1]) * 12 + int(m[2]) if m else int(ht)
+        if str(p.get('weight') or '').strip().isdigit():
+            out['wt'] = int(str(p['weight']).strip())
+        if pos != 'DEF' and (p.get('college') or '').strip():
+            out['col'] = p['college'].strip()
         inj = injury(p)
         if inj:
             out['inj'] = inj

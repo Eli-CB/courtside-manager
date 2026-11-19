@@ -504,6 +504,7 @@ function computeBase(stats, n) {
     out[k] = [m, spread(pool.map(x => { const v = statVal(x, att); return v ? (statVal(x, made) / v - m) * v : 0; }), 0)];
   }
   out.pool = pool.length; // for the explanation
+  Object.defineProperty(out, 'stats', { value: pool }); // (the players themselves: the player card's category profile, catProfile)
   return out;
 }
 

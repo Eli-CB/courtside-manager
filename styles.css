@@ -444,6 +444,20 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .pc-top > .pc-photo, .pc-top > .hs { flex: none; }
 .pc-who { flex: 0 1 190px; min-width: 120px; }
 .pc-who .pc-owner:first-child { margin-top: 0; }
+/* who he is under the photo, as wide as it (cardBio); each category against an average rostered player under his team (catProfile) */
+.pc-side { flex: none; width: min-content; }
+.pc-bio { margin: 8px 0 0; font-size: .8rem; line-height: 1.4; color: var(--muted); }
+.pc-bio > span { display: block; }
+.pc-prof { margin-top: 10px; }
+.pc-who > .pc-prof:first-child { margin-top: 0; }
+.cp-head { display: flex; align-items: center; gap: 5px; margin: 0 0 3px; font-size: .78rem; }
+.cp-row { display: grid; grid-template-columns: 3.3em minmax(0, 1fr); align-items: center; gap: 6px; height: 14px; font-size: .72rem; }
+.cp-k { color: var(--muted); font-weight: 600; }
+.cp-bar { position: relative; height: 8px; background: var(--surface-2); border-radius: 3px; }
+.cp-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); opacity: .5; }
+.cp-fill { position: absolute; top: 0; bottom: 0; }
+.cp-fill.up { left: 50%; background: var(--good); border-radius: 0 3px 3px 0; }
+.cp-fill.down { right: 50%; background: var(--bad); border-radius: 3px 0 0 3px; }
 .proj-grid.pc-tiles { flex: 1 1 300px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 640px) { .pc-who { flex: 1 1 0; } .proj-grid.pc-tiles { flex-basis: 100%; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); } }
 .link-btn.pp-clear:hover, .link-btn.quiet:hover { color: var(--text); text-decoration: underline; }

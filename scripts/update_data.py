@@ -565,6 +565,29 @@ def load_previous():
         return {}
 
 
+BIO_KEYS = ('ht', 'wt', 'col', 'dft')
+
+
+def nba_bio(r):
+    """The player card's bio from NBA.com's player list: height in inches, weight in pounds, his college or club before the
+    NBA, his NBA draft [year, overall pick] (0: undrafted). Blanks left out."""
+    out = {}
+    m = re.match(r'^(\d+)-(\d+)$', str(r.get('HEIGHT') or '').strip())
+    if m:
+        out['ht'] = int(m[1]) * 12 + int(m[2])
+    w = str(r.get('WEIGHT') or '').strip()
+    if w.isdigit():
+        out['wt'] = int(w)
+    col = (r.get('COLLEGE') or '').strip()
+    if col and col.lower() != 'none':
+        out['col'] = col
+    if r.get('DRAFT_YEAR') and r.get('DRAFT_NUMBER'):
+        out['dft'] = [int(r['DRAFT_YEAR']), int(r['DRAFT_NUMBER'])]
+    elif out:  # (a list that has him but no draft: he wasn't drafted)
+        out['dft'] = 0
+    return out
+
+
 def index_from_saved(saved, start_year):
     """Rebuild player-index rows from the saved file when NBA.com won't give us its list."""
     rows = []
@@ -849,6 +872,8 @@ def main():
         was = old.get(pid, {})
         nat = COUNTRY_ISO.get((r.get('COUNTRY') or '').strip()) or was.get('nat')
         if nat: p['nat'] = nat
+        bio = nba_bio(r) or {k: was[k] for k in BIO_KEYS if k in was}  # (the saved list's rows have none: keep his)
+        p.update(bio)
         if games:
             if pid in cur: p['cur'] = cur[pid]
             if pid in l10: p['l10'] = l10[pid]

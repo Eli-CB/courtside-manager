@@ -426,6 +426,66 @@ function cardOwner(raw) {
   return fa ? `<p class="pc-owner">${fa}</p>` : '';
 }
 
+// Who he is, under his photo (the owner's ask, Nov 2026: the card's top had room to spare): height and weight (hockey: the hand he shoots or catches
+// with), his college or club before the league, his draft. The daily job's, from NBA.com, NHL.com or Sleeper (no draft there).
+function cardBio(raw) {
+  const body = [raw.ht ? `${Math.floor(raw.ht / 12)}′${raw.ht % 12}″` : '', raw.wt ? `${raw.wt} lb` : '', raw.sh ? `${isGoalie(raw) ? 'Catches' : 'Shoots'} ${esc(raw.sh)}` : ''].filter(Boolean).join(' · ');
+  const draft = raw.dft === 0 ? 'Undrafted' : Array.isArray(raw.dft) ? `${raw.dft[0]} ${SPORT.name} draft, #${raw.dft[1]}` : '';
+  const lines = [body, raw.col ? esc(raw.col) : '', draft].filter(Boolean);
+  return lines.length ? `<p class="pc-bio">${lines.map(l => `<span>${l}</span>`).join('')}</p>` : '';
+}
+
+// His categories against an average rostered player (the owner's ask, Nov 2026; a goalie against goalies, a skater against
+// skaters): a bar each, green where he helps and red where he hurts, the gap in spreads among those players (the players
+// BASE is made of: the league's teams × roster spots), out to 2.5. Percentages count volume, as catZ. A points league's rows
+// are each scored stat's fantasy points a game (a shooting pair one row, lineCats). Not football: positions differ too much.
+let profileMemo = null;
+keep('sport', () => { profileMemo = null; });
+function profileRows(goalie) {
+  const cats = scoreCats(), sc = leaguePoints(); // (first: it brings BASE up to date)
+  const key = `${goalie}`;
+  if (!profileMemo || profileMemo.BASE !== BASE || profileMemo.cats !== cats) profileMemo = { BASE, cats, by: {} };
+  if (profileMemo.by[key]) return profileMemo.by[key];
+  const role = x => !!(x.sv || x.sa) === goalie;
+  const pool = (BASE.stats || []).filter(x => !isHockey() || role(x));
+  const rows = [];
+  if (pool.length >= 10) {
+    for (const c of sc ? lineCats() : cats) {
+      if (c.fp || (isHockey() && SPORT.goalieCats.includes(c.key) !== goalie)) continue;
+      let f, avg;
+      if (sc) { // fantasy points from the stat (both halves of a shooting pair)
+        const pts = c.shot ? shotPoints(c) : { [c.key]: sc[c.key] };
+        f = x => sum(Object.entries(pts).map(([k, v]) => statVal(x, k) * v));
+      } else if (c.pct) { // makes above the average % at his volume (a rate: per hour, as GAA)
+        const att = sum(pool.map(x => statVal(x, c.att)));
+        avg = att ? sum(pool.map(x => statVal(x, c.made))) / att : 0;
+        f = x => (c.neg ? -1 : 1) * (pctOf(x, c) - avg) * statVal(x, c.att);
+      } else f = x => (c.neg ? -1 : 1) * statVal(x, c.key);
+      const xs = pool.map(f), m = sum(xs) / xs.length, sd = Math.sqrt(sum(xs.map(x => (x - m) ** 2)) / xs.length);
+      if (sd < 1e-6) continue; // (a stat everyone has alike says nothing)
+      rows.push({ c, f, m, sd, avg: c.pct && !sc ? avg : sum(pool.map(x => statVal(x, c.key))) / pool.length });
+    }
+  }
+  return (profileMemo.by[key] = rows);
+}
+function catProfile(raw) {
+  if (isFootball()) return '';
+  const p = nbaStats(raw);
+  if (!p || !p.gp) return '';
+  const goalie = isGoalie(raw), rows = profileRows(goalie);
+  if (!rows.length) return '';
+  const pts = isPoints(), who = `an average rostered ${goalie ? 'goalie' : isHockey() ? 'skater' : 'player'}`;
+  const bars = rows.map(({ c, f, m, sd, avg }) => {
+    const z = (f(p) - m) / sd, w = (Math.min(Math.abs(z), 2.5) / 2.5) * 50;
+    const label = esc(c.label);
+    const tip = pts ? `${fmt(f(p), 1)} FP a game from ${label}; ${who}: ${fmt(m, 1)}`
+      : c.pct ? `${fmtPct(pctOf(p, c))} ${label} on ${fmt(statVal(p, c.att), 1)} ${esc(STAT_LABEL[c.att] || c.att.toUpperCase())} a game; ${who}: ${fmtPct(avg)}`
+      : `${fmt(statVal(p, c.key), c.dec || 1)} ${label} a game; ${who}: ${fmt(avg, c.dec || 1)}`;
+    return `<div class="cp-row" data-tip="${esc(tip)}"><span class="cp-k">${label}</span><span class="cp-bar"><span class="cp-fill ${z >= 0 ? 'up' : 'down'}" style="width:${w.toFixed(1)}%"></span></span></div>`;
+  }).join('');
+  return `<div class="pc-prof"><p class="cp-head" title="Against ${who}"><b>${pts ? 'By stat' : 'By category'}</b>${infoBtn('profile')}</p>${bars}</div>`;
+}
+
 // The card's line for it: the Roster tab's badge (same colors; Drafted blue, as grey is a free agent's), then the rest in grey
 const HOW_BADGE = [[/^Keeper$/, 'Keeper', 'accent'], [/^Drafted · /, 'Drafted', 'info'], [/^Pickup · /, 'Pickup', 'good'], [/^Added /, 'Added', 'good'], [/^Traded /, 'Trade', 'warn']];
 function howBadge(how) {
@@ -645,8 +705,8 @@ function showPlayerDetail(nbaId) {
   const footballTile = () => { const p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, thisWeek) ? fmt(footballPts(p, thisWeek), 1) : 'Bye'}</div></div>`; };
   $('#detailBody').innerHTML = `
     <div class="detail-head pc-top">
-      ${playerPhoto(raw)}
-      ${(() => { const who = cardOwner(raw); return who ? `<div class="pc-who">${who}</div>` : ''; })()}
+      ${(() => { const bio = cardBio(raw); return bio ? `<div class="pc-side">${playerPhoto(raw)}${bio}</div>` : playerPhoto(raw); })()}
+      ${(() => { const who = cardOwner(raw) + catProfile(raw); return who ? `<div class="pc-who">${who}</div>` : ''; })()}
       <div class="proj-grid pc-tiles">
         <div class="proj"><div class="k">Next game</div><div class="v">${t && t.next ? linkTeams(nextGame(t.next)) : '—'}</div>${isGoalie(raw) && t && t.next ? `<div class="pc-rank">${startWords(raw, t.next.date)}</div>` : ''}</div>
         ${isGoalie(raw) ? goalieTile() : isFootball() ? footballTile()

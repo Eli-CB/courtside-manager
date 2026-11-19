@@ -158,5 +158,17 @@ class Season(unittest.TestCase):
         self.assertEqual(cur[3][-2:], [0.0, 0.0])
 
 
+class Bio(unittest.TestCase):
+    """The player card's bio, from NBA.com's player list"""
+    def test_height_weight_college_and_draft(self):
+        r = {'HEIGHT': '6-6', 'WEIGHT': '195', 'COLLEGE': 'Kentucky', 'DRAFT_YEAR': 2018, 'DRAFT_ROUND': 1, 'DRAFT_NUMBER': 11}
+        self.assertEqual(D.nba_bio(r), {'ht': 78, 'wt': 195, 'col': 'Kentucky', 'dft': [2018, 11]})
+
+    def test_undrafted_and_blanks(self):
+        r = {'HEIGHT': '6-10', 'WEIGHT': None, 'COLLEGE': '      ', 'DRAFT_YEAR': None, 'DRAFT_ROUND': None, 'DRAFT_NUMBER': None}
+        self.assertEqual(D.nba_bio(r), {'ht': 82, 'dft': 0})
+        self.assertEqual(D.nba_bio({'COLLEGE': 'None'}), {})  # (nothing known: not called undrafted)
+
+
 if __name__ == '__main__':
     unittest.main()

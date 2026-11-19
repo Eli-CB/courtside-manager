@@ -1438,6 +1438,35 @@ test("player profile: value per game (each game, each season's averages) and thi
   } finally { doc.querySelector = before; }
 });
 
+test('player card: who he is under the photo, and each category against an average rostered player beside it', async () => {
+  const els = {}, doc = app.document, before = doc.querySelector;
+  doc.querySelector = sel => (els[sel] = els[sel] || { innerHTML: '', open: false, showModal() { this.open = true; } });
+  const raw = () => app.NBA.players.filter(r => app.statObj(r.cur) && app.statObj(r.cur).gp >= 3).sort((a, b) => app.statObj(b.cur).pts - app.statObj(a.cur).pts)[0];
+  const card = id => { app.showPlayerDetail(id); return els['#detailBody'].innerHTML; };
+  const bars = html => [...html.matchAll(/<span class="cp-k">([^<]+)<\/span><span class="cp-bar"><span class="cp-fill (up|down)"/g)].map(m => [m[1], m[2]]);
+  const r = raw();
+  try {
+    await app.useLeague(CATS9);
+    Object.assign(r, { ht: 78, wt: 195, col: '<b>Kentucky</b>', dft: [2018, 11] });
+    let html = card(r.id);
+    assert.match(html, /<div class="pc-side"><div class="pc-photo[\s\S]*?<\/div><p class="pc-bio"><span>6′6″ · 195 lb<\/span><span>&lt;b&gt;Kentucky&lt;\/b&gt;<\/span><span>2018 NBA draft, #11<\/span><\/p><\/div>/, 'height, weight, college (as text), draft');
+    // the league's own categories, in its order; the top scorer is above average in points
+    assert.deepEqual(bars(html).map(b => b[0]), Array.from(app.scoreCats(), c => c.label));
+    assert.deepEqual(bars(html).find(b => b[0] === 'PTS'), ['PTS', 'up']);
+    assert.ok(html.indexOf('pc-owner') < html.indexOf('pc-prof') && html.indexOf('pc-prof') < html.indexOf('pc-tiles'), 'under his fantasy team, before the tiles');
+    Object.assign(r, { dft: 0, col: undefined, ht: undefined, wt: undefined });
+    assert.match(card(r.id), /<p class="pc-bio"><span>Undrafted<\/span><\/p>/);
+    delete r.dft;
+    assert.ok(!card(r.id).includes('pc-side'), 'nothing known: the photo alone');
+    // a points league: the fantasy points each scored stat gives him a game (no FP row)
+    await app.useLeague(POINTS);
+    html = card(r.id);
+    assert.match(html, /<b>By stat<\/b>/);
+    assert.ok(bars(html).length >= 5 && !bars(html).some(b => b[0] === 'FP'), JSON.stringify(bars(html)));
+    assert.match(html, /data-tip="[\d.-]+ FP a game from [^"]+; an average rostered player: [\d.-]+"/);
+  } finally { doc.querySelector = before; for (const k of ['ht', 'wt', 'col', 'dft']) delete r[k]; }
+});
+
 test('player card: a fantasy team with its lineup spot', async () => {
   const L = await app.useLeague(CATS9);
   const [tid, roster] = Object.entries(L.rosters).find(([, r]) => r.some(x => x.nba && x.st === 'INJURED_RESERVE'));
@@ -4441,7 +4470,12 @@ test('hockey: every tab shows real numbers, the player card speaks hockey', asyn
     a.showPlayerDetail(goalie.id);
     const tile = String(card.innerHTML).match(/Starts left this week<\/div><div class="v">([^<]*)</);
     assert.ok(tile && /^(about [\d.]+|—)$/.test(tile[1]), `a goalie's tile: ${tile && tile[1]}`);
+    // his categories against goalies, a skater's against skaters (a skater has no saves)
+    const profile = () => [...String(card.innerHTML).matchAll(/<span class="cp-k">([^<]+)<\/span>/g)].map(m => m[1]);
+    const goalieLabels = new Set(a.lineCats().filter(c => !c.fp && a.SPORT.goalieCats.includes(c.key)).map(c => c.label));
+    assert.ok(profile().length && profile().every(l => goalieLabels.has(l)), `a goalie's: ${profile()}`);
     a.showPlayerDetail(skater.id);
+    assert.ok(profile().length && !profile().some(l => goalieLabels.has(l)), `a skater's: ${profile()}`);
     assert.match(String(card.innerHTML), /Games left this week/, "a skater's: games left");
     assert.doesNotMatch(String(card.innerHTML), /Starts left this week/);
   } finally { doc.querySelector = realQuery; }

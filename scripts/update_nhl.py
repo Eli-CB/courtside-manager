@@ -378,7 +378,9 @@ def bios(season_id):
     for kind in ('skater', 'goalie'):
         exp = f'seasonId={season_id} and gameTypeId=2'
         for r in get_json(REST + f'{kind}/bios', {'start': 0, 'limit': -1, 'cayenneExp': exp}, timeout=60)['data']:
-            out[r['playerId']] = {'first': (r.get('firstSeasonForGameType') or 0) // 10000, 'nat': COUNTRY_ISO.get(r.get('birthCountryCode') or ''), 'born': r.get('birthDate') or ''}
+            out[r['playerId']] = {'first': (r.get('firstSeasonForGameType') or 0) // 10000, 'nat': COUNTRY_ISO.get(r.get('birthCountryCode') or ''), 'born': r.get('birthDate') or '',
+                                  # his NHL draft [year, overall pick] for the player card (0: undrafted)
+                                  'dft': [r['draftYear'], r['draftOverall']] if r.get('draftYear') and r.get('draftOverall') else 0}
     return out
 
 
@@ -390,7 +392,9 @@ def rosters(teams):
         for group in ('forwards', 'defensemen', 'goalies'):
             for r in data.get(group, []):
                 out[r['id']] = {'name': f"{r['firstName']['default']} {r['lastName']['default']}".strip(), 'team': tri, 'pos': r.get('positionCode') or '',
-                                'jersey': str(r.get('sweaterNumber') or ''), 'born': r.get('birthDate') or '', 'nat': COUNTRY_ISO.get(r.get('birthCountry') or '')}
+                                'jersey': str(r.get('sweaterNumber') or ''), 'born': r.get('birthDate') or '', 'nat': COUNTRY_ISO.get(r.get('birthCountry') or ''),
+                                # the player card's bio: height (inches), weight (pounds), which hand he shoots or catches with
+                                'ht': r.get('heightInInches'), 'wt': r.get('weightInPounds'), 'sh': r.get('shootsCatches')}
     return out
 
 
@@ -466,6 +470,11 @@ def main():
              'exp': start_year - b['first'] if b.get('first') else 1 if str(pid) in prev else 0}
         nat = r['nat'] or b.get('nat') or was.get('nat')
         if nat: p['nat'] = nat
+        for k in ('ht', 'wt', 'sh'):
+            v = r.get(k) or was.get(k)
+            if v: p[k] = v
+        dft = b['dft'] if 'dft' in b else was.get('dft')
+        if dft is not None: p['dft'] = dft
         if pid in shares: p['st'] = shares[pid]
         if pid in cur:
             p['cur'], p['l10'] = cur[pid], l10[pid]
