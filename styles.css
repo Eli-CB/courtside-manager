@@ -306,8 +306,8 @@ body:has(.mu-card.full) .container { padding-top: max(12px, env(safe-area-inset-
    faintly green or red for his team's win or loss */
 .game-pill { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); color: var(--text);
   font-variant-numeric: tabular-nums; }
-.game-pill.gp-w { background: var(--good-soft); }
-.game-pill.gp-l { background: var(--bad-soft); }
+.game-pill.gp-w { background: color-mix(in srgb, var(--good-soft) 50%, var(--surface-2)); }
+.game-pill.gp-l { background: color-mix(in srgb, var(--bad-soft) 50%, var(--surface-2)); }
 .game-pill .gp-part { white-space: nowrap; }
 .mu-chips { display: flex; flex-wrap: wrap; gap: 3px; }
 .mu-p.right .mu-chips { justify-content: flex-end; }
