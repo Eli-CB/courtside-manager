@@ -353,13 +353,14 @@ function render() {
 
 // Phones: the sections after a tab's first one with a heading roll up to that heading, opened by a tap (which ones are
 // open is kept for the visit: ui.rollOpen, by tab and heading). Trades keeps both sides open; award cards don't roll.
+// A card marked "rolls" rolls up wherever it is, and isn't the first (Standings' Moves this period: news, a tap away).
 function rollCards() {
   if (!isPhone() || ui.tab === 'trade') return;
   let first = true;
   document.querySelectorAll('#view .card').forEach(card => {
     const h = card.querySelector(':scope > .card-head > h2');
     if (!h || card.closest('dialog') || card.closest('.awards')) return;
-    if (first) { first = false; return; }
+    if (first && !card.classList.contains('rolls')) { first = false; return; }
     // a section beside another (two columns) stays open, or its column would sit empty
     const top = card.getBoundingClientRect().top;
     if ([...card.parentElement.children].some(c => c !== card && c.classList.contains('card') && Math.abs(c.getBoundingClientRect().top - top) < 2)) return;

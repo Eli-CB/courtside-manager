@@ -89,14 +89,14 @@
 html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
 /* a section that opens on a tap: one chevron for all of them, pointing down and turning over when open */
 :root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
-.gear-adv > summary::after, .dash-fold > summary::after, .card.rollable > .card-head > h2::after {
+.gear-adv > summary::after, .card.rollable > .card-head > h2::after {
   content: ''; flex: none; width: 18px; height: 18px; background: var(--muted);
   -webkit-mask: var(--chev) center / contain no-repeat; mask: var(--chev) center / contain no-repeat; transition: transform .2s ease;
 }
-.gear-adv[open] > summary::after, .dash-fold[open] > summary::after, .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(180deg); }
+.gear-adv[open] > summary::after, .card.rollable:not(.rolled) > .card-head > h2::after { transform: rotate(180deg); }
 @keyframes fold-in { from { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: no-preference) {
-  .dash-fold[open] > :not(summary), .gear-adv[open] > :not(summary), .card.rollable:not(.rolled) > :not(.card-head) { animation: fold-in .18s ease; }
+  .gear-adv[open] > :not(summary), .card.rollable:not(.rolled) > :not(.card-head) { animation: fold-in .18s ease; }
 }
 body {
   margin: 0;
@@ -232,32 +232,16 @@ a { color: var(--accent); }
 
 .grid { display: grid; gap: 16px; }
 
-/* Dashboard: the matchup at full width, then things to act on (side by side when there's room) */
+/* Matchup tab: the matchup at full width */
 .dash-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); max-width: 920px; margin: 0 auto; } /* two lineups read best close together */
 .dash-grid > .card + .card { margin-top: 0; }
-/* under the matchup: the recap and the waiver wire, one line each until tapped */
-.dash-folds { display: grid; gap: 8px; }
-.dash-folds:empty { display: none; }
-.dash-folds > .card + .card { margin-top: 0; }
-.dash-folds > .dash-fold { padding: 0; }
-.dash-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 12px 16px; min-height: 48px; border-radius: var(--radius); }
-.dash-fold > summary::-webkit-details-marker { display: none; }
-.dash-fold > summary::after { margin-left: auto; }
-.dash-fold > summary:hover, .dash-fold > summary:active { background: var(--surface-2); }
-.dash-fold[open] > summary:hover { border-radius: var(--radius) var(--radius) 0 0; }
-.df-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.df-dot.bad { background: var(--bad); } .df-dot.warn { background: var(--warn); } .df-dot.good { background: var(--good); }
-.df-title { font-weight: 700; white-space: nowrap; }
-.df-sub { color: var(--muted); font-size: .85rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.df-body { padding: 0 16px 16px; }
-.df-body > p:first-child { margin-top: 0; }
 .waiver-line { margin: 12px 0 0; }
 /* its full-screen button (top right, as tall as the toggle's line), and full screen: the card alone, the page's head, tabs,
-   notes, folds and footer hidden (dashFull) */
+   notes and footer hidden (dashFull) */
 .mu-full-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; margin: -4px -6px -4px 6px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; flex: none; }
 .mu-full-btn:hover { background: var(--surface-2); color: var(--text); }
 .mu-full-ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-body:has(.mu-card.full) :is(.head, .topbar, #ctxBar, .site-foot, .dash-folds) { display: none; }
+body:has(.mu-card.full) :is(.head, .topbar, #ctxBar, .site-foot) { display: none; }
 body:has(.mu-card.full) { padding-bottom: env(safe-area-inset-bottom, 0px); } /* (phones: no tab bar to make room for) */
 body:has(.mu-card.full) .container { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
 /* the Dashboard's matchup: a scoreboard, who leads each category, then both lineups slot by slot (you on the left) */
@@ -320,7 +304,7 @@ body:has(.mu-card.full) .container { padding-top: max(12px, env(safe-area-inset-
 @keyframes chip-good { 0%, 35% { background: var(--good-soft); border-color: var(--good); color: var(--good); } }
 @keyframes chip-bad { 0%, 35% { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); } }
 .mu-bench-btn { margin-top: 10px; }
-/* this week's waiver moves, team by team */
+/* Standings' Moves this period, team by team */
 .mv-teams { display: grid; gap: 10px 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .mv-name { font-weight: 700; font-size: .9rem; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mv-team.me .mv-name { color: var(--accent); }
@@ -1436,11 +1420,9 @@ a.lm-item { text-decoration: none; }
   #view > :first-child:not(.card):not(.dash-grid):not(.week-stack) { margin-top: 14px; }
   #view .card { margin-inline: -16px; border-radius: 0; border-width: 0 0 1px; box-shadow: none; padding: 14px 16px; }
   #view .card + .card { margin-top: 0; }
-  #view .dash-grid, #view .dash-folds, #view .week-stack, #view .week-grid,
+  #view .dash-grid, #view .week-stack, #view .week-grid,
   #view .trade-grid, #view .grid { gap: 0; }
   #view .card .card { margin-inline: 0; border-width: 1px; border-radius: var(--radius); }
-  #view .card.dash-fold { padding: 0; }
-  #view .dash-fold > summary { padding: 12px 16px; border-radius: 0; }
   #view .table-wrap { margin: 0 -16px; padding: 0 16px; }
   #view .awards > .card { margin-inline: -16px; }
   #view .dr-gap { margin-top: 0; }

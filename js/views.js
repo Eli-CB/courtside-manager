@@ -144,8 +144,66 @@ function viewStandings() {
       }).join('')}</tbody>
     </table></div>${waiverLine()}` : `<div class="empty"><strong>No standings yet</strong>${sourceName()} didn't return standings for this league.</div>`}
   </div>
+  ${movesCard()}
   ${S && S.cw ? catsWonCard(rows, S.cw) : ''}
   ${L ? seasonTotalsCard(rows, S) : ''}`;
+}
+
+// ----- Moves this period: who joined and left each team since last period's rosters (Standings, under the table) -----
+// Fantrax shares each period's rosters but no transaction log, so a move is a difference between the last period's
+// rosters and this one's as they are now: on no roster before = added, on no roster now = dropped, on another team
+// before = traded (on both teams). A player added and dropped in between isn't seen.
+// Team id -> [{ kind: 'add' | 'drop' | 'trade' (in) | 'away' (traded out), nba, name, from / to }]
+function periodMoves(L, weeks) {
+  const cur = L.rosterPeriod;
+  const now = cur && weeks && weeks.find(w => w.n === cur), before = now && weeks.find(w => w.n === cur - 1);
+  if (!now || !before) return null;
+  const fidNba = currentFidNba();
+  const names = new Map(Object.values(L.rosters || {}).flat().map(x => [x.fid, x.name]));
+  const who = f => { const nba = fidNba(f), raw = nba && nbaById.get(nba); return { nba, name: raw ? raw.name : names.get(f) || 'A player' }; };
+  const out = {};
+  const add = (tid, m) => (out[tid] = out[tid] || []).push(m);
+  for (const [f, o] of now.owner) {
+    const b = before.owner.get(f);
+    if (!b) add(o.tid, { kind: 'add', ...who(f) });
+    else if (b.tid !== o.tid) { add(o.tid, { kind: 'trade', from: b.tid, ...who(f) }); add(b.tid, { kind: 'away', to: o.tid, ...who(f) }); }
+  }
+  for (const [f, b] of before.owner) if (!now.owner.has(f)) add(b.tid, { kind: 'drop', ...who(f) });
+  return out;
+}
+const movesLoad = new WeakMap(); // league -> its weekly rosters, once loaded
+// This season only: a past season's last period says nothing now. On phones it rolls up even though it's the tab's
+// first section with a heading (class "rolls", rollCards): Categories won stays the open one, as before
+function movesCard() {
+  const L = fxLeague();
+  if (!NBA || ui.season || seasonCtx || !L || !hasLineupHistory(L) || !(L.rosterPeriod > 1)) return '';
+  if (!movesLoad.has(L)) {
+    movesLoad.set(L, null);
+    loadRosterWeeks(L).then(w => movesLoad.set(L, w || [])).catch(() => movesLoad.set(L, [])).finally(() => { if (ui.tab === 'standings') render(); });
+  }
+  const weeks = movesLoad.get(L);
+  const card = (sub, body) => `<div class="card rolls" style="margin-top:16px">
+    <div class="card-head"><h2>Moves this period ${infoBtn('moves')}</h2>${sub ? `<span class="muted small">${sub}</span>` : ''}</div>${body}</div>`;
+  if (!weeks) return card('', loadingLine("Loading last period's rosters…"));
+  const moves = periodMoves(L, weeks);
+  if (!moves) return '';
+  const me = myTeamId();
+  const order = { add: 0, trade: 1, away: 2, drop: 3 };
+  const tids = Object.keys(moves).sort((a, b) => (b === me) - (a === me) || moves[b].length - moves[a].length);
+  const at = (readLeagueCache()[L.id] || {}).at;
+  const SIGN = { add: '+', drop: '−' }, SAID = { add: 'added', drop: 'dropped', trade: 'traded for' }; // (a trade either way: ⇄)
+  const who = m => (m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, playerBtn(m.nba, m.name)) : esc(m.name));
+  const other = m => (m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>` : '');
+  const move = m => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${SIGN[m.kind] || '⇄'}</span>${who(m)}${other(m)}<span class="sr-only">${SAID[m.kind] || 'traded away'}</span></li>`;
+  const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${teamLink(tid)}</div>
+      <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
+    : '<p class="muted small" style="margin:0">No adds or drops since last period.</p>';
+  // the line: how many adds and drops (a trade counts once), and yours
+  const n = Object.values(moves).flat().filter(m => m.kind !== 'away').length;
+  const mineM = moves[me] || [], cnt = k => mineM.filter(m => m.kind === k).length;
+  const yours = [cnt('add') && `+${cnt('add')}`, cnt('trade') && `⇄${cnt('trade')}`, cnt('drop') && `−${cnt('drop')}`].filter(Boolean).join(' ');
+  const sub = n ? `${yours ? `you ${yours} · ` : ''}${n} move${n === 1 ? '' : 's'}` : '';
+  return card(sub, `${body}${at ? `<p class="muted small mv-when">Period ${L.rosterPeriod} · rosters as of ${fmtTime(at, { weekday: 'short' })} · ↻ Reload in ⚙ for the latest</p>` : ''}`);
 }
 
 // ----- A fantasy team's card: its record and this week's opponent (the title), its category strengths (teamStrengths), its roster -----

@@ -3568,7 +3568,7 @@ test("Plan Ahead's schedule bubble of a game on now flashes green while he's in 
   assert.doesNotMatch(app.teamLink(other), /mine/, "anyone else's: as it was");
 });
 
-test("Dashboard: this week's waiver moves, from last week's rosters to this week's", async () => {
+test("Standings, not the Matchup tab: this period's moves, from last period's rosters to this one's", async () => {
   const L = await app.useLeague(CATS9);
   const fid = id => app.NBA.players.find(r => r.id === id).fx.id;
   const withFx = app.NBA.players.filter(r => r.fx).slice(0, 4);
@@ -3583,6 +3583,19 @@ test("Dashboard: this week's waiver moves, from last week's rosters to this week
   assert.equal(moves[t2].find(m => m.kind === 'trade').from, t1);
   assert.equal(app.periodMoves({ ...L, rosterPeriod: 1 }, weeks), null, 'week 1 has no week before it');
   assert.ok(fid(withFx[0].id));
+
+  // drawn on Standings (once the weekly rosters are in), never on the Matchup tab
+  const ui = app.get('ui');
+  useTeam(t1);
+  ui.tab = 'standings';
+  try {
+    app.viewStandings(); // starts loading the weekly rosters
+    await new Promise(r => setTimeout(r, 30));
+    const html = app.viewStandings();
+    if (L.rosterPeriod > 1) assert.match(html, /<div class="card rolls"[^>]*>\s*<div class="card-head"><h2>Moves this period/, `period ${L.rosterPeriod}: under the standings`);
+    else assert.doesNotMatch(html, /Moves this period/, 'period 1: no period before it');
+    assert.doesNotMatch(app.viewDashboard(), /Moves this period|Waiver wire|mv-teams/);
+  } finally { ui.tab = 'dashboard'; }
 });
 
 test('times follow the 24-hour setting', () => {

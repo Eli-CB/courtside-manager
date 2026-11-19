@@ -1,4 +1,4 @@
-// League Layer: the Matchup tab: the matchup and the folds under it.
+// League Layer: the Matchup tab.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
@@ -10,16 +10,7 @@ function viewDashboard() {
   return `
   <div class="dash-grid">
     ${NBA ? dashMatchupCard() : ''}
-    <div class="dash-folds">${NBA ? movesCard() : ''}</div>
   </div>`;
-}
-
-// Under the matchup, one line each (the recap, the waiver wire): the line says what's inside, a tap opens
-// the rest. Open ones stay open when the page is drawn again (live updates) and on coming back to the tab, this visit.
-// dot: 'bad' / 'warn' / 'good' for a colored dot before the title
-function dashFold(key, title, sub, body, dot = '') {
-  const open = ui.dashFolds && ui.dashFolds.has(key);
-  return `<details class="card dash-fold" data-fold="${key}"${open ? ' open' : ''}><summary>${dot ? `<span class="df-dot ${dot}" aria-hidden="true"></span>` : ''}<span class="df-title">${title}</span><span class="df-sub">${sub}</span></summary><div class="df-body">${body}</div></details>`;
 }
 
 // ----- The Dashboard's matchup: both lineups slot by slot, for today, the last game day or the week so far -----
@@ -312,58 +303,4 @@ function dashMatchupCard() {
   }
   chipWas = new Map();
   return card(toggle, `${head}${catTable}${dashWeekRows(C, A, B)}`, true);
-}
-
-// ----- This week's waiver moves: who joined and left each team since last week's rosters -----
-// Fantrax shares each period's rosters but no transaction log, so a move is a difference between the last period's
-// rosters and this one's as they are now: on no roster before = added, on no roster now = dropped, on another team
-// before = traded (on both teams). A player added and dropped in between isn't seen.
-// Team id -> [{ kind: 'add' | 'drop' | 'trade' (in) | 'away' (traded out), nba, name, from / to }]
-function periodMoves(L, weeks) {
-  const cur = L.rosterPeriod;
-  const now = cur && weeks && weeks.find(w => w.n === cur), before = now && weeks.find(w => w.n === cur - 1);
-  if (!now || !before) return null;
-  const fidNba = currentFidNba();
-  const names = new Map(Object.values(L.rosters || {}).flat().map(x => [x.fid, x.name]));
-  const who = f => { const nba = fidNba(f), raw = nba && nbaById.get(nba); return { nba, name: raw ? raw.name : names.get(f) || 'A player' }; };
-  const out = {};
-  const add = (tid, m) => (out[tid] = out[tid] || []).push(m);
-  for (const [f, o] of now.owner) {
-    const b = before.owner.get(f);
-    if (!b) add(o.tid, { kind: 'add', ...who(f) });
-    else if (b.tid !== o.tid) { add(o.tid, { kind: 'trade', from: b.tid, ...who(f) }); add(b.tid, { kind: 'away', to: o.tid, ...who(f) }); }
-  }
-  for (const [f, b] of before.owner) if (!now.owner.has(f)) add(b.tid, { kind: 'drop', ...who(f) });
-  return out;
-}
-const movesLoad = new WeakMap(); // league -> its weekly rosters, once loaded
-function movesCard() {
-  const L = fxLeague();
-  if (!L || !hasLineupHistory(L) || !(L.rosterPeriod > 1)) return '';
-  if (!movesLoad.has(L)) {
-    movesLoad.set(L, null);
-    loadRosterWeeks(L).then(w => movesLoad.set(L, w || [])).catch(() => movesLoad.set(L, [])).finally(() => { if (ui.tab === 'dashboard') render(); });
-  }
-  const weeks = movesLoad.get(L);
-  const title = `Waiver wire ${infoBtn('moves')}`;
-  if (!weeks) return dashFold('moves', title, 'loading…', loadingLine("Loading last week's rosters…"));
-  const moves = periodMoves(L, weeks);
-  if (!moves) return '';
-  const me = ui.viewing ? ui.viewA : state.fxTeam;
-  const order = { add: 0, trade: 1, away: 2, drop: 3 };
-  const tids = Object.keys(moves).sort((a, b) => (b === me) - (a === me) || moves[b].length - moves[a].length);
-  const at = (readLeagueCache()[L.id] || {}).at;
-  const SIGN = { add: '+', drop: '−' }, SAID = { add: 'added', drop: 'dropped', trade: 'traded for' }; // (a trade either way: ⇄)
-  const who = m => (m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, playerBtn(m.nba, m.name)) : esc(m.name));
-  const other = m => (m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>` : '');
-  const move = m => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${SIGN[m.kind] || '⇄'}</span>${who(m)}${other(m)}<span class="sr-only">${SAID[m.kind] || 'traded away'}</span></li>`;
-  const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${teamLink(tid)}</div>
-      <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
-    : '<p class="muted small" style="margin:0">No adds or drops since last week.</p>';
-  // the line: how many adds and drops (a trade counts once), and yours
-  const all = Object.values(moves).flat().filter(m => m.kind !== 'away'), n = all.length;
-  const mineM = !ui.viewing && moves[me] ? moves[me] : [], cnt = k => mineM.filter(m => m.kind === k).length;
-  const yours = [cnt('add') && `+${cnt('add')}`, cnt('trade') && `⇄${cnt('trade')}`, cnt('drop') && `−${cnt('drop')}`].filter(Boolean).join(' ');
-  const sub = !n ? 'no adds or drops this week' : `${yours ? `you ${yours} · ` : ''}${n} move${n === 1 ? '' : 's'} this week`;
-  return dashFold('moves', title, sub, `${body}${at ? `<p class="muted small mv-when">Week ${L.rosterPeriod} · rosters as of ${fmtTime(at, { weekday: 'short' })} · ↻ Reload in ⚙ for the latest</p>` : ''}`);
 }
