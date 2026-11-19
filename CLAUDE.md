@@ -331,8 +331,11 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
 - Sleeper basketball's past weeks (Nov 18, 2026): the matchups API's points don't add up to Sleeper's own standings (rosters'
   `fpts`, `wins`, `metadata.record`), in the owner's league and the fixtures' (every team off, 5 of 12 records differ), and the
   same week's answer varies between requests (some show a locked-in game, some the last one). Recap finals, Awards, Season totals
-  and past-week cards come from it; Standings come from the rosters, so they can disagree. Lock-In's real rule isn't public (Sleeper's
-  GraphQL has it, sign-in only).
+  and past-week cards come from it; Standings come from the rosters, so they can disagree: it names the wrong winner in 8 of 32 matchups
+  (The IPA, weeks 1-4) and 3 of 24 (fixtures). Each roster's `metadata.record` ("WLLW") is its real result week by week, from `start_week`
+  (both sides of every matchup agree). The owner's team r00k5 really scored 112.5, 166, 95, 126: week 4 matched the API, weeks 1-3 were one
+  starter off each (an earlier game the API shows counted as his last, or as 0). Lock-In scores a lineup slot day by day, and a slot's
+  game can come from a player moved out since; the public API has only the week's final starters (Sleeper's GraphQL has more, sign-in only).
 - Fantrax names can differ from NBA.com ("Nicolas"/"Nic"): `matchNicknames` (initial + last name + team).
 - The preview browser sometimes loses localStorage on restart (back to the landing page): reconnect the
   league by ID in the form, then pick "Eli's SGAteam".
