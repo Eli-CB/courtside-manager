@@ -42,7 +42,13 @@ const INFO = {
     <p><b>Ranked by the change per game</b>, not the percentage: going from 1 to 2.6 threes is +160% but a smaller change than 15 to 21 points. The percentage is shown next to the numbers; a shooting percentage shows the makes a game above or below his usual rate.</p>
     <p><b>Rostered</b> and <b>Waivers</b>: by Value, what a game of his is worth (categories won, or fantasy points in a points league), his last 5 against his usual game; the players on your league's teams who moved most, and the same for the players on no team.</p>
     <p><b>The sandbox</b> (no league connected): <b>My team</b> and <b>Everyone else</b> by Value instead (one <b>All players</b> list while My team is empty), values for a standard 9-category league.</p>
-    <p><b>Notes</b> say why, where the box scores can: a regular teammate (24+ minutes a game) who missed most of those games, or minutes that moved by 4 or more. The fantasy team shown is who has him today.</p>`],
+    <p><b>Notes</b> say why, where the box scores can: a regular teammate (24+ minutes a game) who missed most of those games, or minutes that moved by 4 or more. The fantasy team shown is who has him today.</p>
+    <p><b>A list's name</b> opens it in full: every player in it, not just the top 5, game by game.</p>`],
+  trendCard: ['A trend, player by player', `
+    <p>Everyone this list takes, by the same rules as the Trends tab (a regular, and a counting stat that moved 15% or more), ranked by the change per game: the number by each name.</p>
+    <p><b>Last 5 games</b>, oldest first: green above his usual game, red below. Hover one for its date, opponent and minutes. <b>Avg</b> is those five games' average, <b>Usual</b> his median game before them, <b>Season</b> every game he's played this season, and <b>MIN</b> his minutes a game, usual → last 5.</p>
+    <p><b>Change</b> is the average less his usual game, with the percentage under it. A shooting percentage shows each game's makes and attempts, its attempts a game (usual → last 5), and the makes a game above or below his usual rate. <b>Value</b> is what a game of his is worth: categories won, or fantasy points in a points league.</p>
+    <p><b>All</b>, <b>Rostered</b> (on one of your league's teams today) or <b>Waivers</b> (on none); in the sandbox, <b>My team</b> or <b>Everyone else</b>. A column's heading sorts by it.</p>`],
   recap: ['Weekly recap', `
     <p><b>Results</b>: <b>Best</b> marks the week's top team and <b>Worst</b> its bottom one: the most and fewest points in a points league, and in a category league the best and worst record had each team played every other team that week. Hover one for the numbers.</p>
     <p>A finished week's standouts across the league, counted from that week's real lineups and the NBA box scores (as Plan Ahead's finished week counts one matchup), then every matchup's result. Only starters count. Stat lines show your league's categories.</p>

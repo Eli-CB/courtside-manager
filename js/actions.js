@@ -114,8 +114,22 @@ const actions = {
     if (!d.open) d.showModal();
   },
   'go-week'() { location.hash = '#week'; },
-  // the Recap's Trends: heating up or cooling off
-  'trend-dir'(el) { ui.trendDir = el.dataset.dir; render(); },
+  // Trends: heating up or cooling off (on the tab, or in a list's card: both follow it)
+  'trend-dir'(el) {
+    ui.trendDir = el.dataset.dir;
+    ui.trendSort = trendSortStart();
+    render();
+    if (el.dataset.card) showTrendCard();
+  },
+  // a list's heading: its card, every player in it game by game (recap.js), whose players as that list's
+  'trend-cat'(el) {
+    ui.trendCard = { key: el.dataset.key, whose: el.dataset.whose || 'all', n: TREND_CARD };
+    ui.trendSort = trendSortStart();
+    showTrendCard();
+  },
+  'trend-whose'(el) { if (ui.trendCard) { Object.assign(ui.trendCard, { whose: el.dataset.whose, n: TREND_CARD }); showTrendCard(); } },
+  'trend-more'() { if (ui.trendCard) { ui.trendCard.n += TREND_CARD; showTrendCard(true); } },
+  'trend-sort'(el) { if (ui.trendCard) { nextSort(ui.trendSort, el.dataset.key, -1); showTrendCard(true); } },
   // the previous or next finished week's recap
   'recap-step'(el) {
     const done = finishedPeriods(fxLeague()).map(p => p.n);
