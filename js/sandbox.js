@@ -252,7 +252,7 @@ function viewSandboxWatch() {
   const valTip = esc(week ? "Categories won by his games this week: what they added to winning a week's categories, against not playing" : valueTip().replace('his average game', 'this game'));
   const cell = p => {
     const { game, line, dim } = info.get(p);
-    const v = line && !isPoints() ? `<span class="mu-chip sb-val" title="${valTip}"><b>${fmtValue(lineValue(line))}</b> value</span>` : '';
+    const v = line && !isPoints() ? `<span class="mu-chip sb-val" title="${valTip}"><b>${fmtValue(lineValue(line))}</b> VAL</span>` : '';
     return `<div class="mu-p sb-w${dim ? ' out' : ''}">
       <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${sbOwns(p.nbaId) ? ' <span class="badge accent sb-mine" title="On My team">Mine</span>' : ''}</div></div>
         <button type="button" class="icon-btn xs sb-x" data-action="sb-unwatch" data-id="${p.nbaId}" aria-label="Stop following ${esc(p.name)}" title="Stop following">✕</button></div>
