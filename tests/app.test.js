@@ -936,12 +936,21 @@ test("the Matchup card's full-screen button, in place of its (i)", async () => {
       const m = app.dashMatchupCard();
       assert.ok(m.includes('data-action="dash-full" aria-pressed="false"') && !m.includes('class="info-btn"'));
       assert.ok(!m.includes('mu-card full'));
+      assert.ok(!m.includes('mu-ph'), 'round photos off full screen');
       for (const r of ['today', 'day', 'week']) {
         ui.dashRange = r;
         ui.dashFull = true;
         const f = app.dashMatchupCard();
         assert.ok(f.includes('class="card mu-card full"') && f.includes('aria-pressed="true"'), `full screen on ${r}`);
       }
+      // full screen: each player's full photo, as on his card; one that wouldn't load is drawn as the round one from then on
+      const f = app.dashMatchupCard(), src = (f.match(/class="pc-photo mu-ph"[^>]*>(?:<img class="pc-logo"[^>]*>)?<img class="pc-shot" src="([^"]+)"/) || [])[1];
+      assert.ok(src && !/decoding="async"/.test(f.split(src)[1].split('>')[0]), 'his full photo, shown as soon as it is in on a redraw');
+      app.get('shotMiss').add(src);
+      try {
+        const g = app.dashMatchupCard();
+        assert.ok(!g.includes(`src="${src}"`) && g.includes('mu-ph no-shot'));
+      } finally { app.get('shotMiss').delete(src); }
     });
   } finally { ui.dashRange = null; ui.dashFull = false; }
 });

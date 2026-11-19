@@ -152,6 +152,12 @@ function dashCatTable(A, B, sc) {
     <tbody>${catRow(A, 1)}${catRow(B, -1)}</tbody></table></div>`;
 }
 
+// His photo: in full screen his full one as on his card, on his team's colors (the owner's ask, Nov 2026), else the round one
+function dashPhoto(p) {
+  const raw = ui.dashFull && p.nbaId != null ? nbaById.get(p.nbaId) : null;
+  return raw && photoSrcs(raw) ? playerPhoto(raw, 'mu-ph', true) : headshot(p, ui.dashFull ? hsPx(56, 40) : hsPx(38, 32));
+}
+
 // One player: who, his game (or the week's games), and what he's put up. C: the card's { D, dates, range, today, hasOpp, flash }
 function dashCell(C, p, right, counts, tag = '', cls = '') {
   const { D, dates, range, today } = C, one = isOneGame();
@@ -172,7 +178,7 @@ function dashCell(C, p, right, counts, tag = '', cls = '') {
   game = linkTeams(game); // (its opponent's code opens that team's players)
   // (in a game on now, the dot by its clock says whether he's on the floor: liveStatus; no green row, the owner's ask)
   return `<div class="mu-p${right ? ' right' : ''}${counts ? '' : ' bench'}${cls}">
-    <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
+    <div class="bplayer">${dashPhoto(p)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${tag}</div></div></div>
     <div class="mu-game">${game}</div>
     ${lines.length ? `<div class="mu-chips">${lineChips(tot, C.flash && C.flash(p, tot))}</div>` : ''}
   </div>`;

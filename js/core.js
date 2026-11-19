@@ -505,12 +505,14 @@ function photoSrcs(raw) {
 }
 // The player card's picture, as ESPN shows one: the player in front of his team's logo on a tint of its color; the
 // small round photo if the big one won't load (marked by the page's error listener, actions.js). cls: another look (the
-// Recap's cards: rx-ph, on his team's color itself, --tint); a tap on it opens his card (data-photo)
-function playerPhoto(raw, cls = '') {
+// Recap's cards: rx-ph, on his team's color itself, --tint); a tap on it opens his card (data-photo). redrawn: drawn
+// again on each live update (the Matchup tab's full screen), so it's shown as soon as it's in, never a blank moment
+const shotMiss = new Set(); // big photos that wouldn't load (actions.js): drawn again, they go straight to the round one
+function playerPhoto(raw, cls = '', redrawn = false) {
   const small = headshot({ nbaId: raw.id, name: raw.name }, 64), src = photoSrcs(raw);
   if (!src) return small;
-  const tc = TEAM_COLORS[raw.team], logo = IMG && IMG.logos[raw.team];
-  return `<div class="pc-photo${cls ? ` ${cls}` : ''}" data-photo="${raw.id}" style="--tint:${teamTint(raw.team)}${tc ? `;--t1:${tc[0]};--t2:${tc[1]}` : ''}">${logo ? `<img class="pc-logo" src="${logo}" alt="" aria-hidden="true">` : ''}<img class="pc-shot" src="${src[0]}" srcset="${src[0]} 1x, ${src[1]} 2x" alt="${esc(raw.name)}" decoding="async">${small}</div>`;
+  const tc = TEAM_COLORS[raw.team], logo = IMG && IMG.logos[raw.team], miss = shotMiss.has(src[0]);
+  return `<div class="pc-photo${cls ? ` ${cls}` : ''}${miss ? ' no-shot' : ''}" data-photo="${raw.id}" style="--tint:${teamTint(raw.team)}${tc ? `;--t1:${tc[0]};--t2:${tc[1]}` : ''}">${logo ? `<img class="pc-logo" src="${logo}" alt="" aria-hidden="true">` : ''}${miss ? '' : `<img class="pc-shot" src="${src[0]}" srcset="${src[0]} 1x, ${src[1]} 2x" alt="${esc(raw.name)}"${redrawn ? '' : ' decoding="async"'}>`}${small}</div>`;
 }
 
 // A team's color to tint a photo or picture with: its first, or its second where the first is too dark to show (Brooklyn's

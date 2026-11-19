@@ -345,6 +345,47 @@ body:has(.mu-card.full) .container { padding-top: max(12px, env(safe-area-inset-
   .mu-cats { font-size: .74rem; }
   .mu-cats thead th { font-size: .64rem; }
 }
+/* full screen (dashFull, the owner's ask, Nov 2026): one plain sheet with no outline or lines between rows, a size up on a
+   computer, and each player's full photo on his team's colors beside his name, game and line, as on his card (dashPhoto) */
+body:has(.mu-card.full) { background: var(--surface); }
+.mu-card.full, #view .mu-card.full { border: 0; box-shadow: none; border-radius: 0; background: none; }
+.mu-card.full { padding: 0; }
+.dash-grid:has(> .mu-card.full) { max-width: 1100px; }
+.mu-card.full .mu-rows { border-top: 0; display: grid; gap: 4px; margin-top: 6px; }
+.mu-card.full .mu-row { border-bottom: 0; }
+.mu-card.full .mu-cats th, .mu-card.full .mu-cats td { border-bottom: 0; }
+.mu-card.full .mu-cats tbody td { padding-block: 5px; }
+.mu-card.full .mu-p { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 4px 12px; align-items: start; padding: 6px 0; }
+.mu-card.full .mu-p > .bplayer { display: contents; }
+.mu-card.full .mu-p > .bplayer > :first-child { grid-row: 1 / -1; grid-column: 1; }
+.mu-card.full .mu-p > :not(.bplayer), .mu-card.full .mu-p .bmain { grid-column: 2; min-width: 0; }
+.mu-card.full .mu-p.right { grid-template-columns: minmax(0, 1fr) auto; }
+.mu-card.full .mu-p.right > .bplayer > :first-child { grid-column: 2; }
+.mu-card.full .mu-p.right > :not(.bplayer), .mu-card.full .mu-p.right .bmain { grid-column: 1; }
+.mu-card.full .mu-p .bname { flex-wrap: wrap; } /* (a tag that doesn't fit beside the name goes under it: the photo takes room) */
+.pc-photo.mu-ph { width: 112px; border-radius: 10px; cursor: pointer; }
+@media (min-width: 641px) {
+  .mu-card.full .mu-board { margin-bottom: 18px; }
+  .mu-card.full .mu-name { font-size: 1.2rem; }
+  .mu-card.full .mu-score { font-size: 3.2rem; }
+  .mu-card.full .mu-pc { font-size: .86rem; padding: 2px 9px; }
+  .mu-card.full .mu-cats { font-size: 1rem; }
+  .mu-card.full .mu-cats thead th { font-size: .8rem; }
+  .mu-card.full .mu-row { grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr); }
+  .mu-card.full .mu-row.day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; }
+  .mu-card.full .mu-slot .slot-label { font-size: .8rem; padding: 3px 6px; }
+  .mu-card.full .bname .pname { font-size: 1.1rem; }
+  .mu-card.full .mu-game { font-size: .9rem; }
+  .mu-card.full .mu-chips { gap: 4px; }
+  .mu-card.full .mu-chip { font-size: .84rem; padding: 2px 8px; }
+}
+/* phones: a smaller photo beside the name and game, the line under both */
+@media (max-width: 640px) {
+  .pc-photo.mu-ph { width: 64px; border-radius: 8px; }
+  .pc-photo.mu-ph.no-shot > .hs { transform: translate(-50%, -50%) scale(.62); }
+  .mu-card.full .mu-p { column-gap: 8px; }
+  .mu-card.full .mu-p > .mu-chips, .mu-card.full .mu-p.right > .mu-chips { grid-column: 1 / -1; }
+}
 /* top performances */
 /* Performances tables: 5 rows show, the rest scroll (fitPerfLists); the header, player and value columns stay put */
 .perf-when { margin: 0 0 0 auto; text-align: right; }
