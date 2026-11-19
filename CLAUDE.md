@@ -265,7 +265,9 @@ so when unsure, leave it out, and an addition should be a line or two, not a par
   runs apart; one that fails (or NFL projections failing) fails the run at the end, so GitHub says so, and the rest still publishes.
   Commit flow used: `git pull --rebase -q origin main && git push -q origin main`, then `gh run watch`. In a worktree (its own branch) the push is
   `git push -q origin HEAD:main` (plain `main` there is the stale local branch, not the work), and the tests run again after the rebase, before it.
-  In the main folder other sessions' unfinished edits may sit beside yours: commit only your own files (`git commit <files>`).
+  In the main folder other sessions' unfinished edits may sit beside yours: commit only your own files (`git commit <files>`), and never `git stash`
+  theirs (or `--autostash`): every session shares one stash list, and another's pop or drop took a stashed Trends edit (Nov 18, 2026; got back from
+  `git fsck --unreachable`). There: `git fetch`; origin/main already in HEAD (`git merge-base --is-ancestor origin/main HEAD`): push; else rebase in a temporary worktree.
   Commit messages end with the Co-Authored-By line.
 - The repo must stay public on GitHub's free plan: making it private deletes the Pages site at once (leaguelayer.com answered 404, Nov 16, 2026), and
   making it public again doesn't bring it back. To restore: `gh api -X POST repos/Eli-CB/league-layer/pages -f build_type=workflow`, then
