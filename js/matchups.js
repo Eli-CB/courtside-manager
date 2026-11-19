@@ -7,7 +7,8 @@ function oddsLabel(p) {
   return p >= 0.9 ? ['Locked', 'good'] : p >= 0.7 ? ['Likely win', 'good'] : p >= 0.55 ? ['Lean win', 'good'] : p > 0.45 ? ['Toss-up', ''] : p > 0.3 ? ['Lean loss', 'bad'] : p > 0.1 ? ['Likely loss', 'bad'] : ['Punt', 'bad'];
 }
 
-function fmtCat(c, v) { return c.pct ? fmtPct(v) : fmt(v, 0); }
+// (a points league's shooting pair, lineCats: v is [makes, attempts], "33/68")
+function fmtCat(c, v) { return c.shot ? `${fmt(v[0], 0)}/${fmt(v[1], 0)}` : c.pct ? fmtPct(v) : fmt(v, 0); }
 
 // Everything the week page (and pickup ideas) needs, computed once per render
 function weekContext(start = weekStart()) {
@@ -32,7 +33,7 @@ function catValue(proj, c) {
   if (!c.pct) return totStat(proj, c.key);
   return proj.tot[c.att] ? proj.tot[c.made] / proj.tot[c.att] : 0;
 }
-const fmtCatDelta = (c, d) => (c.pct ? (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(3).replace(/^0/, '') : signed(d, Math.abs(d) < 10 ? 1 : 0));
+const fmtCatDelta = (c, d) => (c.shot ? d.map(x => signed(x, 1)).join('/') : c.pct ? (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(3).replace(/^0/, '') : signed(d, Math.abs(d) < 10 ? 1 : 0));
 const pctTxt = p => `${Math.round(p * 100)}%`;
 // a change in the matchup goal: categories won, or projected fantasy points
 const goalDelta = v => (isPoints() ? `${signed(v, 1)} FP` : `${signed(v, 2)} cats`);
@@ -51,9 +52,14 @@ function explainChange(ctx, fromIds, toIds, outP, inP) {
   const a = projectSide(ctx.mine, ctx.dates, fromIds), b = projectSide(ctx.mine, ctx.dates, toIds);
   const ca = compareCats(a, ctx.them), cb = compareCats(b, ctx.them);
   const oa = matchOdds(ca), ob = matchOdds(cb);
-  const rows = ca.map((c, i) => {
-    const d = catValue(b, c) - catValue(a, c);
-    return { c, d, good: c.neg ? d < 0 : d > 0, pA: ca[i].p, pB: cb[i].p };
+  // (a points league's shooting pair is one row, lineCats: d is [makes, attempts], good if its points go up)
+  const rows = lineCats().map(l => {
+    if (l.shot) {
+      const pts = sum(Object.entries(foldPoints(shotPoints(l))).map(([k, v]) => ((b.tot[k] || 0) - (a.tot[k] || 0)) * v));
+      return { c: l, d: [totStat(b, l.made) - totStat(a, l.made), totStat(b, l.att) - totStat(a, l.att)], pts, good: pts > 0, pA: null, pB: null };
+    }
+    const i = ca.findIndex(x => x.key === l.key), c = ca[i], d = catValue(b, c) - catValue(a, c);
+    return { c, d, good: c.neg ? d < 0 : d > 0, pA: c.p, pB: cb[i].p };
   });
   const score = ctx.hasOpp ? objective(ob) - objective(oa)
     : (inP ? weeklyPriority(inP, ctx.dates) : 0) - (outP ? weeklyPriority(outP, ctx.dates) : 0);
@@ -137,7 +143,7 @@ function catChips(ex) {
   return `<div class="cat-chips">${ex.rows.map(r => {
     // in points leagues only total points decide the week, so only FP shows a win chance
     const moved = Math.abs(r.pB - r.pA) >= 0.01 && (!isPoints() || r.c.fp);
-    const cls = Math.abs(r.d) < 1e-6 ? '' : r.good ? 'good' : 'bad';
+    const cls = Math.abs(r.c.shot ? r.pts : r.d) < 1e-6 ? '' : r.good ? 'good' : 'bad';
     return `<span class="cchip ${cls}"><b>${r.c.label}</b> ${fmtCatDelta(r.c, r.d)}${moved ? `<span class="cchip-p">${pctTxt(r.pA)}→${pctTxt(r.pB)}</span>` : ''}</span>`;
   }).join('')}</div>`;
 }
@@ -242,13 +248,14 @@ const shadeProb = p => shade((p - 0.5) * 5); // 90% to win ≈ as strong as a +2
 // so the same weekly total always gets the same shade. FG%/FT% count shot volume.
 const WEEK_GAMES = 3.5;
 function contribZ(p, key, g, week) {
-  if (key === 'fp') {
-    const [m, sd] = fpBase();
-    return week ? (fantasyPoints(p) * g - m * WEEK_GAMES) / (sd * WEEK_GAMES) : (fantasyPoints(p) - m) / sd;
+  const c = lineCats().find(x => x.key === key) || catDef(key);
+  // fantasy points; a points league's shooting pair ("8.2/17.1 FG", lineCats) by its own points (shotPoints)
+  if (key === 'fp' || c.shot) {
+    const part = c.shot ? shotPoints(c) : null, [m, sd] = fpBase(part), fp = part ? fantasyPoints(p, part) : fantasyPoints(p);
+    return week ? (fp * g - m * WEEK_GAMES) / (sd * WEEK_GAMES) : (fp - m) / sd;
   }
   if (!BASE[key]) return 0;
   if (!week) return catZ(p)[key] || 0;
-  const c = scoreCats().find(x => x.key === key) || catDef(key);
   if (c.pct) { const att = statVal(p, c.att); return att ? (c.neg ? -1 : 1) * (pctOf(p, c) - BASE[key][0]) * att * g / (BASE[key][1] * WEEK_GAMES) : 0; }
   const z = (statVal(p, key) * g - BASE[key][0] * WEEK_GAMES) / (BASE[key][1] * WEEK_GAMES);
   return c.neg ? -z : z;
@@ -336,6 +343,10 @@ const pctWords = (c, v) => (c.rate ? v.toFixed(2) : `${(v * 100).toFixed(1)}%`);
 // Hover text with the unrounded numbers behind a stat cell
 function statTip(p, c, g, week) {
   const games = `${g} game${g === 1 ? '' : 's'}`;
+  if (c.shot) {
+    const k = week ? g : 1;
+    return `${c.label}: ${(statVal(p, c.made) * k).toFixed(1)}/${(statVal(p, c.att) * k).toFixed(1)} ${week ? `over ${games}` : 'per game'} · ${signed(fantasyPoints(p, shotPoints(c)) * k, 1)} FP`;
+  }
   if (c.pct) {
     const [m, a] = [statVal(p, c.made), statVal(p, c.att)];
     const k = week ? g : 1;
@@ -347,7 +358,7 @@ function statTip(p, c, g, week) {
 
 // Projected-week totals, unrounded, with the matching win chance
 function totalTip(c, v, p, who) {
-  const amount = c.pct ? pctWords(c, v) : v.toFixed(1);
+  const amount = c.shot ? `${v[0].toFixed(1)}/${v[1].toFixed(1)}` : c.pct ? pctWords(c, v) : v.toFixed(1);
   return `${c.label}: ${amount} · ${pctTxt(p)} ${who}`;
 }
 
@@ -355,9 +366,10 @@ function stabCells(p, ctx) {
   const g = weekGames(p, ctx.dates);
   const week = ui.boardMode === 'week';
   const noStats = !p.min && !p.pts && !p.reb; // e.g. a player with no NBA stats on record
-  return scoreCats().map(c => {
+  return lineCats().map(c => {
     const none = noStats || (week && !g);
-    const v = none ? '—' : c.pct ? fmtPct(pctOf(p, c)) : fmt(statOf(p, c) * (week ? g : 1), c.dec && !week ? c.dec : week ? (c.dec ? 1 : 0) : 1);
+    const d = week ? 0 : 1, shot = k => fmt(statVal(p, k) * (week ? g : 1), d);
+    const v = none ? '—' : c.shot ? `${shot(c.made)}/${shot(c.att)}` : c.pct ? fmtPct(pctOf(p, c)) : fmt(statOf(p, c) * (week ? g : 1), c.dec && !week ? c.dec : week ? (c.dec ? 1 : 0) : 1);
     return `<td class="sc" style="${none ? '' : shade(contribZ(p, c.key, g, week))}" title="${none ? `${c.label}: no projection` : statTip(p, c, g, week)}">${v}</td>`;
   }).join('');
 }
@@ -373,15 +385,32 @@ function statTable(ctx, side, title, rows, { bench = false, totals = '', games =
   const s = ui.statSort;
   const th = (key, label, cls = '') => sortTh('stat-sort', key, label, s, { cls, down: s.dir < 0, arrow: key !== 'slot' });
   return `<table class="stab">
-    <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num')}${scoreCats().map(c => th(c.key, c.label, 'sc')).join('')}</tr></thead>
+    <thead><tr>${th('name', bench ? `${esc(title)} <span class="muted">bench</span>` : esc(title), 'st-name')}${th('g', 'G', 'num')}${lineCats().map(c => th(c.key, c.label, 'sc')).join('')}</tr></thead>
     <tbody>${sortStatRows(rows, ctx).map(p => statRow(p, ctx, side, !bench)).join('') || `<tr><td colspan="11" class="muted small">${bench ? 'Nobody on the bench' : side === 'them' ? 'No opponent loaded' : 'No starters'}</td></tr>`}</tbody>
     ${totals ? `<tfoot><tr><td class="st-name"><b>Projected week</b></td><td class="num st-g"><b>${games}</b></td>${totals}</tr></tfoot>` : ''}
   </table>`;
 }
 
+// The chance a points league's shooting pair (lineCats) scores more points (shotPoints) for projection A than for B
+function shotChance(c, A, B) {
+  const sc = Object.entries(foldPoints(shotPoints(c)));
+  const pts = S => sum(sc.map(([k, v]) => (S.tot[k] || 0) * v)), vr = S => sum(sc.map(([k, v]) => ((S.vr || {})[k] || 0) * v * v));
+  const d = pts(A) - pts(B), sd = Math.sqrt(vr(A) + vr(B));
+  return sd > 0 ? phi(d / sd) : d > 0 ? 1 : d < 0 ? 0 : 0.5;
+}
+// The projected week under each column (compareCats'); a shooting pair as its makes/attempts
+function boardTotals(ctx) {
+  return lineCats().map(c => {
+    if (!c.shot) return ctx.catsSet.find(x => x.key === c.key);
+    const pair = S => [totStat(S, c.made), totStat(S, c.att)];
+    return { ...c, a: pair(ctx.asSet), b: pair(ctx.them), p: shotChance(c, ctx.asSet, ctx.them) };
+  });
+}
+
 function statsBoard(ctx, myStarters, myBench, oppStarters, oppBench) {
-  const mine = ctx.hasOpp ? ctx.catsSet.map(c => `<td class="sc" style="${shadeProb(c.p)}" title="${totalTip(c, c.a, c.p, 'to win')}">${fmtCat(c, c.a)}</td>`).join('') : '';
-  const theirs = ctx.hasOpp ? ctx.catsSet.map(c => `<td class="sc" style="${shadeProb(1 - c.p)}" title="${totalTip(c, c.b, 1 - c.p, 'for them')}">${fmtCat(c, c.b)}</td>`).join('') : '';
+  const cats = ctx.hasOpp ? boardTotals(ctx) : [];
+  const mine = cats.map(c => `<td class="sc" style="${shadeProb(c.p)}" title="${totalTip(c, c.a, c.p, 'to win')}">${fmtCat(c, c.a)}</td>`).join('');
+  const theirs = ctx.hasOpp ? cats.map(c => `<td class="sc" style="${shadeProb(1 - c.p)}" title="${totalTip(c, c.b, 1 - c.p, 'for them')}">${fmtCat(c, c.b)}</td>`).join('') : '';
   const oppName = state.opp.name || 'Opponent';
   return `<div class="table-wrap"><div class="stat-boards">
     ${statTable(ctx, 'me', state.teamName, myStarters, { totals: mine, games: ctx.asSet.games })}
@@ -512,7 +541,7 @@ function pickupIdeas(ctx) {
     const proj = projectSide(team, dates, weekly ? bestWeeklyIds(team, dates, null) : null);
     const cats = compareCats(proj, them);
     const odds = matchOdds(cats);
-    out.push({ p, drop, gain: odds.expected - baseOdds.expected, score: objective(odds) - objective(baseOdds), win: odds.win, games: weekGames(p, dates), cats });
+    out.push({ p, drop, gain: odds.expected - baseOdds.expected, score: objective(odds) - objective(baseOdds), win: odds.win, games: weekGames(p, dates), cats, proj });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, 5);
 }
@@ -531,7 +560,9 @@ function pickupsCard(ctx) { // (ctx: the week as the page has just worked it out
     <div class="card">
       <div class="card-head"><h2>Pickup ideas</h2><span class="muted small">vs ${esc(state.opp.name || 'your opponent')} · ${fxLeague() ? 'free agents and waivers in your league' : 'if available in your league'}</span></div>
       ${ideas.length ? `<ul class="alerts">${ideas.map(x => {
-        const better = SPORT.oneNumber ? [] : x.cats.filter((c, i) => c.p - ctx.catsBest[i].p > 0.03).map(c => c.label);
+        // (a points league's shooting pair as one, "FG": lineCats)
+        const lift = c => (c.shot ? shotChance(c, x.proj, ctx.them) - shotChance(c, ctx.best, ctx.them) : x.cats.find(y => y.key === c.key).p - ctx.catsBest.find(y => y.key === c.key).p);
+        const better = SPORT.oneNumber ? [] : lineCats().filter(c => lift(c) > 0.03).map(c => c.label);
         return `<li class="alert">${headshot(x.p, 32)}<span class="grow">${playerBtn(x.p.nbaId, x.p.name)} <span class="muted small">${teamBtn(x.p.team)} · ${posTags(x.p.pos)} · ${isFootball() ? `${fmt(footballPts(x.p, ctx.dates), 1)} proj` : `${x.games} games`}</span><br>
           <span class="small">For ${esc(x.drop.name)}: <b class="pos-good">${goalDelta(x.gain)}</b>, ${Math.round(x.win * 100)}% to win${better.length ? ` · helps ${better.join(', ')}` : ''}</span></span></li>`;
       }).join('')}</ul>` : '<p class="muted small" style="margin:0">No free agent clearly improves this matchup.</p>'}
@@ -610,8 +641,10 @@ function pastWeekCard(start) {
   };
 
   // each team's lineup that week: starters' games (what counted), the week total, then the bench's games
-  const cols = scoreCats().filter(c => !c.fp);
+  // (a points league's shooting pair is one "8/17 FG": lineCats)
+  const cols = lineCats().filter(c => !c.fp);
   const cell = (s, c, cls = '') => {
+    if (c.shot) return `<td class="sc${cls}">${fmt(lineStat(s, c.made), 0)}/${fmt(lineStat(s, c.att), 0)}</td>`;
     if (c.pct) return `<td class="sc${cls}" title="${s[c.att] ? `${s[c.made] || 0}/${s[c.att]}` : 'no attempts'}">${s[c.att] ? fmtPct(s[c.made] / s[c.att]) : '—'}</td>`;
     return `<td class="sc${cls}">${fmt(lineStat(s, c.key), 0)}</td>`;
   };

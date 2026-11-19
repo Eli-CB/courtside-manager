@@ -359,7 +359,7 @@ function lineCats() {
   const has = new Set(cats.map(c => c.key)), pairOf = new Map();
   for (const [made, att, miss, label] of isPoints() ? SPORT.shotPairs || [] : []) {
     if (!has.has(made) || !(has.has(att) || has.has(miss))) continue;
-    const pair = { key: made, label, shot: true, made, att };
+    const pair = { key: made, label, shot: true, made, att, miss };
     for (const k of [made, att, miss]) pairOf.set(k, pair);
   }
   const out = [];
@@ -371,6 +371,8 @@ function lineCats() {
   lineCatsMemo = { cats, out };
   return out;
 }
+// a shooting pair's own points (lineCats): its makes, attempts and misses as the league scores them
+const shotPoints = c => { const sc = leaguePoints() || {}; return Object.fromEntries([c.made, c.att, c.miss].filter(k => sc[k]).map(k => [k, sc[k]])); };
 
 // Player value: what an average game of his adds to winning a week's categories, against not playing (catWins, the
 // same as a single game on the Dashboard), or fantasy points per game in points leagues
@@ -384,16 +386,23 @@ const valueLabel = () => (isPoints() ? 'FP/G' : 'Value');
 const fmtValue = (v, d = 2) => (isPoints() ? fmt(v, 1) : signed(v, d));
 const statOf = (p, c) => (c.fp ? fantasyPoints(p) : c.pct ? pctOf(p, c) : statVal(p, c.key));
 
-// Typical fantasy points per game for a rostered player, for shading the FP column
+// Typical fantasy points per game for a rostered player (the 200 who score the most), for shading the FP column; with part,
+// the points of those stats alone (a shooting pair's column on Plan Ahead: shotPoints)
 let fpBaseCache = null;
 keep('sport', () => { fpBaseCache = null; });
-function fpBase() {
+function fpBase(part) {
   const sc = leaguePoints();
-  if (fpBaseCache && fpBaseCache.sc === sc) return fpBaseCache.v;
-  const fps = NBA.players.map(raw => nbaStats(raw)).filter(x => x && x.gp >= 3).map(x => fantasyPoints(x, sc)).sort((a, b) => b - a).slice(0, 200);
-  const m = sum(fps) / (fps.length || 1), sd = Math.sqrt(sum(fps.map(x => (x - m) ** 2)) / (fps.length || 1)) || 1;
-  fpBaseCache = { sc, v: [m, sd] };
-  return fpBaseCache.v;
+  if (!fpBaseCache || fpBaseCache.sc !== sc) {
+    const top = sortDesc(NBA.players.map(raw => nbaStats(raw)).filter(x => x && x.gp >= 3), x => fantasyPoints(x, sc)).slice(0, 200);
+    fpBaseCache = { sc, top, v: new Map() };
+  }
+  const key = part ? JSON.stringify(part) : '';
+  if (!fpBaseCache.v.has(key)) {
+    const fps = fpBaseCache.top.map(x => fantasyPoints(x, part || sc));
+    const m = sum(fps) / (fps.length || 1), sd = Math.sqrt(sum(fps.map(x => (x - m) ** 2)) / (fps.length || 1)) || 1;
+    fpBaseCache.v.set(key, [m, sd]);
+  }
+  return fpBaseCache.v.get(key);
 }
 
 // Aggregate per-game totals for a group of players (counting stats summed, % weighted by attempts)
