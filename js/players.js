@@ -425,10 +425,13 @@ function cardOwner(raw) {
   return fa ? `<p class="pc-owner">${fa}</p>` : '';
 }
 
-// Who he is, under his photo (the owner's ask, Nov 2026: the card's top had room to spare): height and weight (hockey: the hand he shoots or catches
-// with), his draft ("Drafted 9th in 2021"; no college, the owner's ask, Nov 20, 2026). The daily job's, from NBA.com, NHL.com or Sleeper (no draft there).
+// Who he is, under his photo (the owner's ask, Nov 2026: the card's top had room to spare): height, weight, then his age (moved down from the
+// title, the owner's ask, Nov 20, 2026; hockey: then the hand he shoots or catches with), his draft ("Drafted 9th in 2021"; no college, the owner's
+// ask, Nov 20, 2026). The daily job's, from NBA.com, NHL.com or Sleeper (no draft there). Each piece kept whole, and a line never starts with a dot.
 function cardBio(raw) {
-  const body = [raw.ht ? `${Math.floor(raw.ht / 12)}′${raw.ht % 12}″` : '', raw.wt ? `${raw.wt} lb` : '', raw.sh ? `${isGoalie(raw) ? 'Catches' : 'Shoots'} ${esc(raw.sh)}` : ''].filter(Boolean).join(' · ');
+  const age = raw.born ? Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5)) : null;
+  const body = [raw.ht ? `${Math.floor(raw.ht / 12)}′${raw.ht % 12}″` : '', raw.wt ? `${raw.wt} lb` : '', age != null ? `age ${age}` : '',
+    raw.sh ? `${isGoalie(raw) ? 'Catches' : 'Shoots'} ${esc(raw.sh)}` : ''].filter(Boolean).map(x => x.replace(/ /g, ' ')).join(' · ');
   const draft = raw.dft === 0 ? 'Undrafted' : Array.isArray(raw.dft) ? `Drafted ${ordinal(raw.dft[1])} in ${raw.dft[0]}` : '';
   const lines = [body, draft].filter(Boolean);
   return lines.length ? `<p class="pc-bio">${lines.map(l => `<span>${l}</span>`).join('')}</p>` : '';
@@ -732,11 +735,10 @@ function showPlayerDetail(nbaId) {
   const d = $('#detailDialog');
   cardOpen = nbaId;
   sportCardOpen = null;
-  // his name, and who he is: team, number, positions, age, country, years in the league (his injury, if any, is the note
-  // under the photo, its word first)
+  // his name, and who he is: team, positions, country, years in the league (no jersey number, and his age is under the photo
+  // beside his weight, cardBio: the owner's ask, Nov 20, 2026; his injury, if any, is the note under the photo, its word first)
   // (each piece kept whole: a phone breaks the line only between them, never "1 yr in / league")
-  const bio = [raw.team ? teamBtn(raw.team) : '', raw.jersey ? '#' + esc(raw.jersey) : '', posTags(raw.pos),
-    raw.born ? `age ${Math.floor((Date.now() - Date.parse(raw.born + 'T12:00:00')) / (365.25 * 864e5))}` : '', flagImg(raw.nat),
+  const bio = [raw.team ? teamBtn(raw.team) : '', posTags(raw.pos), flagImg(raw.nat),
     raw.pos[0] === 'DEF' ? '' : raw.exp ? `${raw.exp} ${raw.exp === 1 ? 'yr' : 'yrs'} in league` : 'Rookie'];
   $('#detailTitle').innerHTML = `<span class="dt-name">${esc(raw.name)}</span><span class="dt-bio">${bio.filter(Boolean).map(x => `<span class="dt-bit">${x}</span>`).join(' · ')}</span>`;
   if (!d.open) d.showModal();

@@ -1596,14 +1596,15 @@ test("player profile: value per game (each game, each season's averages) and thi
     assert.ok(html.includes(`>#${better + 1} of ${R.totN}</div>`), 'under Value this season');
     if (Math.round(cur.gp) >= R.minGp) assert.ok(html.includes(`>#${R.per.get(raw.id)} of ${R.perN}</div>`), 'under Value per game');
     assert.ok(!html.includes('Rank per game'), 'no separate tiles');
-    // the title: his name, then his age and flag; beside the photo, whose he is in the league
+    // the title: his name, then his team, positions and flag (no jersey number, and his age is under the photo); beside the photo, whose he is in the league
     const title = els['#detailTitle'].innerHTML;
     assert.match(title, /^<span class="dt-name">[^<]+<\/span><span class="dt-bio">/);
-    if (raw.born) assert.match(title, / · <span class="dt-bit">age \d\d<\/span>/, 'each piece whole (a phone breaks the line between them)');
+    assert.match(title, / · <span class="dt-bit"><span class="pt /, 'each piece whole (a phone breaks the line between them)');
+    assert.doesNotMatch(title, />#\d|>age \d/, 'no number, no age');
     assert.doesNotMatch(title, /<span class="dt-bio"> · /, 'no separator before the first piece');
     if (raw.exp) assert.ok(title.includes(raw.exp === 1 ? '>1 yr in league<' : `>${raw.exp} yrs in league<`));
     if (raw.nat) assert.ok(title.includes(`flagcdn.com/w20/${raw.nat.toLowerCase()}.png`));
-    assert.ok(!/ · age /.test(html), 'not again in the card');
+    if (raw.born) assert.equal(html.match(/age \d\d/g).length, 1, 'his age once, under the photo');
     assert.ok(html.includes('<div class="pc-who"><p class="pc-owner">'), 'his fantasy team, or free agent, beside the photo');
     assert.ok(html.indexOf('pc-who') < html.indexOf('pc-tiles'), 'and the tiles after it');
     // Games: the whole season from the box scores, newest first, scrolling past five
@@ -1640,12 +1641,12 @@ test('player card: who he is under the photo, and each category against an avera
   const raw = () => app.NBA.players.filter(r => app.statObj(r.cur) && app.statObj(r.cur).gp >= 3).sort((a, b) => app.statObj(b.cur).pts - app.statObj(a.cur).pts)[0];
   const card = id => { app.showPlayerDetail(id); return els['#detailBody'].innerHTML; };
   const bars = html => [...html.matchAll(/<span class="cp-k">([^<]+)<\/span><span class="cp-bar"><span class="cp-fill (up|down)"/g)].map(m => [m[1], m[2]]);
-  const r = raw();
+  const r = raw(), born = r.born;
   try {
     await app.useLeague(CATS9);
-    Object.assign(r, { ht: 78, wt: 195, col: 'Kentucky', dft: [2018, 11] });
+    Object.assign(r, { ht: 78, wt: 195, born: '2000-11-01', col: 'Kentucky', dft: [2018, 11] });
     let html = card(r.id);
-    assert.match(html, /<div class="pc-side"><div class="pc-photo[\s\S]*?<\/div><p class="pc-bio"><span>6′6″ · 195 lb<\/span><span>Drafted 11th in 2018<\/span><\/p><\/div>/, 'height, weight, draft; no college');
+    assert.match(html, /<div class="pc-side"><div class="pc-photo[\s\S]*?<\/div><p class="pc-bio"><span>6′6″ · 195 lb · age 25<\/span><span>Drafted 11th in 2018<\/span><\/p><\/div>/, 'height, weight, age (26 next week), draft; no college; each piece whole');
     for (const [pick, said] of [[1, '1st'], [2, '2nd'], [3, '3rd'], [9, '9th'], [12, '12th'], [21, '21st'], [52, '52nd']]) {
       r.dft = [2021, pick];
       assert.ok(card(r.id).includes(`<span>Drafted ${said} in 2021</span>`), said);
@@ -1654,7 +1655,7 @@ test('player card: who he is under the photo, and each category against an avera
     assert.deepEqual(bars(html).map(b => b[0]), Array.from(app.scoreCats(), c => c.label));
     assert.deepEqual(bars(html).find(b => b[0] === 'PTS'), ['PTS', 'up']);
     assert.ok(html.indexOf('pc-owner') < html.indexOf('pc-prof') && html.indexOf('pc-prof') < html.indexOf('pc-tiles'), 'under his fantasy team, before the tiles');
-    Object.assign(r, { dft: 0, col: undefined, ht: undefined, wt: undefined });
+    Object.assign(r, { dft: 0, col: undefined, ht: undefined, wt: undefined, born: undefined });
     assert.match(card(r.id), /<p class="pc-bio"><span>Undrafted<\/span><\/p>/);
     delete r.dft;
     assert.ok(!card(r.id).includes('pc-side'), 'nothing known: the photo alone');
@@ -1664,7 +1665,7 @@ test('player card: who he is under the photo, and each category against an avera
     assert.ok(!html.includes('cp-head'), 'no heading over the bars');
     assert.ok(bars(html).length >= 5 && !bars(html).some(b => b[0] === 'FP'), JSON.stringify(bars(html)));
     assert.match(html, /data-tip="[\d.-]+ FP a game from [^"]+; an average rostered player: [\d.-]+"/);
-  } finally { doc.querySelector = before; for (const k of ['ht', 'wt', 'col', 'dft']) delete r[k]; }
+  } finally { doc.querySelector = before; for (const k of ['ht', 'wt', 'col', 'dft']) delete r[k]; if (born) r.born = born; else delete r.born; }
 });
 
 test('player card: a fantasy team with its lineup spot', async () => {
