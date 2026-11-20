@@ -272,6 +272,107 @@ function landPreview() {
       <div class="lp-foot"><span>Projected <b>6–3</b></span><span class="lp-live">Live</span></div>
     </div></div>`;
 }
+/* ---------- A look inside: three tabs as they look, under the hero ---------- */
+// Made-up numbers, as landPreview's, drawn with each tab's own pieces (.mu-cats, .mu-chip, .game-pill, .lv-dot, the board's
+// .dr-cell and shade, the share picture's RC_IMG colors), so a restyle of a tab carries here. Each row's moment (a basket
+// going in, the picks coming in) plays once it's in view: landReveal puts .in on it. Its button opens that tab in the demo.
+const landFlip = (was, now) => `<span class="pv-sw"><span>${was}</span><span>${now}</span></span>`; // (a number before, then after the basket)
+// [category, yours, theirs, who leads (1 you, -1 them), then after the basket: yours, who leads]: 4–5 down, then 5–4 up on PTS
+const LAND_LIVE_CATS = [['FG%', '.468', '.455', 1, '.474'], ['FT%', '.750', '.800', -1], ['3PM', '7', '6', 1, '8'], ['PTS', '99', '101', -1, '102', 1],
+  ['REB', '41', '45', -1], ['AST', '22', '19', 1], ['STL', '6', '8', -1], ['BLK', '8', '5', 1], ['TO', '15', '12', -1]];
+// each side's players today: name, the game, and his line ([number, stat, number after the basket])
+const LAND_LIVE_ROWS = [
+  [['V. Wembanyama', `<span class="gp-part">SAS 78 @ LAL 74</span> <span class="gp-part"><span class="lv-dot"></span>${landFlip('Q3 4:12', 'Q3 3:48')}</span>`, [['7/14', 'FG', '8/15'], ['3/4', 'FT'], ['1', '3PM', '2'], ['18', 'PTS', '21'], ['9', 'REB'], ['3', 'BLK']]],
+    ['J. Brunson', '<span class="gp-part">NYK 61 @ BOS 66</span> <span class="gp-part"><span class="lv-dot out"></span>Q3 9:30</span>', [['5/11', 'FG'], ['4/4', 'FT'], ['2', '3PM'], ['16', 'PTS'], ['6', 'AST'], ['2', 'TO']]]],
+  [['T. Maxey', 'PHI 118 @ MIA 109', [['11/22', 'FG'], ['6/6', 'FT'], ['4', '3PM'], ['32', 'PTS'], ['7', 'AST'], ['2', 'STL']], ' gp-w'],
+    ['K. Durant', 'HOU 102 @ DEN 111', [['9/17', 'FG'], ['5/5', 'FT'], ['3', '3PM'], ['26', 'PTS'], ['6', 'REB'], ['1', 'BLK']], ' gp-l']],
+];
+function landLive() {
+  const cell = (v, after, lead, leadAfter, me) => {
+    const on = me ? lead > 0 : lead < 0, then = leadAfter == null ? on : me ? leadAfter > 0 : leadAfter < 0;
+    return `<td class="${on ? 'mu-lead' : ''}${on !== then ? (then ? ' pv-gain' : ' pv-lose') : ''}">${after ? landFlip(v, after) : v}</td>`;
+  };
+  const side = ([name, game, line, end = ''], right) => `<div class="pvl-p${right ? ' right' : ''}"><b>${name}</b><span class="game-pill${end}">${game}</span>
+    <span class="mu-chips">${line.map(([v, k, after]) => `<span class="mu-chip${after ? ' pv-flash' : ''}"><b>${after ? landFlip(v, after) : v}</b> ${k}</span>`).join('')}</span></div>`;
+  return `<div class="pv-card pv-live" aria-hidden="true">
+    <div class="pvl-seg"><span class="on">Today</span><span>Yesterday</span><span>This period</span></div>
+    <div class="pvl-board"><div><span>Alley Oops</span><b class="mu-score">${landFlip(4, 5)}</b></div><div class="right"><span>Rim Rockers</span><b class="mu-score">${landFlip(5, 4)}</b></div></div>
+    <table class="mu-cats"><thead><tr>${LAND_LIVE_CATS.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>
+      <tr class="pf-me">${LAND_LIVE_CATS.map(([, a, , lead, after, leadAfter]) => cell(a, after, lead, leadAfter, true)).join('')}</tr>
+      <tr class="mu-opp">${LAND_LIVE_CATS.map(([, , b, lead, , leadAfter]) => cell(b, '', lead, leadAfter, false)).join('')}</tr>
+    </tbody></table>
+    ${LAND_LIVE_ROWS.map(([me, them]) => `<div class="pvl-row">${side(me)}${side(them, true)}</div>`).join('')}
+  </div>`;
+}
+// A snake draft's first three rounds, four teams (yours the second): each pick by his last name and how far ahead (+) or
+// behind (−) of his draft spot he's playing, in the board's own green and red (short names: four columns fit a phone)
+const LAND_BOARD = { teams: ['Rim Rockers', 'Alley Oops', 'Bench Mob', 'Sixth Men'], me: 1,
+  picks: [['Jokić', 2], ['Dončić', 5], ['Edwards', -3], ['Booker', -9], ['Mitchell', 11], ['Banchero', -6], ['Brunson', 4], ['Sengun', -14], ['Fox', -21], ['Maxey', 38], ['Harden', 17], ['Murray', -8]] };
+function landBoard() {
+  const { teams, me, picks } = LAND_BOARD, T = teams.length, grid = {};
+  picks.forEach((p, i) => { const r = Math.floor(i / T), c = r % 2 ? T - 1 - (i % T) : i % T; grid[`${r}|${c}`] = [...p, i]; });
+  const rows = Array.from({ length: picks.length / T }, (_, r) => `<tr><th scope="row">R${r + 1}</th>${teams.map((t, c) => {
+    const [name, gain, i] = grid[`${r}|${c}`];
+    return `<td class="dr-cell" style="--n:${i};${shade(gain / 15)}"><span class="dr-pick">#${i + 1}</span><b>${name}</b><span class="dr-gain ${gain > 0 ? 'pos-good' : 'pos-bad'}">${signed(gain, 0)}</span></td>`;
+  }).join('')}</tr>`).join('');
+  const best = [...picks].sort((a, b) => b[1] - a[1]);
+  return `<div class="pv-card pv-board" aria-hidden="true">
+    <div class="pvd-head"><b>Draft board</b><span>Snake draft</span></div>
+    <table><thead><tr><th></th>${teams.map((t, c) => `<th${c === me ? ' class="dr-mine-col"' : ''}>${t}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
+    <div class="lp-foot"><span>Best pick <b>${best[0][0]} <span class="pos-good">${signed(best[0][1], 0)}</span></b></span><span>Worst <b>${best.at(-1)[0]} <span class="pos-bad">${signed(best.at(-1)[1], 0)}</span></b></span></div>
+  </div>`;
+}
+// The Recap's picture as it goes to the league chat (recapCanvas in share.js), in its own colors, its photos as initials
+const LAND_RECAP = [
+  ['Player of the period', '4 G, per game', 'V. Wembanyama', 'Alley Oops', [['29.5', 'PTS'], ['11.3', 'REB'], ['4.8', 'BLK'], ['.561', 'FG%']]],
+  ['Game of the period', '', 'J. Brunson', 'Bench Mob', [['44', 'PTS'], ['6', '3PM'], ['9', 'AST'], ['.684', 'FG%']]],
+  ['Bench regret', '', '', '', '<b>Sixth Men</b>: starting <b>D. Vassell</b> over <b>B. Hield</b> would have won 5–4'],
+];
+function landRecap() {
+  const C = RC_IMG, card = ([award, per, name, team, line]) => `<div class="pvr-card"><div><small>${award}${per ? ` <i>· ${per}</i>` : ''}</small>
+    ${name ? `<p><b>${name}</b> <span${team === 'Alley Oops' ? ' class="pvr-me"' : ''}>${team}</span></p><p class="pvr-line">${line.map(([v, k]) => `<b>${v}</b> ${k}`).join(' ')}</p>` : `<p class="pvr-note">${line}</p>`}</div>
+    ${name ? `<span class="pvr-face">${initials(name.replace('. ', ' '))}</span>` : ''}</div>`;
+  // each final: a team, the score, the other team, each with the week's Best or Worst badge on its outer side, as the picture has it
+  const badge = m => (m ? `<i class="${m === 'Best' ? 'good' : 'bad'}">${m}</i>` : '');
+  const finals = [['Alley Oops', '6–3', 'Rim Rockers', 'Best', ''], ['Bench Mob', '5–4', 'Sixth Men', '', ''], ['Glass Cleaners', '3–6', 'Fast Breakers', '', 'Worst']];
+  return `<div class="pv-pic" aria-hidden="true" style="--r-bg:${C.bg};--r-card:${C.card};--r-line:${C.line};--r-text:${C.text};--r-soft:${C.soft};--r-muted:${C.muted};--r-accent:${C.accent};--r-good:${C.good};--r-bad:${C.bad}">
+    <span class="pvr-kicker">Period 6 recap</span><b class="pvr-title">Monday Night Hoops</b>
+    ${LAND_RECAP.map(card).join('')}
+    <small class="pvr-sec">Results</small>
+    ${finals.map(([a, s, b, ma, mb]) => `<div class="pvr-final"><span>${badge(ma)}<b>${a}</b></span><strong>${s}</strong><span><b>${b}</b>${badge(mb)}</span></div>`).join('')}
+    <div class="pvr-foot">${LOGO_MARK}<b>League Layer</b><span>leaguelayer.com</span></div>
+  </div>
+  <div class="pvr-share" aria-hidden="true"><span class="on">Share image</span><span>Copy text and link</span></div>`;
+}
+// The rows: the tab's icon and name, what it does, the picture, and a way into the demo at that tab
+const LAND_SHOW = [
+  ['dashboard', 'Matchup', 'Every game, live', "Each starter's game and line as it happens, who's on the floor, and the categories and the score moving as the games go.", landLive],
+  ['draft', 'Draft', 'Every pick on one board', "Your league's whole draft, each pick green or red by how he's playing against where he went. Then the Draft Retrospective's awards, from the biggest reach to the quickest trigger finger.", landBoard],
+  ['recap', 'Recap', 'A recap for the league chat', 'The period in awards, from the player of the period to the bench regret, with every final. Share it as a picture, or as a link that opens with no sign-up.', landRecap],
+];
+function landShow(demo) {
+  return `<section class="land-shows" aria-label="A look inside">${LAND_SHOW.map(([tab, name, title, line, draw], i) => `
+    <div class="land-show${i % 2 ? ' flip' : ''}">
+      <div class="lsh-copy">
+        <p class="lsh-tab">${lineIcon(TAB_ICONS[tab], 'lsh-ico')}${name}</p>
+        <h2>${title}</h2>
+        <p class="lsh-line">${line}</p>
+        ${demo ? `<button type="button" class="btn sm" data-action="land-demo" data-tab="${tab}">See it in the demo</button>` : ''}
+      </div>
+      <div class="lsh-pic">${draw()}</div>
+    </div>`).join('')}
+  </section>`;
+}
+// each row's moment plays once half its picture is on screen (on phones the words come first), where there's no
+// IntersectionObserver at once
+function landReveal() {
+  const pics = [...document.querySelectorAll('.land-show:not(.in) .lsh-pic')], row = el => el.closest('.land-show');
+  if (!pics.length) return;
+  if (typeof IntersectionObserver !== 'function') { pics.forEach(p => row(p).classList.add('in')); return; }
+  const io = new IntersectionObserver(seen => seen.forEach(e => { if (e.isIntersecting) { row(e.target).classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.5 });
+  pics.forEach(p => io.observe(p));
+}
+
 // The headline's sport takes each in turn (a screen reader hears them all, in one line), each with its line icon and its own
 // way in (styles.css: the ball dribbles in, the puck slides in on the ice). Its CSS animation ticks (land-tick): each loop
 // the word rolls away for the next, and the box eases to the next one's width so "week" follows it.
@@ -315,6 +416,7 @@ function landHome(form) {
       </div>
       ${landPreview()}
     </section>
+    ${landShow(demo)}
     <section class="land-features" aria-labelledby="landFeat">
       <h2 id="landFeat">Built around your league's own rules</h2>
       <p class="muted">Categories or points, daily or weekly lineups, its own slots and playoffs.</p>

@@ -350,7 +350,7 @@ const actions = {
     const P = (SB_POINTS[SPORT.key] || {})[el.dataset.preset], f = el.closest('form');
     if (P && f) for (const box of f.querySelectorAll('input[name]')) box.value = P[box.name] != null ? P[box.name] : '';
   },
-  async 'land-demo'() {
+  async 'land-demo'(el) {
     const site = NBA && NBA.siteLeague;
     if (!site) return;
     try {
@@ -358,7 +358,7 @@ const actions = {
       ui.addingLeague = false;
       if (!state.fxTeam) { state.demo = true; demoNames(fxLeague()); adoptTeam(demoTeam()); }
       commit(`Exploring ${fxLeague().name}`);
-      location.hash = '#dashboard';
+      location.hash = `#${(el && el.dataset.tab) || 'dashboard'}`; // (the landing page's rows open their own tab)
     } catch (e) { toast(e.message); }
   },
   // out of the demo, to connect a league of their own

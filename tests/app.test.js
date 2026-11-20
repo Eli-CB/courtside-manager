@@ -5087,6 +5087,8 @@ test('the landing page offers both sports, and says so when a league is on a sit
   assert.match(html, /fantasy basketball or hockey week/);
   assert.match(html, /basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax/);
   assert.match(html, /Try the sandbox<\/b><small>A team of any NBA or NHL players/);
+  // a look inside: the live matchup, the draft board and the recap's picture, each with a way into its tab in the demo
+  assert.match(html, /Every game, live[^]*data-tab="dashboard"[^]*Every pick on one board[^]*data-tab="draft"[^]*A recap for the league chat[^]*data-tab="recap"/);
   // the brand in the head, where a league's menu goes once there is one
   const menu = new (a.document.createElement().constructor)(), find = a.document.querySelector;
   a.document.querySelector = sel => (sel === '#leagueMenu' ? menu : find(sel));
@@ -5133,9 +5135,10 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   const borrowed = st.fxTeam;
   await a.switchLeague(a.get('NBA').siteLeague.id);
   assert.ok(!st.demo && !st.fxTeam, `kept ${borrowed}?`);
-  // and the way out
-  await a.actions['land-demo']();
+  // and the way out (in again from a row of the landing page: its own tab)
+  await a.actions['land-demo']({ dataset: { tab: 'draft' } });
   assert.ok(st.demo && st.fxTeam);
+  assert.equal(a.location.hash, '#draft');
   a.actions['demo-exit']();
   clearTimeout(a.get('live').timer);
   assert.ok(!st.demo && !st.fxTeam && st.players.length === 0);
