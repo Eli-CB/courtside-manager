@@ -242,7 +242,7 @@ function recapText(L, X) {
 // his fantasy team after it, his numbers (his value or points first, then the league's stats, not minutes; a week's "4 G,
 // per game" beside the award) or the award's words, kept short (the owner's ask, Nov 2026: no NBA team or positions, his photo's logo shows
 // the team); any other the award and its line, with the faces of the players it names (or its flags: Passport's, a row a team; or its real teams' logos: a tied Homer's), and any aside under its line in
-// the lighter text (a team award's standout player: "Quickest: Hart (5 s)"). Every face the small round photo on the right, a player award's too (the owner's ask, Nov
+// the lighter text (a team award's standout player: "Quickest: Hart (5s)"). Every face the small round photo on the right, a player award's too (the owner's ask, Nov
 // 2026; the share picture, shareCanvas, is laid out the same). label: the award's title as HTML (the Draft tab's opens its
 // breakdown)
 const standoutFaces = faces => `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>`;

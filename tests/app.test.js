@@ -3459,7 +3459,7 @@ test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (
   assert.equal(get('Clock Milker').text, `${app.fxTeamName(B)}: their picks took 200 seconds on average; longest: ${app.lastName(r[7].name)} (400s)`);
   // on the card the player has a line of his own under the award's, in the lighter text (the owner's ask)
   assert.ok(!get('Trigger Finger').html.includes('quickest'));
-  assert.match(app.standoutCard(get('Trigger Finger')), new RegExp(`<div class="rx-text">[^]*</div><div class="rx-aside">Quickest: <button[^>]*data-nba="${r[0].id}"[^>]*>[^<]+</button> [(]5 s[)]</div>`));
+  assert.match(app.standoutCard(get('Trigger Finger')), new RegExp(`<div class="rx-text">[^]*</div><div class="rx-aside">Quickest: <button[^>]*data-nba="${r[0].id}"[^>]*>[^<]+</button> [(]5s[)]</div>`));
   assert.deepEqual(Array.from(get('Trigger Finger').faces, p => p.nbaId), [r[0].id]);
   assert.deepEqual(Array.from(get('Clock Milker').faces, p => p.nbaId), [r[7].id]);
   assert.ok(get('Clock Milker').aside.includes(`data-nba="${r[7].id}"`), 'his name (on the line under the award) opens his card');
