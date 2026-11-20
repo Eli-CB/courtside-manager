@@ -145,6 +145,11 @@ const INFO = {
     <p>During a game the dot by the clock is solid while he's on the floor and light while he's on the bench or between periods. <b>Value</b> is what the game has added so far to winning a week's categories, against not playing (see Players).</p>
     <p>Until today's first tip-off it shows the last game day; Today then shows each game's tip-off. Players on a game now come first, then finished games, then games still to come, then players with no game (and their next one).</p>
     <p><b>Week</b>: Monday to Sunday so far. Each player's games played and still to come (a game on now with its clock), his stats from those games added up, and their value; players on a game now first, then by that value.</p>`],
+  names: ['Player names', `
+    <p><b>Full names</b> (the default): each player's full name, shortened to an initial ("J. Jaquez Jr.") where a phone's row is tight.</p>
+    <p><b>Last names</b>: just his last name ("Jokić"); where two players share one, his first initial too ("J. Murray"), or his full name if that's shared as well.</p>
+    <p><b>Nicknames</b>: the name he goes by (SGA, KAT, KD, AD, LBJ, Wemby...), from a list League Layer keeps by hand. A player who isn't on it shows his full name.</p>
+    <p>His card always has his full name, and so does hovering over his name. Share pictures and texts don't change: they're for the whole league to read. Basketball only for now; saved on this device.</p>`],
   storage: ['Saved on this device', `
     <p>To keep requests to Fantrax and ESPN low, the site saves what it fetches in this browser: each league you open (the five most recent, reused for 6 hours or until ↻ Reload), each site's player list (and Fantrax's ADP, refreshed daily), and finished weeks' lineups (the 8 most recently used leagues and seasons; a finished week never changes).</p>
     <p>Your leagues, team picks and settings are saved too. Browsers allow about 5 MB per site. <b>Clear saved league data</b> removes only what came from Fantrax and ESPN; it's fetched again the next time it's needed.</p>`],

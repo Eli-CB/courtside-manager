@@ -10,6 +10,7 @@ const STORAGE_KEY = 'league-layer-v1';
 const THEME_KEY = 'league-layer-theme';
 const SCORES_KEY = 'league-layer-hide-scores'; // this device hides game scores (no spoilers)
 const CLOCK_KEY = 'league-layer-clock'; // '24' or '12': this device's choice of clock; unset = the device's own
+const NAMES_KEY = 'league-layer-names'; // 'last' or 'nick': this device's choice of player names (NAME_STYLES); unset = full
 const PICKS_KEY = 'league-layer-picks'; // what was last picked on the Matchup and Players tabs' When menus and Plan Ahead's week (picks)
 const STATUSES = ['Healthy', 'DTD', 'Out'];
 // The sandbox (no league, sandbox.js): a team of any players, up to SANDBOX_MAX, and up to WATCH_MAX followed live (each sport its own)
@@ -120,6 +121,10 @@ ui.clock24 = (() => {
   if (c) return c === '24';
   try { return !/h1[12]/.test(new Intl.DateTimeFormat([], { hour: 'numeric' }).resolvedOptions().hourCycle || 'h12'); } catch (e) { return false; }
 })();
+// Player names, as chosen in the settings menu (nameShown, matchups.js): full (shortened where a phone is tight), last
+// names, or nicknames (js/nicknames.js); only in a sport with a nickname list, full names in the others
+const NAME_STYLES = { full: 'Full names', last: 'Last names', nick: 'Nicknames' };
+ui.names = (k => (Object.hasOwn(NAME_STYLES, k) ? k : 'full'))(store.get(NAMES_KEY));
 // What was last picked on the Matchup and Players tabs' When menus (Today, Yesterday, This period...) and Plan Ahead's
 // week holds over a refresh until what the tab opens on by itself is new (the owner's ask, Nov 2026): Matchup and Players
 // at a new day (Yesterday is another night, This period may be another period), Plan Ahead at a new matchup week or in
@@ -606,8 +611,9 @@ function linkTeams(html) {
   return String(html).replace(/(^|>)([^<]+)/g, (m, open, text) => open + text.replace(/\b[A-Z]{2,4}\b/g, t => (teams[t] ? teamBtn(t) : t)));
 }
 
-// A player's name as the button that opens his card (label: HTML in place of his plain name)
-const playerBtn = (id, name, label = esc(name)) => `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${id}">${label}</button>`;
+// A player's name as the button that opens his card, as the Player names setting shows it (nameShown; label: HTML in
+// place of that); his full name on hover where it shows otherwise
+const playerBtn = (id, name, label = esc(nameShown(name, id))) => `<button type="button" class="link-btn pname" data-action="player-detail" data-nba="${id}"${nameStyle() === 'full' ? '' : ` title="${esc(name)}"`}>${label}</button>`;
 
 // A row of buttons with one of them on (Today / Yesterday, Totals / Per game...): opts [value, label, tip?], on: the value
 // that's on. Each button's data-action is action, its value in data-<attr>; extra: more attributes on every button

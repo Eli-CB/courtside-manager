@@ -3623,6 +3623,54 @@ test('times follow the 24-hour setting', () => {
   } finally { ui.clock24 = was; }
 });
 
+test('Player names: full (shortened on phones), last names or nicknames from the list, basketball only, kept on the device', async () => {
+  const a = loadApp({ 'league-layer-names': 'nick' });
+  await a.ready();
+  const ui = a.get('ui'), SGA = 1628983;
+  assert.equal(ui.names, 'nick', 'the choice saved on the device');
+  assert.equal(loadApp({ 'league-layer-names': 'constructor' }).get('ui').names, 'full', 'anything else saved: full names');
+  ui.names = 'full';
+  assert.equal(a.nameShown('Shai Gilgeous-Alexander', SGA), 'Shai Gilgeous-Alexander');
+  assert.equal(a.nameShown('Jaime Jaquez Jr.', null, 'short'), 'J. Jaquez Jr.');
+  assert.equal(a.nameShown('Jaime Jaquez Jr.', null, 'last'), 'Jaquez', "a spot that shows last names keeps them");
+  assert.equal(a.playerBtn(SGA, 'Shai Gilgeous-Alexander'), '<button type="button" class="link-btn pname" data-action="player-detail" data-nba="1628983">Shai Gilgeous-Alexander</button>');
+  ui.names = 'last';
+  assert.equal(a.nameShown('Nikola Jokić'), 'Jokić');
+  assert.equal(a.nameShown('Jamal Murray', null, 'short'), 'J. Murray', 'a shared last name gets the initial');
+  assert.match(a.playerBtn(SGA, 'Shai Gilgeous-Alexander'), /title="Shai Gilgeous-Alexander">Gilgeous-Alexander</);
+  assert.equal(a.playerName({ nbaId: SGA, name: 'Shai Gilgeous-Alexander' }).includes('n-short'), false, 'one name, no phone version');
+  ui.names = 'nick';
+  assert.equal(a.nameShown('Shai Gilgeous-Alexander', SGA, 'short'), 'SGA');
+  assert.equal(a.nameShown('S. Gilgeous-Alexander', SGA), 'SGA', "by his id, whatever the league's site calls him");
+  assert.equal(a.nameShown('Luka Doncic'), 'Luka', 'accents or not');
+  assert.equal(a.nameShown('Tyrese Maxey', null, 'short'), 'T. Maxey', 'no nickname: as the spot shows it');
+  assert.match(a.playerBtn(SGA, 'Shai Gilgeous-Alexander'), /title="Shai Gilgeous-Alexander">SGA</);
+  assert.match(a.playerName({ nbaId: 2544, name: 'LeBron James' }), />LBJ<\/button>/);
+  const list = a.get('NICKNAMES').nba, nicks = Object.values(list);
+  assert.equal(new Set(nicks.map(n => n.toLowerCase())).size, nicks.length, 'each nickname is one player\'s');
+  const shown = new Map(a.get('NBA').players.map(p => [a.nameShown(p.name, p.id).toLowerCase(), p.name]));
+  assert.equal(shown.size, a.get('NBA').players.length, 'no two players show the same name');
+  // the setting: in the settings menu, saved on the device (full names: forgotten)
+  const gear = a.document.createElement();
+  a.document.querySelector = sel => (sel === '#gearMenu' ? gear : a.document.createElement());
+  a.gearMenu();
+  assert.match(gear.innerHTML, /data-change="set-names"[^>]*>(<option[^>]*>[^<]*<\/option>){3}/);
+  assert.match(gear.innerHTML, /<option value="nick" selected>Nicknames</);
+  a.get('actions')['set-names']({ dataset: { names: 'last' } });
+  assert.equal(a.localStorage.getItem('league-layer-names'), 'last');
+  a.get('actions')['set-names']({ dataset: { names: 'full' } });
+  assert.equal(a.localStorage.getItem('league-layer-names'), null);
+  // another sport has no list: no setting, full names
+  ui.names = 'nick';
+  const nba = a.get('SPORT');
+  a.set('SPORT', a.get('SPORTS').nhl);
+  try {
+    assert.equal(a.nameShown('Shai Gilgeous-Alexander', SGA), 'Shai Gilgeous-Alexander');
+    a.gearMenu();
+    assert.doesNotMatch(gear.innerHTML, /set-names/);
+  } finally { a.set('SPORT', nba); }
+});
+
 // ----- Sleeper -----
 const SLEEPER = '1369432599025442816'; // a public Sleeper league (tests/capture_sleeper_fixtures.py): 12 teams, points, Lock-In
 

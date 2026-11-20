@@ -51,6 +51,12 @@ const actions = {
     store.set(CLOCK_KEY, ui.clock24 ? '24' : '12');
     render();
   },
+  // the settings menu's Player names (NAME_STYLES): full names again forgets the choice
+  'set-names'(el) {
+    ui.names = Object.hasOwn(NAME_STYLES, el.dataset.names) ? el.dataset.names : 'full';
+    if (ui.names === 'full') store.drop(NAMES_KEY); else store.set(NAMES_KEY, ui.names);
+    render();
+  },
   'fx-load-opp'() {
     const opp = fxOpponentFor(weekStart());
     if (!opp) return toast(`No ${sourceName()} matchup found for this week`);
@@ -750,6 +756,8 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.change === 'set-basis') {
     actions['set-basis']({ dataset: { basis: el.value } });
+  } else if (el.dataset.change === 'set-names') {
+    actions['set-names']({ dataset: { names: el.value } });
   } else if (el.dataset.change === 'recap-week') {
     ui.recapWeek = +el.value;
     render();

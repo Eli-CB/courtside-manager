@@ -294,12 +294,12 @@ function perfRowsFor({ proj, avg, perWeek, dates }) {
 
 // The rows the filters keep: whose players (yours, the opponent's, the other teams', waivers: any of them) and, for
 // rostered players, where they are: active or bench (IR counts as bench); waivers have no lineup, so Active or Bench leaves
-// them be. Then the search, positions, NBA teams, rookies and injured.
+// them be. Then the search (by the nickname shown too), positions, NBA teams, rookies and injured.
 function perfPicked(rows, { owner, statusOf, teamOf }, otherPick) {
   const q = normName(ui.perfQ), spotOn = ui.perfSpot !== 'all' && !!fxLeague(); // (the sandbox has no lineups)
   return rows.filter(r => {
     const t = teamOf(r);
-    return (!owner.size || (ui.perfWhose[t || 'fa'] && (t !== 'other' || !otherPick.length || otherPick.includes(owner.get(r.raw.id))) && (!t || !spotOn || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q))
+    return (!owner.size || (ui.perfWhose[t || 'fa'] && (t !== 'other' || !otherPick.length || otherPick.includes(owner.get(r.raw.id))) && (!t || !spotOn || statusOf(r.raw.id) === ui.perfSpot))) && (!q || normName(r.raw.name).includes(q) || normName(nickOf(r.raw.id, r.raw.name)).includes(q))
       && (!ui.perfPos.length || ui.perfPos.some(x => (r.raw.pos || []).includes(x))) && (!ui.perfTeam.length || ui.perfTeam.includes(r.raw.team))
       && (!ui.perfOnly.rookie || isRookie(r.raw)) && (!ui.perfOnly.inj || !!r.raw.inj);
   });

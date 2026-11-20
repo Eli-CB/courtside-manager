@@ -117,7 +117,7 @@ function nearMisses(ctx, base) {
 function whySentence(ex, ctx) {
   const parts = [];
   const gi = ex.inP ? weekGames(ex.inP, ctx.dates) : 0, go = ex.outP ? weekGames(ex.outP, ctx.dates) : 0;
-  const inN = ex.inP ? esc(lastName(ex.inP.name)) : '', outN = ex.outP ? esc(lastName(ex.outP.name)) : '';
+  const inN = ex.inP ? esc(nameShown(ex.inP.name, ex.inP.nbaId, 'last')) : '', outN = ex.outP ? esc(nameShown(ex.outP.name, ex.outP.nbaId, 'last')) : '';
   if (SPORT.oneNumber) {
     const pts = p => fmt(footballPts(p, ctx.dates), 1);
     if (ex.inP && ex.outP) parts.push(`${inN} projects ${pts(ex.inP)} to ${outN}'s ${pts(ex.outP)}.`);
@@ -294,8 +294,35 @@ function shortName(name, plain) {
   return plain || !clashes('i:', short) ? short : String(name);
 }
 
+// The settings menu's Player names (ui.names, core.js): 'full', 'last' or 'nick', in a sport with a nickname list
+// (js/nicknames.js); full names in the others
+const nameStyle = () => (NICKNAMES[SPORT.key] ? ui.names : 'full');
+// A player's nickname from the list, when Nicknames is picked (else none): by his name in the sport's data, or the name given
+const nickIndex = {}; // sport -> Map(normName -> nickname): the list as written, the same all visit
+function nickOf(id, name) {
+  if (nameStyle() !== 'nick') return null;
+  const list = NICKNAMES[SPORT.key];
+  const index = nickIndex[SPORT.key] || (nickIndex[SPORT.key] = new Map(Object.entries(list).map(([n, nick]) => [normName(n), nick])));
+  const raw = id != null && nbaById.get(+id);
+  return (raw && index.get(normName(raw.name))) || index.get(normName(name)) || null;
+}
+// A player's name as the Player names setting shows it. form: how the spot shows it by default ('full'; 'short', "J. Jaquez
+// Jr."; 'last', "Jaquez"); Last names shows the last name everywhere (an initial, or the full name, where two share it),
+// Nicknames his nickname where the list has one, else the spot's own form
+function nameShown(name, id, form = 'full') {
+  const nick = nickOf(id, name);
+  if (nick) return nick;
+  if (form === 'last' || nameStyle() === 'last') return lastName(name);
+  return form === 'short' ? shortName(name) : String(name ?? '');
+}
+// A name that shortens on phones where a row is tight (.n-full / .n-short, styles.css), as the setting shows it
+function nameLabel(name, id) {
+  const full = nameShown(name, id), short = nameShown(name, id, 'short');
+  return full === short ? esc(full) : `<span class="n-full">${esc(full)}</span><span class="n-short">${esc(short)}</span>`;
+}
+
 function playerName(p) {
-  const label = `<span class="n-full">${esc(p.name)}</span><span class="n-short">${esc(shortName(p.name))}</span>`;
+  const label = nameLabel(p.name, p.nbaId);
   return p.nbaId ? `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}" title="${esc(p.name)}">${label}</button>` : `<span class="pname">${label}</span>`;
 }
 
@@ -767,7 +794,7 @@ function viewWeek() {
     <div class="card">
       <div class="card-head"><h2>Daily bench swaps</h2><span class="muted small">${best.games - asSet.games > 0 ? `+${best.games - asSet.games} games over your lineup as set` : 'lineup as set'}</span></div>
       ${swaps.length ? `<ul class="alerts">${swaps.map(x => `<li class="alert ${x.past ? '' : 'good'}"><span class="dot"></span><span class="grow"><b>${fmtDay(x.d)}</b>${x.past ? ' <span class="muted small">(already played)</span>' : ''}<br>
-        Start ${x.start.map(p => `<b>${esc(p.name)}</b>`).join(', ')}${x.sit.length ? `; sit ${x.sit.map(p => esc(p.name)).join(', ')}` : ''}</span></li>`).join('')}</ul>`
+        Start ${x.start.map(p => `<b>${esc(nameShown(p.name, p.nbaId))}</b>`).join(', ')}${x.sit.length ? `; sit ${x.sit.map(p => esc(nameShown(p.name, p.nbaId))).join(', ')}` : ''}</span></li>`).join('')}</ul>`
         : `<p class="muted small" style="margin:0">${mine.length ? 'Your lineup as set already uses every game your bench could add.' : 'Your roster is empty.'}</p>`}
       ${hasOpp && !isPoints() ? `<h3 class="sub" style="margin-top:16px">Categories ${infoBtn('win')}</h3>${catCompareTable(ctx, changed)}` : ''}
     </div>`;

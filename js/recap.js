@@ -170,7 +170,7 @@ function recapItems(X) {
   const team = tid => fxTeamName(tid);
   const out = [];
   const add = (label, html, text, more) => out.push({ label, html, text, ...more });
-  const name = (p, bold) => `<button class="link-btn pname" data-action="player-detail" data-nba="${p.nbaId}">${bold ? `<b>${esc(p.name)}</b>` : esc(p.name)}</button>`;
+  const name = (p, bold) => playerBtn(p.nbaId, p.name, bold ? `<b>${esc(nameShown(p.name, p.nbaId))}</b>` : undefined);
   const unit = isPoints() ? 'FP' : 'value';
   const stand = (label, x, perGame) => {
     const parts = fullLine(x.line, perGame), head = perGame ? `${x.line.gp1} G, per game: ` : '';
@@ -257,7 +257,7 @@ function standoutCard(x, label = `<div class="rx-label">${x.label}${x.tiles && x
     : `<span class="rx-words">${esc(x.stats)}</span>`; // (football's line, a draft award's: words)
   return `<article class="rx-card rx-player"><div class="rx-body">
     ${label}
-    <div class="rx-name">${playerBtn(x.p.nbaId, x.p.name, esc(shortName(x.p.name)))}<span class="rx-team">${teamLink(x.tid)}</span></div>
+    <div class="rx-name">${playerBtn(x.p.nbaId, x.p.name, esc(nameShown(x.p.name, x.p.nbaId, 'short')))}<span class="rx-team">${teamLink(x.tid)}</span></div>
     <div class="rx-stats">${stats}</div>
   </div>${standoutFaces([x.p])}</article>`;
 }

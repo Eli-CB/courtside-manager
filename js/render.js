@@ -208,6 +208,7 @@ const GEAR_STATS = menuIcon('<path d="M5 20v-8M12 20V5M19 20v-5"/>');
 const GEAR_MOON = menuIcon('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>');
 const GEAR_EYE_OFF = menuIcon('<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/><path d="m4 4 16 16"/>');
 const GEAR_CLOCK = menuIcon('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>');
+const GEAR_NAME = menuIcon('<rect x="3" y="5.5" width="18" height="13" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.6-1.4 1.6-2 3-2s2.4.6 3 2M14.5 10h4M14.5 13.5h3"/>');
 const GEAR_TRASH = menuIcon('<path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/>');
 const GEAR_BACKUP = menuIcon('<path d="M12 4v11m0 0-4-4m4 4 4-4"/><path d="M4.5 16.5v2A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-2"/>');
 const GEAR_RESET = menuIcon('<path d="M4 12a8 8 0 1 0 2.34-5.66L4 8.5"/><path d="M4 3.5v5h5"/>');
@@ -261,6 +262,7 @@ function gearMenu() {
       ${toggle('toggle-theme', GEAR_MOON, 'Dark mode', '', dark)}
       ${toggle('toggle-scores', GEAR_EYE_OFF, 'Hide game scores', 'no spoilers on the Matchup tab', ui.hideScores)}
       ${toggle('toggle-clock', GEAR_CLOCK, '24-hour time', `tip-offs as ${fmtTime('2026-11-02T19:30:00')}`, ui.clock24)}
+      ${NICKNAMES[SPORT.key] ? `<div class="gear-row gear-pick">${GEAR_NAME}<span class="gear-text">Player names ${infoBtn('names')}</span><select class="ctx-team" data-change="set-names" aria-label="Player names">${Object.entries(NAME_STYLES).map(([k, l]) => `<option value="${k}" ${ui.names === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
       <div class="lm-sec">Help</div>
       ${row('data-action="feedback"', ICON_MAIL, 'Send feedback', 'a problem, an idea, a wrong number')}
       ${canInstall() ? row('data-action="install-app"', ICON_PHONE, 'Install the app', 'full screen, on your home screen') : ''}

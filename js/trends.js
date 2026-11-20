@@ -76,7 +76,7 @@ function teammateOut(row, regulars) {
   const gone = (regulars.get(team) || []).filter(m => m.id !== row.id && dates.filter(d => !m.days.has(d)).length >= Math.ceil(dates.length * 0.6));
   if (!gone.length) return '';
   const m = gone.sort((a, b) => b.min - a.min)[0];
-  return `with ${esc(lastName(m.name, true))} out`;
+  return `with ${esc(nickOf(m.id, m.name) || lastName(m.name, true))} out`;
 }
 function teamRegulars(end) {
   const out = new Map();

@@ -174,7 +174,7 @@ function draftAwardKit() {
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   // "A, B and C", "A, B, C and 2 others"
   const and = (list, max = 3) => (list.length <= 1 ? list[0] || '' : list.length <= max ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : `${list.slice(0, max).join(', ')} and ${plural(list.length - max, 'other')}`);
-  const who = p => playerBtn(p.nbaId, lastName(p.name)); // (a name inside a line: his card)
+  const who = p => playerBtn(p.nbaId, p.name, esc(nameShown(p.name, p.nbaId, 'last'))); // (a name inside a line: his card)
   const named = p => `${who(p)}${p.keeper ? ' (keeper)' : ''}`; // (a breakdown's name, a keeper marked)
   // (a player award is drawn as the Recap's player standouts: standoutCard, recap.js; no emoji on any award, the owner's ask)
   const award = (label, x, said) => out.push({
@@ -450,7 +450,7 @@ function viewDraft() {
     return { id, name: fxTeamName(id), n: ps.length, avg, top, low, total };
   }).sort((a, b) => b.avg - a.avg);
   draftTeamCards.clear();
-  const pickName = p => (p.nbaId ? playerBtn(p.nbaId, lastName(p.name)) : esc(lastName(p.name))); // (his card, by his last name)
+  const pickName = p => { const n = esc(nameShown(p.name, p.nbaId, 'last')); return p.nbaId ? playerBtn(p.nbaId, p.name, n) : n; }; // (his card, by his last name)
   for (const [id, ps] of Object.entries(byTeam)) draftTeamCards.set(id, draftTeamCard(d, id, ps));
 
   // board: one column per draft slot (round-1 order), one row per round. Traded picks stay in
@@ -476,7 +476,7 @@ function viewDraft() {
     const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
     return top ? top[0] : first;
   });
-  const nameBtn = (nbaId, name) => nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${nbaId}"><span class="n-full">${esc(name)}</span><span class="n-short">${esc(shortName(name))}</span></button>` : esc(name);
+  const nameBtn = (nbaId, name) => nbaId ? `<button class="link-btn" data-action="player-detail" data-nba="${nbaId}">${nameLabel(name, nbaId)}</button>` : esc(name);
   const gainTag = (gain, gp) => !d.graded ? '' : `<span class="dr-gain ${gain > 0 ? 'pos-good' : gain < 0 ? 'pos-bad' : 'muted'}">${gp ? signed(gain, 0) : 'DNP'}</span>`;
   const keeperRows = !Object.values(d.keepers).some(k => k.length) ? '' : [0, 1].map(i => `<tr class="dr-krow"><th scope="row">K${i + 1}</th>${cols.map(t => {
     const k = (d.keepers[t] || [])[i];

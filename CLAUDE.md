@@ -34,7 +34,7 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
 ## Where the notes are
 | Working on | Read |
 |---|---|
-| `sports.js`, `core.js`, `info.js`, `render.js`, `actions.js`, styles.css (the look, positions, picks that hold) | docs/core.md |
+| `sports.js`, `core.js`, `info.js`, `render.js`, `actions.js`, styles.css (the look, positions, picks that hold), `nicknames.js` (Player names) | docs/core.md |
 | the player card, a sport team's or a fantasy team's card | docs/cards.md |
 | `nba.js`: data load, projections, value, the category model, Stats used | docs/model.md |
 | `fantrax.js`, anything that asks Fantrax | docs/fantrax.md |
@@ -60,7 +60,7 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
 
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
-  scope; they must load in the order index.html lists: sports, core, nba, info, fantrax, espn, sleeper, football, yahoo, render, history, views,
+  scope; they must load in the order index.html lists: sports, nicknames, core, nba, info, fantrax, espn, sleeper, football, yahoo, render, history, views,
   dashboard, players, matchups, roto, recap, trends, share, live, draft, leagues, sandbox, actions. Shared builders (Nov 18, 2026): every row of on/off buttons is `segBtns` (core.js), every sortable table's order `sortRows` (views.js: empty cells last), whose a player is `rosterOwners`/`ownerTag`/`faBadge` (players.js, the sandbox's My team included). Top-level code may only use things defined in earlier files (no hoisting across files), and no two files may declare the same function: a later file's silently replaces the earlier one everywhere (history.js's `periodDays` once broke every week's dates; a test checks).
 - Names: "NBA", `nbaId`, `nbaPlayers` and the like mean "the sport's data"; "fx" names (`fxLeague`, `raw.fx`, `fxTeamSide`) mean "the league's
   site", any site. Use the shared pieces, never your own: caches sign up with `keep(from, reset)` beside their declaration and hear
