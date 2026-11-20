@@ -565,6 +565,8 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rx-flags { display: grid; gap: 6px; flex: none; max-width: 50%; margin-right: 16px; }
 .rx-flags > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .rx-flags .flag { display: block; }
+.rx-logos { display: flex; gap: 8px; flex: none; margin-right: 16px; }
+.rx-logos .tlogo { display: block; }
 @media (max-width: 640px) { .rx-body { padding: 12px 14px; } .rx-name { font-size: 1.04rem; } }
 .rc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .rc-item { display: flex; gap: 12px; align-items: flex-start; font-size: .92rem; }

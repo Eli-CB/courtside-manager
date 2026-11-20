@@ -254,15 +254,17 @@ async function sharePad(tall = 5000) {
 // emoji, the owner's ask), then any finals. H: { kicker, title, sub, items, games,
 // mark: tid -> 'top' | 'bottom' | '' }.
 // An item: { label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's numbers
-// are a game of), score: [number, unit] }, one naming players { faces }, Passport { flags: a row of country codes a team }
+// are a game of), score: [number, unit] }, one naming players { faces }, Passport { flags: a row of country codes a team },
+// a tied Homer { logos: real teams }
 async function shareCanvas(H) {
   const items = H.items, games = H.games || [];
   const K = await sharePad(900 + sum(items.map(it => (it.p ? 400 : 340))) + games.length * 100);
   const { C, W, inner, ctx, font, text, round, clip, photo, lay, drawLay } = K;
   // (flags from flagcdn.com, which lets a canvas use them; one that won't load is left out)
-  const flagIms = new Map(), codes = [...new Set(items.flatMap(it => (it.flags || []).flat()))];
+  const flagIms = new Map(), codes = [...new Set(items.flatMap(it => (it.flags || []).flat()))], clubIms = new Map();
   await Promise.all([K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])], false),
-    ...codes.map(c => canvasImg(`https://flagcdn.com/w80/${c.toLowerCase()}.png`, true).then(im => { if (im) flagIms.set(c, im); }))]);
+    ...codes.map(c => canvasImg(`https://flagcdn.com/w80/${c.toLowerCase()}.png`, true).then(im => { if (im) flagIms.set(c, im); })),
+    ...items.flatMap(it => it.logos || []).map(t => logoImg(t).then(im => { if (im) clubIms.set(t, im); }))]);
   const x0 = C.pad, w = inner, fd = 104; // (every photo one size, a player's as a note's faces, as on the page)
   // the award in orange; a week's games after it, gray ("PLAYER OF THE WEEK · 4 G, PER GAME")
   const labelText = (it, x, y, max) => {
@@ -292,15 +294,18 @@ async function shareCanvas(H) {
   };
 
   // The rest: the award, its line (names bold), and the round photos of the players it names, or its flags (a row a team,
-  // as wide as the widest row's flags at 48 px, smaller where a row has more than 7)
+  // as wide as the widest row's flags at 48 px, smaller where a row has more than 7), or its real teams' logos (as big as
+  // a photo, side by side)
   const note = (it, y) => {
     const faces = (it.faces || []).filter(f => f && f.nbaId != null).slice(0, 3), step = 72;
     const rows = (it.flags || []).map(r => r.map(c => flagIms.get(c)).filter(Boolean)).filter(r => r.length);
     const most = Math.max(0, ...rows.map(r => r.length)), fgw = Math.min(48, (400 - (most - 1) * 8) / most), fgh = fgw * 0.75;
     const flagsW = rows.length ? most * fgw + (most - 1) * 8 : 0, flagsH = rows.length * fgh + (rows.length - 1) * 12;
-    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : rows.length ? flagsW + 28 : 0, tx = x0 + 40, tw = x0 + w - 32 - fw - tx;
+    const clubs = (it.logos || []).slice(0, 3).map(t => clubIms.get(t)).filter(Boolean), lg = 16;
+    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : rows.length ? flagsW + 28 : clubs.length ? clubs.length * (fd + lg) - lg + 28 : 0;
+    const tx = x0 + 40, tw = x0 + w - 32 - fw - tx;
     const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), block = 40 + lines.length * 44 - 8;
-    const h = Math.max(block + 64, faces.length ? fd + 60 : 0, rows.length ? flagsH + 60 : 0, 148), ty = y + (h - block) / 2;
+    const h = Math.max(block + 64, faces.length || clubs.length ? fd + 60 : 0, rows.length ? flagsH + 60 : 0, 148), ty = y + (h - block) / 2;
     round(x0, y, w, h, 28, C.card);
     labelText(it, tx, ty, tw);
     drawLay(lines, tx, ty + 40, 31, 44);
@@ -309,6 +314,7 @@ async function shareCanvas(H) {
       const fx = x0 + w - 32 - (r.length - i) * fgw - (r.length - 1 - i) * 8, fy = y + (h - flagsH) / 2 + j * (fgh + 12);
       clip(fx, fy, fgw, fgh, 4); ctx.drawImage(im, fx, fy, fgw, fgh); ctx.restore();
     }));
+    clubs.forEach((im, i) => ctx.drawImage(im, x0 + w - 32 - fd - (clubs.length - 1 - i) * (fd + lg), y + (h - fd) / 2, fd, fd));
     return y + h;
   };
 

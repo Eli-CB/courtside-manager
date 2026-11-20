@@ -241,16 +241,17 @@ function recapText(L, X) {
 // A standout on the Recap tab or the Draft Retrospective: a player award the award, his name (one initial: "T. Maxey") with
 // his fantasy team after it, his numbers (his value or points first, then the league's stats, not minutes; a week's "4 G,
 // per game" beside the award) or the award's words, kept short (the owner's ask, Nov 2026: no NBA team or positions, his photo's logo shows
-// the team); any other the award and its line, with the faces of the players it names (or its flags: Passport's, a row a team). Every face the small round photo on the right, a player award's too (the owner's ask, Nov
+// the team); any other the award and its line, with the faces of the players it names (or its flags: Passport's, a row a team; or its real teams' logos: a tied Homer's). Every face the small round photo on the right, a player award's too (the owner's ask, Nov
 // 2026; the share picture, shareCanvas, is laid out the same). label: the award's title as HTML (the Draft tab's opens its
 // breakdown)
 const standoutFaces = faces => `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>`;
 function standoutCard(x, label = `<div class="rx-label">${x.label}${x.tiles && x.per ? `<span class="rx-per"> · ${x.per} G, per game</span>` : ''}</div>`) {
   if (!x.p) {
     const faces = (x.faces || []).filter(f => f && f.nbaId != null).slice(0, 3);
-    const flags = (x.flags || []).filter(r => r.length);
+    const flags = (x.flags || []).filter(r => r.length), logos = (x.logos || []).filter(t => IMG && IMG.logos[t]).slice(0, 3); // (only logos the site has)
     return `<article class="rx-card rx-note"><div class="rx-body">${label}<div class="rx-text">${x.html}</div></div>`
-      + `${faces.length ? standoutFaces(faces) : ''}${flags.length ? `<div class="rx-flags">${flags.map(r => `<div>${r.map(flagImg).join('')}</div>`).join('')}</div>` : ''}</article>`;
+      + `${faces.length ? standoutFaces(faces) : ''}${flags.length ? `<div class="rx-flags">${flags.map(r => `<div>${r.map(flagImg).join('')}</div>`).join('')}</div>` : ''}`
+      + `${logos.length ? `<div class="rx-logos">${logos.map(t => teamLogo(t, hsPx(44, 36))).join('')}</div>` : ''}</article>`;
   }
   const stats = x.tiles
     ? [[x.score[0], x.score[1], isBelowZero(x.score[0]) ? 'pos-bad' : ''], ...cardTiles(x.tiles, x.per).map(t => [t.v, `${t.k}${t.made ? ` ${t.made}` : ''}`, ''])]

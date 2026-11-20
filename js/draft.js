@@ -310,8 +310,8 @@ function draftAgeAwards(d, squads, { row, teamWho, teamAward, standout, best, te
 
 // Homer: the most players from one real team (by each player's team now); Passport (was The Globalist, then Frequent
 // Flyer): the most countries (the owner's ask: players' nationalities, from the daily file's ISO codes). Their cards kept
-// short (the owner's ask, Nov 2026): the winners and the number, with Homer's players' faces (none on a tie: no room) and
-// each Passport winner's flags; the words are the shared text's
+// short (the owner's ask, Nov 2026): the winners and the number, with Homer's players' faces (a tie: each winner's real
+// team's logo, no room for its players) and each Passport winner's flags; the words are the shared text's
 function draftOriginAwards(squads, { out, and, row, teamWho, breakdown, best, named }) {
   const stacks = squads.map(t => {
     const by = new Map();
@@ -331,7 +331,7 @@ function draftOriginAwards(squads, { out, and, row, teamWho, breakdown, best, na
       html: one ? `<b>${teamLink(one.tid)}</b> (${n} ${teamBtn(one.club)})` : `${and(homers.map(t => `<b>${teamLink(t.tid)}</b>`))} (${n})`,
       text: one ? `${fxTeamName(one.tid)} has ${n} ${full(one.club)} players: ${and(one.ps.map(p => lastName(p.name)), Infinity)}` : `${and(homers.map(t => `${fxTeamName(t.tid)} (${t.club})`))} tied: ${n} players each from one team`,
       detail: breakdown('Homer', 'The most players each team has from one real team, picks and keepers (by his team now)', rows),
-      ...(one ? { faces: one.ps } : {}),
+      ...(one ? { faces: one.ps } : { logos: homers.map(t => t.club) }),
     });
   }
   const globe = best(stacks, t => t.nats.size);

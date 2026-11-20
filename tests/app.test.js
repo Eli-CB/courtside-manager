@@ -3406,12 +3406,21 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     assert.match(getK('Passport').detail.html.split('<li>').slice(1).find(x => x.includes(`data-team="${A}"`)), />2 countries<\/b>/);
     assert.equal(getK('Fall').text, get('Fall').text, 'never in the ADP awards');
     d.keepers = {};
-    // a tie names each team (with its real team on Homer's text); its card just the teams, no room for faces
+    // a tie names each team (with its real team on Homer's text); its card just the teams and their real teams' logos, no
+    // room for faces
     c3.team = 'BOS';
     const tied = app.draftAwards(d).find(x => x.label === 'Homer');
     assert.equal(tied.text, `${app.fxTeamName(A)} (OKC) and ${app.fxTeamName(C)} (BOS) tied: 3 players each from one team`);
     assert.match(tied.html, new RegExp(`data-team="${A}".* and <b>.*data-team="${C}".*</b> [(]3[)]$`));
     assert.ok(!tied.faces);
+    assert.deepEqual(Array.from(tied.logos), ['OKC', 'BOS']);
+    const wasImg = app.get('IMG');
+    try {
+      app.set('IMG', { cols: 24, ids: [], logos: { OKC: 'data:image/svg+xml;base64,AAAA', BOS: 'data:image/svg+xml;base64,AAAA' } });
+      assert.match(app.standoutCard(tied), /class="rx-logos"><img class="tlogo"[^>]*alt="OKC"[^>]*><img class="tlogo"[^>]*alt="BOS"/);
+      app.set('IMG', { cols: 24, ids: [], logos: {} });
+      assert.ok(!app.standoutCard(tied).includes('rx-logos'), 'only logos the site has (never the bare codes)');
+    } finally { app.set('IMG', wasImg); }
     // the seasons' archives not in yet (on their way): no Glass until they are
     const loading = app.get('glassLoading');
     for (const s of seasons) { delete archives[s]; loading.add(s); }
