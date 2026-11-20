@@ -279,7 +279,7 @@ function landHome(form) {
   return `<div class="landing-wrap land-home">
     <section class="land-hero">
       <div class="land-copy">
-        <p class="land-pill">Free · No sign-up</p>
+        <p class="land-pill">Free forever · No sign-up</p>
         <h1>Plan your fantasy basketball or hockey week</h1>
         <p class="land-lead">Your odds for this week's matchup, the best starters, how your categories stack up and a recap the whole league can share.</p>
         <div class="land-connect">${form}</div>
