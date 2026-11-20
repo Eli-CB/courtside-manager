@@ -1643,9 +1643,13 @@ test('player card: who he is under the photo, and each category against an avera
   const r = raw();
   try {
     await app.useLeague(CATS9);
-    Object.assign(r, { ht: 78, wt: 195, col: '<b>Kentucky</b>', dft: [2018, 11] });
+    Object.assign(r, { ht: 78, wt: 195, col: 'Kentucky', dft: [2018, 11] });
     let html = card(r.id);
-    assert.match(html, /<div class="pc-side"><div class="pc-photo[\s\S]*?<\/div><p class="pc-bio"><span>6′6″ · 195 lb<\/span><span>&lt;b&gt;Kentucky&lt;\/b&gt;<\/span><span>2018 NBA draft, #11<\/span><\/p><\/div>/, 'height, weight, college (as text), draft');
+    assert.match(html, /<div class="pc-side"><div class="pc-photo[\s\S]*?<\/div><p class="pc-bio"><span>6′6″ · 195 lb<\/span><span>Drafted 11th in 2018<\/span><\/p><\/div>/, 'height, weight, draft; no college');
+    for (const [pick, said] of [[1, '1st'], [2, '2nd'], [3, '3rd'], [9, '9th'], [12, '12th'], [21, '21st'], [52, '52nd']]) {
+      r.dft = [2021, pick];
+      assert.ok(card(r.id).includes(`<span>Drafted ${said} in 2021</span>`), said);
+    }
     // the league's own categories, in its order; the top scorer is above average in points
     assert.deepEqual(bars(html).map(b => b[0]), Array.from(app.scoreCats(), c => c.label));
     assert.deepEqual(bars(html).find(b => b[0] === 'PTS'), ['PTS', 'up']);

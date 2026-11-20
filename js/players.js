@@ -426,11 +426,11 @@ function cardOwner(raw) {
 }
 
 // Who he is, under his photo (the owner's ask, Nov 2026: the card's top had room to spare): height and weight (hockey: the hand he shoots or catches
-// with), his college or club before the league, his draft. The daily job's, from NBA.com, NHL.com or Sleeper (no draft there).
+// with), his draft ("Drafted 9th in 2021"; no college, the owner's ask, Nov 20, 2026). The daily job's, from NBA.com, NHL.com or Sleeper (no draft there).
 function cardBio(raw) {
   const body = [raw.ht ? `${Math.floor(raw.ht / 12)}′${raw.ht % 12}″` : '', raw.wt ? `${raw.wt} lb` : '', raw.sh ? `${isGoalie(raw) ? 'Catches' : 'Shoots'} ${esc(raw.sh)}` : ''].filter(Boolean).join(' · ');
-  const draft = raw.dft === 0 ? 'Undrafted' : Array.isArray(raw.dft) ? `${raw.dft[0]} ${SPORT.name} draft, #${raw.dft[1]}` : '';
-  const lines = [body, raw.col ? esc(raw.col) : '', draft].filter(Boolean);
+  const draft = raw.dft === 0 ? 'Undrafted' : Array.isArray(raw.dft) ? `Drafted ${ordinal(raw.dft[1])} in ${raw.dft[0]}` : '';
+  const lines = [body, draft].filter(Boolean);
   return lines.length ? `<p class="pc-bio">${lines.map(l => `<span>${l}</span>`).join('')}</p>` : '';
 }
 

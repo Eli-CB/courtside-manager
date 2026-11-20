@@ -176,9 +176,9 @@ class Season(unittest.TestCase):
 
 class Bio(unittest.TestCase):
     """The player card's bio, from NBA.com's player list"""
-    def test_height_weight_college_and_draft(self):
+    def test_height_weight_and_draft(self):
         r = {'HEIGHT': '6-6', 'WEIGHT': '195', 'COLLEGE': 'Kentucky', 'DRAFT_YEAR': 2018, 'DRAFT_ROUND': 1, 'DRAFT_NUMBER': 11}
-        self.assertEqual(D.nba_bio(r), {'ht': 78, 'wt': 195, 'col': 'Kentucky', 'dft': [2018, 11]})
+        self.assertEqual(D.nba_bio(r), {'ht': 78, 'wt': 195, 'dft': [2018, 11]})  # (no college: the card doesn't show it)
 
     def test_undrafted_and_blanks(self):
         r = {'HEIGHT': '6-10', 'WEIGHT': None, 'COLLEGE': '      ', 'DRAFT_YEAR': None, 'DRAFT_ROUND': None, 'DRAFT_NUMBER': None}

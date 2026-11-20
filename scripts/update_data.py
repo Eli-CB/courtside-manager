@@ -577,12 +577,12 @@ def load_previous():
         return {}
 
 
-BIO_KEYS = ('ht', 'wt', 'col', 'dft')
+BIO_KEYS = ('ht', 'wt', 'dft')
 
 
 def nba_bio(r):
-    """The player card's bio from NBA.com's player list: height in inches, weight in pounds, his college or club before the
-    NBA, his NBA draft [year, overall pick] (0: undrafted). Blanks left out."""
+    """The player card's bio from NBA.com's player list: height in inches, weight in pounds, his NBA draft [year, overall
+    pick] (0: undrafted). Blanks left out. No college: the card doesn't show it (the owner's ask, Nov 20, 2026)."""
     out = {}
     m = re.match(r'^(\d+)-(\d+)$', str(r.get('HEIGHT') or '').strip())
     if m:
@@ -590,9 +590,6 @@ def nba_bio(r):
     w = str(r.get('WEIGHT') or '').strip()
     if w.isdigit():
         out['wt'] = int(w)
-    col = (r.get('COLLEGE') or '').strip()
-    if col and col.lower() != 'none':
-        out['col'] = col
     if r.get('DRAFT_YEAR') and r.get('DRAFT_NUMBER'):
         out['dft'] = [int(r['DRAFT_YEAR']), int(r['DRAFT_NUMBER'])]
     elif out:  # (a list that has him but no draft: he wasn't drafted)
