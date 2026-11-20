@@ -255,7 +255,7 @@ async function sharePad(tall = 5000) {
 // mark: tid -> 'top' | 'bottom' | '' }.
 // An item: { label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's numbers
 // are a game of), score: [number, unit] }, one naming players { faces }, Passport { flags: a row of country codes a team },
-// a tied Homer { logos: real teams }
+// a tied Homer { logos: real teams }, a team award's standout { aside: its own line, lighter }
 async function shareCanvas(H) {
   const items = H.items, games = H.games || [];
   const K = await sharePad(900 + sum(items.map(it => (it.p ? 400 : 340))) + games.length * 100);
@@ -304,11 +304,14 @@ async function shareCanvas(H) {
     const clubs = (it.logos || []).slice(0, 3).map(t => clubIms.get(t)).filter(Boolean), lg = 16;
     const fw = faces.length ? fd + (faces.length - 1) * step + 28 : rows.length ? flagsW + 28 : clubs.length ? clubs.length * (fd + lg) - lg + 28 : 0;
     const tx = x0 + 40, tw = x0 + w - 32 - fw - tx;
-    const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), block = 40 + lines.length * 44 - 8;
+    // (its aside on lines of its own under them, smaller and gray: as a player's numbers)
+    const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), aside = it.aside ? lay(wordUnits(htmlRuns(it.aside).map(([t]) => [t, 'm'])), tw, 27) : [];
+    const block = 40 + lines.length * 44 - 8 + (aside.length ? aside.length * 40 + 2 : 0);
     const h = Math.max(block + 64, faces.length || clubs.length ? fd + 60 : 0, rows.length ? flagsH + 60 : 0, 148), ty = y + (h - block) / 2;
     round(x0, y, w, h, 28, C.card);
     labelText(it, tx, ty, tw);
     drawLay(lines, tx, ty + 40, 31, 44);
+    if (aside.length) drawLay(aside, tx, ty + 40 + lines.length * 44 + 2, 27, 40);
     faces.forEach((f, i) => photo(f, x0 + w - 32 - fd - (faces.length - 1 - i) * step, y + (h - fd) / 2, fd, C.card));
     rows.forEach((r, j) => r.forEach((im, i) => {
       const fx = x0 + w - 32 - (r.length - i) * fgw - (r.length - 1 - i) * 8, fy = y + (h - flagsH) / 2 + j * (fgh + 12);

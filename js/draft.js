@@ -193,11 +193,12 @@ function draftAwardKit() {
       text: `${and(winners.map(t => fxTeamName(t.tid)))}${winners.length > 1 ? ' tied' : ''}${st}`, detail: breakdown(label, head, rows), ...more,
     });
   };
-  // Each winner's player who stands out (its quickest pick, its youngest player...): named after the award's line and
-  // shown as a face on its card (the owner's ask). pick: a winner -> { p, v } (v: what's said in brackets)
+  // Each winner's player who stands out (its quickest pick, its youngest player...): shown as a face on its card (the
+  // owner's ask) and named on a line of its own under the award's, in the lighter text (aside; the owner's ask, Nov 2026:
+  // as a player award's numbers), after it in the shared text. pick: a winner -> { p, v } (v: what's said in brackets)
   const standout = (said, winners, word, pick) => {
-    const ps = winners.map(pick), line = name => `; ${word}: ${and(ps.map(y => `${name(y.p)} (${y.v})`))}`;
-    return [[`${said}${line(who)}`, `${said}${line(p => lastName(p.name))}`], { faces: ps.map(y => y.p) }];
+    const ps = winners.map(pick), list = name => and(ps.map(y => `${name(y.p)} (${y.v})`));
+    return [[said, `${said}; ${word}: ${list(p => lastName(p.name))}`], { faces: ps.map(y => y.p), aside: `${word[0].toUpperCase()}${word.slice(1)}: ${list(who)}` }];
   };
   // the teams on top by f (then by g on a tie), or none when the top isn't worth an award
   const best = (list, f, g = () => 0) => {
@@ -282,7 +283,7 @@ function draftGlassAward(squads, { row, teamWho, teamAward, standout, best, tent
     const worst = worstOf(t);
     return row(teamWho(t), `most: ${named(worst.x.p)}, ${perSeason(worst)} a season`, `${Math.round(t.avg)} a season`);
   }).join('');
-  const [said, more] = standout(`: their players missed ${Math.round(won[0].avg)} games a season, the last two seasons`, won, 'most', t => { const w = worstOf(t); return { p: w.x.p, v: `${perSeason(w)} a season` }; });
+  const [said, more] = standout(`: their players missed ${Math.round(won[0].avg)} games a season, the last two seasons`, won, 'most missed', t => { const w = worstOf(t); return { p: w.x.p, v: `${perSeason(w)} a season` }; });
   teamAward('Glass', won, said,
     `Games each team's players (picks and keepers) missed a season, the last two seasons (${esc(seasons[1])} and ${esc(seasons[0])}). Rookies have none to count.`, rows, more);
 }

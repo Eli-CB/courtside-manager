@@ -3371,7 +3371,7 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     assert.equal(get('Fall').p.nbaId, b3.id);
     assert.ok(get('Fall').detail.html.includes('>8 late</b>'));
     // Glass: B's picks missed (42 + 42 + 82 + 82 + 0 + 0) / 6 = 41 a season; its most, the one out both years, named and on its card
-    assert.equal(get('Glass').text, `${app.fxTeamName(B)}: their players missed 41 games a season, the last two seasons; most: ${app.lastName(b2.name)} (82 a season)`);
+    assert.equal(get('Glass').text, `${app.fxTeamName(B)}: their players missed 41 games a season, the last two seasons; most missed: ${app.lastName(b2.name)} (82 a season)`);
     assert.deepEqual(Array.from(get('Glass').faces, p => p.nbaId), [b2.id]);
     const glassRows = get('Glass').detail.html.split('<li>').slice(1);
     assert.deepEqual(Array.from(glassRows, x => x.match(/data-team="([^"]+)"/)[1]), [B, C, A], 'B 41, C 6 (its rookie left out), A 2');
@@ -3452,9 +3452,12 @@ test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (
   // by the average (the owner's ask: one number), the pause in it; the winner's quickest (longest) pick named and its face on the card
   assert.equal(get('Trigger Finger').text, `${app.fxTeamName(A)}: their picks took 5 seconds on average; quickest: ${app.lastName(r[0].name)} (5 s)`);
   assert.equal(get('Clock Milker').text, `${app.fxTeamName(B)}: their picks took 200 seconds on average; longest: ${app.lastName(r[7].name)} (400 s)`);
+  // on the card the player has a line of his own under the award's, in the lighter text (the owner's ask)
+  assert.ok(!get('Trigger Finger').html.includes('quickest'));
+  assert.match(app.standoutCard(get('Trigger Finger')), new RegExp(`<div class="rx-text">[^]*</div><div class="rx-aside">Quickest: <button[^>]*data-nba="${r[0].id}"[^>]*>[^<]+</button> [(]5 s[)]</div>`));
   assert.deepEqual(Array.from(get('Trigger Finger').faces, p => p.nbaId), [r[0].id]);
   assert.deepEqual(Array.from(get('Clock Milker').faces, p => p.nbaId), [r[7].id]);
-  assert.ok(get('Clock Milker').html.includes(`data-nba="${r[7].id}"`), 'his name opens his card');
+  assert.ok(get('Clock Milker').aside.includes(`data-nba="${r[7].id}"`), 'his name (on the line under the award) opens his card');
   const rows = get('Clock Milker').detail.html.split('<li>').slice(1);
   assert.deepEqual(Array.from(rows, x => x.match(/data-team="([^"]+)"/)[1]), [B, C, A], 'slowest first');
   assert.match(rows[0], new RegExp(`longest: <button[^>]*data-nba="${r[7].id}"[^>]*>[^<]+</button>, 400 s</div>.*>200 s</b>`));

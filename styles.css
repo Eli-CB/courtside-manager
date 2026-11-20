@@ -559,6 +559,8 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rx-note, .rx-player { align-items: center; }
 .rx-text { margin-top: 3px; font-size: .92rem; line-height: 1.45; }
 .rx-text .pname { font-size: inherit; }
+.rx-aside { margin-top: 4px; font-size: .82rem; color: var(--muted); } /* as a player award's numbers (.rx-stats) */
+.rx-aside button.link-btn.pname:not(:hover) { color: inherit; } /* (gray too, orange on hover as every name) */
 .rx-faces { display: flex; flex: none; margin-right: 16px; }
 .rx-faces > .hs { outline: 3px solid var(--surface); }
 .rx-faces > .hs + .hs { margin-left: -10px; }
