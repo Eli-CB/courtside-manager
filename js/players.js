@@ -234,7 +234,7 @@ function perfWhenLine({ football, range, proj, avg, weekly, perWeek, dates, day 
   const today = todayIso(), yesterday = addDays(today, -1);
   const updated = range === 'day' || range === 'last' || avg ? '' : live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>`
     : live.at ? ` · updated ${fmtTime(live.at)}` : '';
-  return proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${basisLabel()} stats ${infoBtn('projection')}` : (weekly || perWeek ? `${fmtDay(dates[0])}${dates.length > 1 ? ` – ${fmtDay(dates[dates.length - 1])}` : ''}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
+  return proj ? 'Sleeper\'s projections for this week, in your league\'s scoring' : football && avg ? 'This season' : avg ? `${basisLabel()} · per game` : (weekly || perWeek ? `${fmtDay(dates[0])}${dates.length > 1 ? ` – ${fmtDay(dates[dates.length - 1])}` : ''}${perWeek ? ' · per game' : ''}` : `${day === yesterday ? 'Last night' : day === today ? 'Today' : ''} ${fmtDay(day)}`.trim()) + updated;
 }
 
 // Who has each player now (today's rosters): owner, data id -> team id; spot, data id -> his roster item (st, slot). A
