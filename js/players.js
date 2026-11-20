@@ -702,7 +702,8 @@ function showPlayerDetail(nbaId) {
   const statCols = [...CS, VAL].map(() => '<col>').join(''); // (the same stat columns in both tables, so they line up)
   const goalieTile = () => {
     const left = raw.inj && raw.inj.status === 'Out' ? 0 : expectedGames({ ...raw, nbaId: raw.id }, thisWeek.filter(d => d >= todayIso() && !gameFinal(raw, d)));
-    return `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? `about ${fmt(left, 1)}` : '—'}</div><div class="pc-rank">${t ? `of ${t.left} games` : ''}</div></div>`;
+    // (none: a plain 0, not "about 0.0"; one game left: "of 1 game")
+    return `<div class="proj" data-tip="${esc("From his share of his team's recent starts, and who played the night before")}"><div class="k">Starts left this week</div><div class="v">${t ? (left < 0.05 ? '0' : `about ${fmt(left, 1)}`) : '—'}</div><div class="pc-rank">${t ? (t.left ? `of ${t.left} game${t.left === 1 ? '' : 's'}` : 'no games left') : ''}</div></div>`;
   };
   const footballTile = () => { const p = playerFromRaw(raw); return `<div class="proj"><div class="k">Projected this week</div><div class="v">${gamesIn(p, thisWeek) ? fmt(footballPts(p, thisWeek), 1) : 'Bye'}</div></div>`; };
   $('#detailBody').innerHTML = `

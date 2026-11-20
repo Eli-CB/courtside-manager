@@ -663,6 +663,15 @@ button.dr-award-btn:hover { text-decoration: underline; text-underline-offset: 2
 .pf-more { position: sticky; left: 0; display: inline-block; padding: 10px 8px; }
 .perf-owner.mine { color: var(--accent); font-weight: 600; } /* your team's name: orange */
 .perf-owner.opp { color: var(--text); font-weight: 700; } /* this matchup's opponent: bold */
+/* phones: the lineup dot drawn at the end of the team's name, glued to its last word by no-break spaces (after the name, a
+   name that filled its line, "Tatum Tots" or a long one that wraps, took the dot to a line of its own); the real one kept,
+   out of sight, for screen readers */
+@media (max-width: 640px) {
+  .perf-table .pmeta > .perf-owner + .lu-ico { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .perf-table .pmeta > .perf-owner:has(+ .lu-ico) > .team-link::after { content: "\00a0\00a0\00a0\00a0"; background: no-repeat right center / 8px 8px; }
+  .perf-table .pmeta > .perf-owner:has(+ .lu-ico.active) > .team-link::after { background-image: radial-gradient(circle closest-side, var(--text) 92%, transparent); }
+  .perf-table .pmeta > .perf-owner:has(+ .lu-ico.bench) > .team-link::after { background-image: radial-gradient(circle closest-side, transparent 58%, var(--muted) 64%, var(--muted) 92%, transparent); }
+}
 @media (max-width: 640px) { .perf-table .pf-name { min-width: 150px; max-width: 156px; } .perf-table .pf-name .pmeta, .perf-table .pf-name .pmeta:has(> .perf-owner) { display: block; white-space: normal; } .pmeta:has(> .perf-owner) > .perf-owner, .pmeta:has(> .perf-owner) > .perf-owner > .team-link { margin-right: 0; white-space: normal; overflow: visible; vertical-align: baseline; } .pmeta:has(> .perf-owner) > .lv-dot { bottom: 0; } .perf-table .pf-name .hs { display: none; } } /* phones: no photo, so the stats get the room; badges wrap instead of hiding */
 
 .btn {
@@ -1127,7 +1136,16 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; backgro
   .board:not(.stats) .bmeta { grid-template-columns: auto 2.2em; justify-content: start; }
   .board:not(.stats) .bmeta.fb { grid-template-columns: minmax(0, 1fr) auto; }
   .fb-day { display: none; } /* a phone's column only fits the opponent */
-  .cat-table .pbar-cell { min-width: 190px; }
+  .cat-table .pbar-cell { min-width: 170px; }
+  /* (the suggested lineup's: tight columns, and each category's word under its bars, so Win chance fits a 375 px phone
+     without sliding sideways; its header just "Win chance", the bars' Now / New say the rest) */
+  .cat-table th, .cat-table td { padding-inline: 5px; }
+  .cat-table :is(th, td):first-child { padding-left: 0; }
+  .cat-table :is(th, td):last-child { padding-right: 0; }
+  .cat-table :is(th, td):not(:last-child) { width: 1px; white-space: nowrap; } /* (as narrow as their numbers, 3PM with its lock: the bars take what's left) */
+  .cat-table .pbar-cell:has(.pbars) { min-width: 0; flex-direction: column; align-items: stretch; gap: 4px; }
+  .cat-table .pbar-cell:has(.pbars) > .badge { align-self: flex-start; }
+  .cat-table .pbar-row { grid-template-columns: 28px 1fr 41px; gap: 5px; } /* ("100%" in bold) */
   .swap-net { margin-left: 0; }
 }
 
@@ -1585,6 +1603,9 @@ body.landing::before {
 }
 
 tr.me-row td { background: var(--accent-soft); }
+/* Standings, phones: the numbers' columns tight, so a team's name gets the room (it wrapped onto three lines, and the table
+   ran 3 px past the screen) */
+@media (max-width: 640px) { .st-table th, .st-table td { padding-inline: 5px; } .st-table :is(th, td):first-child { padding-left: 0; } .st-table :is(th, td):last-child { padding-right: 0; } }
 
 /* ---------- Awards ---------- */
 .awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; }

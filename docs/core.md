@@ -32,3 +32,5 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
 ## Gotchas
 - A line cut with `text-overflow: ellipsis` can't cut into a button (`teamLink`, `playerBtn`, `teamBtn`): one that doesn't fit turns into a lone "…" (the Players tab's
   long team names did). Give the button its own ellipsis and the room left over, as `.pmeta:has(> .perf-owner)` in styles.css does.
+- A mark after a name that wraps (a dot, an icon) can land alone on a line: the browser breaks between a word and an inline-block, and a
+  button that wraps fills its line. Draw it as the name's `::after` behind no-break spaces, as the Players tab's lineup dot on phones.

@@ -135,7 +135,7 @@ function viewStandings() {
   const S = L ? seasonLineups(L) : null; // (the season's lineups and games: Categories won and Season totals)
   return `
   <div class="card">
-    ${rows.length ? `<div class="table-wrap"><table>
+    ${rows.length ? `<div class="table-wrap"><table class="st-table">
       <thead><tr><th class="num">#</th><th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">GB</th>${rows.some(r => r.pf != null) ? '<th class="num">Pts for</th>' : ''}</tr></thead>
       <tbody>${rows.map(r => {
         const g = r.w + r.l + r.t;

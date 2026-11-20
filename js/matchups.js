@@ -510,7 +510,7 @@ function matchupBoard(ctx) {
 
 function catCompareTable(ctx, changed) {
   return `<div class="table-wrap"><table class="cat-table">
-    <thead><tr><th>Cat</th><th class="num">Them</th><th class="num">${changed ? 'As set' : 'You'}</th>${changed ? '<th class="num">Suggested</th>' : ''}<th>Win chance${changed ? ': now vs suggested' : ''}</th></tr></thead>
+    <thead><tr><th>Cat</th><th class="num">Them</th><th class="num">${changed ? 'As set' : 'You'}</th>${changed ? '<th class="num">Suggested</th>' : ''}<th>Win chance${changed ? '<span class="hide-sm">: now vs suggested</span>' : ''}</th></tr></thead>
     <tbody>${ctx.catsBest.map((c, i) => {
       const s = ctx.catsSet[i];
       const [lbl, cls] = oddsLabel(c.p);
