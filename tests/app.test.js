@@ -3252,6 +3252,12 @@ test("a team's card has its record: its finals, then today's game once it's over
     assert.ok(ps.length > 1 && each.every(n => n > 0), `the test league has playoffs: ${each}`);
     assert.match(els['#detailTitle'].innerHTML, new RegExp(`<span class="dt-bio dt-team-rec dt-team-po"[^>]*>Playoff Games: <span class="dt-rec">${each.join('-')}</span></span>$`), 'Playoff Games: one number a period');
     assert.doesNotMatch(els['#detailTitle'].innerHTML.replace(/<[^>]*>/g, ''), /\bPHI\b/, 'without its code: the full name says it');
+    // its players' cards have them too, a tile after Games next period
+    const player = app.NBA.players.find(r => r.team === tri);
+    app.showPlayerDetail(player.id);
+    const card = els['#detailBody'].innerHTML;
+    assert.match(card, new RegExp(`<div class="k">Playoff games</div><div class="v">${each.join('-')}</div>`), "a player's card: his team's playoff games");
+    assert.ok(card.indexOf('Games next period') < card.indexOf('Playoff games') && card.indexOf('Playoff games') < card.indexOf('per game</div>'), 'between the games tiles and the value tiles');
     // tonight's game counts once it's over; a preseason game (not on its schedule) never does
     live.games = [{ d: dates[3], home: 'ATL', away: tri, hs: 90, as: 95, state: 'in', period: 4 }, { d: '2026-10-05', home: tri, away: 'ORL', hs: 80, as: 120, state: 'post', period: 4 }];
     assert.equal(app.teamRecord(tri), '2-1', 'not while it is on');

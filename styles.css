@@ -480,6 +480,9 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
   .pc-tiles > .proj .k { font-size: .64rem; line-height: 1.25; } /* (> .proj: past .proj .k, further down) */
   .pc-tiles > .proj:not(.pc-val) .k { min-height: 2.5em; }
   .pc-tiles > .proj .v { font-size: .98rem; white-space: nowrap; }
+  /* (Playoff games: a row of its own between them, its label and numbers on one line) */
+  .pc-tiles > .proj.pc-po { flex-basis: 100%; display: flex; align-items: baseline; gap: 8px; }
+  .pc-tiles > .proj.pc-po .k { min-height: 0; }
 }
 .link-btn.pp-clear:hover, .link-btn.quiet:hover { color: var(--text); text-decoration: underline; }
 .seg button:disabled { opacity: .45; cursor: default; }

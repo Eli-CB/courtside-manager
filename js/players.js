@@ -718,6 +718,11 @@ function showPlayerDetail(nbaId) {
           const next = weekShifts().filter(x => x > 0)[0], dates = next ? matchDates(weekStartAt(next)) : [];
           return `<div class="proj"><div class="k">Games next period</div><div class="v">${dates.length ? gamesIn(playerFromRaw(raw), dates) : '—'}</div></div>`;
         })()}
+        ${isFootball() ? '' : (() => {
+          // his team's games in each of the league's playoff periods still to play, as on its card (none once they're over)
+          const P = playoffDays(), slate = P && playoffSlate(raw.team, P);
+          return P ? `<div class="proj pc-po" data-tip="${esc(`His team's games in each playoff period${P.started ? ' still to play (this one: the games it has left)' : ''}`)}"><div class="k">Playoff games</div><div class="v">${slate && slate.length ? slate.join('-') : '—'}</div></div>` : '';
+        })()}
         ${(() => {
           // his value, and under it his rank among every NBA player this season (per game: regulars only)
           const R = valueRanks(), per = R.per.get(raw.id), tot = R.tot.get(raw.id);
