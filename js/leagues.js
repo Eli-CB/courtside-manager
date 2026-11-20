@@ -272,10 +272,14 @@ function landPreview() {
       <div class="lp-foot"><span>Projected <b>6–3</b></span><span class="lp-live">Live</span></div>
     </div></div>`;
 }
-// The headline's sport takes each in turn (a screen reader hears them all, in one line). Its CSS animation ticks
-// (land-tick): each loop the word rolls away for the next, and the box eases to the next word's width so "week" follows it.
+// The headline's sport takes each in turn (a screen reader hears them all, in one line), each with its line icon and its own
+// way in (styles.css: the ball dribbles in, the puck slides in on the ice). Its CSS animation ticks (land-tick): each loop
+// the word rolls away for the next, and the box eases to the next one's width so "week" follows it.
 // The event, not a timer: it stops with the page, waits in a background tab, and never fires in the tests.
-const LAND_SPORTS = ['basketball', 'hockey'];
+const LAND_SPORTS = [ // (solid, to stand beside the headline's heavy type: the ball's seams and the puck's rim cut out in the page's color)
+  ['basketball', '<circle cx="12" cy="12" r="10"/><path class="ls-seam" d="M12 2v20M2 12h20M4.9 4.9a10 10 0 0 1 0 14.2M19.1 4.9a10 10 0 0 0 0 14.2"/>'],
+  ['hockey', '<path class="ls-fx" d="M-11 8h6M-14 12.5h9M-10 17h5"/><path d="M2 9v6c0 2.2 4.5 4 10 4s10-1.8 10-4V9c0-2.2-4.5-4-10-4S2 6.8 2 9z"/><path class="ls-seam" d="M2.6 10.4c1.4 1.5 5 2.6 9.4 2.6s8-1.1 9.4-2.6"/>'],
+];
 document.addEventListener('animationiteration', e => {
   const box = e.target;
   if (e.animationName !== 'land-tick' || !box.classList || !box.classList.contains('land-sport')) return;
@@ -283,7 +287,7 @@ document.addEventListener('animationiteration', e => {
   box.style.width = `${box.offsetWidth / em}em`; // (from auto, which doesn't ease, to its own width first)
   void box.offsetWidth;
   box.style.width = `${next.offsetWidth / em}em`;
-  next.style.transition = 'none'; // (back below the line at once, to roll in from there)
+  next.style.transition = 'none'; // (out of its rolled-away place at once, to come in its own way)
   next.classList.remove('out');
   void next.offsetWidth;
   next.style.transition = '';
@@ -298,7 +302,7 @@ function landHome(form) {
     <section class="land-hero">
       <div class="land-copy">
         <p class="land-pill">Free forever · No sign-up</p>
-        <h1><span class="sr-only">Plan your fantasy ${LAND_SPORTS.join(' or ')} week</span><span aria-hidden="true">Plan your fantasy<br><span class="land-sport">${LAND_SPORTS.map((s, i) => `<span${i ? '' : ' class="on"'}>${s}</span>`).join('')}</span> week</span></h1>
+        <h1><span class="sr-only">Plan your fantasy ${LAND_SPORTS.map(s => s[0]).join(' or ')} week</span><span aria-hidden="true">Plan your fantasy<br><span class="land-sport">${LAND_SPORTS.map(([s, icon], i) => `<span data-sport="${s}"${i ? '' : ' class="on"'}>${lineIcon(icon, 'ls-ico')}<span class="ls-w">${s}</span></span>`).join('')}</span> week</span></h1>
         <p class="land-lead">Your odds for this week's matchup, the best starters, how your categories stack up and a recap the whole league can share.</p>
         <div class="land-connect">${form}</div>
         <div class="land-alt">

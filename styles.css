@@ -1338,14 +1338,42 @@ body.landing::before {
 .land-pill { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 4px 12px 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .78rem; font-weight: 500; color: var(--muted); }
 .land-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
 .land-home h1 { font-size: clamp(2.1rem, 1.3rem + 2.4vw, 3.1rem); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; margin: 0 0 14px; }
-/* the headline's sport, one at a time on its own line (so the lines never re-wrap): the old word rolls up and away as the
-   next rolls up from below, and the box eases to the new word's width (leagues.js, on each loop of land-tick) */
-.land-sport { display: inline-grid; perspective: 8em; animation: land-tick 2.6s linear infinite; transition: width .45s cubic-bezier(.3, 0, .2, 1); }
+/* the headline's sport, one at a time on its own line (so the lines never re-wrap), its icon before it: the old one rolls up
+   and away, the box eases to the new one's width (leagues.js, on each loop of land-tick), and the new one comes in its own way:
+   the ball drops in and dribbles to a stop, the puck slides in on the ice with the word gliding behind it */
+.land-sport { display: inline-grid; perspective: 8em; animation: land-tick 3s linear infinite; transition: width .45s cubic-bezier(.3, 0, .2, 1); }
 .land-sport > span { grid-area: 1 / 1; justify-self: start; white-space: nowrap; backface-visibility: hidden; transition: transform .5s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, filter .3s ease; }
-.land-sport > span.on { transition-duration: .6s, .45s, .45s; transition-delay: .16s; } /* (the new word a beat later, once "week" is on its way) */
-.land-sport > span:not(.on) { opacity: 0; transform: translateY(.5em) rotateX(-80deg); filter: blur(4px); }
-.land-sport > span.out { transform: translateY(-.5em) rotateX(80deg); }
+.land-sport > span.on { transition: opacity .2s ease .08s; }
+.land-sport > span:not(.on) { opacity: 0; }
+.land-sport > span.out { transform: translateY(-.5em) rotateX(80deg); filter: blur(4px); }
+.ls-ico { display: inline-block; width: .82em; height: .82em; margin-right: .2em; vertical-align: -.08em; overflow: visible; fill: currentColor; }
+.ls-seam { fill: none; stroke: var(--bg); stroke-width: 1.6; stroke-linecap: round; }
+.ls-fx { opacity: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; } /* (the puck's speed lines, seen only as it slides) */
+.ls-w { display: inline-block; }
 @keyframes land-tick { to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  [data-sport="basketball"].on .ls-ico { animation: ls-dribble-x .95s .05s cubic-bezier(.2, .6, .35, 1) both, ls-dribble .95s .05s both; }
+  [data-sport="basketball"].on .ls-w { animation: ls-rise .5s .3s cubic-bezier(.3, 1.5, .5, 1) both; }
+  [data-sport="hockey"].on .ls-ico { animation: ls-slide .65s .05s cubic-bezier(.15, .85, .25, 1) both; }
+  [data-sport="hockey"].on .ls-fx { animation: ls-fx .65s .05s ease-in both; }
+  [data-sport="hockey"].on .ls-w { animation: ls-glide .55s .12s cubic-bezier(.2, .8, .3, 1) both; }
+}
+/* the ball dribbles in from the left, each bounce lower: falling eases in, rising eases out, a squash at each bounce, a spin that runs down
+   (kept under the line above: its highest bounce stays below "Plan") */
+@keyframes ls-dribble-x { from { translate: -1.8em 0; } to { translate: 0 0; } }
+@keyframes ls-dribble {
+  0% { transform: translateY(-.45em) scale(1, 1) rotate(-300deg); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  30% { transform: translateY(.04em) scale(1.15, .84) rotate(-120deg); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  52% { transform: translateY(-.28em) scale(.97, 1.03) rotate(-50deg); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  70% { transform: translateY(.03em) scale(1.08, .91) rotate(-15deg); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  84% { transform: translateY(-.1em) scale(1, 1) rotate(-5deg); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  94% { transform: translateY(0) scale(1.03, .97) rotate(-1deg); animation-timing-function: ease-out; }
+  100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+}
+@keyframes ls-rise { from { opacity: 0; transform: translateY(.4em); } }
+@keyframes ls-slide { 0% { transform: translateX(-3em); } 75% { transform: translateX(.1em); } 100% { transform: translateX(0); } }
+@keyframes ls-fx { 0%, 45% { opacity: .55; } 100% { opacity: 0; } }
+@keyframes ls-glide { 0% { opacity: 0; transform: translateX(-.7em) skewX(-16deg); } 65% { opacity: 1; transform: translateX(.05em) skewX(4deg); } 100% { transform: translateX(0) skewX(0deg); } }
 @media (prefers-reduced-motion: reduce) { /* no roll: the width jumps, the old word goes at once and the new one fades in */
   .land-sport { transition: none; }
   .land-sport > span.on { transition: opacity .4s ease; }
