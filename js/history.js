@@ -692,7 +692,7 @@ function pastStarters(L, G, tid, r, teams) {
 // ----- Season awards -----
 // Every award comes from Fantrax's weekly lineups and the season's games (a past season's archived game
 // log, or this season's box scores). Without both there are no awards.
-// ----- What made a team's award number (Waiver Wire Wizard, Unc Status), opened from its name -----
+// ----- What made a team's award number (Waiver Wire Wizard, Old), opened from its name -----
 const awardDetails = new Map(); // "award|team" -> { title, html }, written as the awards draw
 function awardRows(list, val, meta) {
   return `<ul class="aw-break">${list.map(p => `<li><div class="bplayer">${headshot({ nbaId: p.nba, name: p.name }, hsPx(32, 28))}<div class="bmain">${playerBtn(p.nba, p.name)}<div class="muted small">${meta(p)}</div></div></div><b class="aw-break-v">${val(p)}</b></li>`).join('')}</ul>`;
@@ -896,7 +896,7 @@ function seasonAwards() {
     ...(cats.length ? [{ title: 'Biggest punt', info: 'awPunt', list: ranked('punt', 1, T => T.punt.cat, T => `${fmt(-T.punt.z, 1)} spreads below average`).sort((a, b) => a.T.punt.z - b.T.punt.z) },
       { title: 'Even Steven', info: 'awSteven', list: ranked('spread', -1, T => `${fmt(T.spread, 2)} spread`, T => { const order = [...cats].sort((a, b) => T.z[b.key] - T.z[a.key]); return `best: ${order[0].label} · worst: ${order[order.length - 1].label}`; }) }] : []),
     { title: 'Fan Boy', info: 'awFan', detail: fanDetail, list: ranked('fanShare', 1, T => `${Math.round(T.fanShare * 100)}% ${T.fan.teams[0].team}`, T => `${T.fan.teams[0].n} of ${T.fan.n} starts`) },
-    { title: 'Unc Status', info: 'awUnc', detail: uncDetail, list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`, T => (T.oldest ? `oldest regular: ${T.oldest.name} (${Math.floor(T.oldest.age)}, ${T.oldest.weeks} wks)` : '')) },
+    { title: 'Old', info: 'awUnc', detail: uncDetail, list: ranked('age', 1, T => `${fmt(T.age, 1)} yrs`, T => (T.oldest ? `oldest regular: ${T.oldest.name} (${Math.floor(T.oldest.age)}, ${T.oldest.weeks} wks)` : '')) },
   ].filter(a => a.list.length);
 }
 

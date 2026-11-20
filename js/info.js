@@ -196,7 +196,7 @@ const INFO = {
     <p>Each team's season totals (every game its starters played, week by week, the same numbers as the Standings tab's Season totals), compared with the league's other teams category by category, in team-to-team spreads. The award goes to the single category furthest below the league average.</p>`],
   awSteven: ['Even Steven', `
     <p>Each team's season totals (every game its starters played, week by week, the same numbers as the Standings tab's Season totals), compared with the league's other teams category by category, in team-to-team spreads. The most balanced team has the smallest spread between its best and worst categories.</p>`],
-  awUnc: ['Unc Status', `
+  awUnc: ['Old', `
     <p>The oldest <b>starting lineups</b>. Every week, Fantrax's rosters say who each team started; each starter's age that week is averaged over all of the team's starter-weeks, so a player who started 20 weeks counts 20 times as much as one who started once. Bench and IR players don't count.</p>
     <p>Ages come from ESPN birth dates. Players without one on record (mostly those no longer in the NBA) are left out.</p>
     <p>Tap a team's name to see the players who moved its average most.</p>`],

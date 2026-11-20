@@ -540,7 +540,7 @@ test('Street Clothes counts only games starters missed while starting', async ()
   assert.ok(all.every(p => p.games <= p.sched && p.weeks >= 1), 'missed out of his team\'s games while starting');
 });
 
-test('Unc Status averages the ages of the players each team started', async () => {
+test('Old averages the ages of the players each team started', async () => {
   const P = await app.loadSeason('czqgnyozmf2tbr93');
   const ages = app.startersAge(P.league);
   const teams = Object.values(ages);
@@ -555,7 +555,7 @@ test('Unc Status averages the ages of the players each team started', async () =
   }
 });
 
-test('Awards: a team name in Waiver Wire Wizard and Unc Status opens its breakdown', async () => {
+test('Awards: a team name in Waiver Wire Wizard and Old opens its breakdown', async () => {
   await app.loadSeason('czqgnyozmf2tbr93');
   await app.loadGameLog('2025-26');
   const ui = app.get('ui');
@@ -563,7 +563,7 @@ test('Awards: a team name in Waiver Wire Wizard and Unc Status opens its breakdo
   let html;
   try { html = app.withSeason(() => app.viewAwards()); } finally { ui.season = null; }
   const keys = [...html.matchAll(/data-action="award-team" data-key="([^"]+)"/g)].map(m => m[1].replace(/&#39;/g, "'").replace(/&amp;/g, '&'));
-  assert.ok(keys.some(k => k.startsWith('Waiver Wire Wizard|')) && keys.some(k => k.startsWith('Unc Status|')));
+  assert.ok(keys.some(k => k.startsWith('Waiver Wire Wizard|')) && keys.some(k => k.startsWith('Old|')));
   assert.ok(keys.some(k => k.startsWith('Street Clothes|')));
   const dr = [...app.get('awardDetails').entries()].find(([k]) => k.startsWith('Best draft|'));
   assert.ok(dr, 'Best draft has one');
@@ -584,7 +584,7 @@ test('Awards: a team name in Waiver Wire Wizard and Unc Status opens its breakdo
   assert.ok(/Helped/.test(w.html) && /data-action="player-detail"/.test(w.html), 'the pickups that helped, each a player link');
   const st = [...D.entries()].find(([k]) => k.startsWith('Street Clothes|'))[1];
   assert.ok((st.html.match(/<li>/g) || []).length <= 10 && /out \d+ of \d+ · \d+ wk/.test(st.html), 'the starters who missed most');
-  const u = [...D.entries()].find(([k]) => k.startsWith('Unc Status|'))[1];
+  const u = [...D.entries()].find(([k]) => k.startsWith('Old|'))[1];
   assert.ok((u.html.match(/<li>/g) || []).length <= 10 && /\+\d\.\d\d yrs/.test(u.html), 'up to 10 players and how much each moved the average');
 });
 
@@ -3970,7 +3970,7 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     await new Promise(r => setTimeout(r, 30));
     const html = app.viewAwardsSoFar();
     assert.ok(!/No awards for Sleeper/.test(html), 'awards for Sleeper leagues');
-    assert.match(html, /Best manager|Waiver Wire Wizard|Unc Status/);
+    assert.match(html, /Best manager|Waiver Wire Wizard|Old/);
     if (html.includes('Street Clothes')) assert.match(html, /empty start/);
   } finally { ui.tab = 'dashboard'; app.get('state').fxTeam = null; }
 }));
@@ -4135,7 +4135,7 @@ test("Sleeper basketball: weeks before the site saw one end are estimates, marke
       await new Promise(r => setTimeout(r, 30));
       const aw = app.viewAwardsSoFar();
       assert.ok(!/aw-title">(Best manager|Week of the Year|Heartbreak Hotel)/.test(aw) && aw.includes('none yet'), 'none of the three, and the page says why');
-      assert.match(aw, /aw-title">(Street Clothes|Unc Status|Fan Boy)/, "the lineups' awards stay");
+      assert.match(aw, /aw-title">(Street Clothes|Old|Fan Boy)/, "the lineups' awards stay");
       // once the site has the total through week 1 (a read the week before), week 2's real score is the difference
       const t1 = Object.fromEntries(L.teams.map(t => [t.id, 100]));
       app.slpTotalsSave(L.id, { n: 1, pts: t1 });

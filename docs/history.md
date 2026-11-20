@@ -16,7 +16,7 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   Best draft (picks' games until first dropped, through trades, above replacement in cats), Best manager
   (actual wins vs all-play record), Waiver Wire Wizard (pickups' games while starting; trades excluded),
   Street Clothes (games starters missed while starting), Biggest punt / Even Steven (real season totals),
-  Unc Status (starters' ages, week-weighted), Steal / Bust of the Draft (one pick vs its rank over the season, Draft
+  Old (was Unc Status: starters' ages, week-weighted), Steal / Bust of the Draft (one pick vs its rank over the season, Draft
   tab's Season totals; keepers excluded), Week of the Year (best all-play week), Heartbreak Hotel (losses by one
   category; points: under 5% of the winner), Benchwarmer Blues (bench players' games), Fan Boy (biggest share of
   starts from one NBA team). Seasons never mix.
