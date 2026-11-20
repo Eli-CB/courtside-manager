@@ -5134,6 +5134,14 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   ui.tab = 'standings';
   assert.ok(a.needsLanding());
   assert.match(a.viewLanding(), /Explore a basketball demo league/);
+  // its rows, in order: the player cards' button opens his card in the demo, Trends is named under it, and the pictures'
+  // photos are only pictures (no tap to a card, as on the tabs)
+  const land = a.viewLanding();
+  assert.deepEqual([...land.matchAll(/class="lsh-tab">[^]*?<\/svg>([^<]+)<\/p>/g)].map(m => m[1]), ['Matchup', 'Plan Ahead', 'Player cards', 'Draft', 'Recap']);
+  assert.match(land, /data-tab="players" data-player="1628983"/);
+  assert.match(land, /data-tab="trends">Trends</);
+  assert.match(land, /Free · No sign-up/);
+  assert.ok(!/data-photo/.test(land));
   await a.actions['land-demo']();
   clearTimeout(a.get('live').timer);
   assert.ok(st.demo && st.fxTeam && st.players.length > 0, 'a team, not an empty league');

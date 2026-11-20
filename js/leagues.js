@@ -279,27 +279,30 @@ function landPreview() {
       <div class="lp-foot"><span>Projected <b>6–3</b></span><span class="lp-live">Live</span></div>
     </div></div>`;
 }
-/* ---------- A look inside: three tabs as they look, under the hero ---------- */
+/* ---------- A look inside: the tabs as they look, under the hero ---------- */
 // Made-up numbers, as landPreview's, drawn with each tab's own pieces (.mu-cats, .mu-chip, .game-pill, .lv-dot, the board's
 // .dr-cell and shade, the share picture's RC_IMG colors), so a restyle of a tab carries here. Each row's moment (a basket
 // going in, the picks coming in) plays once it's in view: landReveal puts .in on it. Its button opens that tab in the demo.
 const landFlip = (was, now) => `<span class="pv-sw"><span>${was}</span><span>${now}</span></span>`; // (a number before, then after the basket)
+// a player's round photo from the site's own sheet (his initials until it's in), by his NBA.com id; only a picture here, so
+// no tap to his card
+const landFace = (id, name, px) => headshot({ nbaId: id, name }, px).replace(/ data-photo="[^"]*"/, '');
 // [category, yours, theirs, who leads (1 you, -1 them), then after the basket: yours, who leads]: 4–5 down, then 5–4 up on PTS
 const LAND_LIVE_CATS = [['FG%', '.468', '.455', 1, '.474'], ['FT%', '.750', '.800', -1], ['3PM', '7', '6', 1, '8'], ['PTS', '99', '101', -1, '102', 1],
   ['REB', '41', '45', -1], ['AST', '22', '19', 1], ['STL', '6', '8', -1], ['BLK', '8', '5', 1], ['TO', '15', '12', -1]];
-// each side's players today: name, the game, and his line ([number, stat, number after the basket])
+// each side's players today: name, NBA.com id, the game, and his line ([number, stat, number after the basket])
 const LAND_LIVE_ROWS = [
-  [['V. Wembanyama', `<span class="gp-part">SAS 78 @ LAL 74</span> <span class="gp-part"><span class="lv-dot"></span>${landFlip('Q3 4:12', 'Q3 3:48')}</span>`, [['7/14', 'FG', '8/15'], ['3/4', 'FT'], ['1', '3PM', '2'], ['18', 'PTS', '21'], ['9', 'REB'], ['3', 'BLK']]],
-    ['J. Brunson', '<span class="gp-part">NYK 61 @ BOS 66</span> <span class="gp-part"><span class="lv-dot out"></span>Q3 9:30</span>', [['5/11', 'FG'], ['4/4', 'FT'], ['2', '3PM'], ['16', 'PTS'], ['6', 'AST'], ['2', 'TO']]]],
-  [['T. Maxey', 'PHI 118 @ MIA 109', [['11/22', 'FG'], ['6/6', 'FT'], ['4', '3PM'], ['32', 'PTS'], ['7', 'AST'], ['2', 'STL']], ' gp-w'],
-    ['K. Durant', 'HOU 102 @ DEN 111', [['9/17', 'FG'], ['5/5', 'FT'], ['3', '3PM'], ['26', 'PTS'], ['6', 'REB'], ['1', 'BLK']], ' gp-l']],
+  [['V. Wembanyama', 1641705, `<span class="gp-part">SAS 78 @ LAL 74</span> <span class="gp-part"><span class="lv-dot"></span>${landFlip('Q3 4:12', 'Q3 3:48')}</span>`, [['7/14', 'FG', '8/15'], ['3/4', 'FT'], ['1', '3PM', '2'], ['18', 'PTS', '21'], ['9', 'REB'], ['3', 'BLK']]],
+    ['J. Brunson', 1628973, '<span class="gp-part">NYK 61 @ BOS 66</span> <span class="gp-part"><span class="lv-dot out"></span>Q3 9:30</span>', [['5/11', 'FG'], ['4/4', 'FT'], ['2', '3PM'], ['16', 'PTS'], ['6', 'AST'], ['2', 'TO']]]],
+  [['T. Maxey', 1630178, 'PHI 118 @ MIA 109', [['11/22', 'FG'], ['6/6', 'FT'], ['4', '3PM'], ['32', 'PTS'], ['7', 'AST'], ['2', 'STL']], ' gp-w'],
+    ['K. Durant', 201142, 'HOU 102 @ DEN 111', [['9/17', 'FG'], ['5/5', 'FT'], ['3', '3PM'], ['26', 'PTS'], ['6', 'REB'], ['1', 'BLK']], ' gp-l']],
 ];
 function landLive() {
   const cell = (v, after, lead, leadAfter, me) => {
     const on = me ? lead > 0 : lead < 0, then = leadAfter == null ? on : me ? leadAfter > 0 : leadAfter < 0;
     return `<td class="${on ? 'mu-lead' : ''}${on !== then ? (then ? ' pv-gain' : ' pv-lose') : ''}">${after ? landFlip(v, after) : v}</td>`;
   };
-  const side = ([name, game, line, end = ''], right) => `<div class="pvl-p${right ? ' right' : ''}"><b>${name}</b><span class="game-pill${end}">${game}</span>
+  const side = ([name, id, game, line, end = ''], right) => `<div class="pvl-p${right ? ' right' : ''}"><span class="bplayer">${landFace(id, name, 28)}<b>${name}</b></span><span class="game-pill${end}">${game}</span>
     <span class="mu-chips">${line.map(([v, k, after]) => `<span class="mu-chip${after ? ' pv-flash' : ''}"><b>${after ? landFlip(v, after) : v}</b> ${k}</span>`).join('')}</span></div>`;
   return `<div class="pv-card pv-live" aria-hidden="true">
     <div class="pvl-seg"><span class="on">Today</span><span>Yesterday</span><span>This period</span></div>
@@ -329,16 +332,16 @@ function landBoard() {
     <div class="lp-foot"><span>Best pick <b>${best[0][0]} <span class="pos-good">${signed(best[0][1], 0)}</span></b></span><span>Worst <b>${best.at(-1)[0]} <span class="pos-bad">${signed(best.at(-1)[1], 0)}</span></b></span></div>
   </div>`;
 }
-// The Recap's picture as it goes to the league chat (recapCanvas in share.js), in its own colors, its photos as initials
+// The Recap's picture as it goes to the league chat (recapCanvas in share.js), in its own colors, with each award's photo
 const LAND_RECAP = [
-  ['Player of the period', '4 G, per game', 'V. Wembanyama', 'Alley Oops', [['29.5', 'PTS'], ['11.3', 'REB'], ['4.8', 'BLK'], ['.561', 'FG%']]],
-  ['Game of the period', '', 'J. Brunson', 'Bench Mob', [['44', 'PTS'], ['6', '3PM'], ['9', 'AST'], ['.684', 'FG%']]],
-  ['Bench regret', '', '', '', '<b>Sixth Men</b>: starting <b>D. Vassell</b> over <b>B. Hield</b> would have won 5–4'],
+  ['Player of the period', '4 G, per game', 'V. Wembanyama', 1641705, 'Alley Oops', [['29.5', 'PTS'], ['11.3', 'REB'], ['4.8', 'BLK'], ['.561', 'FG%']]],
+  ['Game of the period', '', 'J. Brunson', 1628973, 'Bench Mob', [['44', 'PTS'], ['6', '3PM'], ['9', 'AST'], ['.684', 'FG%']]],
+  ['Bench regret', '', '', 0, '', '<b>Sixth Men</b>: starting <b>D. Vassell</b> over <b>B. Hield</b> would have won 5–4'],
 ];
 function landRecap() {
-  const C = RC_IMG, card = ([award, per, name, team, line]) => `<div class="pvr-card"><div><small>${award}${per ? ` <i>· ${per}</i>` : ''}</small>
+  const C = RC_IMG, card = ([award, per, name, id, team, line]) => `<div class="pvr-card"><div><small>${award}${per ? ` <i>· ${per}</i>` : ''}</small>
     ${name ? `<p><b>${name}</b> <span${team === 'Alley Oops' ? ' class="pvr-me"' : ''}>${team}</span></p><p class="pvr-line">${line.map(([v, k]) => `<b>${v}</b> ${k}`).join(' ')}</p>` : `<p class="pvr-note">${line}</p>`}</div>
-    ${name ? `<span class="pvr-face">${initials(name.replace('. ', ' '))}</span>` : ''}</div>`;
+    ${name ? landFace(id, name, 34) : ''}</div>`;
   // each final: a team, the score, the other team, each with the week's Best or Worst badge on its outer side, as the picture has it
   const badge = m => (m ? `<i class="${m === 'Best' ? 'good' : 'bad'}">${m}</i>` : '');
   const finals = [['Alley Oops', '6–3', 'Rim Rockers', 'Best', ''], ['Bench Mob', '5–4', 'Sixth Men', '', ''], ['Glass Cleaners', '3–6', 'Fast Breakers', '', 'Worst']];
@@ -351,20 +354,81 @@ function landRecap() {
   </div>
   <div class="pvr-share" aria-hidden="true"><span class="on">Share image</span><span>Copy text and link</span></div>`;
 }
-// The rows: the tab's icon and name, what it does, the picture, and a way into the demo at that tab
+// Plan Ahead's next period: your starters' games day by day in the board's own dots, the bench under them, and the suggested
+// swap (.swap.suggested). Its moment: the dots come in day by day, then the swap goes in (the four-game bench player takes
+// the two-game starter's spot) and the win chance, the starters' games and the projection turn over
+// [lineup spot, NBA.com id, name, positions, his games Monday to Sunday: 1 a game, 2 the second night of a back-to-back]
+const LAND_PLAN = {
+  rows: [['PG', 1630595, 'C. Cunningham', ['PG', 'SG'], '1010120'], ['SG', 1626164, 'D. Booker', ['PG', 'SG', 'SF'], '0100010'],
+    ['F', 1630552, 'J. Johnson', ['SF', 'PF'], '0101010'], ['C', 1630578, 'A. Sengun', ['PF', 'C'], '1001012']],
+  bench: [1641708, 'A. Thompson', ['PG', 'SG', 'SF', 'PF'], '1001012'],
+  swap: 1, // (the starter he replaces: Booker's 2 games for his 4)
+  chips: [['STL', '+2.4', '52%→70%', 'good'], ['REB', '+6.1', '44%→61%', 'good'], ['BLK', '+1.5', '', 'good'], ['3PM', '−2.2', '91%→87%', 'bad']],
+};
+function landPlan() {
+  const { rows, bench, swap, chips } = LAND_PLAN, games = d => d.replace(/0/g, '').length;
+  const who = ([id, name, pos, days]) => `<div class="bplayer">${landFace(id, name, 34)}<div class="bmain"><div class="bname"><b>${name}</b></div>
+    <div class="bmeta"><span class="bmeta-info">${posTags(pos)}</span><span class="dots">${[...days].map((g, d) => `<i class="${g === '0' ? 'none' : g === '2' ? 'up b2b' : 'up'}" style="--d:${d}"></i>`).join('')}</span><b class="bmeta-g">${games(days)}G</b></div></div></div>`;
+  // the swapped rows hold both players, the second shown once the swap goes in
+  const both = (a, b) => `<div class="pv-sw pvp-sw">${who(a)}${who(b)}</div>`;
+  const row = (slot, body, cls = '') => `<div class="pvp-row${cls}">${slotBadge(slot)}${body}</div>`;
+  const out = rows[swap].slice(1), starts = n => rows.reduce((s, r, i) => s + games(i === swap ? n : r[4]), 0);
+  return `<div class="pv-card pv-plan" aria-hidden="true">
+    <div class="lp-head"><div><b>Next period</b><span>Win chance vs Rim Rockers</span></div><strong>${landFlip('61%', '74%')}</strong></div>
+    <div class="pvp-board">
+      ${rows.map(([slot, ...p], i) => row(slot, i === swap ? both(p, bench) : who(p), i === swap ? ' pvp-in' : '')).join('')}
+      <p class="pvp-sep">Bench</p>
+      ${row('BN', both(bench, out), ' pvp-out')}
+    </div>
+    <div class="swap suggested pvp-swap"><div class="swap-head"><span class="swap-in">↑ Start <b>${bench[1]}</b> <span class="muted small">· ${games(bench[3])} G</span></span><span class="swap-out">↓ Bench <b>${out[1]}</b> <span class="muted small">· ${games(out[3])} G</span></span><span class="swap-net pos-good">+13% win</span></div>
+      <div class="cat-chips">${chips.map(([k, v, p, c]) => `<span class="cchip ${c}"><b>${k}</b> ${v}${p ? `<span class="cchip-p">${p}</span>` : ''}</span>`).join('')}</div></div>
+    <div class="lp-foot"><span>Starter games <b>${landFlip(starts(out[3]), starts(bench[3]))}</b></span><span>Projected <b>${landFlip('4.9', '5.6')}</b> cats</span></div>
+  </div>`;
+}
+// The player card (showPlayerDetail): his photo before his team's logo, who has him and how, each category against an average
+// rostered player (catProfile's bars, growing out of the middle as it comes in), his next games and value, his last games
+const LAND_CARD = { id: 1628983, name: 'Shai Gilgeous-Alexander', team: 'OKC', pos: ['PG'],
+  // each category: how far above (+) or below (−) an average rostered player, in the card's half-bar widths (%)
+  prof: [['FG%', 5], ['FT%', 13], ['3PM', 8], ['PTS', 50], ['REB', -13], ['AST', 2], ['STL', -11], ['BLK', 14], ['TO', -1]],
+  games: [['Wed vs ATL', '14/29', 34, 5, 3, '+0.20'], ['Sun @ SAC', '13/20', 37, 2, 4, '+0.45'], ['Fri @ LAC', '15/26', 40, 4, 2, '+0.31']] };
+function landCard() {
+  const { id, name, team, pos, prof, games } = LAND_CARD;
+  const photo = playerPhoto({ id, name, team }).replace(/ data-photo="[^"]*"/g, '');
+  const bars = prof.map(([k, v], i) => `<div class="cp-row"><span class="cp-k">${k}</span><span class="cp-bar"><span class="cp-fill ${v < 0 ? 'down' : 'up'}" style="width:${Math.abs(v)}%;--i:${i}"></span></span></div>`).join('');
+  return `<div class="pv-card pv-pcard" aria-hidden="true">
+    <div class="pvc-head"><b>${name}</b><span>${team} · ${posTags(pos)} · 8 yrs in league</span></div>
+    <div class="pvc-top">
+      <div class="pc-side">${photo}<p class="pc-bio"><span>6′6″ · 195 lb · age 28</span><span>Drafted 11th in 2018</span></p></div>
+      <div class="pc-who"><p class="pc-owner"><b class="pvc-team">Alley Oops</b> <span class="badge accent">Keeper</span></p><div class="pc-prof">${bars}</div></div>
+    </div>
+    <div class="proj-grid pvc-tiles">
+      <div class="proj"><div class="k">Next game</div><div class="v">Fri vs NOP</div></div>
+      <div class="proj"><div class="k">Games next period</div><div class="v">4</div></div>
+      <div class="proj"><div class="k">Value per game</div><div class="v">+0.32</div><div class="pc-rank">#13 of 351</div></div>
+    </div>
+    <table class="pvc-games"><thead><tr><th>Game</th><th>FG</th><th>PTS</th><th>REB</th><th>3PM</th><th>Value</th></tr></thead>
+      <tbody>${games.map(([g, fg, ...v], i) => `<tr style="--i:${i}"><td>${g}</td><td>${fg}</td>${v.map(x => `<td>${x}</td>`).join('')}</tr>`).join('')}</tbody></table>
+  </div>`;
+}
+// The rows: the tab's icon and name, what it does, the picture, and a way into the demo at that tab (the player cards':
+// the Players tab with his card open). more: a line under the button, for a tab without a row of its own
 const LAND_SHOW = [
   ['dashboard', 'Matchup', 'Every game, live', "Each starter's game and line as it happens, who's on the floor, and the categories and the score moving as the games go.", landLive],
+  ['week', 'Plan Ahead', "Next period's lineup, planned", "Every player's games day by day, and the lineup that gives you the best chance to win: each swap with what it does to every category.", landPlan],
+  ['players', 'Player cards', 'Any player, one tap away', 'Tap a name anywhere for his card: who has him and how they got him, each category against an average rostered player, his games ahead, his value and every game this season.', landCard,
+    { player: LAND_CARD.id, more: ['trends', 'Trends', "Who's heating up and who's cooling off: each category's biggest risers over the last five games, and the best of them still on waivers."] }],
   ['draft', 'Draft', 'Every pick on one board', "Your league's whole draft, each pick green or red by how he's playing against where he went. Then the Draft Retrospective's awards, from the biggest reach to the quickest trigger finger.", landBoard],
   ['recap', 'Recap', 'A recap for the league chat', 'The period in awards, from the player of the period to the bench regret, with every final. Share it as a picture, or as a link that opens with no sign-up.', landRecap],
 ];
 function landShow(demo) {
-  return `<section class="land-shows" aria-label="A look inside">${LAND_SHOW.map(([tab, name, title, line, draw], i) => `
+  return `<section class="land-shows" aria-label="A look inside">${LAND_SHOW.map(([key, name, title, line, draw, { player, more } = {}], i) => `
     <div class="land-show${i % 2 ? ' flip' : ''}">
       <div class="lsh-copy">
-        <p class="lsh-tab">${lineIcon(TAB_ICONS[tab], 'lsh-ico')}${name}</p>
+        <p class="lsh-tab">${lineIcon(TAB_ICONS[key], 'lsh-ico')}${name}</p>
         <h2>${title}</h2>
         <p class="lsh-line">${line}</p>
-        ${demo ? `<button type="button" class="btn sm" data-action="land-demo" data-tab="${tab}">See it in the demo</button>` : ''}
+        ${demo ? `<button type="button" class="btn sm" data-action="land-demo" data-tab="${key}"${player ? ` data-player="${player}"` : ''}>See it in the demo</button>` : ''}
+        ${more ? `<p class="lsh-more">${lineIcon(TAB_ICONS[more[0]], 'lsh-ico')}<span><b>${demo ? `<button type="button" class="link-btn" data-action="land-demo" data-tab="${more[0]}">${more[1]}</button>` : more[1]}</b> ${more[2]}</span></p>` : ''}
       </div>
       <div class="lsh-pic">${draw()}</div>
     </div>`).join('')}
@@ -409,7 +473,7 @@ function landHome(form) {
   return `<div class="landing-wrap land-home">
     <section class="land-hero">
       <div class="land-copy">
-        <p class="land-pill">Free forever · No sign-up</p>
+        <p class="land-pill">Free · No sign-up</p>
         <h1><span class="sr-only">Plan your fantasy ${LAND_SPORTS.map(s => s[0]).join(' or ')} week</span><span aria-hidden="true">Plan your fantasy<br><span class="land-sport">${LAND_SPORTS.map(([s, icon], i) => `<span data-sport="${s}"${i ? '' : ' class="on"'}>${lineIcon(icon, 'ls-ico')}<span class="ls-w">${s}</span></span>`).join('')}</span> week</span></h1>
         <p class="land-lead">Your odds for this week's matchup, the best starters, how your categories stack up and a recap the whole league can share.</p>
         <div class="land-connect">${form}</div>

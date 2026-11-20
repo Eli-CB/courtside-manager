@@ -359,6 +359,7 @@ const actions = {
       if (!state.fxTeam) { state.demo = true; demoNames(fxLeague()); adoptTeam(demoTeam()); }
       commit(`Exploring ${fxLeague().name}`);
       location.hash = `#${(el && el.dataset.tab) || 'dashboard'}`; // (the landing page's rows open their own tab)
+      if (el && el.dataset.player) showPlayerDetail(+el.dataset.player); // (the player cards' row: his card, over the Players tab)
     } catch (e) { toast(e.message); }
   },
   // out of the demo, to connect a league of their own

@@ -1438,7 +1438,7 @@ body.landing::before {
 .lp-card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 24px 48px -24px rgb(0 0 0 / .22); overflow: hidden; }
 .lp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 20px 14px; }
 .lp-head b { display: block; font-size: 1.05rem; font-weight: 600; letter-spacing: -.01em; }
-.lp-head span { font-size: .82rem; color: var(--muted); }
+.lp-head > div > span { font-size: .82rem; color: var(--muted); }
 .lp-head strong { font-size: 2.1rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
 .lp-legend { display: flex; gap: 14px; padding: 0 20px 12px; border-bottom: 1px solid var(--border); font-size: .72rem; font-weight: 500; color: var(--muted); }
 .lp-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -1461,7 +1461,7 @@ body.landing::before {
 @keyframes lp-grow { from { transform: scaleX(0); } }
 @keyframes lp-pulse { 50% { opacity: .35; } }
 
-/* a look inside: three tabs as they look (leagues.js, landShow), the words beside each picture, every other row the other way
+/* a look inside: the tabs as they look (leagues.js, landShow), the words beside each picture, every other row the other way
    round; each picture's moment plays once its row is in view (.in, landReveal) */
 .land-shows { display: grid; gap: 72px; margin-top: 64px; padding-top: 56px; border-top: 1px solid var(--border); }
 .land-show { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 56px; align-items: center; }
@@ -1471,6 +1471,10 @@ body.landing::before {
 .lsh-ico { width: 28px; height: 28px; padding: 6px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .land-show h2 { margin: 0 0 10px; font-size: clamp(1.5rem, 1.1rem + 1.1vw, 2rem); font-weight: 800; line-height: 1.12; letter-spacing: -.03em; text-wrap: balance; }
 .lsh-line { margin: 0 0 18px; max-width: 42ch; font-size: 1rem; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
+.lsh-more { display: flex; gap: 10px; align-items: flex-start; max-width: 42ch; margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--border); font-size: .9rem; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
+.lsh-more .lsh-ico { flex: none; margin-top: -3px; }
+.lsh-more b { color: var(--text); font-weight: 600; }
+.lsh-more .link-btn { font: inherit; color: var(--text); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
 .lsh-pic { padding: 28px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface-2); }
 .pv-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 24px 48px -24px rgb(0 0 0 / .22); overflow: hidden; }
 /* the Matchup tab's Today: a three goes in, and its numbers, the category and the score turn over (.pv-sw: before, then after) */
@@ -1492,10 +1496,12 @@ body.landing::before {
 .pvl-p.right { align-items: flex-end; text-align: right; }
 .pvl-p.right .mu-chips { justify-content: flex-end; }
 .pvl-p .game-pill { font-size: .7rem; }
+.pvl-p .bplayer { gap: 6px; } /* (each one's photo by his name, as the tab has it: the other side's on the right) */
+.pvl-p.right .bplayer { flex-direction: row-reverse; }
 .pv-live .mu-chip { font-size: .66rem; padding: 0 5px; }
 .pv-sw { display: inline-grid; }
-.pv-sw > span { grid-area: 1 / 1; }
-.pv-sw > span + span { opacity: 0; }
+.pv-sw > * { grid-area: 1 / 1; }
+.pv-sw > * + * { opacity: 0; }
 .land-show.in .pv-sw > :first-child { animation: pv-out .25s var(--pv-at) forwards; }
 .land-show.in .pv-sw > :last-child { animation: pv-in .4s var(--pv-at) forwards; }
 .land-show.in .pv-live .mu-chip.pv-flash { animation: chip-good 2.4s ease-out var(--pv-at); }
@@ -1530,7 +1536,7 @@ body.landing::before {
 .pvr-card p > span { font-size: .64rem; color: var(--r-muted); }
 .pvr-card p > .pvr-me { color: var(--r-accent); }
 .pvr-line { font-size: .64rem; color: var(--r-muted); }
-.pvr-face { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--r-line); color: var(--r-text); font-size: .58rem; font-weight: 700; }
+.pvr-card > .hs { --hs-wash: rgb(32 32 36 / .48); background-color: var(--r-line); color: var(--r-text); box-shadow: none; }
 .pvr-sec { margin: 10px 0 2px; color: var(--r-muted); }
 .pvr-final { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 5px 0; font-size: .64rem; }
 .pvr-final + .pvr-final { border-top: 1px solid var(--r-line); }
@@ -1560,6 +1566,56 @@ body.landing::before {
   .lsh-pic:hover .pv-pic { rotate: 0deg; }
 }
 @keyframes pv-pick { from { opacity: 0; transform: translateY(6px) scale(.92); } }
+/* Plan Ahead: the board's rows (.bplayer, .bmeta, .dots) and the suggested swap (.swap.suggested); the dots come in day by
+   day, the swap under them, then it goes in (--pv-at): the bench player takes the starter's row and the numbers turn over */
+.pv-plan { --pv-at: 2.2s; }
+.pv-plan .lp-head { padding: 14px 16px 10px; }
+.pv-plan .lp-head strong { font-size: 1.8rem; }
+.pvp-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 16px; border-top: 1px solid var(--border); }
+.pvp-row .slot-label { min-width: 0; }
+.pvp-row .bname { font-size: .84rem; }
+.pvp-sep { margin: 0; padding: 3px 16px; border-top: 1px solid var(--border); background: var(--surface-2); font-size: .68rem; font-weight: 600; color: var(--muted); }
+.pvp-sw { display: grid; min-width: 0; }
+.pvp-swap { margin: 0 12px 12px; padding: 10px; font-size: .8rem; }
+.pvp-swap .swap-head { gap: 4px 10px; }
+.pvp-swap .cat-chips { gap: 4px; margin-top: 8px; }
+.pvp-swap .cchip { padding: 2px 6px; font-size: .7rem; }
+.pvp-board { margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.land-show.in .pv-plan :is(.pvp-in, .pvp-out) { animation: pvp-glow 1.8s ease-out var(--pv-at); }
+@keyframes pvp-glow { 0%, 35% { background: var(--good-soft); } }
+@keyframes pvp-rise { from { opacity: 0; transform: translateY(8px); } }
+/* the player card, in its own pieces (.pc-photo, .pc-bio, .cp-row, .proj); the category bars grow out of the middle */
+.pv-pcard { padding: 14px 16px 4px; }
+.pvc-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; margin-bottom: 12px; }
+.pvc-head b { font-size: 1.05rem; font-weight: 600; letter-spacing: -.01em; }
+.pvc-head span { font-size: .78rem; color: var(--muted); }
+.pvc-top { display: flex; gap: 14px; align-items: flex-start; }
+.pvc-top .pc-photo { width: 150px; }
+.pvc-top .pc-bio { font-size: .72rem; }
+.pvc-top .pc-who { flex: 1 1 0; min-width: 0; }
+.pvc-top .pc-owner { font-size: .84rem; }
+.pvc-team { color: var(--accent); font-weight: 600; }
+.proj-grid.pvc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+.pvc-tiles .proj { padding: 7px 8px; }
+.pvc-tiles .proj .k { font-size: .6rem; }
+.pvc-tiles .proj .v { font-size: .9rem; white-space: nowrap; }
+.pvc-tiles .pc-rank { font-size: .68rem; }
+.pvc-games { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: .74rem; font-variant-numeric: tabular-nums; }
+.pvc-games th { padding: 6px 4px; font-size: .64rem; font-weight: 600; color: var(--muted); text-align: right; }
+.pvc-games td { padding: 6px 4px; border-top: 1px solid var(--border); text-align: right; }
+.pvc-games :is(th, td):first-child { padding-left: 0; text-align: left; white-space: nowrap; }
+.pvc-games :is(th, td):last-child { padding-right: 0; }
+.pvc-games td:last-child { font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) {
+  .land-show:not(.in) .pv-plan .dots i, .land-show:not(.in) .pvp-swap, .land-show:not(.in) .pvc-games tbody tr { opacity: 0; }
+  .land-show.in .pv-plan .dots i { animation: pv-pick .3s cubic-bezier(.2, .8, .2, 1) calc(var(--d) * 90ms + .3s) both; }
+  .land-show.in .pvp-swap { animation: pvp-rise .45s cubic-bezier(.2, .8, .2, 1) 1.3s both; }
+  .pv-pcard .cp-fill.up { transform-origin: left; }
+  .pv-pcard .cp-fill.down { transform-origin: right; }
+  .land-show:not(.in) .pv-pcard .cp-fill { transform: scaleX(0); }
+  .land-show.in .pv-pcard .cp-fill { animation: lp-grow .7s cubic-bezier(.2, .7, .2, 1) calc(var(--i) * 60ms + .2s) both; }
+  .land-show.in .pvc-games tbody tr { animation: pvp-rise .4s cubic-bezier(.2, .8, .2, 1) calc(var(--i) * 120ms + .9s) both; }
+}
 
 /* what the site does: a tab's icon each */
 .land-features { margin-top: 64px; padding-top: 40px; border-top: 1px solid var(--border); }
@@ -1600,6 +1656,11 @@ body.landing::before {
   .pv-board table { padding: 0 4px 8px; border-spacing: 2px; }
   .pv-board .dr-cell { padding: 5px; }
   .pv-board .dr-cell b { font-size: .72rem; }
+  .pvp-row, .pvp-sep { padding-inline: 10px; }
+  .pvp-swap { margin-inline: 8px; }
+  .pv-pcard { padding: 12px 12px 2px; }
+  .pvc-top { gap: 10px; }
+  .pvc-top .pc-photo { width: 112px; }
 }
 
 tr.me-row td { background: var(--accent-soft); }
