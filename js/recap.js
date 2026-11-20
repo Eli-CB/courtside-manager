@@ -237,8 +237,8 @@ function recapText(L, X) {
 // A standout on the Recap tab or the Draft Retrospective: a player award the award, his name, his fantasy team, his NBA team
 // and positions, his numbers (his value or points first) or the award's words; any other the award and its line, with the
 // faces of the players it names. Every face the small round photo on the right, a player award's too (the owner's ask, Nov
-// 2026: the big photo on his team's color is the share picture's alone). label: the award's title as HTML (the Draft tab's
-// opens its breakdown)
+// 2026; the share picture, shareCanvas, is laid out the same). label: the award's title as HTML (the Draft tab's opens its
+// breakdown)
 const standoutFaces = faces => `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>`;
 function standoutCard(x, label = `<div class="rx-label">${x.label}</div>`) {
   if (!x.p) {

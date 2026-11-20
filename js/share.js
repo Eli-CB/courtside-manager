@@ -3,9 +3,9 @@
 'use strict';
 
 // ----- The recap as a picture, for the league chat -----
-// 1080 px wide, as tall as it needs: the league and week, the standouts, every final, the site's name. Each player stands
-// on his NBA team's colors in front of its logo, as the player card shows him (ESPN's cutout; the round photo from the
-// site's own sheet where there's none). Drawn on a canvas from the same recap.
+// 1080 px wide, as tall as it needs: the league and week, the standouts, every final, the site's name. Every player is his
+// round photo from the site's own sheet, as the page's cards show him (the owner's ask, Nov 2026: no cutouts there; a
+// trade's picture keeps them, each player on his team's colors). Drawn on a canvas from the same recap.
 const RC_IMG = { w: 1080, pad: 56, bg: '#0b0c0f', card: '#16181d', card2: '#1f2229', line: '#2a2e36', text: '#f4f4f5', soft: '#d4d8df', muted: '#9aa3b2', accent: '#f07a2a', good: '#4ade80', bad: '#f87171' };
 const RC_FONT = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
@@ -108,8 +108,8 @@ const statUnits = tiles => tiles.map(t => [[t.v, t.hot ? (isBelowZero(t.v) ? 'r'
 const isBelowZero = v => /^[-−]/.test(String(v));
 
 // What every share picture is drawn with (the recap's, the draft's, a trade's): a canvas `tall` px high in the share
-// colors, and its tools (K): fonts, text, rounded cards, styled lines (lay, drawLay), a player on his team's colors
-// (prep loads the photos and logos first; panel, face, photo), his team and positions (meta), the top (a kicker, a
+// colors, and its tools (K): fonts, text, rounded cards, styled lines (lay, drawLay), a player's round photo (photo) or
+// him on his team's colors (panel; prep loads the logos and those cutouts first), his team and positions (meta), the top (a kicker, a
 // title, a line under it), then done(y): the site's name at the bottom and the canvas cut to what was drawn
 async function sharePad(tall = 5000) {
   const C = RC_IMG, W = C.w;
@@ -130,7 +130,7 @@ async function sharePad(tall = 5000) {
   const text = (t, x, y, color = C.text, align = 'left') => { ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(t, x, y); };
   const round = (x, y, w, h, r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
   const clip = (x, y, w, h, r) => { ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.clip(); };
-  // the cutouts and logos of the players a picture shows, loaded before it's drawn (prep, 8 s at most each)
+  // the logos (and for a panel the cutouts) of the players a picture shows, loaded before it's drawn (prep, 8 s at most each)
   const shots = new Map(), logos = new Map();
   // a circle's edge: `ring` (6 px, so faces that overlap stand apart), else a thin gray line, as on the site
   const edge = (cx, cy, d, ring) => {
@@ -144,14 +144,16 @@ async function sharePad(tall = 5000) {
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = C.card2; ctx.fill(); ctx.clip();
     if (logo) { ctx.globalAlpha = 0.52; ctx.drawImage(logo, x, y, d, d); ctx.globalAlpha = 1; }
+    ctx.imageSmoothingQuality = 'high'; // (the sheet's 80 px, drawn larger)
     if (sheet && i !== undefined) ctx.drawImage(sheet, (i % IMG.cols) * IMG.size, Math.floor(i / IMG.cols) * IMG.size, IMG.size, IMG.size, x, y, d, d);
     else { font(d * 0.36, 700); ctx.textBaseline = 'middle'; text(initials(p.name), cx, cy, C.muted, 'center'); ctx.textBaseline = 'top'; }
     ctx.restore();
     edge(cx, cy, d, ring);
   };
-  const prep = ps => Promise.all(ps.filter(p => p && p.nbaId != null).map(async p => {
+  // (cutouts: a panel's, which only a trade's picture draws)
+  const prep = (ps, cutouts = true) => Promise.all(ps.filter(p => p && p.nbaId != null).map(async p => {
     const raw = nbaById.get(p.nbaId);
-    const [shot, logo] = await Promise.all([shotImg(raw), logoImg(raw && raw.team)]);
+    const [shot, logo] = await Promise.all([cutouts ? shotImg(raw) : null, logoImg(raw && raw.team)]);
     if (shot) shots.set(p.nbaId, shot);
     if (logo) logos.set(raw.team, logo);
   }));
@@ -173,19 +175,6 @@ async function sharePad(tall = 5000) {
     if (logo && raw.pos && raw.pos[0] === 'DEF') { const s = Math.min(w, h) * 0.72; ctx.drawImage(logo, x + (w - s) / 2, y + (h - s) / 2, s, s); return; }
     const d = Math.min(w, h) * 0.62;
     photo(p, x + (w - d) / 2, y + (h - d) / 2, d);
-  };
-  // a player's face in a circle on his team's color, its logo faint behind his cutout's head and shoulders (his round
-  // photo where there's no cutout), ringed in `ring` so faces that overlap stand apart
-  const face = (p, cx, cy, d, ring) => {
-    const raw = nbaById.get(p.nbaId) || {}, shot = shots.get(p.nbaId), logo = logos.get(raw.team);
-    if (!shot) { photo(p, cx - d / 2, cy - d / 2, d, ring); return; }
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fillStyle = hexA(teamTint(raw.team), 1, 0.3); ctx.fill(); ctx.clip();
-    if (logo) { ctx.globalAlpha = 0.45; ctx.drawImage(logo, cx - d / 2, cy - d / 2, d, d); ctx.globalAlpha = 1; }
-    const s = shot.height * 0.84;
-    ctx.drawImage(shot, (shot.width - s) / 2, shot.height * 0.04, s, s, cx - d / 2, cy - d / 2, d, d);
-    ctx.restore();
-    edge(cx, cy, d, ring);
   };
   // styled units (wordUnits, statUnits) in lines that fit maxW at px, `gap` apart (a space by default); then drawn from
   // (x, y), lh apart, returning the y under them
@@ -256,32 +245,32 @@ async function sharePad(tall = 5000) {
     out.getContext('2d').drawImage(cv, 0, 0);
     return out;
   };
-  return { C, W, inner, ctx, font, text, round, photo, prep, panel, face, lay, drawLay, meta, top, done };
+  return { C, W, inner, ctx, font, text, round, photo, prep, panel, lay, drawLay, meta, top, done };
 }
 
 // A picture to share in a league chat (1080 px wide): a kicker, the league's name and any line under it, then the
-// standouts (each player beside his photo, every one alike: no larger card for the first, the owner's ask; the rest with
-// the faces of any players they name; no emoji, the owner's ask), then any finals. H: { kicker, title, sub, items, games,
+// standouts laid out as the page's cards (standoutCard, recap.js): each player with his round photo on the right, every one
+// alike (no larger card for the first, the owner's ask); the rest with the round photos of any players they name; no
+// emoji, the owner's ask), then any finals. H: { kicker, title, sub, items, games,
 // mark: tid -> 'top' | 'bottom' | '' }.
 // An item: { label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's numbers
 // are a game of), score: [number, unit] }, one naming players { faces }
 async function shareCanvas(H) {
   const items = H.items, games = H.games || [];
   const K = await sharePad(900 + sum(items.map(it => (it.p ? 440 : 340))) + games.length * 100);
-  const { C, W, inner, ctx, font, text, round, panel, face, lay, drawLay, meta } = K;
-  await K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])]);
-  const x0 = C.pad, w = inner;
+  const { C, W, inner, ctx, font, text, round, photo, lay, drawLay, meta } = K;
+  await K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])], false);
+  const x0 = C.pad, w = inner, fd = 104; // (every photo one size, a player's as a note's faces, as on the page)
   const posOf = p => p.pos || (nbaById.get(p.nbaId) || {}).pos;
   const labelText = (it, x, y, max) => { font(22, 700, 2); text(fitText(ctx, it.label.toUpperCase(), max), x, y, C.accent); };
 
-  // A player: his photo on his team's colors at the left, the award, his name, his teams, his numbers (his value or points
-  // first, in orange)
+  // A player: the award, his name, his teams, his numbers (his value or points first, in orange), his round photo on the right
   const player = (it, y) => {
-    const p = it.p, raw = nbaById.get(p.nbaId) || {}, pw = 300, tx = x0 + pw + 40, tw = x0 + w - 40 - tx;
+    const p = it.p, raw = nbaById.get(p.nbaId) || {}, tx = x0 + 40, tw = x0 + w - 32 - fd - 32 - tx;
     const units = it.tiles ? statUnits([{ v: it.score[0], k: it.score[1], hot: true }, ...it.tiles]) : wordUnits([[it.stats || '', '']]);
-    const lines = lay(units, tw, 27, it.tiles ? 22 : undefined), h = Math.max(300, 214 + lines.length * 40 + 26);
+    const lines = lay(units, tw, 27, it.tiles ? 22 : undefined), h = 214 + lines.length * 40 + 26;
     round(x0, y, w, h, 28, C.card);
-    panel(p, x0, y, pw, h, [28, 0, 0, 28]);
+    photo(p, x0 + w - 32 - fd, y + (h - fd) / 2, fd);
     labelText(it, tx, y + 36, tw);
     font(44, 700, -0.5); text(fitText(ctx, p.name, tw), tx, y + 74, C.text);
     font(27, 600); text(fitText(ctx, fxTeamName(it.tid), tw), tx, y + 132, C.soft);
@@ -290,16 +279,16 @@ async function shareCanvas(H) {
     return y + h;
   };
 
-  // The rest: the award, its line (names bold), and the faces of the players it names
+  // The rest: the award, its line (names bold), and the round photos of the players it names
   const note = (it, y) => {
-    const faces = (it.faces || []).filter(f => f && f.nbaId != null).slice(0, 3), fd = 104, step = 72;
+    const faces = (it.faces || []).filter(f => f && f.nbaId != null).slice(0, 3), step = 72;
     const fw = faces.length ? fd + (faces.length - 1) * step + 28 : 0, tx = x0 + 40, tw = x0 + w - 32 - fw - tx;
     const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), block = 40 + lines.length * 44 - 8;
     const h = Math.max(block + 64, faces.length ? fd + 60 : 0, 148), ty = y + (h - block) / 2;
     round(x0, y, w, h, 28, C.card);
     labelText(it, tx, ty, tw);
     drawLay(lines, tx, ty + 40, 31, 44);
-    faces.forEach((f, i) => face(f, x0 + w - 32 - fd / 2 - (faces.length - 1 - i) * step, y + h / 2, fd, C.card));
+    faces.forEach((f, i) => photo(f, x0 + w - 32 - fd - (faces.length - 1 - i) * step, y + (h - fd) / 2, fd, C.card));
     return y + h;
   };
 
