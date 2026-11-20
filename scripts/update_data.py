@@ -288,17 +288,29 @@ def espn_rosters():
     return out
 
 
+SLEEPER_UNRANKED = 9999999  # Sleeper's search_rank for a player its search doesn't offer
+
+
 def sleeper_ids():
     """Sleeper's NBA players (one request a day, as Sleeper asks), keyed by normalized name: [(Sleeper id, team, active,
-    positions)]. Sleeper leagues name players only by these ids, so each player carries his ('slp'), and Sleeper's
-    position eligibility ('slpPos', which Sleeper lineups follow)."""
+    positions, name, ranked)]. Sleeper leagues name players only by these ids, so each player carries his ('slp'), and
+    Sleeper's position eligibility ('slpPos', which Sleeper lineups follow). ranked: Sleeper's search offers him."""
     out = {}
     for pid, v in (get_json('https://api.sleeper.app/v1/players/nba', timeout=90) or {}).items():
         name = v.get('full_name') or f"{v.get('first_name') or ''} {v.get('last_name') or ''}".strip()
         if name:
             pos = [x for x in ('PG', 'SG', 'SF', 'PF', 'C') if x in (v.get('fantasy_positions') or [])]
-            out.setdefault(norm_name(name), []).append((pid, v.get('team') or '', bool(v.get('active')), pos))
+            rank = v.get('search_rank')
+            ranked = isinstance(rank, (int, float)) and rank < SLEEPER_UNRANKED
+            out.setdefault(norm_name(name), []).append((pid, v.get('team') or '', bool(v.get('active')), pos, name, ranked))
     return out
+
+
+def sleeper_names(slp, matched):
+    """Sleeper id -> name for Sleeper's players no NBA.com player matched (a free agent with no NBA team, a prospect): a
+    Sleeper league's rosters and transactions name players only by id ('slpNames' in the file). Active ones Sleeper's
+    search offers only, the ones a league can add: 516 of the 1,357 active and unmatched, Nov 2026, about 12 KB."""
+    return {x[0]: x[4] for xs in slp.values() for x in xs if x[2] and x[5] and x[0] not in matched}
 
 
 def sleeper_id(slp, name, team):
@@ -907,6 +919,9 @@ def main():
             matched_inj += 1
         players.append(p)
     log(f'  matched {matched_inj}/{len(inj)} injury entries to players')
+    # Sleeper's players without an NBA.com one, by name (Sleeper's list didn't come: yesterday's)
+    slp_names = sleeper_names(slp, {p['slp'] for p in players if p.get('slp')}) if slp else saved.get('slpNames') or {}
+    log(f'  {len(slp_names)} Sleeper players named without an NBA.com match')
 
     out = {
         'updated': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
@@ -915,6 +930,7 @@ def main():
         'statKeys': STAT_KEYS, 'logKeys': LOG_KEYS, 'sdKeys': SD_KEYS,
         'week': week, 'teams': teams, 'players': players, 'league': league,
         'box': box_months(BOX_CACHE),
+        **({'slpNames': slp_names} if slp_names else {}),
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     tmp = OUT + '.tmp'

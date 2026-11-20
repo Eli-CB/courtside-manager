@@ -25,8 +25,10 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   when Standings first draws the league. Only `status: 'complete'` (failed waiver claims are listed too); a trade's `adds`/`drops` say who got each player from
   whom, `draft_picks` (`roster_id` = whose pick it was) and `waiver_budget` too; a waiver's bid is `settings.waiver_bid`. Sleeper files a dynasty league's whole
   offseason under week 1 (The IPA: 276 back to March, 29 trades), so moves count from a week before the period starts (`status_updated`). Checked on The IPA,
-  weeks 1-5: 5 of 87 players weren't in the data file, players with no NBA team (Jeremy Sochan, Cam Thomas, Rob Dillingham, Nov 2026), drawn "A player":
-  Sleeper's own list names them, but it is 414 KB compressed (2.5 MB), too much for the page to fetch for a name.
+  weeks 1-5: 5 of 87 players weren't in the data file, players with no NBA team (Jeremy Sochan, Cam Thomas, Rob Dillingham, Nov 2026). Sleeper's own list
+  is 414 KB compressed (2.5 MB), too much for the page, so the daily job names them: `slpNames` in players.json (`sleeper_names`, update_data.py: Sleeper id ->
+  name for active players Sleeper's search offers that no NBA.com player matched, 516, 12 KB), read by `fetchSleeperLeague` (after the draft's own names)
+  and `moveWho`; drawn with initials, no card. With it, all 87 named. A league saved on a device before keeps "Player <id>" until its next read.
 
 ## Gotchas
 - Sleeper basketball's past weeks (Nov 18, 2026): the matchups API's points don't add up to Sleeper's own standings (rosters'

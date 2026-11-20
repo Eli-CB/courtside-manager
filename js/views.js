@@ -152,11 +152,13 @@ function viewStandings() {
 // ----- Moves this period: each team's adds, drops and trades this period (Standings, under the table) -----
 // Team id -> [{ kind: 'add' | 'drop' | 'trade' (in) | 'away' (traded out), nba, name, from / to; a Sleeper waiver claim's
 // bid; a draft pick traded, pick: { year, round, from: whose pick it was }; waiver budget traded, budget }]
-// A player in a move: by his id on the league's site (fx.id), else the name the league's rosters give
+// A player in a move: by his id on the league's site (fx.id), else his name: a Sleeper player with no NBA.com match from
+// the daily file (slpNames: one dropped is on no roster), else the one the league's rosters give
 function moveWho(L) {
   const fidNba = currentFidNba();
   const names = new Map(Object.values(L.rosters || {}).flat().map(x => [x.fid, x.name]));
-  return f => { const nba = fidNba(f), raw = nba && nbaById.get(nba); return { nba, name: raw ? raw.name : names.get(f) || 'A player' }; };
+  const slp = (L.source === 'sleeper' && NBA.slpNames) || {};
+  return f => { const nba = fidNba(f), raw = nba && nbaById.get(nba); return { nba, name: raw ? raw.name : slp[f] || names.get(f) || 'A player' }; };
 }
 // Fantrax shares each period's rosters but no transaction log, so a move is a difference between the last period's
 // rosters and this one's as they are now: on no roster before = added, on no roster now = dropped, on another team
@@ -248,7 +250,8 @@ function movesCard() {
   // what moved: a player (his card), a draft pick (named as on Trades) or waiver budget
   const what = (m, tid) => (m.pick ? `<span class="mv-what">${pickName(m.pick)} pick${m.pick.from !== (m.kind === 'away' ? tid : m.from) ? ` <span class="muted small">originally ${esc(fxTeamName(m.pick.from))}</span>` : ''}</span>`
     : m.budget != null ? `<span class="mv-what">$${fmt(m.budget, 0)} of waiver budget</span>`
-    : m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, playerBtn(m.nba, m.name)) : esc(m.name));
+    : m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, playerBtn(m.nba, m.name))
+    : m.name !== 'A player' ? inlinePlayer({ nbaId: null, name: m.name }, esc(m.name)) : esc(m.name)); // (no NBA team: his initials, no card)
   const other = m => (m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>`
     : m.bid ? ` <span class="muted small" title="Waiver bid">$${fmt(m.bid, 0)}</span>` : '');
   const move = (m, tid) => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${SIGN[m.kind] || '⇄'}</span>${what(m, tid)}${other(m)}<span class="sr-only">${SAID[m.kind] || 'traded away'}</span></li>`;

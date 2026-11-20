@@ -32,6 +32,22 @@ class Names(unittest.TestCase):
         self.assertEqual(D.name_key('Nene'), 'nene')
 
 
+class Sleeper(unittest.TestCase):
+    def test_ids_and_the_names_of_players_with_no_nba_match(self):
+        fake_get_json(self, {
+            '1': {'full_name': 'Cam Thomas', 'team': None, 'active': True, 'fantasy_positions': ['SG'], 'search_rank': 121},
+            '2': {'first_name': 'Luka', 'last_name': 'Dončić', 'team': 'LAL', 'active': True, 'fantasy_positions': ['SG', 'PG'], 'search_rank': 3},
+            '3': {'full_name': 'Not Offered', 'active': True, 'search_rank': D.SLEEPER_UNRANKED},
+            '4': {'full_name': 'Retired Guy', 'active': False, 'search_rank': 400},
+            '5': {'full_name': 'No Rank', 'active': True},
+        })
+        slp = D.sleeper_ids()
+        self.assertEqual(slp['cam thomas'], [('1', '', True, ['SG'], 'Cam Thomas', True)])
+        self.assertEqual(D.sleeper_id(slp, 'Luka Dončić', 'LAL')[:4], ('2', 'LAL', True, ['PG', 'SG']))
+        # named: the active players Sleeper's search offers that no NBA.com player matched (Luka is matched)
+        self.assertEqual(D.sleeper_names(slp, {'2'}), {'1': 'Cam Thomas'})
+
+
 class Small(unittest.TestCase):
     def test_season_names(self):
         self.assertEqual(D.season_str(2026), '2026-27')

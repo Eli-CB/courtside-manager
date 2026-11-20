@@ -3744,6 +3744,24 @@ async function sleeperMovesChecks(L, ui) {
   assert.match(app.viewStandings(), new RegExp(`${n} moves</span>`), `the fixture's ${real.length} transactions: ${n} adds and drops`);
 }
 
+test('Sleeper players with no NBA.com match are named from the daily file (slpNames): on rosters and in moves', async () => {
+  const D = app.NBA, was = D.slpNames;
+  // (2009: on a fixture roster, in no fixture player's slp, named by the draft's picks)
+  D.slpNames = { 2009: 'Another Name', 99999999: 'Dropped Unmatched' };
+  try {
+    const { league: L, idMap } = await app.fetchSleeperLeague(SLEEPER);
+    assert.equal(idMap.names[99999999], 'Dropped Unmatched', 'the names a league reads (its rosters) include the daily file’s');
+    const item = Object.values(L.rosters).flat().find(x => x.fid === '2009');
+    assert.equal(item.nba, null);
+    assert.equal(item.name, 'Kevin Porter', "Sleeper's own draft record names him first");
+    const tid = L.teams[0].id;
+    const M = app.sleeperMoves(L, [{ type: 'free_agent', status: 'complete', status_updated: 1, adds: null, drops: { 99999999: +tid } }]);
+    assert.equal(M[tid][0].name, 'Dropped Unmatched', 'one dropped, on no roster now, too');
+  } finally {
+    if (was === undefined) delete D.slpNames; else D.slpNames = was;
+  }
+});
+
 test('Sleeper league IDs and addresses', () => {
   assert.equal(app.parseLeagueId(SLEEPER), SLEEPER);
   assert.equal(app.parseLeagueId(`https://sleeper.com/leagues/${SLEEPER}/matchup`), SLEEPER);

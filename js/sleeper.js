@@ -125,6 +125,8 @@ async function fetchSleeperLeague(id) {
     const m = p.metadata || {};
     if (p.player_id && !names[p.player_id]) names[p.player_id] = `${m.first_name || ''} ${m.last_name || ''}`.trim();
   }
+  // a player with no NBA.com match (a free agent with no NBA team, a prospect): the daily file names him (slpNames)
+  for (const [sid, n] of Object.entries(D.slpNames || {})) if (!names[sid]) names[sid] = n;
   const onRoster = new Set(rosters.flatMap(r => r.players || []));
   const fxPlayers = {};
   // Sleeper's own positions (its lineups follow them), else NBA.com's
