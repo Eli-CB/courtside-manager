@@ -1336,6 +1336,19 @@ body.landing::before {
 .land-pill { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 4px 12px 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .78rem; font-weight: 500; color: var(--muted); }
 .land-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
 .land-home h1 { font-size: clamp(2.1rem, 1.3rem + 2.4vw, 3.1rem); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; margin: 0 0 14px; }
+/* the headline's sport, one at a time on its own line (so the lines never re-wrap): the old word rolls up and away as the
+   next rolls up from below, and the box eases to the new word's width (leagues.js, on each loop of land-tick) */
+.land-sport { display: inline-grid; perspective: 8em; animation: land-tick 2.6s linear infinite; transition: width .45s cubic-bezier(.3, 0, .2, 1); }
+.land-sport > span { grid-area: 1 / 1; justify-self: start; white-space: nowrap; backface-visibility: hidden; transition: transform .5s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, filter .3s ease; }
+.land-sport > span.on { transition-duration: .6s, .45s, .45s; transition-delay: .16s; } /* (the new word a beat later, once "week" is on its way) */
+.land-sport > span:not(.on) { opacity: 0; transform: translateY(.5em) rotateX(-80deg); filter: blur(4px); }
+.land-sport > span.out { transform: translateY(-.5em) rotateX(80deg); }
+@keyframes land-tick { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { /* no roll: the width jumps, the old word goes at once and the new one fades in */
+  .land-sport { transition: none; }
+  .land-sport > span.on { transition: opacity .4s ease; }
+  .land-sport > span:not(.on), .land-sport > span.out { transform: none; filter: none; transition: none; }
+}
 .land-lead { font-size: 1.06rem; line-height: 1.6; color: var(--muted); margin: 0 0 22px; max-width: 46ch; text-wrap: pretty; }
 .land-connect { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px 18px 16px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 16px 40px -20px rgb(0 0 0 / .18); }
 .land-connect .land-form { margin-top: 0; }

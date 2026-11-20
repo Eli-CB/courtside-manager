@@ -272,6 +272,24 @@ function landPreview() {
       <div class="lp-foot"><span>Projected <b>6–3</b></span><span class="lp-live">Live</span></div>
     </div></div>`;
 }
+// The headline's sport takes each in turn (a screen reader hears them all, in one line). Its CSS animation ticks
+// (land-tick): each loop the word rolls away for the next, and the box eases to the next word's width so "week" follows it.
+// The event, not a timer: it stops with the page, waits in a background tab, and never fires in the tests.
+const LAND_SPORTS = ['basketball', 'hockey'];
+document.addEventListener('animationiteration', e => {
+  const box = e.target;
+  if (e.animationName !== 'land-tick' || !box.classList || !box.classList.contains('land-sport')) return;
+  const words = [...box.children], cur = words.findIndex(w => w.classList.contains('on')), next = words[(cur + 1) % words.length], em = parseFloat(getComputedStyle(box).fontSize);
+  box.style.width = `${box.offsetWidth / em}em`; // (from auto, which doesn't ease, to its own width first)
+  void box.offsetWidth;
+  box.style.width = `${next.offsetWidth / em}em`;
+  next.style.transition = 'none'; // (back below the line at once, to roll in from there)
+  next.classList.remove('out');
+  void next.offsetWidth;
+  next.style.transition = '';
+  if (words[cur]) words[cur].classList.replace('on', 'out');
+  next.classList.add('on');
+});
 // A first visit: what the site does around the form, and the ways in without a league
 function landHome(form) {
   const demo = NBA && NBA.siteLeague;
@@ -280,7 +298,7 @@ function landHome(form) {
     <section class="land-hero">
       <div class="land-copy">
         <p class="land-pill">Free forever · No sign-up</p>
-        <h1>Plan your fantasy basketball or hockey week</h1>
+        <h1><span class="sr-only">Plan your fantasy ${LAND_SPORTS.join(' or ')} week</span><span aria-hidden="true">Plan your fantasy<br><span class="land-sport">${LAND_SPORTS.map((s, i) => `<span${i ? '' : ' class="on"'}>${s}</span>`).join('')}</span> week</span></h1>
         <p class="land-lead">Your odds for this week's matchup, the best starters, how your categories stack up and a recap the whole league can share.</p>
         <div class="land-connect">${form}</div>
         <div class="land-alt">

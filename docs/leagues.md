@@ -14,3 +14,5 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
 - Landing page (Nov 20, 2026): a first visit gets `landHome` (the form, the demo and sandbox as option cards, `landPreview`, the
   `LAND_FEATURES` grid with the tabs' own icons); adding a league or season and Step 2 (each team with its initials) stay one card. `landPreview`'s
   numbers are made up, the same picture as icons/og.png: change both together. The head shows the site's mark and name there (`leagueMenu`).
+  The headline's sport rolls through `LAND_SPORTS` (a sport there when the site announces one), on its own line so nothing re-wraps; each turn is
+  the `animationiteration` of its CSS `land-tick`, not a timer (the harness's `querySelector` always finds an element, so a timer loop never ends in the tests).
