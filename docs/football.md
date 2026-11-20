@@ -8,7 +8,7 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   from ESPN, stats by week from Sleeper's undocumented `api.sleeper.com/stats`. A game counts only with its `gp`: `gms_active` is on for anyone on an active roster, injured starters included. A line's stats keep Sleeper's names, the same as a league's `scoring_settings`, so
   `L.points` is simply those settings and `lineFp` gives the league's exact points, bonuses and defense brackets included: 80 team-weeks of a real league matched Sleeper's
   to the hundredth. `statKeys` come from the file (`fetchSport` fills `countKeys`, `playerKeys`). A league is `oneGame`, which already means one game a week per slot, with no
-  Game of the week. Weeks are Tuesday to Monday (`weekShift`, in `dayOffset`), from the file's `weeks`. During a game the points come from Sleeper's matchups (`footballLines`:
+  Game of the period. Weeks are Tuesday to Monday (`weekShift`, in `dayOffset`), from the file's `weeks`. During a game the points come from Sleeper's matchups (`footballLines`:
   lines holding only `bonus`), every 30 s; ESPN gives only the game clock (scoreboard, no box scores). A team defense is a player, id 900000 + its team's index, `slp` its code.
   Projections: the job adds Sleeper's weekly feed (Rotowire's numbers, also undocumented) as `raw.proj[week]`, in `projKeys` order, for 3 weeks (`projWeeks`), with the stat names of a
   league's scoring, so `footballPts` is exact in any scoring; kicks are renamed to match (`projected`). A week not in the file uses season averages, and so does a failed feed.

@@ -266,7 +266,7 @@ async function shareCanvas(H) {
     ...codes.map(c => canvasImg(`https://flagcdn.com/w80/${c.toLowerCase()}.png`, true).then(im => { if (im) flagIms.set(c, im); })),
     ...items.flatMap(it => it.logos || []).map(t => logoImg(t).then(im => { if (im) clubIms.set(t, im); }))]);
   const x0 = C.pad, w = inner, fd = 104; // (every photo one size, a player's as a note's faces, as on the page)
-  // the award in orange; a week's games after it, gray ("PLAYER OF THE WEEK · 4 G, PER GAME")
+  // the award in orange; a week's games after it, gray ("PLAYER OF THE PERIOD · 4 G, PER GAME")
   const labelText = (it, x, y, max) => {
     font(22, 700, 2); const t = fitText(ctx, it.label.toUpperCase(), max); text(t, x, y, C.accent);
     const per = it.p && it.tiles && it.per ? ` · ${it.per} G, PER GAME` : '', lw = ctx.measureText(t).width;

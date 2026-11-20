@@ -5,7 +5,7 @@
 // ----- Weekly recap -----
 // A finished week across the whole league, counted from the week's real lineups and box scores as How week N ended
 // counts one matchup: every final, then the standouts. Fantrax, Sleeper and ESPN basketball leagues (hasWeekLineups);
-// in Sleeper's one-game weeks a starter's week is the game that counted, so Player of the week is the best such game.
+// in Sleeper's one-game weeks a starter's week is the game that counted, so Player of the period is the best such game.
 const recaps = new Map(); // "league|period" -> recap, or null when the week's lineups aren't there
 keep('box league', id => dropKept(recaps, id));
 
@@ -122,7 +122,7 @@ function buildRecap(L, P, period) {
       carry: carry && carry.share >= 0.2 ? { ...carry, pts: lineFp(carry.line), of: score.get(carry.tid) } : null,
     };
   }
-  // Hockey: the best goalie's week (when Player of the week isn't one), and every starter's three-goal game
+  // Hockey: the best goalie's week (when Player of the period isn't one), and every starter's three-goal game
   const isGoalie = line => !!(line.sa || line.gs);
   const goalie = isHockey() ? best(weeks.filter(x => isGoalie(x.line)), x => x.v) : null;
   const mvp = best(weeks, x => x.v);
@@ -136,7 +136,7 @@ function buildRecap(L, P, period) {
     defense: defense && defense !== mvp ? defense : null,
     period, games: order,
     mvp,
-    game: L.oneGame ? null : best(single, x => x.v), // one-game weeks: the player of the week's game
+    game: L.oneGame ? null : best(single, x => x.v), // one-game weeks: the player of the period's game
     // the least a starter did a game over the week, among those with 2 or more games (one short night isn't a week)
     brick: L.oneGame ? null : best(weeks.filter(x => x.line.gp1 >= 2), x => -x.v / x.line.gp1),
     dud: best(single, x => -x.v), // the single worst game
@@ -155,9 +155,9 @@ const recapMark = (X, tid) => (!X.rank ? '' : X.rank.top.includes(tid) ? 'top' :
 const RECAP_MARK = { top: 'Best', bottom: 'Worst' }; // (the owner's words)
 function recapMarkTip(X, tid) {
   const top = X.rank.top.includes(tid);
-  if (isPoints()) return `${top ? 'Most' : 'Fewest'} points this week: ${fmtFp(X.rank.score[tid])}`;
+  if (isPoints()) return `${top ? 'Most' : 'Fewest'} points this period: ${fmtFp(X.rank.score[tid])}`;
   const a = X.rank.rec[tid];
-  return `${top ? 'Best' : 'Worst'} week in the league: ${a.w}-${a.l}${a.t ? `-${a.t}` : ''} against every other team`;
+  return `${top ? 'Best' : 'Worst'} period in the league: ${a.w}-${a.l}${a.t ? `-${a.t}` : ''} against every other team`;
 }
 
 // (≈: a Sleeper week the site could only estimate, buildRecap)
@@ -177,11 +177,11 @@ function recapItems(X) {
     add(label, '', `${x.p.name} (${team(x.tid)}): ${head}${parts.join(', ')}`, { p: x.p, tid: x.tid, stats: `${head}${parts.join(' · ')}`,
       tiles: lineTiles(x.line, perGame), per: perGame ? x.line.gp1 : 0, score: [isPoints() && !perGame ? fmtFp(x.v) : fmtValue(x.v, perGame ? 1 : 2), unit] });
   };
-  if (X.mvp) stand('Player of the week', X.mvp, !isOneGame());
-  if (X.goalie) stand('Goalie of the week', X.goalie, true);
-  if (X.defense) stand('Defense of the week', X.defense, false);
-  if (X.game) stand('Game of the week', X.game, false);
-  if (X.brick) stand('Worst week', X.brick, true);
+  if (X.mvp) stand('Player of the period', X.mvp, !isOneGame());
+  if (X.goalie) stand('Goalie of the period', X.goalie, true);
+  if (X.defense) stand('Defense of the period', X.defense, false);
+  if (X.game) stand('Game of the period', X.game, false);
+  if (X.brick) stand('Worst period', X.brick, true);
   if (X.dud) stand('Worst game', X.dud, false);
   if (X.missed && X.missed.length) {
     // nobody's photo: names in line with the text, as the others
@@ -220,18 +220,18 @@ function recapItems(X) {
     const g = X.close, by = `by ${fmt(g.margin, g.margin < 1 ? 2 : 1)}`;
     add('Nail-biter', `<b>${teamLink(g.a)}</b> beat ${teamLink(g.b)} ${final(g)}, ${by}`, `${team(g.a)} beat ${team(g.b)} ${final(g)}, ${by}`);
   }
-  // Best week: a category week is hard to read from the finals; a points week is just the top score, there for all to see
+  // Best period: a category week is hard to read from the finals; a points week is just the top score, there for all to see
   if (X.allPlay && X.teams > 2 && !isPoints()) {
     // matchups won against every other team's week, not categories
     const a = X.allPlay, n = X.teams - 1;
     const beat = `${a.w === n ? `every other team (${n} of ${n})` : `${a.w} of ${n} teams`}${a.t ? `, tied ${a.t}` : ''}`;
-    add('Best week', `<b>${teamLink(a.tid)}</b> would have beaten ${beat}`, `${team(a.tid)} would have beaten ${beat}`);
+    add('Best period', `<b>${teamLink(a.tid)}</b> would have beaten ${beat}`, `${team(a.tid)} would have beaten ${beat}`);
   }
   return out;
 }
 
 // The address that opens this recap in the league: anyone in it can pick their team and land here
-const recapUrl = (L, n) => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}&week=${n}#recap`;
+const recapUrl = (L, n) => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}&period=${n}#recap`;
 
 // What Share sends: the standouts only (everyone already has the results in their league)
 function recapText(L, X) {
@@ -246,7 +246,7 @@ function recapText(L, X) {
 // 2026; the share picture, shareCanvas, is laid out the same). label: the award's title as HTML (the Draft tab's opens its
 // breakdown)
 const standoutFaces = faces => `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>`;
-function standoutCard(x, label = `<div class="rx-label">${x.label}${x.tiles && x.per ? `<span class="rx-per"> · ${x.per} G, per game</span>` : ''}</div>`) {
+function standoutCard(x, label = `<div class="rx-label"><span class="rx-award">${x.label}</span>${x.tiles && x.per ? ` <span class="rx-per">· ${x.per} G, per game</span>` : ''}</div>`) {
   if (!x.p) {
     const faces = (x.faces || []).filter(f => f && f.nbaId != null).slice(0, 3);
     const flags = (x.flags || []).filter(r => r.length), logos = (x.logos || []).filter(t => IMG && IMG.logos[t]).slice(0, 3); // (only logos the site has)
@@ -269,7 +269,7 @@ function viewRecap() {
   const L = fxLeague();
   if (!L || !NBA) return '';
   const empty = (t, m) => `<div class="card"><div class="empty"><strong>${t}</strong>${m}</div></div>`;
-  if (!hasWeekLineups(L)) return empty(`No recaps for ${esc(sourceName(L))}${isFootball() ? ' football' : ''} leagues yet`, "Recaps come from each week's real lineups, which the site doesn't read from those yet.");
+  if (!hasWeekLineups(L)) return empty(`No recaps for ${esc(sourceName(L))}${isFootball() ? ' football' : ''} leagues yet`, "Recaps come from each period's real lineups, which the site doesn't read from those yet.");
   // the last game day's box scores tell whether a week is over before Fantrax says so
   if (!BOX) loadBoxes().then(() => { if (ui.tab === 'recap') render(); }).catch(() => {});
   else fillWeekFromEspn(L); // (the night a week ends, its last games from ESPN before the daily job saves them)
@@ -288,7 +288,7 @@ function viewRecap() {
 
   const me = myTeamId();
   // every finished period, newest by default: ‹ Period 2 › steps back through the earlier ones
-  const picker = done.length > 1 ? stepper('recap-step', 'week', `<select class="ctx-team" data-change="recap-week" aria-label="Period">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Period ${p.n}</option>`).join('')}</select>`,
+  const picker = done.length > 1 ? stepper('recap-step', 'period', `<select class="ctx-team" data-change="recap-week" aria-label="Period">${done.map(p => `<option value="${p.n}" ${p.n === period.n ? 'selected' : ''}>Period ${p.n}</option>`).join('')}</select>`,
     { first: period.n === done[0].n, last: period.n === done[done.length - 1].n }) : '';
   // the finals, the week's top and bottom teams marked on the row's outer edge (before the left team, after the right)
   const mark = tid => { const k = recapMark(X, tid); return k ? `<span class="rc-badge rc-${k}" title="${esc(recapMarkTip(X, tid))}">${RECAP_MARK[k]}</span>` : ''; };
@@ -300,7 +300,7 @@ function viewRecap() {
   </div>
   <div class="card"><div class="card-head"><h2>Results</h2></div>
     <ul class="rc-finals">${finals}</ul>
-    ${X.est ? `<p class="muted small" style="margin:8px 0 0">≈ estimated: Sleeper doesn't share this week's scores. The winners are Sleeper's. ${infoBtn('slpScores')}</p>` : ''}
+    ${X.est ? `<p class="muted small" style="margin:8px 0 0">≈ estimated: Sleeper doesn't share this period's scores. The winners are Sleeper's. ${infoBtn('slpScores')}</p>` : ''}
   </div>`;
 }
 
@@ -309,7 +309,7 @@ function viewRecap() {
 const recapCanvas = (L, X) => shareCanvas({
   kicker: `PERIOD ${X.period.n} RECAP`, title: L.name, items: recapItems(X), games: X.games, mark: tid => recapMark(X, tid),
 });
-const recapFileName = (L, X) => `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-week-${X.period.n}.png`;
+const recapFileName = (L, X) => `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-period-${X.period.n}.png`;
 // The Recap's share (shareWith, share.js)
 const recapShare = (L, X) => ({
   title: `Period ${X.period.n} recap`, name: `${L.name} · Period ${X.period.n} recap`, what: 'Recap', link: 'Full recap',

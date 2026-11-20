@@ -14,7 +14,7 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   on Sleeper's weekly matchups (`hasLineupHistory`; `loadRosterWeeks` keeps [id, starting, points] per player and the
   week's pairings under '#m', which fill `L.matchups`): `countedRows` keeps a starter's one counted game (nearest
   Sleeper's points, `countedIndex`; none when Sleeper says 0), a bench swap puts in the bench player's best game, Street
-  Clothes counts empty starts, and the Recap has no Game of the week / Worst week. A game's Sleeper bonuses (40-point games...)
+  Clothes counts empty starts, and the Recap has no Game of the period / Worst period. A game's Sleeper bonuses (40-point games...)
   ride along as `bonus` on game lines (`withBonus`, added by `lineFp`), so weekly scores match the matchups API's within techs and
   stat corrections (not Sleeper's real results: Gotchas). Past seasons stay Fantrax-only. Dynasty: a taxi squad (`r.taxi`) is roster status
   'TAXI', in a side's `il` with the IR (never in a lineup or projection), drawn "Taxi" (`onTaxi`, `slotBadge('TAXI')`); past weeks mark

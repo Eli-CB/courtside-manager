@@ -329,7 +329,7 @@ function viewLanding() {
   const step2 = chosen ? `
       <p class="land-step">Step 2 of 2</p>
       <h1>Which team is yours?</h1>
-      <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. ${ui.afterPick === '#recap' ? `Pick your team to see the week${ui.recapWeek ? ` ${ui.recapWeek}` : ''} recap a league mate shared.` : ui.afterPick === '#trade' && ui.tradeLink ? 'Pick your team to see the trade a league mate shared.' : afterSeason ? `Pick your team to see the ${afterSeason.label} season.` : "Pick your team to load your roster and this week's matchup."}</p>
+      <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. ${ui.afterPick === '#recap' ? `Pick your team to see the ${ui.recapWeek ? `period ${ui.recapWeek}` : 'period'} recap a league mate shared.` : ui.afterPick === '#trade' && ui.tradeLink ? 'Pick your team to see the trade a league mate shared.' : afterSeason ? `Pick your team to see the ${afterSeason.label} season.` : "Pick your team to load your roster and this week's matchup."}</p>
       ${preDraft() ? `<p class="land-note">This league hasn't drafted yet${draftWhen(fxLeague()) ? ` (draft: ${esc(draftWhen(fxLeague()))})` : ''}, so rosters are empty for now.</p>` : ''}
       <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}"><span class="lt-tag" aria-hidden="true">${esc(initials(t.name))}</span><span class="lt-name">${esc(t.name)}</span></button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';

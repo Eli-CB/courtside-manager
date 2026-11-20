@@ -2406,10 +2406,10 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.match(html, new RegExp(`class="rx-faces"><span class="hs[^"]*" style="width:44px;height:44px[^"]*" data-photo="${X.mvp.p.nbaId}"`), "the player's round photo, which opens his card");
     // kept short (the owner's ask, Nov 2026): his name with one initial and his fantasy team on one line, a week's games
     // beside the award, no NBA team, positions or minutes, a week's percentages without makes/attempts (a game's keep them)
-    const mvpCard = html.slice(html.indexOf('Player of the week'), html.indexOf('</article>', html.indexOf('Player of the week')));
+    const mvpCard = html.slice(html.indexOf('Player of the period'), html.indexOf('</article>', html.indexOf('Player of the period')));
     assert.ok(mvpCard.includes(`${X.mvp.line.gp1} G, per game</span>`) && mvpCard.includes(`>${app.esc(app.shortName(X.mvp.p.name))}</button><span class="rx-team">`), 'short name, team beside it');
     assert.ok(!html.includes('rx-meta') && !mvpCard.includes('class="pt ') && !mvpCard.includes('data-action="sport-team"') && !mvpCard.includes(' MIN') && !/\d\/\d/.test(mvpCard), 'no NBA team, positions, minutes or a week\'s makes/attempts');
-    const gameCard = html.slice(html.indexOf('Game of the week'), html.indexOf('</article>', html.indexOf('Game of the week')));
+    const gameCard = html.slice(html.indexOf('Game of the period'), html.indexOf('</article>', html.indexOf('Game of the period')));
     assert.ok(gameCard.includes(` ${X.game.line.fgm}/${X.game.line.fga}`), "a game's makes/attempts kept");
     // the finals agree with Fantrax's standings (week 1 is the only finished week)
     for (const g of X.games) {
@@ -2423,7 +2423,7 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     // the brick did the least over the week, the dud had the worst single game
     assert.ok(X.brick && X.dud);
     assert.ok(X.brick.line.gp1 >= 2 && X.brick.v / X.brick.line.gp1 <= X.mvp.v / X.mvp.line.gp1 && X.dud.v <= X.game.v && X.dud.line.gp1 === 1);
-    assert.ok(html.includes('Worst week') && html.includes('Worst game'));
+    assert.ok(html.includes('Worst period') && html.includes('Worst game'));
     // Street clothes: games missed while starting, never more than his team played
     assert.ok(X.missed.every(x => x.games > 0 && x.games <= x.sched));
     if (X.missed.length) assert.ok(html.includes('Street clothes') && html.includes('while starting'));
@@ -2433,28 +2433,30 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     const recs = Object.values(X.rank.rec), vals = recs.map(a => a.w + a.t / 2);
     assert.deepEqual(Array.from(X.rank.top, String).sort(), recs.filter(a => a.w + a.t / 2 === Math.max(...vals)).map(a => String(a.tid)).sort());
     assert.deepEqual(Array.from(X.rank.bottom, String).sort(), recs.filter(a => a.w + a.t / 2 === Math.min(...vals)).map(a => String(a.tid)).sort());
-    assert.ok(X.rank.top.includes(X.allPlay.tid), 'Best week is the crowned one');
+    assert.ok(X.rank.top.includes(X.allPlay.tid), 'Best period is the crowned one');
     const results = html.split('class="rc-finals"')[1];
     assert.equal((results.match(/class="rc-badge rc-top"[^>]*>Best</g) || []).length, X.rank.top.length);
     assert.equal((results.match(/class="rc-badge rc-bottom"[^>]*>Worst</g) || []).length, X.rank.bottom.length);
-    assert.match(results, /title="Best week in the league: \d+-\d+(-\d+)? against every other team"/);
-    for (const label of ['Player of the week', 'Game of the week', 'Best week']) assert.ok(html.includes(label), label);
-    assert.match(html, /would have beaten (every other team|\d+ of \d+ teams)/, 'Best week counts teams beaten, not categories');
+    assert.match(results, /title="Best period in the league: \d+-\d+(-\d+)? against every other team"/);
+    for (const label of ['Player of the period', 'Game of the period', 'Best period']) assert.ok(html.includes(label), label);
+    const words = L.teams.reduce((t, tm) => t.split(app.esc(tm.name)).join(' '), html.replace(/<[^>]+>/g, ' ')); // (not a team's name: "BYE WEEK")
+    assert.ok(!/\bweek/i.test(words) && !/\bweek/i.test(app.get('INFO').recap.join(' ')), 'the recap says period, never week (the owner\'s ask)');
+    assert.match(html, /would have beaten (every other team|\d+ of \d+ teams)/, 'Best period counts teams beaten, not categories');
     // the message: the standouts only (everyone has the results), each with its full line in the league's categories
     const text = app.recapText(L, X);
     assert.ok(text.startsWith(`${L.name} · Period 1 recap`) && !/\p{Extended_Pictographic}/u.test(text), text.slice(0, 80));
     assert.ok(!X.games.some(g => text.includes(`${app.fxTeamName(g.a)} ${app.scoreLine(g.sc)} ${app.fxTeamName(g.b)}`)), 'no results');
-    assert.ok(text.includes('Player of the week: ') && !/<[a-z]/.test(text), 'plain text, no markup');
+    assert.ok(text.includes('Player of the period: ') && !/<[a-z]/.test(text), 'plain text, no markup');
     for (const c of app.scoreCats()) assert.ok(text.includes(` ${c.pct ? c.label.replace('%', '') : c.label}`), `${c.label} in the lines`);
     assert.ok(text.includes(`${X.game.line.fgm}/${X.game.line.fga} FG`), 'shooting as makes/attempts');
     assert.ok(!/Biggest win|Closest/.test(text + html), 'not the biggest win or the closest');
     assert.ok(!html.includes('inl-p'), 'names without photos, in line with the text');
-    assert.ok(app.recapUrl(L, 1).endsWith(`?league=${L.id}&week=1#recap`), app.recapUrl(L, 1));
+    assert.ok(app.recapUrl(L, 1).endsWith(`?league=${L.id}&period=1#recap`), app.recapUrl(L, 1));
     // the image: each player standout brings its player, team and stat line (stats kept whole: ' · ' between them)
-    const items = app.recapItems(X), mvp = items.find(x => x.label === 'Player of the week');
+    const items = app.recapItems(X), mvp = items.find(x => x.label === 'Player of the period');
     assert.ok(mvp.p.nbaId === X.mvp.p.nbaId && mvp.tid === X.mvp.tid && mvp.stats.includes(' · ') && mvp.stats.startsWith(`${X.mvp.line.gp1} G, per game: `));
     assert.ok(items.filter(x => !x.p).every(x => x.text && !x.stats), 'the others are a sentence');
-    assert.match(app.recapFileName(L, X), /^[a-z0-9-]+-week-1\.png$/);
+    assert.match(app.recapFileName(L, X), /^[a-z0-9-]+-period-1\.png$/);
     // the Matchup tab doesn't point to it (the Recap tab is one tap away)
     assert.ok(!app.viewDashboard().includes('Week 1 recap'));
   } finally { ui.tab = 'dashboard'; }
@@ -2520,12 +2522,14 @@ test("ESPN recap: a finished week from each of its days' lineups, asked for once
 });
 
 test('a shared recap link: connects the league, asks for the team, then shows the recap', async () => {
+  // &period= (a link shared before Nov 20, 2026 says &week=)
+  for (const key of ['period', 'week']) {
   const L = await app.useLeague(CATS9);
   const state = app.get('state'), ui = app.get('ui');
   const was = { ...state }, loc = { search: app.location.search, hash: app.location.hash };
   app.history = { replaceState() { app.location.search = ''; } };
   Object.assign(state, { fxTeam: null, fxLeagueId: null, leagueStates: {}, savedLeagues: [], leagueChosen: false, demo: false });
-  app.location.search = `?league=${L.id}&week=1`;
+  app.location.search = `?league=${L.id}&${key}=1`;
   app.location.hash = '#recap';
   app.route(); // as the page does on load, before the link is read
   try {
@@ -2534,7 +2538,7 @@ test('a shared recap link: connects the league, asks for the team, then shows th
     assert.equal(ui.recapWeek, 1);
     assert.equal(app.currentLeagueId(), L.id);
     assert.ok(app.needsLanding(), 'pick your team first');
-    assert.match(app.viewLanding(), /week 1 recap a league mate shared/);
+    assert.match(app.viewLanding(), /the period 1 recap a league mate shared/);
     app.actions['land-team']({ dataset: { id: L.teams[2].id } });
     assert.equal(state.fxTeam, L.teams[2].id);
     assert.equal(ui.tab, 'recap', 'then the recap');
@@ -2545,6 +2549,7 @@ test('a shared recap link: connects the league, asks for the team, then shows th
     ui.recapWeek = null; ui.tab = 'dashboard';
     const live = app.get('live'); clearTimeout(live.timer); live.timer = null;
     await app.useLeague(CATS9);
+  }
   }
 });
 
@@ -3926,22 +3931,22 @@ test('Sleeper recap and awards: one counted game per starter', () => asSleeper(a
     assert.match(html, /Period 1 recap/);
     const X = app.get('recaps').get(`${L.id}|1`);
     assert.equal(X.games.length, 6);
-    assert.ok(X.mvp && X.mvp.line.gp1 === 1, 'Player of the week: his counted game');
-    assert.equal(X.game, null, 'no separate Game of the week');
-    assert.equal(X.brick, null, 'no Worst week: a week is one game');
+    assert.ok(X.mvp && X.mvp.line.gp1 === 1, 'Player of the period: his counted game');
+    assert.equal(X.game, null, 'no separate Game of the period');
+    assert.equal(X.brick, null, 'no Worst period: a period is one game');
     assert.ok(X.dud && X.dud.line.gp1 === 1);
-    assert.ok(!html.includes('Game of the week') && html.includes('Player of the week'));
+    assert.ok(!html.includes('Game of the period') && html.includes('Player of the period'));
     assert.ok(X.missed.every(x => x.games === 1 && x.sched === 1), 'Street clothes: a start without any game');
     if (X.missed.length) assert.ok(html.includes('started without playing a game'));
     // a points week's best is the top score, already in the finals; the share text and the image come from the same list
-    assert.ok(X.allPlay && !app.recapItems(X).some(x => x.label === 'Best week') && !html.includes('Best week') && !app.recapText(L, X).includes('Best week'));
+    assert.ok(X.allPlay && !app.recapItems(X).some(x => x.label === 'Best period') && !html.includes('Best period') && !app.recapText(L, X).includes('Best period'));
     // the results crown the week's top score and mark the lowest
     const scores = Object.entries(X.rank.score), hi = Math.max(...scores.map(s => s[1])), lo = Math.min(...scores.map(s => s[1]));
     assert.deepEqual(Array.from(X.rank.top, String), scores.filter(s => s[1] === hi).map(s => s[0]));
     assert.deepEqual(Array.from(X.rank.bottom, String), scores.filter(s => s[1] === lo).map(s => s[0]));
     assert.equal(app.recapMark(X, X.rank.top[0]), 'top');
     assert.equal(app.recapMark(X, X.rank.bottom[0]), 'bottom');
-    assert.ok(html.includes(`title="Most points this week: ${app.fmtFp(hi)}"`) && html.includes(`title="Fewest points this week: ${app.fmtFp(lo)}"`));
+    assert.ok(html.includes(`title="Most points this period: ${app.fmtFp(hi)}"`) && html.includes(`title="Fewest points this period: ${app.fmtFp(lo)}"`));
     // a points week's luck: the best score that lost and the worst that won (each only on the wrong side of the middle),
     // the closest final, and the starter with the biggest share of his team's points
     const decided = X.games.filter(g => g.margin > 0);
@@ -5042,7 +5047,7 @@ test('hockey history: weeks, recaps and awards run on its box scores, and a heal
   }
   // the recap's hockey items: a goalie of the week (a goalie's line), and three-goal games
   const X = [...a.get('recaps').values()].find(Boolean);
-  assert.ok(!X.goalie || (X.goalie.line.sa || X.goalie.line.gs) && X.goalie !== X.mvp, 'Goalie of the week: a goalie, not the Player of the week');
+  assert.ok(!X.goalie || (X.goalie.line.sa || X.goalie.line.gs) && X.goalie !== X.mvp, 'Goalie of the period: a goalie, not the Player of the period');
   assert.ok(X.hats.every(x => a.lineStat(x.line, 'g') >= 3));
   ui.tab = 'standings';
 });

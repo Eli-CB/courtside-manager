@@ -834,14 +834,15 @@ $('#importFile').addEventListener('change', async e => {
   }
 });
 
-// A link someone shared (?league=<id>&week=<n>#recap, or a trade: &from=<team>&to=<team>&give=<ids>&get=<ids>, its draft picks in &givepicks= &getpicks=, #trade, kept
+// A link someone shared (?league=<id>&period=<n>#recap (&week=<n> in links shared before Nov 20, 2026), or a trade: &from=<team>&to=<team>&give=<ids>&get=<ids>, its draft picks in &givepicks= &getpicks=, #trade, kept
 // until your team is known: applyTradeLink): open that league, or connect it and ask for the team first
 async function openSharedLink() {
   if (!location.search) return;
   const q = new URLSearchParams(location.search), id = q.get('league');
   if (!id) return;
   history.replaceState(null, '', location.pathname + location.hash);
-  if (+q.get('week')) ui.recapWeek = +q.get('week');
+  const n = +(q.get('period') || q.get('week'));
+  if (n) ui.recapWeek = n;
   const ids = k => (q.get(k) || '').split(',').filter(Boolean);
   if (q.get('from') && q.get('to')) { ui.tradeLink = { from: q.get('from'), to: q.get('to'), give: ids('give'), get: ids('get'), givePicks: ids('givepicks'), getPicks: ids('getpicks') }; ui.tradeSeen = null; }
   ui.afterPick = location.hash || '#recap';

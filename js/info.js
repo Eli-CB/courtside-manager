@@ -55,19 +55,19 @@ const INFO = {
     <p><b>Last 5 games</b>, oldest first: green above his usual game, red below. Hover one for its date, opponent and minutes. <b>Avg</b> is those five games' average, <b>Usual</b> his median game before them, <b>Season</b> every game he's played this season, and <b>MIN</b> his minutes a game, usual → last 5.</p>
     <p><b>Change</b> is the average less his usual game, with the percentage under it. A shooting percentage shows each game's makes and attempts, its attempts a game (usual → last 5), and the makes a game above or below his usual rate. <b>Value</b> is what a game of his is worth: categories won, or fantasy points in a points league.</p>
     <p><b>All</b>, <b>Rostered</b> (on one of your league's teams today) or <b>Waivers</b> (on none); in the sandbox, <b>My team</b> or <b>Everyone else</b>. A column's heading sorts by it.</p>`],
-  recap: ['Weekly recap', `
-    <p><b>Results</b>: <b>Best</b> marks the week's top team and <b>Worst</b> its bottom one: the most and fewest points in a points league, and in a category league the best and worst record had each team played every other team that week. Hover one for the numbers.</p>
-    <p>A finished week's standouts across the league, counted from that week's real lineups and the NBA box scores (as Plan Ahead's finished week counts one matchup), then every matchup's result. Only starters count. Stat lines show your league's categories.</p>
-    <ul><li><b>Player of the week:</b> the most value from a starter's games that week (categories won, or fantasy points in points leagues), with his per-game line.</li>
-    <li><b>Game of the week:</b> the best single game by a starter.</li>
-    <li><b>Worst week:</b> the starter who did the least a game over the week (2 or more games), with his per-game line.</li>
+  recap: ['Period recap', `
+    <p><b>Results</b>: <b>Best</b> marks the period's top team and <b>Worst</b> its bottom one: the most and fewest points in a points league, and in a category league the best and worst record had each team played every other team that period. Hover one for the numbers.</p>
+    <p>A finished period's standouts across the league, counted from that period's real lineups and the NBA box scores (as Plan Ahead's finished period counts one matchup), then every matchup's result. Only starters count. Stat lines show your league's categories.</p>
+    <ul><li><b>Player of the period:</b> the most value from a starter's games that period (categories won, or fantasy points in points leagues), with his per-game line.</li>
+    <li><b>Game of the period:</b> the best single game by a starter.</li>
+    <li><b>Worst period:</b> the starter who did the least a game over the period (2 or more games), with his per-game line.</li>
     <li><b>Worst game:</b> the worst single game by a starter.</li>
-    <li><b>Street clothes:</b> the starter who missed the most of his NBA team's games while in a starting lineup that week (injury, rest or coach's decision; the box scores can't tell which).</li>
-    <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Plan Ahead, for a finished week).</li>
-    <li><b>Best week</b> (category leagues): the team whose week would have beaten the most others. In a points league that's simply the top score in the finals.</li>
+    <li><b>Street clothes:</b> the starter who missed the most of his NBA team's games while in a starting lineup that period (injury, rest or coach's decision; the box scores can't tell which).</li>
+    <li><b>Bench regret:</b> the one bench-for-starter swap that would have changed a result most (see Bench swaps on Plan Ahead, for a finished period).</li>
+    <li><b>Best period</b> (category leagues): the team whose period would have beaten the most others. In a points league that's simply the top score in the finals.</li>
     <li><b>Points leagues:</b> <b>Carried</b>, the starter with the biggest share of his team's points (a fifth or more); <b>Tough luck</b>, the best score that lost, when it was in the league's top half; <b>Lucky win</b>, the worst score that won, when it was in the bottom half; <b>Nail-biter</b>, the closest final.</li>
-    <li><b>Hockey:</b> <b>Goalie of the week</b> (when the Player of the week isn't a goalie) and every starter's <b>Hat trick</b>. <b>Football:</b> <b>Defense of the week</b>, the best team defense started.</li></ul>
-    <p><b>Sleeper leagues</b> count one game a week for each starter, so a starter's week is the game that counted (the one whose fantasy points match Sleeper's for him that week, bonuses included). Player of the week is the best of those games and Worst game the worst; there's no separate Game of the week or Worst week. Street clothes is a starter who didn't play a game all week while his NBA team did, and a bench regret puts in the bench player's best game.</p>
+    <li><b>Hockey:</b> <b>Goalie of the period</b> (when the Player of the period isn't a goalie) and every starter's <b>Hat trick</b>. <b>Football:</b> <b>Defense of the period</b>, the best team defense started.</li></ul>
+    <p><b>Sleeper leagues</b> count one game a period for each starter, so a starter's period is the game that counted (the one whose fantasy points match Sleeper's for him that period, bonuses included). Player of the period is the best of those games and Worst game the worst; there's no separate Game of the period or Worst period. Street clothes is a starter who didn't play a game all period while his NBA team did, and a bench regret puts in the bench player's best game.</p>
     <p><b>Share</b> sends the standouts to your league chat with a link (everyone already has the results in their league). Anyone in the league who opens it connects the league and picks their team, then lands on this recap.</p>`],
   moves: ['Moves this period', `
     <p>Who each team added and dropped since last period's rosters: this period's moves so far, including the ones made before its first game. A player on no roster last period is an add (+), one on no roster now a drop (−), one who was on another team a trade (⇄).</p>
