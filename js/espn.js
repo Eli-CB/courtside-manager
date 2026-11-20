@@ -405,13 +405,25 @@ function espnWeekPoints(j, n) {
   return pts;
 }
 
+// An ID ESPN knows as neither basketball nor football: a hockey or baseball league's, said plainly (a bare ID doesn't say
+// its sport; a link does, connectLeague), else not found. Asked only when nothing loaded: a mistyped ID costs two requests.
+// (hockey's season is named like basketball's, by the year it ends; baseball's by its own year)
+async function espnOtherSport(id) {
+  for (const [game, sport, season] of [['fhl', 'hockey', espnSeason()], ['flb', 'baseball', new Date().getFullYear()]]) {
+    // (a private league answers 401: it's there all the same)
+    const there = await espnGet(`${espnLeaguePath(season, id)}view=mSettings`, null, game).then(() => true, e => /\b40[13]\b/.test(e.message));
+    if (there) return sportNotRead('ESPN', sport);
+  }
+  return new Error('League not found');
+}
+
 async function fetchEspnFootball(id) {
   const D = SPORT.key === 'nfl' && NBA ? NBA : await fetchSport('nfl');
   const season = +D.season;
   const j = await espnLeagueJson(season, id, 'ffl');
-  if (!j) throw new Error('League not found');
+  if (!j) throw await espnOtherSport(id);
   const s = j.settings, sched = s.scheduleSettings || {}, ss = s.scoringSettings || {};
-  if (!/POINTS/.test(ss.scoringType || '')) throw new Error("ESPN football leagues scored by categories aren't supported yet: points leagues are");
+  if (!/POINTS/.test(ss.scoringType || '')) throw plainError("That's an ESPN football league scored by categories. ESPN football works with points leagues for now.");
 
   // the data's players by ESPN id; anyone rostered who isn't there keeps ESPN's name
   const toNba = {}, names = {};

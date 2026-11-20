@@ -66,8 +66,14 @@ function foldPastSeasons() {
 // What the league form connects: a league, or an earlier season of one, opened under its league. A past season
 // whose league isn't here yet is kept for when it is, and returned as { label, name } so the form can ask for it.
 async function connectLeague(input) {
-  // (only Fantrax has hockey here; an ESPN hockey league's ID would be read as a basketball one)
-  if (/espn\.com\/hockey/i.test(String(input))) throw new Error("ESPN hockey leagues aren't supported yet. Hockey works with Fantrax leagues.");
+  // a link that names a sport the site doesn't read on its site, said before anything's asked (an ESPN hockey or baseball
+  // league's bare ID is asked for as basketball, then football: espnOtherSport)
+  const text = String(input);
+  const espn = text.match(/espn\.com\/(?:fantasy\/)?(hockey|baseball)\b/i);
+  if (espn) throw sportNotRead('ESPN', espn[1].toLowerCase());
+  const yh = text.match(/(?:([a-z]+)\.)?fantasysports\.yahoo\.com\/(\w+)/i);
+  if (yh && !yahooOn()) throw plainError(YAHOO_CLOSED);
+  if (yh && yh[1] && yh[2].toLowerCase() !== 'nba') throw sportNotRead('Yahoo', yh[1].toLowerCase());
   const id = parseLeagueId(input);
   if (!id) throw new Error(BAD_LEAGUE_ID);
   if (leagueSourceOf(id) === 'fantrax') {
@@ -148,13 +154,14 @@ async function needNba() {
   if (!NBA) await nbaLoading;
   if (!NBA) throw new Error(`Couldn't load ${SPORT.name} data. Check your connection and try again.`);
 }
-// A league that didn't load, as a readable message
+// Until Yahoo approves the sign-in, only testers see it (yahooOn): everyone else is told so, not sent to a button they don't have
+const YAHOO_CLOSED = "Yahoo leagues can't be loaded yet: League Layer is waiting on Yahoo's approval. Fantrax, ESPN and Sleeper leagues work now.";
+// A league that didn't load, as a readable message (a sport the site doesn't read on that site: sportNotRead, as it is)
 function leagueError(id, e) {
   const site = SOURCE_NAME[leagueSourceOf(id)];
-  if (e.message === 'yahoo sign-in') return new Error('Sign in with Yahoo to load Yahoo leagues.');
+  if (e.plain) return e;
+  if (e.message === 'yahoo sign-in') return new Error(yahooOn() ? 'Sign in with Yahoo to load Yahoo leagues.' : YAHOO_CLOSED);
   if (e.message === 'private league') return new Error("That ESPN league is private, so ESPN won't share it. Only public ESPN leagues can be loaded; the league manager can make it viewable to the public in the league's settings.");
-  if (/not basketball/.test(e.message)) return new Error(`That league isn't basketball (${e.message.replace(/^that's /, '')}).`);
-  if (/^not supported: /.test(e.message)) return new Error(`That's a Fantrax ${e.message.replace(/^not supported: /, '')} league. League Layer covers basketball and hockey leagues on Fantrax (and football on Sleeper) for now.`);
   return new Error(`${site} didn't find that league (${e.message}). Check the ID in your league's address.${site === 'ESPN' ? ' Only public ESPN leagues can be loaded.' : ''}`);
 }
 

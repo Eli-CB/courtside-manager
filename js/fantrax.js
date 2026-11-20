@@ -30,6 +30,15 @@ function parseLeagueId(text) {
   return /^\d{3,12}$/.test(id) || /^[A-Za-z0-9]{6,32}$/.test(id) ? id : null;
 }
 const BAD_LEAGUE_ID = "That doesn't look like a league ID. Paste your league's address from Fantrax, ESPN or Sleeper, or just its ID.";
+// A league that can't be read, said plainly: leagueError shows a plainError's message as it is
+const plainError = msg => Object.assign(new Error(msg), { plain: true });
+// The sports each site's leagues are read for (Yahoo's sign-in shows once Yahoo approves it: yahooOn)
+const SITE_SPORTS = { Fantrax: ['basketball', 'hockey'], ESPN: ['basketball', 'football'], Sleeper: ['basketball', 'football'], Yahoo: ['basketball'] };
+// A league of a sport the site doesn't read on that site, and the sites that sport works with
+function sportNotRead(site, sport) {
+  const s = String(sport).toLowerCase(), elsewhere = Object.keys(SITE_SPORTS).filter(k => k !== site && SITE_SPORTS[k].includes(s));
+  return plainError(`That's ${/^[AEIOU]/.test(site) ? 'an' : 'a'} ${site} ${sport} league. On ${site}, League Layer covers ${SITE_SPORTS[site].join(' and ')} leagues${elsewhere.length ? `; ${s} works with ${elsewhere.join(' and ')} leagues` : ''}.`);
+}
 // Weekly lineup history (Season totals, Awards, Recap) is read from Fantrax and Sleeper (past seasons: Fantrax only)
 const hasLineupHistory = L => !!L && ['fantrax', 'sleeper'].includes(L.source || 'fantrax');
 
@@ -286,7 +295,7 @@ async function fetchFantraxLeague(id, opts = {}) {
   // which sports people try goes to the error log, to see what's wanted
   if (!FANTRAX_SPORTS.includes(sport)) {
     reportError(`Fantrax ${sport} league tried (not supported)`, 'js/fantrax.js');
-    throw new Error(`not supported: ${sport}`);
+    throw sportNotRead('Fantrax', sport);
   }
   const T = SPORTS[sport];
   const [D, { ids, adp: adpList }, rosters, draftFirst, standings] = await Promise.all([

@@ -8,6 +8,11 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   under it (`season-pick`/`season-add`); the team menu only picks a team. The league form (`connectLeague`)
   files an earlier season (year < `NBA.season`, or a later season of the same Fantrax `historyId` is here) under its
   league in `state.pastSeasons[historyId]`, never as a league; `foldPastSeasons` moves old duplicates there
+- A league that can't load says why (`leagueError`; Nov 20, 2026): a `plainError` (fantrax.js) is shown as it is; a sport a site isn't read for is
+  `sportNotRead`, from `SITE_SPORTS` (fantrax.js: keep it in step when a site gains a sport). A link's sport is read before anything's asked
+  (`connectLeague`: ESPN hockey/baseball, Yahoo's subdomain); a bare ESPN ID that's neither basketball nor football is asked for as hockey, then baseball
+  (`espnOtherSport`). Yahoo, until its sign-in is open to all (`yahooOn`), is `YAHOO_CLOSED`, never "Sign in with Yahoo" with no button. A private
+  Fantrax league has never been tried: if Fantrax refuses one, it reads as "didn't find that league".
 - Demo (`state.demo`, the landing page's "Explore a basketball demo league"): the daily file's site league, seen as a team (`demoTeam`: the
   best record with a matchup) so every tab has something to show, it and its teams under made-up names (`demoNames`, in memory only); never in `savedLeagues`, the team picker changes the team, `demo-exit` or
   connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).

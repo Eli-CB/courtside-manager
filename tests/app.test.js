@@ -2641,7 +2641,10 @@ test('Yahoo: sign-in needed, an expired token renewed, the leagues on the accoun
   app.get('yahoo').proxy = 'https://yahoo.test';
   app.localStorage.removeItem('league-layer-yahoo');
   await assert.rejects(app.yahooGet('users;use_login=1/games;game_keys=nba/leagues'), /yahoo sign-in/);
-  assert.match(app.leagueError(YAHOO, new Error('yahoo sign-in')).message, /Sign in with Yahoo/);
+  assert.equal(app.leagueError(YAHOO, new Error('yahoo sign-in')).message, app.get('YAHOO_CLOSED'), 'before Yahoo approves, no button to send them to');
+  app.localStorage.setItem('league-layer-yahoo-beta', '1');
+  assert.match(app.leagueError(YAHOO, new Error('yahoo sign-in')).message, /Sign in with Yahoo/, 'a tester has the button');
+  app.localStorage.removeItem('league-layer-yahoo-beta');
   yahooSignedIn({ access: 'old', refresh: 'r', until: app.NOW - 1 });
   const leagues = [...await app.yahooLeagues()];
   assert.equal(JSON.parse(app.localStorage.getItem('league-layer-yahoo')).access, 'new', 'renewed before asking');
@@ -3572,11 +3575,14 @@ test("a Fantrax league of a sport the site doesn't read (golf) says so, instead 
   assert.equal(app.fxSport(group('BASKETBALL_PLAYER')), 'nba');
   assert.equal(app.fxSport(group('HOCKEY_SKATING')), 'nhl');
   assert.equal(app.fxSport(group('GOLF_GOLFER')), 'golf');
-  assert.equal(app.fxSport(group('FOOTBALL_PLAYER')), 'football', 'football on Fantrax: not read yet (Sleeper only)');
+  assert.equal(app.fxSport(group('FOOTBALL_PLAYER')), 'football', 'football on Fantrax: not read yet (Sleeper and ESPN only)');
   assert.equal(app.fxSport({}), 'nba', "groups that don't say: basketball, as before");
   const err = await app.fetchFantraxLeague('golffixture0001').then(() => null, e => e);
-  assert.ok(err && err.message === 'not supported: golf', err && err.message);
-  assert.equal(app.leagueError('golffixture0001', err).message, "That's a Fantrax golf league. League Layer covers basketball and hockey leagues on Fantrax (and football on Sleeper) for now.");
+  const golf = "That's a Fantrax golf league. On Fantrax, League Layer covers basketball and hockey leagues.";
+  assert.equal(err && err.message, golf);
+  assert.equal(app.leagueError('golffixture0001', err).message, golf, 'shown as it is');
+  assert.equal(app.sportNotRead('Fantrax', 'football').message, "That's a Fantrax football league. On Fantrax, League Layer covers basketball and hockey leagues; football works with ESPN and Sleeper leagues.");
+  assert.equal(app.sportNotRead('Sleeper', 'LCS').message, "That's a Sleeper LCS league. On Sleeper, League Layer covers basketball and football leagues.");
 });
 
 test("Plan Ahead's schedule bubble of a game on now flashes green while he's in it; your own team's name is orange wherever it's drawn", async () => {
@@ -5099,7 +5105,7 @@ test('the landing page offers both sports, and says so when a league is on a sit
   a.leagueMenu();
   a.document.querySelector = find;
   assert.match(menu.innerHTML, /lm-mark[^]*League Layer/);
-  await assert.rejects(a.connectLeague('https://fantasy.espn.com/hockey/league?leagueId=12345678'), /Hockey works with Fantrax leagues/);
+  await assert.rejects(a.connectLeague('https://fantasy.espn.com/hockey/league?leagueId=12345678'), /hockey works with Fantrax leagues/);
 });
 
 test("a season's memos don't cross sports", async () => {
@@ -5836,6 +5842,44 @@ test('football and the other sports leave each other alone', async () => {
   quiet(a);
   assert.equal(a.get('SPORT').key, 'nfl');
   assert.equal(a.get('state').slots.length, 9);
+});
+
+test("a league the site can't read says why: a link's sport, a bare ESPN hockey ID, ESPN football by categories, Yahoo before it opens", async () => {
+  const a = loadApp();
+  await a.ready();
+  const realFetch = a.fetch, calls = [];
+  const answer = (status, body) => Promise.resolve({ ok: status === 200, status, headers: { get: () => null }, text: async () => JSON.stringify(body) });
+  // a link says its sport: told before anything's asked
+  a.fetch = (url, init) => { calls.push(String(url)); return realFetch(url, init); };
+  try {
+    await assert.rejects(a.connectLeague('https://fantasy.espn.com/baseball/league?leagueId=12345678'), { message: "That's an ESPN baseball league. On ESPN, League Layer covers basketball and football leagues." });
+    await assert.rejects(a.connectLeague('https://basketball.fantasysports.yahoo.com/nba/777'), { message: a.get('YAHOO_CLOSED') });
+    await assert.rejects(a.connectLeague('https://hockey.fantasysports.yahoo.com/hockey/12345'), { message: a.get('YAHOO_CLOSED') });
+    assert.deepEqual(calls.filter(u => /fantasy\.espn\.com|yahoo/.test(u)), [], 'no league asked for');
+    a.localStorage.setItem('league-layer-yahoo-beta', '1');
+    await assert.rejects(a.connectLeague('https://hockey.fantasysports.yahoo.com/hockey/12345'), { message: "That's a Yahoo hockey league. On Yahoo, League Layer covers basketball leagues; hockey works with Fantrax leagues." });
+    a.localStorage.removeItem('league-layer-yahoo-beta');
+  } finally { a.fetch = realFetch; }
+  // a bare ID ESPN knows as hockey (private too: ESPN still says it's there), not as basketball or football
+  for (const status of [200, 401]) {
+    a.fetch = (url, init) => (String(url).includes('/games/fhl/') ? answer(status, {}) : realFetch(url, init));
+    try {
+      await assert.rejects(a.connectLeague('55555555'), { message: "That's an ESPN hockey league. On ESPN, League Layer covers basketball and football leagues; hockey works with Fantrax leagues." });
+    } finally { a.fetch = realFetch; }
+  }
+  await assert.rejects(a.connectLeague('55555555'), /ESPN didn't find that league \(League not found\)/, 'in no sport: not found');
+  // ESPN football scored by categories: found, and said so
+  a.fetch = async (url, init) => {
+    const r = await realFetch(url, init);
+    if (!String(url).includes(`/games/ffl/`) || !String(url).includes(`/leagues/${ESPN_FOOTBALL}?`) || !r.ok) return r;
+    const j = JSON.parse(await r.text());
+    j.settings.scoringSettings.scoringType = 'H2H_CATEGORY';
+    return answer(200, j);
+  };
+  try {
+    await assert.rejects(a.connectLeague(ESPN_FOOTBALL), { message: "That's an ESPN football league scored by categories. ESPN football works with points leagues for now." });
+  } finally { a.fetch = realFetch; }
+  assert.equal(a.get('SPORT').key, 'nba', 'the sport as it was');
 });
 
 test('the site installs to a home screen: its manifest, the offer in the menu, iPhone steps, and staying fresh', async () => {

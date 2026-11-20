@@ -101,7 +101,7 @@ async function fetchSleeperLeague(id) {
   let lg;
   try { lg = await slpGet(`league/${encodeURIComponent(id)}`); } catch (e) { throw e; }
   if (!lg || !lg.league_id) throw new Error('League not found');
-  if (lg.sport && lg.sport !== 'nba' && lg.sport !== 'nfl') throw new Error(`that's a Sleeper ${String(lg.sport).toUpperCase()} league, not basketball or football`);
+  if (lg.sport && lg.sport !== 'nba' && lg.sport !== 'nfl') throw sportNotRead('Sleeper', String(lg.sport).toUpperCase());
   // that sport's data, without changing the page (switchLeague opens it)
   const sport = lg.sport === 'nfl' ? 'nfl' : 'nba', D = SPORT.key === sport && NBA ? NBA : await fetchSport(sport);
   const s = lg.settings || {};
