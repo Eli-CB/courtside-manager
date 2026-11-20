@@ -11,3 +11,5 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   lineups also load next period's rosters (`L.nextRosters`, one more request; the daily job too), and the Matchups tab
   shows them on next week (`withViewedTeam(viewWeek, true)`, `nextRosterPeriod()`, `fxTeamSide(tid, period)`). Every
   other tab and the saved lineup stay on this week's.
+- The Lineups board's Per game and Week total show FG% and FT% to two places, ".49", players and Projected week alike (the owner's
+  ask, Nov 20, 2026: `fmtPct(n, 2)`); the Categories table and the tips keep three.

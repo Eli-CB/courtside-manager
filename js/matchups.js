@@ -8,7 +8,7 @@ function oddsLabel(p) {
 }
 
 // (a points league's shooting pair, lineCats: v is [makes, attempts], "33/68")
-function fmtCat(c, v) { return c.shot ? `${fmt(v[0], 0)}/${fmt(v[1], 0)}` : c.pct ? fmtPct(v) : fmt(v, 0); }
+function fmtCat(c, v, pctDec = 3) { return c.shot ? `${fmt(v[0], 0)}/${fmt(v[1], 0)}` : c.pct ? fmtPct(v, pctDec) : fmt(v, 0); }
 
 // Everything the week page (and pickup ideas) needs, computed once per render
 function weekContext(start = weekStart()) {
@@ -399,7 +399,8 @@ function stabCells(p, ctx) {
   return lineCats().map(c => {
     const none = noStats || (week && !g);
     const d = week ? 0 : 1, shot = k => fmt(statVal(p, k) * (week ? g : 1), d);
-    const v = none ? '—' : c.shot ? `${shot(c.made)}/${shot(c.att)}` : c.pct ? fmtPct(pctOf(p, c)) : fmt(statOf(p, c) * (week ? g : 1), c.dec && !week ? c.dec : week ? (c.dec ? 1 : 0) : 1);
+    // (FG% and FT% to two places, ".49", in both views, the owner's ask, Nov 20, 2026; the totals under them too)
+    const v = none ? '—' : c.shot ? `${shot(c.made)}/${shot(c.att)}` : c.pct ? fmtPct(pctOf(p, c), 2) : fmt(statOf(p, c) * (week ? g : 1), c.dec && !week ? c.dec : week ? (c.dec ? 1 : 0) : 1);
     return `<td class="sc" style="${none ? '' : shade(contribZ(p, c.key, g, week))}" title="${none ? `${c.label}: no projection` : statTip(p, c, g, week)}">${v}</td>`;
   }).join('');
 }
@@ -445,8 +446,8 @@ function boardTotals(ctx) {
 // solo: your tables alone, where there's never an opponent (roto)
 function statsBoard(ctx, myStarters, myBench, oppStarters, oppBench, solo = false) {
   const cats = ctx.hasOpp ? boardTotals(ctx) : [];
-  const mine = cats.map(c => `<td class="sc" style="${shadeProb(c.p)}" title="${totalTip(c, c.a, c.p, 'to win')}">${fmtCat(c, c.a)}</td>`).join('');
-  const theirs = ctx.hasOpp ? cats.map(c => `<td class="sc" style="${shadeProb(1 - c.p)}" title="${totalTip(c, c.b, 1 - c.p, 'for them')}">${fmtCat(c, c.b)}</td>`).join('') : '';
+  const mine = cats.map(c => `<td class="sc" style="${shadeProb(c.p)}" title="${totalTip(c, c.a, c.p, 'to win')}">${fmtCat(c, c.a, 2)}</td>`).join('');
+  const theirs = ctx.hasOpp ? cats.map(c => `<td class="sc" style="${shadeProb(1 - c.p)}" title="${totalTip(c, c.b, 1 - c.p, 'for them')}">${fmtCat(c, c.b, 2)}</td>`).join('') : '';
   const oppName = state.opp.name || 'Opponent', cols = `style="--cols:${colShares(lineCats())}"`, boards = `stat-boards${solo ? ' solo' : ''}`;
   return `<div class="table-wrap"><div class="${boards}" ${cols}>
     ${statTable(ctx, 'me', state.teamName, myStarters, { totals: mine, games: ctx.asSet.games })}
