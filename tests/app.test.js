@@ -3346,7 +3346,7 @@ test("Draft tab: a pick's fantasy team opens its card, and each team's best and 
   assert.ok(html.indexOf('dr-awards') > html.indexOf('<table class="dr-board">'), 'under the draft board');
 });
 
-test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () => {
+test('Draft awards: Fall, Glass, Young, Old, Homer and Passport', async () => {
   const L = await app.useLeague(CATS9);
   const [A, B, C] = L.teams.map(t => t.id);
   const players = app.NBA.players, archives = app.get('archives');
@@ -3370,7 +3370,7 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     const gp = new Map([[a1.id, 80], [a2.id, 80], [a3.id, 80], [b1.id, 40], [b3.id, 82], [c2.id, 82], [c3.id, 70]]);
     for (const s of seasons) archives[s] = { keys: ['gp'], players: new Map([...gp].map(([id, g]) => [id, { n: '', s: [g] }])) };
     const awards = app.draftAwards(d), get = label => awards.find(x => x.label === label);
-    assert.deepEqual(Array.from(awards, x => x.label), ['Reach', 'Fall', 'Glass', 'Youngins', 'Uncs', 'Homer', 'Passport'], 'no Value Meal: gone');
+    assert.deepEqual(Array.from(awards, x => x.label), ['Reach', 'Fall', 'Glass', 'Young', 'Old', 'Homer', 'Passport'], 'no Value Meal: gone');
     // Fall: the pick taken furthest past consensus
     assert.equal(get('Fall').text, `${b3.name} (${app.fxTeamName(B)}): taken #9, 8 picks late: consensus #1 (ADP 0.5)`);
     assert.equal(get('Fall').p.nbaId, b3.id);
@@ -3381,12 +3381,12 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     const glassRows = get('Glass').detail.html.split('<li>').slice(1);
     assert.deepEqual(Array.from(glassRows, x => x.match(/data-team="([^"]+)"/)[1]), [B, C, A], 'B 41, C 6 (its rookie left out), A 2');
     assert.match(glassRows[0], new RegExp(`most: <button[^>]*data-nba="${b2.id}"[^>]*>[^<]+</button>, 82 a season`));
-    // Youngins and Uncs: average age on draft day
+    // Young and Old: average age on draft day
     const age = born => (Date.parse('2026-10-20T12:00:00') - Date.parse(`${born}T12:00:00`)) / (365.25 * 864e5);
-    assert.equal(get('Youngins').text, `${app.fxTeamName(A)}: their players averaged ${age('2005-06-01').toFixed(1)} years old; youngest: ${app.lastName(a1.name)} (${Math.floor(age('2005-06-01'))})`);
-    assert.equal(get('Uncs').text, `${app.fxTeamName(B)}: their players averaged ${age('1990-06-01').toFixed(1)} years old; oldest: ${app.lastName(b1.name)} (${Math.floor(age('1990-06-01'))})`);
-    assert.deepEqual([get('Youngins').faces[0].nbaId, get('Uncs').faces[0].nbaId], [a1.id, b1.id], "the winner's youngest and oldest on their cards");
-    assert.ok(get('Uncs').detail.html.indexOf(`data-team="${B}"`) < get('Uncs').detail.html.indexOf(`data-team="${A}"`), 'oldest first');
+    assert.equal(get('Young').text, `${app.fxTeamName(A)}: their players averaged ${age('2005-06-01').toFixed(1)} years old; youngest: ${app.lastName(a1.name)} (${Math.floor(age('2005-06-01'))})`);
+    assert.equal(get('Old').text, `${app.fxTeamName(B)}: their players averaged ${age('1990-06-01').toFixed(1)} years old; oldest: ${app.lastName(b1.name)} (${Math.floor(age('1990-06-01'))})`);
+    assert.deepEqual([get('Young').faces[0].nbaId, get('Old').faces[0].nbaId], [a1.id, b1.id], "the winner's youngest and oldest on their cards");
+    assert.ok(get('Old').detail.html.indexOf(`data-team="${B}"`) < get('Old').detail.html.indexOf(`data-team="${A}"`), 'oldest first');
     // Homer: three Thunder, their faces on its card; Passport: three countries (players' nationalities, not their teams)
     assert.deepEqual(Array.from(get('Homer').faces, p => p.nbaId).sort(), [a1, a2, a3].map(x => x.id).sort(), "Homer's card: the faces of the players it names");
     assert.equal(get('Homer').text, `${app.fxTeamName(A)} has 3 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1')}`);
@@ -3407,7 +3407,7 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     const withK = app.draftAwards(d), getK = label => withK.find(x => x.label === label);
     assert.equal(getK('Homer').text, `${app.fxTeamName(A)} has 4 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ')} and ${app.lastName(k.name)}`);
     assert.match(getK('Homer').detail.html, /\(keeper\)/, 'marked as a keeper in the breakdown');
-    assert.equal(getK('Youngins').text, `${app.fxTeamName(A)}: their players averaged ${((3 * age('2005-06-01') + age('1985-06-01')) / 4).toFixed(1)} years old; youngest: ${app.lastName(a1.name)} (${Math.floor(age('2005-06-01'))})`);
+    assert.equal(getK('Young').text, `${app.fxTeamName(A)}: their players averaged ${((3 * age('2005-06-01') + age('1985-06-01')) / 4).toFixed(1)} years old; youngest: ${app.lastName(a1.name)} (${Math.floor(age('2005-06-01'))})`);
     assert.match(getK('Passport').detail.html.split('<li>').slice(1).find(x => x.includes(`data-team="${A}"`)), />2 countries<\/b>/);
     assert.equal(getK('Fall').text, get('Fall').text, 'never in the ADP awards');
     d.keepers = {};
@@ -3455,8 +3455,8 @@ test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (
   const d = { keepers: {}, date: '2026-10-17', start, picks };
   const get = label => app.draftAwards(d).find(x => x.label === label);
   // by the average (the owner's ask: one number), the pause in it; the winner's quickest (longest) pick named and its face on the card
-  assert.equal(get('Trigger Finger').text, `${app.fxTeamName(A)}: their picks took 5 seconds on average; quickest: ${app.lastName(r[0].name)} (5 s)`);
-  assert.equal(get('Clock Milker').text, `${app.fxTeamName(B)}: their picks took 200 seconds on average; longest: ${app.lastName(r[7].name)} (400 s)`);
+  assert.equal(get('Trigger Finger').text, `${app.fxTeamName(A)}: their picks took 5 seconds on average; quickest: ${app.lastName(r[0].name)} (5s)`);
+  assert.equal(get('Clock Milker').text, `${app.fxTeamName(B)}: their picks took 200 seconds on average; longest: ${app.lastName(r[7].name)} (400s)`);
   // on the card the player has a line of his own under the award's, in the lighter text (the owner's ask)
   assert.ok(!get('Trigger Finger').html.includes('quickest'));
   assert.match(app.standoutCard(get('Trigger Finger')), new RegExp(`<div class="rx-text">[^]*</div><div class="rx-aside">Quickest: <button[^>]*data-nba="${r[0].id}"[^>]*>[^<]+</button> [(]5 s[)]</div>`));
@@ -3465,10 +3465,10 @@ test("Draft awards: Trigger Finger and Clock Milker, from Fantrax's pick times (
   assert.ok(get('Clock Milker').aside.includes(`data-nba="${r[7].id}"`), 'his name (on the line under the award) opens his card');
   const rows = get('Clock Milker').detail.html.split('<li>').slice(1);
   assert.deepEqual(Array.from(rows, x => x.match(/data-team="([^"]+)"/)[1]), [B, C, A], 'slowest first');
-  assert.match(rows[0], new RegExp(`longest: <button[^>]*data-nba="${r[7].id}"[^>]*>[^<]+</button>, 400 s</div>.*>200 s</b>`));
+  assert.match(rows[0], new RegExp(`longest: <button[^>]*data-nba="${r[7].id}"[^>]*>[^<]+</button>, 400s</div>.*>200s</b>`));
   const fastRows = get('Trigger Finger').detail.html.split('<li>').slice(1);
   assert.deepEqual(Array.from(fastRows, x => x.match(/data-team="([^"]+)"/)[1]), [A, C, B], 'fastest first');
-  assert.match(fastRows[2], />quickest: <button[^>]*>[^<]+<\/button>, 100 s<\/div>/, "each team's quickest pick, not its longest");
+  assert.match(fastRows[2], />quickest: <button[^>]*>[^<]+<\/button>, 100s<\/div>/, "each team's quickest pick, not its longest");
   assert.ok(!/typical/.test(get('Trigger Finger').detail.html + get('Clock Milker').text), 'no typical pick any more');
   // a draft whose picks all carry one time (Fantrax rewrites an old draft's): no pick clocks
   for (const p of picks) p.at = start + 1000;

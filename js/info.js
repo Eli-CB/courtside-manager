@@ -216,9 +216,9 @@ const INFO = {
     <p><b>Reach</b> is the pick taken furthest ahead of his consensus spot (taken #73, consensus #159: 86 picks early). <b>Fall</b> is the other way: the pick taken furthest past it, who fell to them.</p>
     <p><b>Trigger Finger</b> and <b>Clock Milker</b>: the fastest and slowest picking teams, by each team's average pick time, with the winner's quickest (or longest) pick. A pick's time is the wait since the pick before, so a pause in the draft counts as pick time. Fantrax leagues only: ESPN, Sleeper and Yahoo don't say when each pick was made. Fantrax rewrites an old draft's pick times, so a past season's are lost.</p>
     <p><b>Glass</b> is the team whose players missed the most games a season over the last two seasons: his team's 82 less the games he played, for any reason. A season he wasn't in the league yet doesn't count (so a rookie has none); one he sat out whole counts as all 82 missed. Goalies are left out, since a healthy backup sits most games.</p>
-    <p><b>Youngins</b> and <b>Uncs</b>: the youngest and oldest players on average, by age on draft day, with the winner's youngest (or oldest) player.</p>
+    <p><b>Young</b> and <b>Old</b>: the youngest and oldest players on average, by age on draft day, with the winner's youngest (or oldest) player.</p>
     <p><b>Homer</b> drafted the most players from one real team (by each player's team now), and <b>Passport</b> from the most countries.</p>
-    <p>Glass, Youngins, Uncs, Homer and Passport count each team's keepers with its picks: its whole roster on draft day. The ADP and pick-time awards are picks only. Team awards count teams with at least half as many picks as the most of any team, and a tie names every team in it.</p>
+    <p>Glass, Young, Old, Homer and Passport count each team's keepers with its picks: its whole roster on draft day. The ADP and pick-time awards are picks only. Team awards count teams with at least half as many picks as the most of any team, and a tie names every team in it.</p>
     <p><b>The breakdowns.</b> Tap an award's title for the whole list behind it. A name opens his card.</p>
     <p>A past season has no awards here: today's ADP, ages and teams say nothing about a draft from another year.</p>`],
   board: ['Reading the draft board', `

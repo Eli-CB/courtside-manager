@@ -116,7 +116,7 @@ function draftData() {
 // drafts): a pick is compared with where consensus would take its player in this draft. The league's keepers come off the
 // board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
 // ADP order among the players not kept. Trigger Finger and Clock Milker come from how long each pick took (Fantrax's pick
-// times). The rest come from the players themselves: Glass (games missed the last two seasons), Youngins and Uncs (age
+// times). The rest come from the players themselves: Glass (games missed the last two seasons), Young and Old (age
 // on draft day), Homer (their real teams now) and Passport (their countries), each team's keepers counted with
 // its picks (the owner's ask: a draft-day roster); the ADP and pick-time ones are picks only. Team awards count
 // only teams with at least half as many picks as the most of any team, and a tie names every team in it. Not for a past
@@ -254,7 +254,7 @@ function draftClockAwards(d, { plural, who, row, teamWho, teamAward, standout, b
   for (const p of timed) { if (prev && p.at >= prev) waits.push({ p, s: (p.at - prev) / 1000 }); prev = p.at; }
   const clocks = byTeam(waits).map(t => { const ss = t.xs.map(x => x.s); return { ...t, avg: sum(ss) / ss.length, quick: sortDesc(t.xs, x => -x.s)[0], long: sortDesc(t.xs, x => x.s)[0] }; });
   if (clocks.length < 2) return;
-  const sec = s => `${Math.round(s)} s`;
+  const sec = s => `${Math.round(s)}s`;
   // each award: its winners by their average, their quickest (or longest) pick, and every team's in the breakdown
   const give = (label, sign, word, end, order) => {
     const won = best(clocks, t => sign * tenth(t.avg));
@@ -288,7 +288,7 @@ function draftGlassAward(squads, { row, teamWho, teamAward, standout, best, tent
     `Games each team's players (picks and keepers) missed a season, the last two seasons (${esc(seasons[1])} and ${esc(seasons[0])}). Rookies have none to count.`, rows, more);
 }
 
-// Youngins and Uncs: the youngest and oldest players on average, by age on draft day; the winner's youngest (oldest)
+// Young and Old: the youngest and oldest players on average, by age on draft day; the winner's youngest (oldest)
 // player on its card
 function draftAgeAwards(d, squads, { row, teamWho, teamAward, standout, best, tenth, named }) {
   const day = Date.parse(`${d.date || todayIso()}T12:00:00`);
@@ -305,8 +305,8 @@ function draftAgeAwards(d, squads, { row, teamWho, teamAward, standout, best, te
     const [said, more] = standout(`: their players averaged ${fmt(won[0].avg, 1)} years old`, won, word, t => { const end = endOf(t, sign); return { p: end.x.p, v: Math.floor(end.a) }; });
     teamAward(label, won, said, `Each team's players' average age on draft day (picks and keepers), ${word} first`, rows, more);
   };
-  give('Youngins', -1, 'youngest');
-  give('Uncs', 1, 'oldest');
+  give('Young', -1, 'youngest');
+  give('Old', 1, 'oldest');
 }
 
 // Homer: the most players from one real team (by each player's team now); Passport (was The Globalist, then Frequent
