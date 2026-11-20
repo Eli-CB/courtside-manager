@@ -3679,6 +3679,59 @@ test('Player names: full (shortened on phones), last names or nicknames from the
 // ----- Sleeper -----
 const SLEEPER = '1369432599025442816'; // a public Sleeper league (tests/capture_sleeper_fixtures.py): 12 teams, points, Lock-In
 
+test("Sleeper: Moves this period is Sleeper's own list of transactions", async () => {
+  const saved = app.NBA.players.map(r => [r, r.fx, r.pos]), ui = app.get('ui');
+  try {
+    app.applyFantraxLeague(await app.getLeague(SLEEPER, true)); // the players under their Sleeper ids, as on the page
+    await sleeperMovesChecks(app.fxLeague(), ui);
+  } finally {
+    for (const [r, fx, pos] of saved) { if (fx) r.fx = fx; else delete r.fx; r.pos = pos; }
+    app.set('nbaCache', null);
+    ui.tab = 'dashboard';
+  }
+});
+async function sleeperMovesChecks(L, ui) {
+  const P = app.NBA.players.filter(r => r.slp).slice(0, 6);
+  const [a, b, c, d, e, f] = P.map(r => r.slp);
+  const [t1, t2, t3] = L.teams.map(t => t.id);
+  const at = 1793500000000;
+  const txs = [
+    { type: 'free_agent', status: 'complete', status_updated: at, adds: { [a]: +t1 }, drops: { [b]: +t1 } },
+    { type: 'free_agent', status: 'complete', status_updated: at + 1, adds: null, drops: { [a]: +t1 } }, // added and dropped again: both show
+    { type: 'waiver', status: 'complete', status_updated: at + 2, settings: { waiver_bid: 7 }, adds: { [c]: +t2 }, drops: null },
+    { type: 'waiver', status: 'failed', status_updated: at + 2, settings: { waiver_bid: 3 }, adds: { [c]: +t3 }, drops: null },
+    { type: 'trade', status: 'complete', status_updated: at + 3, adds: { [d]: +t1, [e]: +t2 }, drops: { [d]: +t2, [e]: +t1, [f]: +t2 },
+      draft_picks: [{ season: '2027', round: 1, roster_id: +t3, previous_owner_id: +t2, owner_id: +t1 }], waiver_budget: [{ sender: +t1, receiver: +t2, amount: 5 }] },
+    { type: 'commissioner', status: 'complete', status_updated: at - 9e9, adds: { [f]: +t3 }, drops: null }, // the offseason, before `since`
+  ];
+  const M = app.sleeperMoves(L, txs, at - 1e9);
+  const list = tid => JSON.parse(JSON.stringify((M[tid] || []).map(m => [m.kind, m.nba || (m.pick ? `${m.pick.year}-${m.pick.round}-${m.pick.from}` : `$${m.budget}`), m.from || m.to || m.bid || null])));
+  assert.deepEqual(list(t1), [['add', P[0].id, null], ['drop', P[1].id, null], ['drop', P[0].id, null], ['trade', P[3].id, t2], ['away', P[4].id, t2], ['trade', `2027-1-${t3}`, t2], ['away', '$5', t2]],
+    'in the order they went through: a player added and dropped again shows both; a trade: each side what it got, a pick, budget');
+  assert.deepEqual(list(t2), [['add', P[2].id, 7], ['away', P[3].id, t1], ['trade', P[4].id, t1], ['away', `2027-1-${t3}`, t1], ['trade', '$5', t1], ['drop', P[5].id, null]],
+    "a waiver claim keeps its bid; a player dropped to make room in a trade is a drop");
+  assert.equal(M[t3], undefined, "a failed claim isn't a move, and the offseason's are left out");
+
+  // drawn on Standings: these, then the fixture's real week 2 (sleeperWeekNow) from Sleeper
+  const load = app.get('movesLoad');
+  useTeam(t1);
+  ui.tab = 'standings';
+  load.set(L, { n: 2, at: Date.now(), moves: M });
+  const html = app.viewStandings();
+  assert.match(html, /<h2>Moves this period <button[^>]*data-key="movesSlp"/);
+  assert.match(html, /2027 Round 1 pick <span class="muted small">originally /, 'a pick from a third team says whose it was');
+  assert.match(html, /\$5 of waiver budget/);
+  assert.match(html, /title="Waiver bid">\$7</);
+  assert.match(html, /you \+1 ⇄2 −2 · 9 moves/, "yours, and every move once (a trade's pieces on the side that got them)");
+  assert.doesNotMatch(html, /rosters as of/, "Sleeper's own list, not the rosters");
+  load.delete(L);
+  app.viewStandings(); // asks Sleeper for this week's
+  await new Promise(r => setTimeout(r, 30));
+  const real = JSON.parse(readFixture(`sleeper/league_${SLEEPER}_transactions_2.json`));
+  const n = real.filter(t => t.status === 'complete').reduce((s, t) => s + Object.keys(t.adds || {}).length + Object.keys(t.drops || {}).length, 0);
+  assert.match(app.viewStandings(), new RegExp(`${n} moves</span>`), `the fixture's ${real.length} transactions: ${n} adds and drops`);
+}
+
 test('Sleeper league IDs and addresses', () => {
   assert.equal(app.parseLeagueId(SLEEPER), SLEEPER);
   assert.equal(app.parseLeagueId(`https://sleeper.com/leagues/${SLEEPER}/matchup`), SLEEPER);

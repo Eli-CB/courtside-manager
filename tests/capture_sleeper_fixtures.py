@@ -16,6 +16,7 @@ OUT = os.path.join(ROOT, 'tests', 'fixtures', 'sleeper')
 API = 'https://api.sleeper.app/v1/'
 LEAGUE = '1369432599025442816'  # a public 12-team points league, Lock-In mode, 2026-27
 WEEKS = [1, 2, 3]  # the fixtures' clock is in week 2: the week before, this week and the next
+TX_KEYS = ('transaction_id', 'type', 'status', 'leg', 'created', 'status_updated', 'roster_ids', 'adds', 'drops', 'draft_picks', 'waiver_budget', 'settings')
 
 
 def get(path):
@@ -38,6 +39,9 @@ def main():
     save(f'league/{LEAGUE}/rosters', [{k: r[k] for k in ('roster_id', 'owner_id', 'players', 'starters', 'reserve', 'taxi', 'settings')} for r in rosters])
     for n in WEEKS:
         save(f'league/{LEAGUE}/matchups/{n}', get(f'league/{LEAGUE}/matchups/{n}'))
+    # this week's transactions (Standings' Moves this period), without who made them or Sleeper's notes
+    n = WEEKS[1]
+    save(f'league/{LEAGUE}/transactions/{n}', [{k: t.get(k) for k in TX_KEYS} for t in get(f'league/{LEAGUE}/transactions/{n}')])
     draft = get(f"draft/{lg['draft_id']}")
     save(f"draft/{lg['draft_id']}", {k: draft[k] for k in ('draft_id', 'type', 'status', 'start_time', 'season', 'settings', 'slot_to_roster_id')})
     picks = get(f"draft/{lg['draft_id']}/picks")

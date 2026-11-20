@@ -310,7 +310,7 @@ body:has(.mu-card.full) .container { padding-top: max(12px, env(safe-area-inset-
 .mv-team.me .mv-name { color: var(--accent); }
 .mv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: .88rem; }
 .mv { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.mv .inl-p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mv .inl-p, .mv-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mv-k { width: 16px; flex: none; text-align: center; font-weight: 800; }
 .mv-add .mv-k { color: var(--good); }
 .mv-drop .mv-k { color: var(--bad); }

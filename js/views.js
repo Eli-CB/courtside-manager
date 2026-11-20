@@ -149,18 +149,23 @@ function viewStandings() {
   ${L ? seasonTotalsCard(rows, S) : ''}`;
 }
 
-// ----- Moves this period: who joined and left each team since last period's rosters (Standings, under the table) -----
+// ----- Moves this period: each team's adds, drops and trades this period (Standings, under the table) -----
+// Team id -> [{ kind: 'add' | 'drop' | 'trade' (in) | 'away' (traded out), nba, name, from / to; a Sleeper waiver claim's
+// bid; a draft pick traded, pick: { year, round, from: whose pick it was }; waiver budget traded, budget }]
+// A player in a move: by his id on the league's site (fx.id), else the name the league's rosters give
+function moveWho(L) {
+  const fidNba = currentFidNba();
+  const names = new Map(Object.values(L.rosters || {}).flat().map(x => [x.fid, x.name]));
+  return f => { const nba = fidNba(f), raw = nba && nbaById.get(nba); return { nba, name: raw ? raw.name : names.get(f) || 'A player' }; };
+}
 // Fantrax shares each period's rosters but no transaction log, so a move is a difference between the last period's
 // rosters and this one's as they are now: on no roster before = added, on no roster now = dropped, on another team
 // before = traded (on both teams). A player added and dropped in between isn't seen.
-// Team id -> [{ kind: 'add' | 'drop' | 'trade' (in) | 'away' (traded out), nba, name, from / to }]
 function periodMoves(L, weeks) {
   const cur = L.rosterPeriod;
   const now = cur && weeks && weeks.find(w => w.n === cur), before = now && weeks.find(w => w.n === cur - 1);
   if (!now || !before) return null;
-  const fidNba = currentFidNba();
-  const names = new Map(Object.values(L.rosters || {}).flat().map(x => [x.fid, x.name]));
-  const who = f => { const nba = fidNba(f), raw = nba && nbaById.get(nba); return { nba, name: raw ? raw.name : names.get(f) || 'A player' }; };
+  const who = moveWho(L);
   const out = {};
   const add = (tid, m) => (out[tid] = out[tid] || []).push(m);
   for (const [f, o] of now.owner) {
@@ -171,39 +176,91 @@ function periodMoves(L, weeks) {
   for (const [f, b] of before.owner) if (!now.owner.has(f)) add(b.tid, { kind: 'drop', ...who(f) });
   return out;
 }
-const movesLoad = new WeakMap(); // league -> its weekly rosters, once loaded
+// Sleeper lists every transaction, by its week (transactions/<week>): the ones that went through (a failed waiver claim
+// isn't a move), in that order. A trade gives each side what it got: players, draft picks and waiver budget (a player
+// dropped to make room is a drop); a waiver claim keeps its bid; a commissioner's move counts as the team's.
+// since: none from before it (Sleeper puts a dynasty league's whole offseason in week 1)
+function sleeperMoves(L, txs, since = 0) {
+  const who = moveWho(L);
+  const out = {};
+  const add = (tid, m) => (out[tid] = out[tid] || []).push(m);
+  const done = (Array.isArray(txs) ? txs : []).filter(t => t && t.status === 'complete' && +t.status_updated >= since)
+    .sort((a, b) => a.status_updated - b.status_updated);
+  for (const t of done) {
+    const adds = t.adds || {}, drops = t.drops || {};
+    if (t.type === 'trade') {
+      for (const [f, to] of Object.entries(adds)) {
+        if (drops[f] == null) continue;
+        const from = String(drops[f]);
+        add(String(to), { kind: 'trade', from, ...who(f) });
+        add(from, { kind: 'away', to: String(to), ...who(f) });
+      }
+      for (const k of t.draft_picks || []) {
+        const pick = { year: +k.season, round: +k.round, from: String(k.roster_id) }, to = String(k.owner_id), from = String(k.previous_owner_id);
+        add(to, { kind: 'trade', from, pick });
+        add(from, { kind: 'away', to, pick });
+      }
+      for (const b of t.waiver_budget || []) {
+        add(String(b.receiver), { kind: 'trade', from: String(b.sender), budget: +b.amount });
+        add(String(b.sender), { kind: 'away', to: String(b.receiver), budget: +b.amount });
+      }
+      for (const [f, tid] of Object.entries(drops)) if (adds[f] == null) add(String(tid), { kind: 'drop', ...who(f) });
+      continue;
+    }
+    const bid = t.type === 'waiver' ? +((t.settings || {}).waiver_bid) || 0 : 0;
+    for (const [f, tid] of Object.entries(adds)) add(String(tid), { kind: 'add', ...who(f), ...(bid ? { bid } : {}) });
+    for (const [f, tid] of Object.entries(drops)) add(String(tid), { kind: 'drop', ...who(f) });
+  }
+  return out;
+}
+// The period's moves: { n: the period, at: as of when, rosters: from the rosters (Fantrax), moves (null: none to show) }.
+// Sleeper's: one request, for the week on now (sleeperWeekNow), counting from a week before it starts
+function loadMoves(L) {
+  if (L.source === 'sleeper') {
+    const n = sleeperWeekNow(L.periods || []), p = (L.periods || []).find(x => x.n === n);
+    if (!p) return Promise.resolve({ moves: null });
+    const since = new Date(`${addDays(p.start, -7)}T00:00:00`).getTime();
+    return slpGet(`league/${encodeURIComponent(L.id)}/transactions/${n}`).then(txs => ({ n, at: Date.now(), moves: sleeperMoves(L, txs, since) }));
+  }
+  return loadRosterWeeks(L).then(w => ({ n: L.rosterPeriod, at: (readLeagueCache()[L.id] || {}).at, rosters: true, moves: periodMoves(L, w || []) }));
+}
+const movesLoad = new WeakMap(); // league -> its moves (loadMoves), once read: a league read again (↻ Reload) reads them again
 // This season only: a past season's last period says nothing now. On phones it rolls up even though it's the tab's
 // first section with a heading (class "rolls", rollCards): Categories won stays the open one, as before
 function movesCard() {
   const L = fxLeague();
-  if (!NBA || ui.season || seasonCtx || !L || !hasLineupHistory(L) || !(L.rosterPeriod > 1)) return '';
+  const slp = !!L && L.source === 'sleeper';
+  if (!NBA || ui.season || seasonCtx || !L || !(slp || (hasLineupHistory(L) && L.rosterPeriod > 1))) return '';
   if (!movesLoad.has(L)) {
     movesLoad.set(L, null);
-    loadRosterWeeks(L).then(w => movesLoad.set(L, w || [])).catch(() => movesLoad.set(L, [])).finally(() => { if (ui.tab === 'standings') render(); });
+    loadMoves(L).catch(() => ({ moves: null })).then(r => movesLoad.set(L, r)).finally(() => { if (ui.tab === 'standings') render(); });
   }
-  const weeks = movesLoad.get(L);
+  const got = movesLoad.get(L);
   const card = (sub, body) => `<div class="card rolls" style="margin-top:16px">
-    <div class="card-head"><h2>Moves this period ${infoBtn('moves')}</h2>${sub ? `<span class="muted small">${sub}</span>` : ''}</div>${body}</div>`;
-  if (!weeks) return card('', loadingLine("Loading last period's rosters…"));
-  const moves = periodMoves(L, weeks);
+    <div class="card-head"><h2>Moves this period ${infoBtn(slp ? 'movesSlp' : 'moves')}</h2>${sub ? `<span class="muted small">${sub}</span>` : ''}</div>${body}</div>`;
+  if (!got) return card('', loadingLine(slp ? "Loading Sleeper's transactions…" : "Loading last period's rosters…"));
+  const { moves } = got;
   if (!moves) return '';
   const me = myTeamId();
   const order = { add: 0, trade: 1, away: 2, drop: 3 };
   const tids = Object.keys(moves).sort((a, b) => (b === me) - (a === me) || moves[b].length - moves[a].length);
-  const at = (readLeagueCache()[L.id] || {}).at;
   const SIGN = { add: '+', drop: '−' }, SAID = { add: 'added', drop: 'dropped', trade: 'traded for' }; // (a trade either way: ⇄)
-  const who = m => (m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, playerBtn(m.nba, m.name)) : esc(m.name));
-  const other = m => (m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>` : '');
-  const move = m => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${SIGN[m.kind] || '⇄'}</span>${who(m)}${other(m)}<span class="sr-only">${SAID[m.kind] || 'traded away'}</span></li>`;
+  // what moved: a player (his card), a draft pick (named as on Trades) or waiver budget
+  const what = (m, tid) => (m.pick ? `<span class="mv-what">${pickName(m.pick)} pick${m.pick.from !== (m.kind === 'away' ? tid : m.from) ? ` <span class="muted small">originally ${esc(fxTeamName(m.pick.from))}</span>` : ''}</span>`
+    : m.budget != null ? `<span class="mv-what">$${fmt(m.budget, 0)} of waiver budget</span>`
+    : m.nba ? inlinePlayer({ nbaId: m.nba, name: m.name }, playerBtn(m.nba, m.name)) : esc(m.name));
+  const other = m => (m.kind === 'trade' ? ` <span class="muted small">from ${esc(fxTeamName(m.from))}</span>` : m.kind === 'away' ? ` <span class="muted small">to ${esc(fxTeamName(m.to))}</span>`
+    : m.bid ? ` <span class="muted small" title="Waiver bid">$${fmt(m.bid, 0)}</span>` : '');
+  const move = (m, tid) => `<li class="mv mv-${m.kind}"><span class="mv-k" aria-hidden="true">${SIGN[m.kind] || '⇄'}</span>${what(m, tid)}${other(m)}<span class="sr-only">${SAID[m.kind] || 'traded away'}</span></li>`;
   const body = tids.length ? `<div class="mv-teams">${tids.map(tid => `<div class="mv-team${tid === me ? ' me' : ''}"><div class="mv-name">${teamLink(tid)}</div>
-      <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(move).join('')}</ul></div>`).join('')}</div>`
-    : '<p class="muted small" style="margin:0">No adds or drops since last period.</p>';
-  // the line: how many adds and drops (a trade counts once), and yours
+      <ul class="mv-list">${[...moves[tid]].sort((a, b) => order[a.kind] - order[b.kind]).map(m => move(m, tid)).join('')}</ul></div>`).join('')}</div>`
+    : '<p class="muted small" style="margin:0">No moves yet this period.</p>';
+  // the line: how many moves (each piece of a trade once), and yours
   const n = Object.values(moves).flat().filter(m => m.kind !== 'away').length;
   const mineM = moves[me] || [], cnt = k => mineM.filter(m => m.kind === k).length;
   const yours = [cnt('add') && `+${cnt('add')}`, cnt('trade') && `⇄${cnt('trade')}`, cnt('drop') && `−${cnt('drop')}`].filter(Boolean).join(' ');
   const sub = n ? `${yours ? `you ${yours} · ` : ''}${n} move${n === 1 ? '' : 's'}` : '';
-  return card(sub, `${body}${at ? `<p class="muted small mv-when">Period ${L.rosterPeriod} · rosters as of ${fmtTime(at, { weekday: 'short' })} · ↻ Reload in ⚙ for the latest</p>` : ''}`);
+  return card(sub, `${body}${got.at ? `<p class="muted small mv-when">Period ${got.n} · ${got.rosters ? 'rosters ' : ''}as of ${fmtTime(got.at, { weekday: 'short' })} · ↻ Reload in ⚙ for the latest</p>` : ''}`);
 }
 
 // ----- A fantasy team's card: its record and this week's opponent (the title), its category strengths (teamStrengths), its roster -----

@@ -21,6 +21,12 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   today's taxi players `o.taxi` (one promoted can't go back), left out of bench swaps and Benchwarmer Blues. A rookie draft: the board's
   columns are `draft.slots` (slot_to_roster_id) and each pick's slot; Reach/Fall rank among players on no roster (`draft.rostered`, a
   dynasty draft with fewer rounds than spots) and, a rookies-only draft (`player_type` 1), rookies only (`draft.rookies`).
+- Transactions (Standings' Moves this period, `sleeperMoves` in views.js; the owner's ask, Nov 20, 2026): `league/<id>/transactions/<week>`, one request
+  when Standings first draws the league. Only `status: 'complete'` (failed waiver claims are listed too); a trade's `adds`/`drops` say who got each player from
+  whom, `draft_picks` (`roster_id` = whose pick it was) and `waiver_budget` too; a waiver's bid is `settings.waiver_bid`. Sleeper files a dynasty league's whole
+  offseason under week 1 (The IPA: 276 back to March, 29 trades), so moves count from a week before the period starts (`status_updated`). Checked on The IPA,
+  weeks 1-5: 5 of 87 players weren't in the data file, players with no NBA team (Jeremy Sochan, Cam Thomas, Rob Dillingham, Nov 2026), drawn "A player":
+  Sleeper's own list names them, but it is 414 KB compressed (2.5 MB), too much for the page to fetch for a name.
 
 ## Gotchas
 - Sleeper basketball's past weeks (Nov 18, 2026): the matchups API's points don't add up to Sleeper's own standings (rosters'
