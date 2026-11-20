@@ -80,6 +80,8 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
 ## Rules settled with the owner (keep them)
 - How the owner works (Nov 17, 2026): several sessions at once, and the owner doesn't read code. No pull requests: a session lands
   its own work on main once it's tested and checked, without asking (only force pushes, rewriting history or deleting things need a yes), rebasing onto origin/main and fixing any conflict itself, keeping both sides' changes (Deploy, under Gotchas).
+  A cloud session (claude.ai/code) is told to push only to its own `claude/...` branch: this rule still holds there, so its tested commit goes to
+  main too, with a plain push (`git push origin <commit>:main`); never force its branch after a rebase, merge instead (its permission check blocked a force push, Nov 20, 2026).
 - Where the site is going (Oct 31, 2026): grow it, not keep it a personal tool. Its niche: head-to-head category leagues (Fantrax, weekly lineups), matchup odds,
   league-wide fun (recaps, awards, past seasons), free with no account. Favor what a whole league shares and what spreads through league chats (share links and
   pictures that open with no setup); not what needs staff or a backend (articles, expert rankings, a draft extension, push notifications).
