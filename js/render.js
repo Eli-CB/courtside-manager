@@ -263,7 +263,7 @@ function gearMenu() {
       ${toggle('toggle-theme', GEAR_MOON, 'Dark mode', '', dark)}
       ${toggle('toggle-scores', GEAR_EYE_OFF, 'Hide game scores', 'no spoilers on the Matchup tab', ui.hideScores)}
       ${toggle('toggle-clock', GEAR_CLOCK, '24-hour time', `tip-offs as ${fmtTime('2026-11-02T19:30:00')}`, ui.clock24)}
-      ${NICKNAMES[SPORT.key] ? `<div class="gear-row gear-pick">${GEAR_NAME}<span class="gear-text">Player names ${infoBtn('names')}</span><select class="ctx-team" data-change="set-names" aria-label="Player names">${Object.entries(NAME_STYLES).map(([k, l]) => `<option value="${k}" ${ui.names === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
+      ${NICKNAMES[SPORT.key] ? `<div class="gear-row gear-pick">${GEAR_NAME}<span class="gear-text">Player names</span>${segBtns('Player names', 'set-names', 'names', Object.entries(NAME_STYLES).map(([k, [l, tip]]) => [k, l, tip]), ui.names)}</div>` : ''}
       <div class="lm-sec">Help</div>
       ${row('data-action="feedback"', ICON_MAIL, 'Send feedback', 'a problem, an idea, a wrong number')}
       ${canInstall() ? row('data-action="install-app"', ICON_PHONE, 'Install the app', 'full screen, on your home screen') : ''}

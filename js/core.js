@@ -123,7 +123,12 @@ ui.clock24 = (() => {
 })();
 // Player names, as chosen in the settings menu (nameShown, matchups.js): full (shortened where a phone is tight), last
 // names, or nicknames (js/nicknames.js); only in a sport with a nickname list, full names in the others
-const NAME_STYLES = { full: 'Full names', last: 'Last names', nick: 'Nicknames' };
+// (the menu's toggle: [label, tip on hover])
+const NAME_STYLES = {
+  full: ['Full', "Full names, with an initial where a phone's row is tight"],
+  last: ['Last', 'Last names, with an initial where two players share one'],
+  nick: ['Nick', 'Nicknames (SGA, KAT, LBJ...), full names for the rest'],
+};
 ui.names = (k => (Object.hasOwn(NAME_STYLES, k) ? k : 'full'))(store.get(NAMES_KEY));
 // What was last picked on the Matchup and Players tabs' When menus (Today, Yesterday, This period...) and Plan Ahead's
 // week holds over a refresh until what the tab opens on by itself is new (the owner's ask, Nov 2026): Matchup and Players

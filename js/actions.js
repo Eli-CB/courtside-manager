@@ -756,8 +756,6 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.change === 'set-basis') {
     actions['set-basis']({ dataset: { basis: el.value } });
-  } else if (el.dataset.change === 'set-names') {
-    actions['set-names']({ dataset: { names: el.value } });
   } else if (el.dataset.change === 'recap-week') {
     ui.recapWeek = +el.value;
     render();

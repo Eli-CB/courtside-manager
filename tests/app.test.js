@@ -3676,8 +3676,8 @@ test('Player names: full (shortened on phones), last names or nicknames from the
   const gear = a.document.createElement();
   a.document.querySelector = sel => (sel === '#gearMenu' ? gear : a.document.createElement());
   a.gearMenu();
-  assert.match(gear.innerHTML, /data-change="set-names"[^>]*>(<option[^>]*>[^<]*<\/option>){3}/);
-  assert.match(gear.innerHTML, /<option value="nick" selected>Nicknames</);
+  assert.equal(gear.innerHTML.match(/data-action="set-names"/g).length, 3, 'a Full / Last / Nick toggle');
+  assert.match(gear.innerHTML, /class="on" data-action="set-names" data-names="nick"[^>]*>Nick</);
   a.get('actions')['set-names']({ dataset: { names: 'last' } });
   assert.equal(a.localStorage.getItem('league-layer-names'), 'last');
   a.get('actions')['set-names']({ dataset: { names: 'full' } });
