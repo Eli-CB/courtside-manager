@@ -252,6 +252,55 @@ const demoNote = () => (state.demo && state.fxTeam ? `<span><b>Demo league.</b> 
 /* ---------- Landing page: connect a league, then pick your team ---------- */
 const needsLanding = () => ui.addingLeague || (!state.fxTeam && !state.demo && !state.browse);
 
+// The front page's picture of a week's matchup, drawn as the shared link's picture is (icons/og.png): made-up numbers, for the look only.
+// Each category: its label, your bar, your opponent's (TO: fewer wins), so 6 won and 3 lost
+const LAND_PREVIEW = [['PTS', 92, 80], ['REB', 69, 85], ['AST', 88, 61], ['3PM', 73, 65], ['STL', 55, 71], ['BLK', 64, 40], ['TO', 46, 59], ['FG%', 81, 78], ['FT%', 69, 83]];
+const LAND_FEATURES = [
+  ['dashboard', 'Matchup odds', 'Your chance to win the week and each category, live during games.'],
+  ['week', 'Best lineup', 'Who plays when, and the starters that give you the best chance to win.'],
+  ['standings', 'Standings', 'How your categories stack up against every team in the league.'],
+  ['recap', 'Weekly recap', "The week's awards, as a picture ready for the league chat."],
+  ['trade', 'Trades', 'What a deal does to each side, category by category.'],
+  ['draft', 'Draft retrospective', 'Which picks paid off, and how your draft is holding up.'],
+];
+function landPreview() {
+  const rows = LAND_PREVIEW.map(([k, a, b], i) => `<div class="lp-row" style="--i:${i}"><span>${k}</span><i style="--w:${a}%"></i><i class="opp" style="--w:${b}%"></i></div>`).join('');
+  return `<div class="land-preview" aria-hidden="true"><div class="lp-card">
+      <div class="lp-head"><div><b>This week</b><span>Win odds</span></div><strong>68%</strong></div>
+      <div class="lp-legend"><span class="you">You</span><span>Opponent</span></div>
+      <div class="lp-rows">${rows}</div>
+      <div class="lp-foot"><span>Projected <b>6–3</b></span><span class="lp-live">Live</span></div>
+    </div></div>`;
+}
+// A first visit: what the site does around the form, and the ways in without a league
+function landHome(form) {
+  const demo = NBA && NBA.siteLeague;
+  const option = (action, icon, title, line) => `<button type="button" class="land-option" data-action="${action}">${lineIcon(icon, 'lo-ico')}<span><b>${title}</b><small>${line}</small></span>${lineIcon('<path d="m9 6 6 6-6 6"/>', 'lo-go')}</button>`;
+  return `<div class="landing-wrap land-home">
+    <section class="land-hero">
+      <div class="land-copy">
+        <p class="land-pill">Free · No sign-up</p>
+        <h1>Plan your fantasy basketball or hockey week</h1>
+        <p class="land-lead">Your odds for this week's matchup, the best starters, how your categories stack up and a recap the whole league can share.</p>
+        <div class="land-connect">${form}</div>
+        <div class="land-alt">
+          <p class="land-alt-title">No league to connect?</p>
+          <div class="land-options">
+            ${demo ? option('land-demo', TAB_ICONS.dashboard, 'Explore a basketball demo league', 'Every tab filled in, as one of its teams') : ''}
+            ${option('land-browse', TAB_ICONS.team, 'Try the sandbox', 'A team of any NBA or NHL players, followed live')}
+          </div>
+        </div>
+      </div>
+      ${landPreview()}
+    </section>
+    <section class="land-features" aria-labelledby="landFeat">
+      <h2 id="landFeat">Built around your league's own rules</h2>
+      <p class="muted">Categories or points, daily or weekly lineups, its own slots and playoffs.</p>
+      <div class="lf-grid">${LAND_FEATURES.map(([icon, title, line]) => `<div class="lf">${lineIcon(TAB_ICONS[icon], 'lf-ico')}<div><h3>${title}</h3><p>${line}</p></div></div>`).join('')}</div>
+    </section>
+  </div>`;
+}
+
 function viewLanding() {
   const chosen = !ui.addingLeague && state.leagueChosen && fxLeague() && !state.fxTeam;
   const afterSeason = ui.afterPick && pastCache[ui.afterPick.split('/')[1]];
@@ -260,15 +309,10 @@ function viewLanding() {
       <h1>Which team is yours?</h1>
       <p class="muted">Connected to <b>${esc(fxLeague().name)}</b>. ${ui.afterPick === '#recap' ? `Pick your team to see the week${ui.recapWeek ? ` ${ui.recapWeek}` : ''} recap a league mate shared.` : ui.afterPick === '#trade' && ui.tradeLink ? 'Pick your team to see the trade a league mate shared.' : afterSeason ? `Pick your team to see the ${afterSeason.label} season.` : "Pick your team to load your roster and this week's matchup."}</p>
       ${preDraft() ? `<p class="land-note">This league hasn't drafted yet${draftWhen(fxLeague()) ? ` (draft: ${esc(draftWhen(fxLeague()))})` : ''}, so rosters are empty for now.</p>` : ''}
-      <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>
+      <div class="land-teams">${fxPickable().map(t => `<button type="button" class="land-team" data-action="land-team" data-id="${esc(t.id)}"><span class="lt-tag" aria-hidden="true">${esc(initials(t.name))}</span><span class="lt-name">${esc(t.name)}</span></button>`).join('')}</div>
       <p class="small muted" style="margin:16px 0 0"><button class="link-btn" data-action="land-back">Use a different league</button>${(state.savedLeagues || []).length ? ' · <button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>` : '';
   const adding = ui.addingLeague && state.fxTeam, forSeason = adding && ui.addingLeague === 'season' && fxLeague();
-  const step1 = chosen ? '' : `
-      <p class="land-step">${forSeason ? 'Add a season' : adding ? 'Add a league' : 'League Layer'}</p>
-      <h1>${forSeason ? 'Add an earlier season' : adding ? 'Connect another league' : 'Plan your fantasy basketball or hockey week'}</h1>
-      <p class="muted">${forSeason ? `Each season of <b>${esc(forSeason.name)}</b> has its own Fantrax league ID: open that season on Fantrax and copy the part of the address after <b>/league/</b>.`
-        : adding ? 'Enter its league ID. Each league keeps its own team and notes, and earlier seasons go under their league in the menu at the top.'
-        : "Connect your league to see your odds for this week's matchup, the best starters for the week, how your categories stack up against the league, and how your draft is holding up."}</p>
+  const form = `
       <form class="land-form" data-form="land-league">
         <label class="field" for="landLeague">${forSeason ? "That season's league ID or address" : 'League ID or address'}
           <input id="landLeague" name="leagueId" placeholder="${forSeason ? 'Fantrax league ID' : 'Fantrax, ESPN or Sleeper league ID'}" autocomplete="off" spellcheck="false" autofocus>
@@ -288,7 +332,12 @@ function viewLanding() {
         <span class="land-url">sleeper.com/leagues/<b>1234567890123456789</b>/matchup</span></p>
         <p>Pasting the whole address works too.</p>
       </details>
-      <p class="small muted land-foot">Built for head-to-head leagues: basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>
-      ${adding ? '' : `<p class="small muted land-browse">No league to connect? ${NBA && NBA.siteLeague ? '<button class="link-btn" data-action="land-demo">Explore a basketball demo league</button> or ' : ''}<button class="link-btn" data-action="land-browse">try the sandbox</button>: a team of any NBA or NHL players, followed live and traded for anyone, in categories or points.</p>`}`;
+      <p class="small muted land-foot">Built for head-to-head leagues: basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax. ${adding ? '<button class="link-btn" data-action="land-cancel">Cancel</button>' : ''}</p>`;
+  if (!chosen && !adding) return landHome(form);
+  const step1 = chosen ? '' : `
+      <p class="land-step">${forSeason ? 'Add a season' : 'Add a league'}</p>
+      <h1>${forSeason ? 'Add an earlier season' : 'Connect another league'}</h1>
+      <p class="muted">${forSeason ? `Each season of <b>${esc(forSeason.name)}</b> has its own Fantrax league ID: open that season on Fantrax and copy the part of the address after <b>/league/</b>.`
+        : 'Enter its league ID. Each league keeps its own team and notes, and earlier seasons go under their league in the menu at the top.'}</p>${form}`;
   return `<div class="landing-wrap"><div class="landing-card">${step1}${step2}</div></div>`;
 }

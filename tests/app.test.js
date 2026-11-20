@@ -4279,7 +4279,7 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   const st = a.get('state'), ui = a.get('ui');
   ui.tab = 'standings'; // (no live box scores in the background until a tab here wants them)
   assert.ok(a.needsLanding(), 'a first visit: the landing page');
-  assert.match(a.viewLanding(), /data-action="land-browse">try the sandbox</);
+  assert.match(a.viewLanding(), /data-action="land-browse">[^]*?<b>Try the sandbox<\/b>/);
   a.actions['land-browse']();
   assert.ok(st.browse && !a.needsLanding() && a.fxLeague() === null);
   assert.equal(a.location.hash, '#team', 'it opens on My team');
@@ -4993,7 +4993,13 @@ test('the landing page offers both sports, and says so when a league is on a sit
   const html = a.viewLanding();
   assert.match(html, /fantasy basketball or hockey week/);
   assert.match(html, /basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax/);
-  assert.match(html, /try the sandbox<\/button>: a team of any NBA or NHL players/);
+  assert.match(html, /Try the sandbox<\/b><small>A team of any NBA or NHL players/);
+  // the brand in the head, where a league's menu goes once there is one
+  const menu = new (a.document.createElement().constructor)(), find = a.document.querySelector;
+  a.document.querySelector = sel => (sel === '#leagueMenu' ? menu : find(sel));
+  a.leagueMenu();
+  a.document.querySelector = find;
+  assert.match(menu.innerHTML, /lm-mark[^]*League Layer/);
   await assert.rejects(a.connectLeague('https://fantasy.espn.com/hockey/league?leagueId=12345678'), /Hockey works with Fantrax leagues/);
 });
 
