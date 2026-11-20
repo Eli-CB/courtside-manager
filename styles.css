@@ -1292,8 +1292,16 @@ tr.dr-mine td { background: color-mix(in srgb, var(--accent-soft) 60%, transpare
 
 /* ---------- Landing ---------- */
 body.landing .topbar { display: none; } /* no sections before a league */
+/* the page behind it: a faint dot grid, fading out toward the edges (fixed: it never widens the page) */
+body.landing .head { background: transparent; }
+body.landing::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(var(--border) 1px, transparent 1.4px); background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 60% at 50% 28%, #000 25%, transparent 80%); mask-image: radial-gradient(ellipse 75% 60% at 50% 28%, #000 25%, transparent 80%);
+}
+.lm-brand { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 1rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); white-space: nowrap; }
 .landing-wrap { min-height: calc(100vh - 140px); display: grid; place-items: center; padding-block: 24px; }
-.landing-card { width: min(560px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 28px; }
+.landing-card { width: min(560px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 12px 32px -16px rgb(0 0 0 / .14); padding: 28px; }
 .landing-card h1 { font-size: 1.7rem; letter-spacing: -.02em; text-wrap: balance; margin-bottom: 8px; }
 .landing-card > p { margin: 0 0 16px; max-width: 60ch; }
 .land-step { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 0 0 8px !important; }
@@ -1308,15 +1316,101 @@ body.landing .topbar { display: none; } /* no sections before a league */
 .install-steps li { margin: 6px 0; }
 .land-url { display: inline-block; margin-top: 4px; font-family: ui-monospace, Consolas, monospace; font-size: .85rem; color: var(--text); background: var(--surface-2); padding: 3px 8px; border-radius: 6px; word-break: break-all; }
 .land-foot { margin: 0 !important; padding-top: 14px; border-top: 1px solid var(--border); }
-.land-browse { margin: 8px 0 0 !important; }
 .land-note { font-size: .88rem; background: var(--surface-2); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px !important; }
+/* step 2: the league's teams, each with its initials */
 .land-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.land-team { font: inherit; font-weight: 600; text-align: left; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+.land-team { display: flex; align-items: center; gap: 10px; min-width: 0; font: inherit; font-weight: 600; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color .15s, background-color .15s; }
 .land-team:hover, .land-team:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+.lt-tag { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .02em; transition: background-color .15s, color .15s; }
+.land-team:hover .lt-tag, .land-team:focus-visible .lt-tag { background: var(--accent); color: var(--accent-text); }
+.lt-name { min-width: 0; overflow-wrap: anywhere; }
+
+/* a first visit: the form beside a picture of a matchup, the ways in without a league, then what the site does */
+.landing-wrap.land-home { display: block; place-items: normal; min-height: 0; max-width: 1080px; margin: 0 auto; padding-block: 28px 8px; }
+.land-hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 48px; align-items: center; }
+.land-pill { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 4px 12px 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .78rem; font-weight: 500; color: var(--muted); }
+.land-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+.land-home h1 { font-size: clamp(2.1rem, 1.3rem + 2.4vw, 3.1rem); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; margin: 0 0 14px; }
+.land-lead { font-size: 1.06rem; line-height: 1.6; color: var(--muted); margin: 0 0 22px; max-width: 46ch; text-wrap: pretty; }
+.land-connect { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px 18px 16px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 16px 40px -20px rgb(0 0 0 / .18); }
+.land-connect .land-form { margin-top: 0; }
+.land-connect .land-help { margin-bottom: 12px; }
+.land-alt { margin-top: 22px; }
+.land-alt-title { margin: 0 0 8px; font-size: .78rem; font-weight: 600; color: var(--muted); }
+.land-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.land-option {
+  display: flex; align-items: flex-start; gap: 11px; min-width: 0; padding: 12px 12px 12px 13px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  background: color-mix(in srgb, var(--surface) 80%, transparent); border: 1px solid var(--border); border-radius: 12px; transition: border-color .15s, background-color .15s, transform .15s;
+}
+.land-option:hover, .land-option:focus-visible { border-color: var(--ring); background: var(--surface); }
+.land-option:active { transform: translateY(1px); }
+.land-option > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.land-option b { font-size: .9rem; font-weight: 600; line-height: 1.3; }
+.land-option small { font-size: .78rem; line-height: 1.4; color: var(--muted); }
+.lo-ico, .lo-go, .lf-ico { flex: none; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.lo-ico { width: 32px; height: 32px; padding: 7px; border-radius: 8px; background: var(--surface-2); stroke-width: 1.8; }
+.lo-go { width: 16px; height: 16px; margin-top: 8px; stroke: var(--muted); stroke-width: 2; transition: transform .15s; }
+.land-option:hover .lo-go { transform: translateX(2px); stroke: var(--text); }
+
+/* the picture: a week's matchup as the shared link's picture draws it, a second sheet behind it (the layers of the logo) */
+.land-preview { position: relative; padding: 18px 18px 0 0; }
+.land-preview::before { content: ''; position: absolute; inset: 0 0 18px 18px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface-2); }
+.lp-card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 24px 48px -24px rgb(0 0 0 / .22); overflow: hidden; }
+.lp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 20px 14px; }
+.lp-head b { display: block; font-size: 1.05rem; font-weight: 600; letter-spacing: -.01em; }
+.lp-head span { font-size: .82rem; color: var(--muted); }
+.lp-head strong { font-size: 2.1rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.lp-legend { display: flex; gap: 14px; padding: 0 20px 12px; border-bottom: 1px solid var(--border); font-size: .72rem; font-weight: 500; color: var(--muted); }
+.lp-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lp-legend span::before { content: ''; width: 10px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.lp-legend .you::before { background: var(--accent); }
+.lp-rows { display: grid; gap: 9px; padding: 14px 20px 16px; }
+.lp-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; row-gap: 3px; align-items: center; }
+.lp-row span { grid-row: 1 / 3; font-size: .72rem; font-weight: 600; color: var(--muted); }
+.lp-row i { display: block; height: 6px; width: var(--w); border-radius: 3px; background: var(--accent); transform-origin: left; }
+.lp-row i.opp { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.lp-foot { display: flex; justify-content: space-between; align-items: center; padding: 11px 20px; border-top: 1px solid var(--border); background: var(--surface-2); font-size: .8rem; color: var(--muted); }
+.lp-foot b { color: var(--text); font-variant-numeric: tabular-nums; }
+.lp-live { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--good); }
+.lp-live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+@media (prefers-reduced-motion: no-preference) {
+  .lp-row i { animation: lp-grow .9s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i) * 45ms + 150ms); }
+  .lp-row i.opp { animation-delay: calc(var(--i) * 45ms + 230ms); }
+  .lp-live::before { animation: lp-pulse 2s ease-in-out infinite; }
+}
+@keyframes lp-grow { from { transform: scaleX(0); } }
+@keyframes lp-pulse { 50% { opacity: .35; } }
+
+/* what the site does: a tab's icon each */
+.land-features { margin-top: 64px; padding-top: 40px; border-top: 1px solid var(--border); }
+.land-features > h2 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; text-wrap: balance; }
+.land-features > p { margin: 6px 0 22px; }
+.lf-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lf { display: flex; gap: 12px; align-items: flex-start; padding: 16px; background: color-mix(in srgb, var(--surface) 85%, transparent); border: 1px solid var(--border); border-radius: 12px; }
+.lf-ico { width: 34px; height: 34px; padding: 7px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); stroke-width: 1.7; }
+.lf h3 { font-size: .92rem; font-weight: 600; margin: 1px 0 3px; }
+.lf p { margin: 0; font-size: .84rem; line-height: 1.5; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .landing-wrap.land-home { max-width: 640px; } /* one column: the form, the picture, then what the site does */
+  .land-hero { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .land-preview { width: min(440px, 100%); margin-inline: auto; }
+  .lf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 640px) {
   .landing-card { padding: 20px; }
   .land-form { grid-template-columns: minmax(0, 1fr); }
   .land-teams { grid-template-columns: minmax(0, 1fr); }
+  .landing-wrap.land-home { padding-top: 12px; }
+  .land-pill { font-size: .72rem; margin-bottom: 12px; }
+  .land-lead { font-size: 1rem; margin-bottom: 18px; }
+  .land-connect { padding: 14px; border-radius: 14px; }
+  .land-options { grid-template-columns: minmax(0, 1fr); }
+  .land-preview { padding: 12px 12px 0 0; }
+  .land-preview::before { inset: 0 0 12px 12px; }
+  .land-features { margin-top: 40px; padding-top: 28px; }
+  .lf-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .lf { padding: 12px 14px; }
 }
 
 tr.me-row td { background: var(--accent-soft); }

@@ -11,3 +11,6 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
 - Demo (`state.demo`, the landing page's "Explore a basketball demo league"): the daily file's site league, seen as a team (`demoTeam`: the
   best record with a matchup) so every tab has something to show, it and its teams under made-up names (`demoNames`, in memory only); never in `savedLeagues`, the team picker changes the team, `demo-exit` or
   connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
+- Landing page (Nov 20, 2026): a first visit gets `landHome` (the form, the demo and sandbox as option cards, `landPreview`, the
+  `LAND_FEATURES` grid with the tabs' own icons); adding a league or season and Step 2 (each team with its initials) stay one card. `landPreview`'s
+  numbers are made up, the same picture as icons/og.png: change both together. The head shows the site's mark and name there (`leagueMenu`).

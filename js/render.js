@@ -45,7 +45,8 @@ function leagueMenu() {
   const el = $('#leagueMenu');
   if (!el) return;
   const L = fxLeague(), sb = !L && state.browse; // (the sandbox: no league on the page, its leagues to go back to)
-  if ((!L && !sb) || needsLanding()) { el.innerHTML = ''; return; }
+  if (needsLanding()) { el.innerHTML = `<span class="lm-brand">${LOGO_MARK}League Layer</span>`; return; } // (no league yet: the site's name)
+  if (!L && !sb) { el.innerHTML = ''; return; }
   const cur = sb ? null : currentLeagueId();
   const saved = state.savedLeagues || [];
   const site = NBA && NBA.siteLeague;
