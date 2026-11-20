@@ -547,10 +547,10 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rx-card { display: flex; min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
 .rx-body { flex: 1; min-width: 0; padding: 14px 16px; }
 .rx-label { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.rx-name { margin-top: 3px; font-size: 1.12rem; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
+.rx-per { font-weight: 600; white-space: nowrap; }
+.rx-name { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; margin-top: 3px; font-size: 1.12rem; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
 .rx-name .pname { font-size: inherit; font-weight: inherit; }
-.rx-team { margin-top: 2px; font-size: .88rem; font-weight: 600; }
-.rx-meta { margin-top: 2px; font-size: .78rem; color: var(--muted); }
+.rx-team { min-width: 0; font-size: .88rem; font-weight: 600; letter-spacing: 0; }
 .rx-stats { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 8px; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rx-stats > span { white-space: nowrap; } /* "7 REB" stays together */
 .rx-stats > .rx-words { white-space: normal; }

@@ -2404,6 +2404,13 @@ test('weekly recap: every final of a finished week, the standouts, and a message
     assert.equal((html.match(/class="rx-card rx-player"/g) || []).length, app.recapItems(X).filter(x => x.p).length);
     assert.ok(!html.includes('pc-photo'), 'no big photo on the tab');
     assert.match(html, new RegExp(`class="rx-faces"><span class="hs[^"]*" style="width:44px;height:44px[^"]*" data-photo="${X.mvp.p.nbaId}"`), "the player's round photo, which opens his card");
+    // kept short (the owner's ask, Nov 2026): his name with one initial and his fantasy team on one line, a week's games
+    // beside the award, no NBA team, positions or minutes, a week's percentages without makes/attempts (a game's keep them)
+    const mvpCard = html.slice(html.indexOf('Player of the week'), html.indexOf('</article>', html.indexOf('Player of the week')));
+    assert.ok(mvpCard.includes(`${X.mvp.line.gp1} G, per game</span>`) && mvpCard.includes(`>${app.esc(app.shortName(X.mvp.p.name))}</button><span class="rx-team">`), 'short name, team beside it');
+    assert.ok(!html.includes('rx-meta') && !mvpCard.includes('class="pt ') && !mvpCard.includes('data-action="sport-team"') && !mvpCard.includes(' MIN') && !/\d\/\d/.test(mvpCard), 'no NBA team, positions, minutes or a week\'s makes/attempts');
+    const gameCard = html.slice(html.indexOf('Game of the week'), html.indexOf('</article>', html.indexOf('Game of the week')));
+    assert.ok(gameCard.includes(` ${X.game.line.fgm}/${X.game.line.fga}`), "a game's makes/attempts kept");
     // the finals agree with Fantrax's standings (week 1 is the only finished week)
     for (const g of X.games) {
       const ra = L.standings.find(r => r.id === g.a);

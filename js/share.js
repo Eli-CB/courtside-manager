@@ -257,25 +257,34 @@ async function sharePad(tall = 5000) {
 // are a game of), score: [number, unit] }, one naming players { faces }
 async function shareCanvas(H) {
   const items = H.items, games = H.games || [];
-  const K = await sharePad(900 + sum(items.map(it => (it.p ? 440 : 340))) + games.length * 100);
-  const { C, W, inner, ctx, font, text, round, photo, lay, drawLay, meta } = K;
+  const K = await sharePad(900 + sum(items.map(it => (it.p ? 400 : 340))) + games.length * 100);
+  const { C, W, inner, ctx, font, text, round, photo, lay, drawLay } = K;
   await K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])], false);
   const x0 = C.pad, w = inner, fd = 104; // (every photo one size, a player's as a note's faces, as on the page)
-  const posOf = p => p.pos || (nbaById.get(p.nbaId) || {}).pos;
-  const labelText = (it, x, y, max) => { font(22, 700, 2); text(fitText(ctx, it.label.toUpperCase(), max), x, y, C.accent); };
+  // the award in orange; a week's games after it, gray ("PLAYER OF THE WEEK · 4 G, PER GAME")
+  const labelText = (it, x, y, max) => {
+    font(22, 700, 2); const t = fitText(ctx, it.label.toUpperCase(), max); text(t, x, y, C.accent);
+    const per = it.p && it.tiles && it.per ? ` · ${it.per} G, PER GAME` : '', lw = ctx.measureText(t).width;
+    if (per && lw + ctx.measureText(per).width <= max) text(per, x + lw, y, C.muted);
+  };
 
-  // A player: the award, his name, his teams, his numbers (his value or points first, in orange), his round photo on the right
+  // A player, as the page's card (standoutCard, recap.js): the award; his name (one initial) and his fantasy team after it;
+  // his numbers (his value or points in orange, then the league's stats; a week's games beside the award); his round photo
+  // on the right. Kept short (the owner's ask, Nov 2026): no NBA team or positions, no minutes
   const player = (it, y) => {
-    const p = it.p, raw = nbaById.get(p.nbaId) || {}, tx = x0 + 40, tw = x0 + w - 32 - fd - 32 - tx;
-    const units = it.tiles ? statUnits([{ v: it.score[0], k: it.score[1], hot: true }, ...it.tiles]) : wordUnits([[it.stats || '', '']]);
-    const lines = lay(units, tw, 27, it.tiles ? 22 : undefined), h = 214 + lines.length * 40 + 26;
+    const p = it.p, tx = x0 + 40, tw = x0 + w - 32 - fd - 32 - tx;
+    const units = it.tiles ? statUnits([{ v: it.score[0], k: it.score[1], hot: true }, ...cardTiles(it.tiles, it.per)]) : wordUnits([[it.stats || '', '']]);
+    const lines = lay(units, tw, 27, it.tiles ? 22 : undefined), h = Math.max(fd + 60, 147 + lines.length * 40);
     round(x0, y, w, h, 28, C.card);
     photo(p, x0 + w - 32 - fd, y + (h - fd) / 2, fd);
-    labelText(it, tx, y + 36, tw);
-    font(44, 700, -0.5); text(fitText(ctx, p.name, tw), tx, y + 74, C.text);
-    font(27, 600); text(fitText(ctx, fxTeamName(it.tid), tw), tx, y + 132, C.soft);
-    meta(tx, y + 172, 23, raw.team, posOf(p), it.per ? [[` · ${it.per} G, per game`, C.muted]] : []);
-    drawLay(lines, tx, y + 216, 27, 40);
+    labelText(it, tx, y + 32, tw);
+    // (the name and the team on one baseline; the team cut to what the name leaves)
+    ctx.textBaseline = 'alphabetic';
+    font(42, 700, -0.5); const name = fitText(ctx, shortName(p.name), tw), nw = ctx.measureText(name).width;
+    text(name, tx, y + 106, C.text);
+    font(28, 600); if (tw - nw - 18 > 80) text(fitText(ctx, fxTeamName(it.tid), tw - nw - 18), tx + nw + 18, y + 106, C.soft);
+    ctx.textBaseline = 'top';
+    drawLay(lines, tx, y + 128, 27, 40);
     return y + h;
   };
 

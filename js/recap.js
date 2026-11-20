@@ -37,6 +37,10 @@ function lineTiles(s, perGame) {
   return out;
 }
 
+// what a standout's card shows of his line (the tab's, the picture's), kept short (the owner's ask, Nov 2026): not his
+// minutes, and a week's percentages without makes/attempts a game (a game's keep theirs: "17/30")
+const cardTiles = (tiles, per) => tiles.filter(t => t.k !== 'MIN').map(t => (per && t.made ? { ...t, made: '' } : t));
+
 function buildRecap(L, P, period) {
   const pairs = L.matchups[String(period.n)].filter(m => m.length === 2);
   const R = benchSwaps({ ...L, fidNba: currentFidNba() }, P.G, P.weeks, period, pairs.flat());
@@ -234,28 +238,26 @@ function recapText(L, X) {
   return [`${L.name} · Period ${X.period.n} recap`, '', ...recapItems(X).map(x => `${x.label}: ${x.text}`)].join('\n\n');
 }
 
-// A standout on the Recap tab or the Draft Retrospective: a player award the award, his name, his fantasy team, his NBA team
-// and positions, his numbers (his value or points first) or the award's words; any other the award and its line, with the
-// faces of the players it names. Every face the small round photo on the right, a player award's too (the owner's ask, Nov
+// A standout on the Recap tab or the Draft Retrospective: a player award the award, his name (one initial: "T. Maxey") with
+// his fantasy team after it, his numbers (his value or points first, then the league's stats, not minutes; a week's "4 G,
+// per game" beside the award) or the award's words, kept short (the owner's ask, Nov 2026: no NBA team or positions, his photo's logo shows
+// the team); any other the award and its line, with the faces of the players it names. Every face the small round photo on the right, a player award's too (the owner's ask, Nov
 // 2026; the share picture, shareCanvas, is laid out the same). label: the award's title as HTML (the Draft tab's opens its
 // breakdown)
 const standoutFaces = faces => `<div class="rx-faces">${faces.map(f => headshot(f, hsPx(44, 36))).join('')}</div>`;
-function standoutCard(x, label = `<div class="rx-label">${x.label}</div>`) {
+function standoutCard(x, label = `<div class="rx-label">${x.label}${x.tiles && x.per ? `<span class="rx-per"> · ${x.per} G, per game</span>` : ''}</div>`) {
   if (!x.p) {
     const faces = (x.faces || []).filter(f => f && f.nbaId != null).slice(0, 3);
     return `<article class="rx-card rx-note"><div class="rx-body">${label}<div class="rx-text">${x.html}</div></div>`
       + `${faces.length ? standoutFaces(faces) : ''}</article>`;
   }
-  const raw = nbaById.get(x.p.nbaId) || { id: x.p.nbaId, name: x.p.name }, pos = x.p.pos || raw.pos || [];
   const stats = x.tiles
-    ? [[x.score[0], x.score[1], isBelowZero(x.score[0]) ? 'pos-bad' : ''], ...x.tiles.map(t => [t.v, `${t.k}${t.made ? ` ${t.made}` : ''}`, ''])]
+    ? [[x.score[0], x.score[1], isBelowZero(x.score[0]) ? 'pos-bad' : ''], ...cardTiles(x.tiles, x.per).map(t => [t.v, `${t.k}${t.made ? ` ${t.made}` : ''}`, ''])]
       .map(([v, k, cls]) => `<span><b${cls ? ` class="${cls}"` : ''}>${esc(v)}</b> ${esc(k)}</span>`).join('')
     : `<span class="rx-words">${esc(x.stats)}</span>`; // (football's line, a draft award's: words)
   return `<article class="rx-card rx-player"><div class="rx-body">
     ${label}
-    <div class="rx-name">${playerBtn(x.p.nbaId, x.p.name)}</div>
-    <div class="rx-team">${teamLink(x.tid)}</div>
-    <div class="rx-meta">${raw.team ? teamBtn(raw.team) : 'FA'}${pos.length ? ` · ${posTags(pos)}` : ''}${x.per ? ` · ${x.per} G, per game` : ''}</div>
+    <div class="rx-name">${playerBtn(x.p.nbaId, x.p.name, esc(shortName(x.p.name)))}<span class="rx-team">${teamLink(x.tid)}</span></div>
     <div class="rx-stats">${stats}</div>
   </div>${standoutFaces([x.p])}</article>`;
 }
