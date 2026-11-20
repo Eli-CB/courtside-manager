@@ -3385,9 +3385,13 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     // Homer: three Thunder, their faces on its card; Passport: three countries (players' nationalities, not their teams)
     assert.deepEqual(Array.from(get('Homer').faces, p => p.nbaId).sort(), [a1, a2, a3].map(x => x.id).sort(), "Homer's card: the faces of the players it names");
     assert.equal(get('Homer').text, `${app.fxTeamName(A)} has 3 Oklahoma City Thunder players: ${[a1, a2, a3].map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1')}`);
-    // (its first player taken from outside the league's most common country, the US, named and on its card)
-    assert.equal(get('Passport').text, `${app.fxTeamName(B)}: their players came from 3 countries; first taken from abroad: ${app.lastName(b2.name)} (France)`);
-    assert.deepEqual(Array.from(get('Passport').faces, p => p.nbaId), [b2.id]);
+    // their cards kept short (the owner's ask): the team and the number, Homer's faces and Passport's flags (most players first)
+    assert.match(get('Homer').html, new RegExp(`^<b><button[^>]*data-team="${A}"[^>]*>[^<]+</button></b> [(]3 <button[^>]*>OKC</button>[)]$`));
+    assert.equal(get('Passport').text, `${app.fxTeamName(B)}: their players came from 3 countries`);
+    assert.match(get('Passport').html, new RegExp(`^<b><button[^>]*data-team="${B}"[^>]*>[^<]+</button></b> [(]3[)]$`));
+    assert.deepEqual(Array.from(get('Passport').flags, r => Array.from(r)), [['US', 'FR', 'CA']]);
+    assert.ok(!get('Passport').faces);
+    assert.equal((app.draftAwardsCard(d).match(/class="rx-flags"><div>(<img class="flag"[^>]*>){3}<\/div><\/div>/g) || []).length, 1, "Passport's card: the winner's flags");
     const globeRows = get('Passport').detail.html.split('<li>').slice(1);
     assert.match(globeRows[0], />3 countries<\/b>/);
     assert.equal((globeRows[0].match(/<img class="flag"/g) || []).length, 3, "B's three flags");
@@ -3402,11 +3406,12 @@ test('Draft awards: Fall, Glass, Youngins, Uncs, Homer and Passport', async () =
     assert.match(getK('Passport').detail.html.split('<li>').slice(1).find(x => x.includes(`data-team="${A}"`)), />2 countries<\/b>/);
     assert.equal(getK('Fall').text, get('Fall').text, 'never in the ADP awards');
     d.keepers = {};
-    // a tie names each team (with its real team and its players on Homer, the first of each taken on its card)
+    // a tie names each team (with its real team on Homer's text); its card just the teams, no room for faces
     c3.team = 'BOS';
-    const tied = app.draftAwards(d).find(x => x.label === 'Homer'), names = xs => xs.map(x => app.lastName(x.name)).join(', ').replace(/, ([^,]*)$/, ' and $1');
-    assert.equal(tied.text, `${app.fxTeamName(A)} (OKC: ${names([a1, a2, a3])}) and ${app.fxTeamName(C)} (BOS: ${names([c1, c2, c3])}) tied: 3 players each from one team`);
-    assert.deepEqual(Array.from(tied.faces, p => p.nbaId), [a1.id, c1.id]);
+    const tied = app.draftAwards(d).find(x => x.label === 'Homer');
+    assert.equal(tied.text, `${app.fxTeamName(A)} (OKC) and ${app.fxTeamName(C)} (BOS) tied: 3 players each from one team`);
+    assert.match(tied.html, new RegExp(`data-team="${A}".* and <b>.*data-team="${C}".*</b> [(]3[)]$`));
+    assert.ok(!tied.faces);
     // the seasons' archives not in yet (on their way): no Glass until they are
     const loading = app.get('glassLoading');
     for (const s of seasons) { delete archives[s]; loading.add(s); }

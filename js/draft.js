@@ -308,11 +308,11 @@ function draftAgeAwards(d, squads, { row, teamWho, teamAward, standout, best, te
   give('Uncs', 1, 'oldest');
 }
 
-// Homer: the most players from one real team (by each player's team now), the players named and on its card (a tie: each
-// team's, the first of each taken on the card); Passport (was The Globalist, then Frequent Flyer): the most countries (the
-// owner's ask: players' nationalities, from the daily file's ISO codes), each winner's first player taken from outside the
-// league's most common country (abroad) named and on its card
-function draftOriginAwards(squads, { out, and, who, row, teamWho, breakdown, teamAward, standout, best, named }) {
+// Homer: the most players from one real team (by each player's team now); Passport (was The Globalist, then Frequent
+// Flyer): the most countries (the owner's ask: players' nationalities, from the daily file's ISO codes). Their cards kept
+// short (the owner's ask, Nov 2026): the winners and the number, with Homer's players' faces (none on a tie: no room) and
+// each Passport winner's flags; the words are the shared text's
+function draftOriginAwards(squads, { out, and, row, teamWho, breakdown, best, named }) {
   const stacks = squads.map(t => {
     const by = new Map();
     for (const x of t.xs) if (x.p.raw.team) by.set(x.p.raw.team, [...(by.get(x.p.raw.team) || []), x.p]);
@@ -327,12 +327,11 @@ function draftOriginAwards(squads, { out, and, who, row, teamWho, breakdown, tea
     const rows = sortDesc(stacks, t => t.ps.length * 100 + t.teams).map(t => row(teamWho(t), t.ps.length > 1 ? `${teamBtn(t.club)}: ${t.ps.map(named).join(', ')}` : 'one player from each team', String(t.ps.length))).join('');
     out.push({
       label: 'Homer',
-      // one team: whose players and who; a tie: each team and its real team
-      html: one ? `<b>${teamLink(one.tid)}</b> has ${n} ${esc(full(one.club))} players: ${and(one.ps.map(who), Infinity)}` : `${and(homers.map(t => `<b>${teamLink(t.tid)}</b> (${teamBtn(t.club)}: ${and(t.ps.map(who), Infinity)})`))} tied: ${n} players each from one team`,
-      text: one ? `${fxTeamName(one.tid)} has ${n} ${full(one.club)} players: ${and(one.ps.map(p => lastName(p.name)), Infinity)}` : `${and(homers.map(t => `${fxTeamName(t.tid)} (${t.club}: ${and(t.ps.map(p => lastName(p.name)), Infinity)})`))} tied: ${n} players each from one team`,
+      // one team: it, how many of which real team, their faces; a tie: the teams and how many. The text: whose players and who
+      html: one ? `<b>${teamLink(one.tid)}</b> (${n} ${teamBtn(one.club)})` : `${and(homers.map(t => `<b>${teamLink(t.tid)}</b>`))} (${n})`,
+      text: one ? `${fxTeamName(one.tid)} has ${n} ${full(one.club)} players: ${and(one.ps.map(p => lastName(p.name)), Infinity)}` : `${and(homers.map(t => `${fxTeamName(t.tid)} (${t.club})`))} tied: ${n} players each from one team`,
       detail: breakdown('Homer', 'The most players each team has from one real team, picks and keepers (by his team now)', rows),
-      // (the players it names, as the Recap's cards show them; keepers count as taken before the draft)
-      faces: one ? one.ps : homers.map(t => sortDesc(t.ps, p => -p.pick)[0]),
+      ...(one ? { faces: one.ps } : {}),
     });
   }
   const globe = best(stacks, t => t.nats.size);
@@ -340,14 +339,13 @@ function draftOriginAwards(squads, { out, and, who, row, teamWho, breakdown, tea
     // each team's countries as flags, the most picks first (×2 for two)
     const flags = t => sortDesc([...t.nats], ([, k]) => k).map(([c, k]) => `${flagImg(c)}${k > 1 ? `×${k}` : ''}`).join(' ');
     const rows = sortDesc(stacks, t => t.nats.size * 100 - t.n).map(t => row(teamWho(t), flags(t) || 'no countries known', `${t.nats.size} ${t.nats.size === 1 ? 'country' : 'countries'}`)).join('');
-    const homeCount = new Map();
-    for (const t of stacks) for (const [c, k] of t.nats) homeCount.set(c, (homeCount.get(c) || 0) + k);
-    const home = sortDesc([...homeCount], ([, k]) => k)[0][0]; // (the league's most common country: the NBA's US)
-    const [said, more] = standout(`: their players came from ${globe[0].nats.size} countries${globe.length > 1 ? ' each' : ''}`, globe, 'first taken from abroad', t => {
-      const p = sortDesc(t.xs.filter(x => x.p.raw.nat && x.p.raw.nat !== home), x => -x.p.pick)[0].p;
-      return { p, v: countryName(p.raw.nat) };
+    const n = globe[0].nats.size;
+    out.push({
+      label: 'Passport', html: `${and(globe.map(t => `<b>${teamLink(t.tid)}</b>`))} (${n})`,
+      text: `${and(globe.map(t => fxTeamName(t.tid)))}${globe.length > 1 ? ' tied' : ''}: their players came from ${n} countries${globe.length > 1 ? ' each' : ''}`,
+      detail: breakdown('Passport', "How many countries each team's players come from, picks and keepers", rows),
+      flags: globe.map(t => sortDesc([...t.nats], ([, k]) => k).map(([c]) => c)), // (a row a winner, in the order named)
     });
-    teamAward('Passport', globe, said, "How many countries each team's players come from, picks and keepers", rows, more);
   }
 }
 

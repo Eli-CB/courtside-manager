@@ -245,7 +245,7 @@ async function sharePad(tall = 5000) {
     out.getContext('2d').drawImage(cv, 0, 0);
     return out;
   };
-  return { C, W, inner, ctx, font, text, round, photo, prep, panel, lay, drawLay, meta, top, done };
+  return { C, W, inner, ctx, font, text, round, clip, photo, prep, panel, lay, drawLay, meta, top, done };
 }
 
 // A picture to share in a league chat (1080 px wide): a kicker, the league's name and any line under it, then the
@@ -254,12 +254,15 @@ async function sharePad(tall = 5000) {
 // emoji, the owner's ask), then any finals. H: { kicker, title, sub, items, games,
 // mark: tid -> 'top' | 'bottom' | '' }.
 // An item: { label, html, text }, a player's also { p, tid, stats (words), tiles (lineTiles), per (games a week's numbers
-// are a game of), score: [number, unit] }, one naming players { faces }
+// are a game of), score: [number, unit] }, one naming players { faces }, Passport { flags: a row of country codes a team }
 async function shareCanvas(H) {
   const items = H.items, games = H.games || [];
   const K = await sharePad(900 + sum(items.map(it => (it.p ? 400 : 340))) + games.length * 100);
-  const { C, W, inner, ctx, font, text, round, photo, lay, drawLay } = K;
-  await K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])], false);
+  const { C, W, inner, ctx, font, text, round, clip, photo, lay, drawLay } = K;
+  // (flags from flagcdn.com, which lets a canvas use them; one that won't load is left out)
+  const flagIms = new Map(), codes = [...new Set(items.flatMap(it => (it.flags || []).flat()))];
+  await Promise.all([K.prep([...items.filter(it => it.p).map(it => it.p), ...items.flatMap(it => it.faces || [])], false),
+    ...codes.map(c => canvasImg(`https://flagcdn.com/w80/${c.toLowerCase()}.png`, true).then(im => { if (im) flagIms.set(c, im); }))]);
   const x0 = C.pad, w = inner, fd = 104; // (every photo one size, a player's as a note's faces, as on the page)
   // the award in orange; a week's games after it, gray ("PLAYER OF THE WEEK · 4 G, PER GAME")
   const labelText = (it, x, y, max) => {
@@ -288,16 +291,24 @@ async function shareCanvas(H) {
     return y + h;
   };
 
-  // The rest: the award, its line (names bold), and the round photos of the players it names
+  // The rest: the award, its line (names bold), and the round photos of the players it names, or its flags (a row a team,
+  // as wide as the widest row's flags at 48 px, smaller where a row has more than 7)
   const note = (it, y) => {
     const faces = (it.faces || []).filter(f => f && f.nbaId != null).slice(0, 3), step = 72;
-    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : 0, tx = x0 + 40, tw = x0 + w - 32 - fw - tx;
+    const rows = (it.flags || []).map(r => r.map(c => flagIms.get(c)).filter(Boolean)).filter(r => r.length);
+    const most = Math.max(0, ...rows.map(r => r.length)), fgw = Math.min(48, (400 - (most - 1) * 8) / most), fgh = fgw * 0.75;
+    const flagsW = rows.length ? most * fgw + (most - 1) * 8 : 0, flagsH = rows.length * fgh + (rows.length - 1) * 12;
+    const fw = faces.length ? fd + (faces.length - 1) * step + 28 : rows.length ? flagsW + 28 : 0, tx = x0 + 40, tw = x0 + w - 32 - fw - tx;
     const lines = lay(wordUnits(htmlRuns(it.html)), tw, 31), block = 40 + lines.length * 44 - 8;
-    const h = Math.max(block + 64, faces.length ? fd + 60 : 0, 148), ty = y + (h - block) / 2;
+    const h = Math.max(block + 64, faces.length ? fd + 60 : 0, rows.length ? flagsH + 60 : 0, 148), ty = y + (h - block) / 2;
     round(x0, y, w, h, 28, C.card);
     labelText(it, tx, ty, tw);
     drawLay(lines, tx, ty + 40, 31, 44);
     faces.forEach((f, i) => photo(f, x0 + w - 32 - fd - (faces.length - 1 - i) * step, y + (h - fd) / 2, fd, C.card));
+    rows.forEach((r, j) => r.forEach((im, i) => {
+      const fx = x0 + w - 32 - (r.length - i) * fgw - (r.length - 1 - i) * 8, fy = y + (h - flagsH) / 2 + j * (fgh + 12);
+      clip(fx, fy, fgw, fgh, 4); ctx.drawImage(im, fx, fy, fgw, fgh); ctx.restore();
+    }));
     return y + h;
   };
 
