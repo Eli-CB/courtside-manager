@@ -5105,7 +5105,7 @@ test('the landing page offers both sports, and says so when a league is on a sit
   assert.match(html, /basketball on Fantrax, ESPN and Sleeper, hockey on Fantrax/);
   assert.match(html, /Try the sandbox<\/b><small>A team of any NBA or NHL players/);
   // a look inside: the live matchup, the draft board and the recap's picture, each with a way into its tab in the demo
-  assert.match(html, /Every game, live[^]*data-tab="dashboard"[^]*Every pick on one board[^]*data-tab="draft"[^]*A recap for the league chat[^]*data-tab="recap"/);
+  assert.match(html, /Every game, live[^]*data-tab="dashboard"[^]*Every pick on one board[^]*data-tab="draft"[^]*Recaps for the league chat[^]*data-tab="recap"/);
   // the brand in the head, where a league's menu goes once there is one
   const menu = new (a.document.createElement().constructor)(), find = a.document.querySelector;
   a.document.querySelector = sel => (sel === '#leagueMenu' ? menu : find(sel));
@@ -5134,10 +5134,13 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   ui.tab = 'standings';
   assert.ok(a.needsLanding());
   assert.match(a.viewLanding(), /Explore a basketball demo league/);
-  // its rows, in order: the player cards' button opens his card in the demo, Trends is named under it, and the pictures'
-  // photos are only pictures (no tap to a card, as on the tabs)
+  // its rows, in order: the cards' button opens a player's card in the demo, Trends is named under it, the three cards take
+  // turns (a CSS loop: no timer), the Recap's picture has the Draft Retrospective's beside it, and the pictures' photos are only
+  // pictures (no tap to a card, as on the tabs)
   const land = a.viewLanding();
-  assert.deepEqual([...land.matchAll(/class="lsh-tab">[^]*?<\/svg>([^<]+)<\/p>/g)].map(m => m[1]), ['Matchup', 'Plan Ahead', 'Player cards', 'Draft', 'Recap']);
+  assert.deepEqual([...land.matchAll(/class="lsh-tab">[^]*?<\/svg>([^<]+)<\/p>/g)].map(m => m[1]), ['Matchup', 'Plan Ahead', 'Cards', 'Draft', 'Recap']);
+  assert.match(land, /class="pvx-deck">[^]*?pv-pcard[^]*?pv-tcard[^]*?Playoff Games[^]*?pv-fcard/);
+  assert.match(land, /class="pv-pics"[^]*?Period 6 recap[^]*?Draft Retrospective/);
   assert.match(land, /data-tab="players" data-player="1628983"/);
   assert.match(land, /data-tab="trends">Trends</);
   assert.match(land, /Free · No sign-up/);

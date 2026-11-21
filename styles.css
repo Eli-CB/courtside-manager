@@ -1535,6 +1535,13 @@ body.landing::before {
 .pvr-foot .m-b { fill: #7f8a9c; }
 .pvr-foot b { font-size: .7rem; color: var(--r-text); }
 .pvr-foot span { margin-left: auto; font-size: .6rem; color: var(--r-muted); }
+/* beside it the Draft Retrospective's, tipped the other way; on phones a row to swipe, the second peeking in at the edge */
+.pv-pics { display: flex; justify-content: center; align-items: flex-start; gap: 14px; }
+.pv-pics > .pv-pic { flex: 1 1 0; min-width: 0; max-width: 270px; margin: 0; }
+.pv-pics > .pv-pic + .pv-pic { margin-top: 26px; rotate: 2deg; }
+.pvr-sub { display: block; margin: -8px 0 12px; font-size: .62rem; color: var(--r-muted); }
+.lsh-pic:has(> .pv-pics) { padding-inline: 16px; }
+.pv-pics .pvr-title { font-size: 1.25rem; }
 .pvr-share { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
 .pvr-share span { padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: .76rem; font-weight: 500; }
 .pvr-share .on { background: var(--text); border-color: var(--text); color: var(--surface); }
@@ -1567,9 +1574,9 @@ body.landing::before {
 @keyframes pvp-glow { 0%, 35% { background: var(--good-soft); } }
 @keyframes pvp-rise { from { opacity: 0; transform: translateY(8px); } }
 /* the player card, in its own pieces (.pc-photo, .pc-bio, .cp-row, .proj); the category bars grow out of the middle */
-.pv-pcard { padding: 14px 16px 4px; }
+:is(.pv-pcard, .pv-tcard, .pv-fcard) { padding: 14px 16px 4px; }
 .pvc-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; margin-bottom: 12px; }
-.pvc-head b { font-size: 1.05rem; font-weight: 600; letter-spacing: -.01em; }
+.pvc-head > b { font-size: 1.05rem; font-weight: 600; letter-spacing: -.01em; }
 .pvc-head span { font-size: .78rem; color: var(--muted); }
 .pvc-top { display: flex; gap: 14px; align-items: flex-start; }
 .pvc-top .pc-photo { width: 150px; }
@@ -1588,6 +1595,48 @@ body.landing::before {
 .pvc-games :is(th, td):first-child { padding-left: 0; text-align: left; white-space: nowrap; }
 .pvc-games :is(th, td):last-child { padding-right: 0; }
 .pvc-games td:last-child { font-weight: 700; }
+/* an NBA team's card and a fantasy team's, in the same pieces (.proj, .strip/.sdot, .badge.fa) */
+.pvt-head { align-items: center; }
+.pvt-head .tlogo { flex: none; }
+.pvt-rec { padding-left: 10px; border-left: 1px solid var(--border); font-weight: 600; color: var(--text) !important; }
+.pvt-po b { color: var(--text); font-weight: 600; }
+.pvt-sub { margin: 14px 0 0; font-size: .84rem; font-weight: 600; }
+.pvt-sub span { margin-left: 4px; font-size: .76rem; font-weight: 400; color: var(--muted); }
+.pvt-table .bplayer { gap: 8px; }
+.pvt-table .bmain { min-width: 0; }
+.pvt-table .bmain > b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.pvt-table .bmain > div { font-size: .68rem; color: var(--muted); }
+.pvt-table .pvt-n { width: 14px; color: var(--muted); }
+.pvt-table :is(.pvt-p, .pvt-t) { text-align: left; }
+.pvt-table td.pvt-p { max-width: 0; width: 52%; }
+.pvt-table td.pvt-t { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pvt-table .badge.fa { font-size: .66rem; }
+.pvf-table { margin-top: 2px; }
+.pvf-table td { padding-block: 4px; }
+.pvf-table :is(th, td):nth-child(2), .pvf-table :is(th, td):nth-child(3) { width: 3.6em; }
+.pvf-table :is(th, td):last-child { width: 50%; padding-left: 12px; text-align: left; }
+.pvf-table .strip { height: 14px; }
+.pvf-table .sdot { width: 6px; height: 6px; margin: -3px 0 0 -3px; }
+.pvf-table .sdot.this { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
+.pv-fcard .pvt-table { margin-top: 8px; }
+.pv-fcard .pvt-table td.pvt-p { width: 85%; }
+.pv-fcard .pvc-head span b { color: var(--text); }
+/* the three cards in turn, 6 s each, the one showing lit above them (a loop of CSS alone); held while the pointer's on them */
+.pvx-seg { display: flex; width: max-content; margin: 0 auto 12px; }
+.pvx-deck { display: grid; }
+.pvx-deck > .pv-card { grid-area: 1 / 1; }
+.pvx-deck > .pv-card + .pv-card { opacity: 0; visibility: hidden; }
+.land-show.in .pvx-deck > .pv-card, .land-show.in .pvx-seg > span { animation: pvx-card 18s linear infinite; }
+.land-show.in .pvx-seg > span { animation-name: pvx-seg; }
+.land-show.in .pvx :is(.pvx-deck, .pvx-seg) > :nth-child(2) { animation-delay: -12s; }
+.land-show.in .pvx :is(.pvx-deck, .pvx-seg) > :nth-child(3) { animation-delay: -6s; }
+.lsh-pic:hover .pvx :is(.pvx-deck, .pvx-seg) > * { animation-play-state: paused; }
+@keyframes pvx-card { 0%, 31% { opacity: 1; visibility: visible; } 33.4%, 97% { opacity: 0; visibility: hidden; } 100% { opacity: 1; visibility: visible; } }
+@keyframes pvx-seg {
+  0%, 31% { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px var(--border); }
+  33.4%, 97% { background: transparent; color: var(--muted); box-shadow: none; }
+  100% { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px var(--border); }
+}
 @media (prefers-reduced-motion: no-preference) {
   .land-show:not(.in) .pv-plan .dots i, .land-show:not(.in) .pvp-swap, .land-show:not(.in) .pvc-games tbody tr { opacity: 0; }
   .land-show.in .pv-plan .dots i { animation: pv-pick .3s cubic-bezier(.2, .8, .2, 1) calc(var(--d) * 90ms + .3s) both; }
@@ -1635,11 +1684,16 @@ body.landing::before {
   .pv-board table { padding: 0 4px 8px; border-spacing: 2px; }
   .pv-board .dr-cell { padding: 5px; }
   .pv-board .dr-cell b { font-size: .72rem; }
+  .pv-pics { justify-content: flex-start; gap: 12px; margin: -12px -12px -6px; padding: 12px 12px 18px; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .pv-pics::-webkit-scrollbar { display: none; }
+  .pv-pics > .pv-pic { flex: 0 0 82%; max-width: none; scroll-snap-align: center; }
+  .pvr-share { margin-top: 12px; }
   .pvp-row, .pvp-sep { padding-inline: 10px; }
   .pvp-swap { margin-inline: 8px; }
-  .pv-pcard { padding: 12px 12px 2px; }
+  :is(.pv-pcard, .pv-tcard, .pv-fcard) { padding: 12px 12px 2px; }
   .pvc-top { gap: 10px; }
   .pvc-top .pc-photo { width: 112px; }
+  .pvt-table .pvt-gp { display: none; } /* (an NBA team's games played: the fantasy team gets the room) */
 }
 
 tr.me-row td { background: var(--accent-soft); }

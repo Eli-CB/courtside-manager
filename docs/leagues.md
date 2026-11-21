@@ -20,9 +20,10 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   in the hero, the owner's ask: the "This week, Win odds 68%" card was removed; the `LAND_FEATURES` grid at the foot with the tabs' own icons,
   Trends among them, the owner's ask; the hero's two columns top-aligned, so opening "Where do I find my league ID?" never moves the headline,
   the owner's ask); adding a league or season and Step 2 (each team with its initials) stay one card. The head shows the site's mark and name there (`leagueMenu`).
-  Under the hero, `landShow`'s rows (Nov 20, 2026, the owner's ask): the Matchup tab live, Plan Ahead, the player card (Trends named under it, the
-  owner's ask), the draft board and the Recap's picture, made up too but drawn with each tab's own classes (`.mu-chip`, `.game-pill`, `.bmeta`/`.dots`,
-  `.swap`, `.pc-photo`/`.cp-row`, `.dr-cell` + `shade`, `RC_IMG`), so check its row after restyling one of those. Players there are real, with their
+  Under the hero, `landShow`'s rows (Nov 20, 2026, the owner's ask): the Matchup tab live, Plan Ahead, "In-depth cards" (a player's, an NBA team's with
+  its playoff games, a fantasy team's, taking turns 6 s each in a CSS loop, `landCards`; Trends named under it: the owner's asks), the draft board, and
+  the Recap's picture with the Draft Retrospective's beside it (the owner's ask; a row to swipe on phones), made up too but drawn with each tab's own
+  classes (`.mu-chip`, `.game-pill`, `.bmeta`/`.dots`, `.swap`, `.pc-photo`/`.cp-row`, `.strip`/`.sdot`, `.dr-cell` + `shade`, `RC_IMG`), so check its row after restyling one of those. Players there are real, with their
   real photos (the owner's ask): `landFace`/`playerPhoto` by NBA.com id, `data-photo` taken off so a photo isn't a way to his card. A row's moment (a
   basket turning PTS and the score, the swap going in, the picks coming in) plays once its picture is half in view (`landReveal`, run by `render` after the landing; `.in`);
   its button is `land-demo` with `data-tab`, the demo opened at that tab (`data-player`: with his card open). The pill says "Free · No sign-up" and the footer "League Layer is free." (never "forever", the owner's ask).

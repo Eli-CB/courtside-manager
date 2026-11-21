@@ -328,19 +328,35 @@ const LAND_RECAP = [
   ['Game of the period', '', 'J. Brunson', 1628973, 'Bench Mob', [['44', 'PTS'], ['6', '3PM'], ['9', 'AST'], ['.684', 'FG%']]],
   ['Bench regret', '', '', 0, '', '<b>Sixth Men</b>: starting <b>D. Vassell</b> over <b>B. Hield</b> would have won 5–4'],
 ];
+// The Draft Retrospective's picture beside it (draftShare in draft.js: the same shareCanvas): a player's award, or a team's with
+// its standout player on a lighter line of his own. [award, NBA.com id, his name, the team, its line, a team award's standout]
+const LAND_DRAFT_AWARDS = [
+  ['Reach', 1642907, 'C. Coward', 'Bench Mob', 'Taken #58, 41 picks early: consensus #99 (ADP 104.2)'],
+  ['Fall', 1630169, 'T. Haliburton', 'Alley Oops', 'Taken #47, 25 picks late: consensus #22 (ADP 23.8)'],
+  ['Trigger Finger', 1630581, 'J. Giddey', 'Sixth Men', 'their picks took 14 seconds on average', 'Quickest: Giddey (3s)'],
+  ['Old', 2544, 'L. James', 'Rim Rockers', 'their players averaged 30.4 years old', 'Oldest: L. James (41)'],
+];
 function landRecap() {
-  const C = RC_IMG, card = ([award, per, name, id, team, line]) => `<div class="pvr-card"><div><small>${award}${per ? ` <i>· ${per}</i>` : ''}</small>
-    ${name ? `<p><b>${name}</b> <span${team === 'Alley Oops' ? ' class="pvr-me"' : ''}>${team}</span></p><p class="pvr-line">${line.map(([v, k]) => `<b>${v}</b> ${k}`).join(' ')}</p>` : `<p class="pvr-note">${line}</p>`}</div>
+  const C = RC_IMG, team = t => `<span${t === 'Alley Oops' ? ' class="pvr-me"' : ''}>${t}</span>`;
+  const card = ([award, per, name, id, t, line]) => `<div class="pvr-card"><div><small>${award}${per ? ` <i>· ${per}</i>` : ''}</small>
+    ${name ? `<p><b>${name}</b> ${team(t)}</p><p class="pvr-line">${line.map(([v, k]) => `<b>${v}</b> ${k}`).join(' ')}</p>` : `<p class="pvr-note">${line}</p>`}</div>
     ${name ? landFace(id, name, 34) : ''}</div>`;
+  const award = ([label, id, name, t, line, aside]) => `<div class="pvr-card"><div><small>${label}</small>
+    ${aside ? `<p class="pvr-note"><b${t === 'Alley Oops' ? ' class="pvr-me"' : ''}>${t}</b>: ${line}</p><p class="pvr-line">${aside}</p>` : `<p><b>${name}</b> ${team(t)}</p><p class="pvr-line">${line}</p>`}</div>
+    ${landFace(id, name, 34)}</div>`;
   // each final: a team, the score, the other team, each with the week's Best or Worst badge on its outer side, as the picture has it
   const badge = m => (m ? `<i class="${m === 'Best' ? 'good' : 'bad'}">${m}</i>` : '');
   const finals = [['Alley Oops', '6–3', 'Rim Rockers', 'Best', ''], ['Bench Mob', '5–4', 'Sixth Men', '', ''], ['Glass Cleaners', '3–6', 'Fast Breakers', '', 'Worst']];
-  return `<div class="pv-pic" aria-hidden="true" style="--r-bg:${C.bg};--r-card:${C.card};--r-line:${C.line};--r-text:${C.text};--r-soft:${C.soft};--r-muted:${C.muted};--r-accent:${C.accent};--r-good:${C.good};--r-bad:${C.bad}">
-    <span class="pvr-kicker">Period 6 recap</span><b class="pvr-title">Monday Night Hoops</b>
-    ${LAND_RECAP.map(card).join('')}
-    <small class="pvr-sec">Results</small>
-    ${finals.map(([a, s, b, ma, mb]) => `<div class="pvr-final"><span>${badge(ma)}<b>${a}</b></span><strong>${s}</strong><span><b>${b}</b>${badge(mb)}</span></div>`).join('')}
+  const pic = (kicker, sub, body) => `<div class="pv-pic" style="--r-bg:${C.bg};--r-card:${C.card};--r-line:${C.line};--r-text:${C.text};--r-soft:${C.soft};--r-muted:${C.muted};--r-accent:${C.accent};--r-good:${C.good};--r-bad:${C.bad}">
+    <span class="pvr-kicker">${kicker}</span><b class="pvr-title">Monday Night Hoops</b>${sub ? `<span class="pvr-sub">${sub}</span>` : ''}
+    ${body}
     <div class="pvr-foot">${LOGO_MARK}<b>League Layer</b><span>leaguelayer.com</span></div>
+  </div>`;
+  return `<div class="pv-pics" aria-hidden="true">
+    ${pic('Period 6 recap', '', `${LAND_RECAP.map(card).join('')}
+    <small class="pvr-sec">Results</small>
+    ${finals.map(([a, s, b, ma, mb]) => `<div class="pvr-final"><span>${badge(ma)}<b>${a}</b></span><strong>${s}</strong><span><b>${b}</b>${badge(mb)}</span></div>`).join('')}`)}
+    ${pic('Draft Retrospective', 'Snake draft · 144 picks', LAND_DRAFT_AWARDS.map(award).join(''))}
   </div>
   <div class="pvr-share" aria-hidden="true"><span class="on">Share image</span><span>Copy text and link</span></div>`;
 }
@@ -400,15 +416,67 @@ function landCard() {
       <tbody>${games.map(([g, fg, ...v], i) => `<tr style="--i:${i}"><td>${g}</td><td>${fg}</td>${v.map(x => `<td>${x}</td>`).join('')}</tr>`).join('')}</tbody></table>
   </div>`;
 }
+// An NBA team's card (showSportTeamCard): its record and its games in each playoff period, its next games, and its players
+// by their value this season, each one's fantasy team ('' on waivers). [NBA.com id, name, positions, fantasy team, GP, total]
+const LAND_TEAM = { team: 'OKC', name: 'Oklahoma City Thunder', rec: '14-2', po: '4-3-4-3-4', tiles: [['Next game', 'Fri vs NOP'], ['Games left this week', 2], ['Games next period', 4]],
+  players: [[1628983, 'Shai Gilgeous-Alexander', ['PG'], 'Alley Oops', 15, '+4.8'], [1631096, 'Chet Holmgren', ['PF', 'C'], 'Rim Rockers', 15, '+3.1'],
+    [1631114, 'Jalen Williams', ['SG', 'SF', 'PF'], 'Bench Mob', 11, '+1.9'], [1628392, 'Isaiah Hartenstein', ['C'], 'Sixth Men', 14, '+1.4'], [1642349, 'Ajay Mitchell', ['PG', 'SG', 'SF'], '', 16, '+1.1'],
+    [1641717, 'Cason Wallace', ['PG', 'SG', 'SF'], 'Fast Breakers', 16, '+0.9'], [1627936, 'Alex Caruso', ['PG', 'SG', 'SF'], '', 12, '+0.6']] };
+const landOwner = t => (!t ? '<span class="badge fa">Waivers</span>' : t === 'Alley Oops' ? `<b class="pvc-team">${t}</b>` : t);
+function landTeamCard() {
+  const { team, name, rec, po, tiles, players } = LAND_TEAM;
+  return `<div class="pv-card pv-tcard" aria-hidden="true">
+    <div class="pvc-head pvt-head">${teamLogo(team, 28)}<b>${name}</b><span class="pvt-rec">${rec}</span><span class="pvt-po">Playoff Games: <b>${po}</b></span></div>
+    <div class="proj-grid pvc-tiles">${tiles.map(([k, v]) => `<div class="proj"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
+    <p class="pvt-sub">Players <span>17</span></p>
+    <table class="pvc-games pvt-table"><thead><tr><th class="pvt-n"></th><th class="pvt-p">Player</th><th class="pvt-t">Fantasy team</th><th class="pvt-gp">GP</th><th>Total</th></tr></thead>
+      <tbody>${players.map(([id, n, pos, t, gp, v], i) => `<tr><td class="pvt-n">${i + 1}</td><td class="pvt-p"><div class="bplayer">${landFace(id, n, 28)}<div class="bmain"><b>${n}</b><div>${posTags(pos)}</div></div></div></td><td class="pvt-t">${landOwner(t)}</td><td class="pvt-gp">${gp}</td><td>${v}</td></tr>`).join('')}</tbody></table>
+  </div>`;
+}
+// A fantasy team's card (showTeamCard): its record and place, each category's number a player against every team in the league
+// (rank, and every team's dot on one line, yours the big orange one), then its best players. [category, number, your dot's
+// place (%), the other teams' places]
+const LAND_FANTASY = {
+  cats: [['FG%', '.485', 62, [38, 78, 55, 25, 39, 79, 68, 36, 20, 47, 58]], ['FT%', '.832', 74, [30, 52, 61, 44, 81, 22, 66, 39, 57, 48, 35]],
+    ['3PM', '2.0', 66, [41, 49, 72, 33, 58, 26, 62, 47, 80, 38, 55]], ['PTS', '19.6', 71, [32, 45, 64, 50, 27, 77, 41, 58, 36, 53, 62]],
+    ['REB', '5.5', 30, [62, 49, 71, 55, 82, 44, 58, 37, 66, 41, 52]], ['AST', '4.2', 48, [57, 33, 69, 42, 61, 26, 52, 74, 38, 45, 64]],
+    ['STL', '1.3', 79, [41, 52, 34, 63, 47, 58, 29, 70, 44, 55, 37]], ['BLK', '1.0', 86, [43, 57, 35, 61, 48, 52, 29, 66, 40, 71, 46]],
+    ['TO', '2.0', 76, [52, 63, 45, 68, 34, 58, 41, 80, 49, 37, 60]]],
+  roster: [[1641705, 'Victor Wembanyama', ['C'], 'SAS', '+8.3'], [1628983, 'Shai Gilgeous-Alexander', ['PG'], 'OKC', '+4.8'], [1630595, 'Cade Cunningham', ['PG', 'SG'], 'DET', '+4.6']],
+};
+function landFantasyCard() {
+  const { cats, roster } = LAND_FANTASY, n = cats[0][3].length + 1;
+  const row = ([k, v, me, others]) => {
+    const rank = 1 + others.filter(x => x > me).length;
+    return `<tr><td><b>${k}</b></td><td><b>${v}</b></td><td class="${rank <= 3 ? 'pos-good' : rank > n - 3 ? 'pos-bad' : ''}"><b>${ordinal(rank)}</b></td>
+      <td><div class="strip">${others.map(x => `<span class="sdot" style="left:${x}%"></span>`).join('')}<span class="sdot this me" style="left:${me}%"></span></div></td></tr>`;
+  };
+  return `<div class="pv-card pv-fcard" aria-hidden="true">
+    <div class="pvc-head"><b class="pvc-team">Alley Oops</b><span><b>9-3</b> · 2nd of ${n} · This week vs Rim Rockers</span></div>
+    <p class="pvt-sub">By category <span>top 8, against every team</span></p>
+    <table class="pvc-games pvf-table"><thead><tr><th>Cat</th><th>Per player</th><th>Rank</th><th>Every team (you in orange)</th></tr></thead>
+      <tbody>${cats.map(row).join('')}</tbody></table>
+    <table class="pvc-games pvt-table"><thead><tr><th class="pvt-p">Player</th><th>Total</th></tr></thead>
+      <tbody>${roster.map(([id, name, pos, team, v]) => `<tr><td class="pvt-p"><div class="bplayer">${landFace(id, name, 28)}<div class="bmain"><b>${name}</b><div>${posTags(pos)} · ${team}</div></div></div></td><td>${v}</td></tr>`).join('')}</tbody></table>
+  </div>`;
+}
+// The three cards in turn (a CSS loop, so nothing runs in the background or the tests), the one showing named above them;
+// held while the pointer's on them
+function landCards() {
+  return `<div class="pvx" aria-hidden="true">
+    <div class="pvl-seg pvx-seg"><span class="on">Player</span><span>NBA team</span><span>Fantasy team</span></div>
+    <div class="pvx-deck">${landCard()}${landTeamCard()}${landFantasyCard()}</div>
+  </div>`;
+}
 // The rows: the tab's icon and name, what it does, the picture, and a way into the demo at that tab (the player cards':
 // the Players tab with his card open). more: a line under the button, for a tab without a row of its own
 const LAND_SHOW = [
   ['dashboard', 'Matchup', 'Every game, live', "Each starter's game and line as it happens, who's on the floor, and the categories and the score moving as the games go.", landLive],
   ['week', 'Plan Ahead', "Next period's lineup, planned", "Every player's games day by day, and the lineup that gives you the best chance to win: each swap with what it does to every category.", landPlan],
-  ['players', 'Player cards', 'Any player, one tap away', 'Tap a name anywhere for his card: who has him and how they got him, each category against an average rostered player, his games ahead, his value and every game this season.', landCard,
+  ['players', 'Cards', 'In-depth cards', "Tap any name for its card. A player's: who has him, each category against an average rostered player, his games ahead, his value and every game. An NBA team's: its record, its games in each playoff period and every player. A fantasy team's: each category against every team in the league, and its roster.", landCards,
     { player: LAND_CARD.id, more: ['trends', 'Trends', "Who's heating up and who's cooling off: each category's biggest risers over the last five games, and the best of them still on waivers."] }],
   ['draft', 'Draft', 'Every pick on one board', "Your league's whole draft, each pick green or red by how he's playing against where he went. Then the Draft Retrospective's awards, from the biggest reach to the quickest trigger finger.", landBoard],
-  ['recap', 'Recap', 'A recap for the league chat', 'The period in awards, from the player of the period to the bench regret, with every final. Share it as a picture, or as a link that opens with no sign-up.', landRecap],
+  ['recap', 'Recap', 'Recaps for the league chat', "The period in awards, from the player of the period to the bench regret, with every final, and the draft's, from the biggest reach to the oldest roster. Share each as a picture, or as a link that opens with no sign-up.", landRecap],
 ];
 function landShow(demo) {
   return `<section class="land-shows" aria-label="A look inside">${LAND_SHOW.map(([key, name, title, line, draw, { player, more } = {}], i) => `
