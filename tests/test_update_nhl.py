@@ -1,7 +1,11 @@
 """The NHL data job's own logic, no network: python -m unittest discover -s tests -p "test_*.py" """
+import datetime as dt
+import json
 import os
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
 import update_nhl as N  # noqa: E402
@@ -74,6 +78,89 @@ class Season(unittest.TestCase):
             return {'id': d, 'gameDate': d, 'homeTeam': {'abbrev': 'A'}, 'awayTeam': {'abbrev': 'B'}, 'gameState': 'FUT'}
         weeks = [g['week'] for g in N.week_games([game('2026-09-29'), game('2026-10-04'), game('2026-10-05')])]
         self.assertEqual(weeks, [1, 1, 2])
+
+
+def side(gid, team, skaters, goalie=True):
+    """A team's rows of a game: skaters of 15 minutes, and its goalie (his hours played make him one)."""
+    rows = [[gid * 100 + i + (50 if team == 'B' else 0), team, 15.0] for i in range(skaters)]
+    if goalie:
+        rows.append([gid * 100 + 99 + (50 if team == 'B' else 0), team, 60.0] + [0] * (N.LINE_KEYS.index('gt') - 1) + [1.0])
+    return rows
+
+
+def scheduled(gid, d):
+    return {'id': gid, 'gameDate': d, 'gameState': 'OFF', 'homeTeam': {'abbrev': 'A', 'score': 3}, 'awayTeam': {'abbrev': 'B', 'score': 2}}
+
+
+class Fetching(unittest.TestCase):
+    """NHL.com's stats API sends 100 rows a request since Nov 17, 2026; the job cached those as whole days."""
+
+    def test_a_report_comes_a_page_at_a_time_sorted(self):
+        everyone = [{'gameId': 1 + i // 40, 'playerId': i} for i in range(250)]
+        asked = []
+
+        def api(url, params, timeout):
+            asked.append(params)
+            self.assertIn('playerId', params['sort'], 'pages need a sort, or they repeat rows and skip others')
+            return {'data': everyone[params['start']:params['start'] + min(params['limit'], 100)], 'total': len(everyone)}
+        with mock.patch.object(N, 'get_json', api):
+            rows = N.report('skater/summary', '2026-11-17', '2026-11-19')
+        self.assertEqual(rows, everyone)
+        self.assertEqual([p['start'] for p in asked], [0, 100, 200])
+
+    def test_pages_that_repeat_rows_fail_the_job(self):
+        everyone = [{'gameId': 1, 'playerId': i} for i in range(150)]
+        with mock.patch.object(N, 'get_json', lambda url, params, timeout: {'data': everyone[:100], 'total': 150}):
+            with self.assertRaises(RuntimeError):
+                N.report('skater/summary', '2026-11-17', '2026-11-19')
+
+    def test_a_game_is_complete_with_both_teams_skaters_and_goalies(self):
+        game = lambda rows: {'home': 'A', 'away': 'B', 'rows': rows}
+        self.assertTrue(N.complete(game(side(1, 'A', 18) + side(1, 'B', 15))))
+        self.assertFalse(N.complete(game(side(1, 'A', 18) + side(1, 'B', 14))), 'a team short of skaters')
+        self.assertFalse(N.complete(game(side(1, 'A', 18) + side(1, 'B', 18, goalie=False))), 'no goalie')
+        self.assertFalse(N.complete(game(side(1, 'A', 1) + side(1, 'B', 1))), "Nov 19, 2026's DAL @ VGK: two skaters and the goalies")
+
+    def test_spans_keep_an_old_game_from_bringing_every_game_since(self):
+        self.assertEqual(N.spans(['2026-10-20', '2026-11-17', '2026-11-18', '2026-11-19']), [['2026-10-20', '2026-10-20'], ['2026-11-17', '2026-11-19']])
+
+    def test_an_incomplete_day_is_fetched_again(self):
+        whole = lambda gid: side(gid, 'A', 18) + side(gid, 'B', 18)
+        # cached: Nov 12 whole, Nov 17 cut short (as the 100-row answers left it); a run on Nov 25, past the three days
+        cache = {'season': '2026-27', 'v': N.BOX_VERSION, 'keys': N.LINE_KEYS, 'who': {}, 'games': {
+            '12': {'d': '2026-11-12', 'home': 'A', 'away': 'B', 'hs': 3, 'as': 2, 'last': 'REG', 'rows': whole(12)},
+            '17': {'d': '2026-11-17', 'home': 'A', 'away': 'B', 'hs': 3, 'as': 2, 'last': 'REG', 'rows': side(17, 'A', 2) + side(17, 'B', 1)}}}
+        asked = []
+
+        def season_lines(start, end):
+            asked.append((start, end))
+            return {12: whole(12)[:5], 17: whole(17)}, {}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'boxscores.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(cache, f)
+            with mock.patch.object(N, 'BOX_CACHE', path), mock.patch.object(N, 'DATA', tmp), mock.patch.object(N, 'season_lines', season_lines), \
+                    mock.patch.object(N, 'log', lambda *a: None):
+                out = N.box_scores('2026-27', [scheduled(12, '2026-11-12'), scheduled(17, '2026-11-17')], dt.date(2026, 11, 25))
+            with open(path, encoding='utf-8') as f:
+                saved = json.load(f)
+        self.assertEqual(asked, [('2026-11-17', '2026-11-17')], 'only the short day, not the whole one before it')
+        self.assertEqual(len(out['games']['17']['rows']), 38)
+        self.assertTrue(N.complete(saved['games']['17']), 'saved whole')
+        self.assertEqual(len(saved['games']['12']['rows']), 38, 'Nov 12 untouched')
+
+    def test_a_whole_game_is_not_swapped_for_part_of_one(self):
+        whole = side(17, 'A', 18) + side(17, 'B', 18)
+        cache = {'season': '2026-27', 'v': N.BOX_VERSION, 'keys': N.LINE_KEYS, 'who': {}, 'games': {
+            '17': {'d': '2026-11-17', 'home': 'A', 'away': 'B', 'hs': 3, 'as': 2, 'last': 'REG', 'rows': whole}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'boxscores.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(cache, f)
+            with mock.patch.object(N, 'BOX_CACHE', path), mock.patch.object(N, 'DATA', tmp), \
+                    mock.patch.object(N, 'season_lines', lambda s, e: ({17: whole[:4]}, {})), mock.patch.object(N, 'log', lambda *a: None):
+                out = N.box_scores('2026-27', [scheduled(17, '2026-11-17')], dt.date(2026, 11, 18))  # in the three days: asked again
+        self.assertEqual(len(out['games']['17']['rows']), 38)
 
 
 class Goalies(unittest.TestCase):

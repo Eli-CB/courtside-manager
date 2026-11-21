@@ -3,7 +3,7 @@
 Sources (all public, no API key):
   - NHL.com (api-web.nhle.com): each club's roster and schedule
   - NHL.com stats (api.nhle.com/stats/rest): every player's line of every regular-season game, asked for by date
-    range, so a day of new games takes four requests rather than one or two per game. Box scores don't carry
+    range, 100 rows a request (rest_rows), so a day of new games takes a few requests per report rather than some per game. Box scores don't carry
     faceoff wins, power-play assists or game-winning goals, which fantasy hockey counts.
   - ESPN: injury report, birth dates and ESPN's player ids (the site matches ESPN's live box scores by them)
 
@@ -52,6 +52,10 @@ LOG_KEYS = ['date', 'matchup', 'wl'] + LINE_KEYS + ['type']
 SD_KEYS = [k for k in LINE_KEYS if k not in ('min', 'gs')]
 SD_MIN = 10  # a game counts for the spreads from this many minutes (a goalie's mop-up relief can stay out)
 BOX_VERSION = 2  # goalies' own columns
+PAGE = 100  # the most rows NHL.com's stats API sends a request (rest_rows)
+# A cached game with a team short of this many skaters, or with no goalie, is asked for again: its stats came in part.
+# In ten seasons (2016-17 to 2025-26) a team's game always had 15 to 19 skaters (15 once, 17-18 nearly always) and a goalie.
+MIN_SKATERS = 15
 # Who starts in goal: a share of the team's recent starts, each game worth this much of the next newer one, plus this many
 # games' worth of last season's shares. Chosen on 2025-26's and this season's starts, from each team's Monday, by how well
 # they name each game's starter (js/nba.js: startChain carries on from these).
@@ -64,10 +68,27 @@ def get_json(url, params=None, tries=3, timeout=40):
     return fetch_json(url, tries, timeout, HEADERS)
 
 
+def rest_rows(name, params, key):
+    """Every row of a stats report, a page at a time. Since Nov 17, 2026 NHL.com sends at most PAGE rows a request
+    whatever `limit` asks (limit=-1 used to send all of them), with the full count in `total`. The pages need a sort on
+    a key unique to a row, or they repeat some rows and skip others. A short or repeated answer fails the job rather
+    than saving part of a day as if it were all of it."""
+    sort = json.dumps([{'property': k, 'direction': 'ASC'} for k in key])
+    rows = []
+    while True:
+        page = get_json(REST + name, {**params, 'start': len(rows), 'limit': PAGE, 'sort': sort}, timeout=60)
+        rows += page['data']
+        if not page['data'] or len(rows) >= page['total']:
+            break
+    if len(rows) != page['total'] or len({tuple(r[k] for k in key) for r in rows}) != len(rows):
+        raise RuntimeError(f'{name}: {len(rows)} rows for a total of {page["total"]}, or some twice')
+    return rows
+
+
 def report(name, start, end):
-    """One stats report's rows, a row per player per game. The API stops at 10,000 rows however many are asked for."""
+    """One stats report's rows, a row per player per game."""
     exp = f'gameDate>="{start}" and gameDate<="{end}" and gameTypeId=2'
-    return get_json(REST + name, {'isGame': 'true', 'start': 0, 'limit': -1, 'cayenneExp': exp}, timeout=60)['data']
+    return rest_rows(name, {'isGame': 'true', 'cayenneExp': exp}, ('gameId', 'playerId'))
 
 
 def merge_lines(summary, realtime, faceoffs, goalies):
@@ -144,10 +165,33 @@ def week_games(games):
              'week': (dt.date.fromisoformat(g['gameDate']) - monday).days // 7 + 1, 'final': g.get('gameState') in ('OFF', 'FINAL')} for g in games]
 
 
-def box_scores(season, games):
+def complete(g):
+    """Whether a cached game has both teams' players: MIN_SKATERS skaters and a goalie (a goalie's row has hours played)."""
+    gt = LINE_KEYS.index('gt') + 2
+    for team in (g['home'], g['away']):
+        rows = [r for r in g['rows'] if r[1] == team]
+        goalies = sum(1 for r in rows if len(r) > gt and r[gt])
+        if not goalies or len(rows) - goalies < MIN_SKATERS:
+            return False
+    return True
+
+
+def spans(dates):
+    """Sorted ISO dates to [first, last] runs of days in a row, so an old game asked for again doesn't bring every
+    game since with it."""
+    out = []
+    for d in dates:
+        if out and dt.date.fromisoformat(d) - dt.date.fromisoformat(out[-1][1]) <= dt.timedelta(days=1):
+            out[-1][1] = d
+        else:
+            out.append([d, d])
+    return out
+
+
+def box_scores(season, games, today=None):
     """All finished games, cached in data/nhl/boxscores.json. The last three days are asked for again each run, for
-    stat corrections. {gameId: {d, home, away, hs, as, last (REG, OT or SO), rows}}, and who: {id: [name, position]} for
-    players who've left the rosters."""
+    stat corrections, and so is any game whose stats came in part (complete). {gameId: {d, home, away, hs, as, last
+    (REG, OT or SO), rows}}, and who: {id: [name, position]} for players who've left the rosters."""
     cache = {'season': season, 'v': BOX_VERSION, 'keys': LINE_KEYS, 'who': {}, 'games': {}}
     if os.path.exists(BOX_CACHE):
         with open(BOX_CACHE, encoding='utf-8') as f:
@@ -155,23 +199,31 @@ def box_scores(season, games):
         if saved.get('season') == season and saved.get('v') == BOX_VERSION:
             cache = saved
     finals = [g for g in games if g.get('gameState') in ('OFF', 'FINAL')]
-    recent = (dt.date.today() - dt.timedelta(days=3)).isoformat()
-    todo = [g for g in finals if str(g['id']) not in cache['games'] or g['gameDate'] >= recent]
-    if todo:
-        lines, who = season_lines(todo[0]['gameDate'], todo[-1]['gameDate'])
-        cache['who'].update({str(pid): [w['name'], w['pos']] for pid, w in who.items()})
-        for g in todo:
-            rows = lines.get(g['id'])
-            if not rows:  # the stats aren't up yet: next run
-                continue
-            last = (g.get('gameOutcome') or {}).get('lastPeriodType') or 'REG'
-            cache['games'][str(g['id'])] = {'d': g['gameDate'], 'home': g['homeTeam']['abbrev'], 'away': g['awayTeam']['abbrev'],
-                                            'hs': g['homeTeam'].get('score', 0), 'as': g['awayTeam'].get('score', 0), 'last': last,
-                                            'rows': shootout_losses(rows, last)}
+    recent = ((today or dt.date.today()) - dt.timedelta(days=3)).isoformat()
+    short = {g['id'] for g in finals if str(g['id']) in cache['games'] and not complete(cache['games'][str(g['id'])])}
+    todo = [g for g in finals if str(g['id']) not in cache['games'] or g['gameDate'] >= recent or g['id'] in short]
+    lines, who = {}, {}
+    for start, end in spans(sorted({g['gameDate'] for g in todo})):
+        got, w = season_lines(start, end)
+        lines.update(got)
+        who.update(w)
+    cache['who'].update({str(pid): [w['name'], w['pos']] for pid, w in who.items()})
+    for g in todo:
+        rows = lines.get(g['id'])
+        if not rows:  # the stats aren't up yet: next run
+            continue
+        last = (g.get('gameOutcome') or {}).get('lastPeriodType') or 'REG'
+        game = {'d': g['gameDate'], 'home': g['homeTeam']['abbrev'], 'away': g['awayTeam']['abbrev'],
+                'hs': g['homeTeam'].get('score', 0), 'as': g['awayTeam'].get('score', 0), 'last': last, 'rows': shootout_losses(rows, last)}
+        had = cache['games'].get(str(g['id']))
+        if had and complete(had) and not complete(game):  # a whole copy isn't swapped for a part
+            continue
+        cache['games'][str(g['id'])] = game
     os.makedirs(DATA, exist_ok=True)
     with open(BOX_CACHE, 'w', encoding='utf-8') as f:
         json.dump(cache, f, separators=(',', ':'))
-    log(f'  {len(todo)} game(s) asked for (new, or from the last three days)')
+    still = sum(1 for g in finals if str(g['id']) in cache['games'] and not complete(cache['games'][str(g['id'])]))
+    log(f'  {len(todo)} game(s) asked for (new, from the last three days, or {len(short)} short of players); {still} still short')
     return cache
 
 
@@ -377,7 +429,7 @@ def bios(season_id):
     out = {}
     for kind in ('skater', 'goalie'):
         exp = f'seasonId={season_id} and gameTypeId=2'
-        for r in get_json(REST + f'{kind}/bios', {'start': 0, 'limit': -1, 'cayenneExp': exp}, timeout=60)['data']:
+        for r in rest_rows(f'{kind}/bios', {'cayenneExp': exp}, ('playerId',)):
             out[r['playerId']] = {'first': (r.get('firstSeasonForGameType') or 0) // 10000, 'nat': COUNTRY_ISO.get(r.get('birthCountryCode') or ''), 'born': r.get('birthDate') or '',
                                   # his NHL draft [year, overall pick] for the player card (0: undrafted)
                                   'dft': [r['draftYear'], r['draftOverall']] if r.get('draftYear') and r.get('draftOverall') else 0}
@@ -431,7 +483,7 @@ def main():
     week, team_sched, _ = schedule(today, week_games(games))
     log(f'  {len(index)} players, {len(games)} games')
     log('- Box scores...')
-    cache = box_scores(season, games)
+    cache = box_scores(season, games, today)
     boxes = cache['games']
     cur, l10, logs, lines = season_from_boxes(boxes)
     prev = archive(prev_season)
