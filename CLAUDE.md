@@ -115,7 +115,7 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
   `.claude/` is git-ignored, so a worktree has no `launch.json` (and the preview tool reads the main folder's, which a worktree session may not edit: its "site" serves the main folder's code; if so, run the worktree's `python serve.py 5176` in the background and open its URL): write one there whose port no other session uses (5174, 5175...: `runtimeArgs` `["serve.py", "5174"]`;
   serve.py refuses a port in use, as Windows would otherwise let two servers share one; keep to 5174-5179). Another port is another origin, with its own empty storage: open it as
   `http://localhost:<port>/?league=my19c8mwmoipvhon#dashboard` (`openSharedLink` connects the league; pick "Eli's SGAteam" if it asks), not by typing the ID in the form. The Worker
-  answers localhost:5173-5179 (`SITE_ORIGINS`, worker/wrangler.toml; 5174-5179 added Nov 18, 2026, live once the owner deploys the Worker: until then those ports fall back to ESPN directly).
+  answers localhost:5173-5179 (`SITE_ORIGINS`, worker/wrangler.toml; 5174-5179 added Nov 18, 2026, live since the owner's deploy of Nov 21, 2026).
 - Deploy: push to main triggers the site workflow (deploy only); `gh workflow run site.yml` refreshes data. It publishes only what the page reads
   (`index.html`, `404.html`, `styles.css`, `manifest.webmanifest`, `js/`, `data/`, `fonts/`, `icons/`: the deploy job's "Gather" step): a new top-level file or folder the page needs must be added there. Each sport's refresh
   runs apart; one that fails (or NFL projections failing) fails the run at the end, so GitHub says so, and the rest still publishes.
