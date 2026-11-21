@@ -1,11 +1,22 @@
-# Yahoo sign-in helper
+# League Layer's Worker
+
+`index.js` is the site's one server, a Cloudflare Worker at `api.leaguelayer.com` on Cloudflare's free plan, for what
+a static page can't do alone: the live feed (Live feed), ESPN's feeds through Cloudflare (ESPN fallback), the error log
+(Error log), the daily data job's start (Daily data job) and Yahoo's sign-in (Yahoo sign-in, waiting on Yahoo). The
+owner deploys it, from this folder: `npx wrangler deploy` (Claude never runs wrangler).
+
+It's deployed under the name `leaguelayer-yahoo` (`name` in `wrangler.toml`, from its first job): that's the name in
+Cloudflare's dashboard. Renaming it there would make a new Worker, so its secrets would need setting again and the old
+one deleting (or it keeps starting the daily data job too).
+
+## Yahoo sign-in
 
 Yahoo leagues load through each visitor's Yahoo login. Yahoo's fantasy API needs a server for two things a static
 page can't do: trade the sign-in code for tokens (that takes the app's secret) and pass API requests through
-(Yahoo doesn't allow requests from other sites' pages). `yahoo.js` is that server, a Cloudflare Worker, free on
-Cloudflare's plan. It stores nothing: each visitor's tokens stay in their browser.
+(Yahoo doesn't allow requests from other sites' pages). The Worker does both and stores nothing: each visitor's tokens
+stay in their browser.
 
-## One-time setup
+### One-time setup
 
 1. **Yahoo app** (needs a Yahoo account): go to https://developer.yahoo.com/apps/create/ and fill in
    - Application name: League Layer
@@ -29,7 +40,7 @@ Cloudflare's plan. It stores nothing: each visitor's tokens stay in their browse
 3. **Turn it on in the site**: in `js/yahoo.js`, set `proxy: 'https://api.leaguelayer.com'` and deploy the site.
    The "Sign in with Yahoo" button appears on the league form.
 
-## When Yahoo approves
+### When Yahoo approves
 
 Since July 2026 Yahoo lets only approved apps read fantasy data: until then every Fantasy API call answers 403 "This
 application is not authorized", whatever the code does. Apply at https://sports.yahoo.com/developer/access/ (sign the
@@ -106,7 +117,7 @@ The site's live scores, late box scores and injury report come from ESPN's site 
 browser. Should ESPN stop answering the site directly, the page switches by itself (after two misses in a row while
 leaguelayer.com still answers) to `GET /espn/<sport>/<league>/<scoreboard|summary|injuries>` here, which asks ESPN once
 for everyone and keeps each answer at Cloudflare's edge for 10 seconds (an earlier day's scoreboard 10 minutes, the
-injury report 5). With ESPN's own servers' copies already a few seconds old, a live score is at most about 30 s behind. Only those feeds, only for the site's own pages (`SITE_ORIGINS`). Nothing to set up beyond deploying:
+injury report 5), rebuilt by one request at a time as the live feed is (Live feed). With ESPN's own servers' copies already a few seconds old, a live score is at most about 30 s behind. Only those feeds, only for the site's own pages (`SITE_ORIGINS`). Nothing to set up beyond deploying:
 
 ```
 npx wrangler deploy
@@ -122,8 +133,10 @@ visitor makes about 2,000 an evening, so a busy night on the fallback may need t
 `GET /live/<sport>/<league>` (`basketball/nba`, `hockey/nhl`, `football/nfl`): today's scoreboard and each game's box
 score in one answer, cut to what the page reads (scores, clocks, every player's line, who's on the floor): about
 8 KB compressed for a night of games, where asking ESPN directly is a 16 KB scoreboard plus 37 KB per game. Built once
-and kept at Cloudflare's edge for 5 seconds, so ESPN is asked a few times a minute per Cloudflare data center however
-many people are watching, and each visitor's update every 30 seconds is one request. A build reads at most 3 box scores
+and kept at Cloudflare's edge for 5 seconds; once it's older, one request rebuilds it while the others take the old copy
+(under 15 s old) or wait for the new one (`sharedCopy`), so ESPN is asked a few times a minute per Cloudflare data
+center however many people are watching, even when they ask together (every open page asks at a game's tip-off, then
+every 30 s from it), and each visitor's update every 30 seconds is one request. A build reads at most 3 box scores
 (each takes ~3 ms of CPU, and the free plan allows 10 ms a request), the oldest first; each game keeps its last one in
 the cache between builds, and a finished game is read once. The page reads this first and asks ESPN directly for a game
 whose box score here is over 45 s old (few people watching: builds are rare then), and for everything when this doesn't
@@ -178,7 +191,7 @@ repository's Actions tab shows a run of "Refresh data and publish site" started 
 after 08:00 UTC. A run it couldn't start is in the error log (Error log above) as "Daily data job not started", with why.
 To renew the token: make a new one the same way, then `npx wrangler secret put GITHUB_TOKEN` again (no deploy needed).
 
-## Checking it
+## Checking the Yahoo sign-in
 
 `https://api.leaguelayer.com/yahoo/login?return=https://leaguelayer.com/` should open Yahoo's sign-in. After
 allowing access you land back on the site with your Yahoo leagues listed.

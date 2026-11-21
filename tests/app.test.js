@@ -5260,10 +5260,10 @@ test("ESPN not answering the site: after two misses in a row (the site itself an
 });
 
 test("the Worker's ESPN route: only the site's feeds, only for its pages, kept for seconds", async () => {
-  const worker = (await import('../worker/yahoo.js')).default;
+  const worker = (await import('../worker/index.js')).default;
   const store = new Map(), upstream = [];
   const realFetch = globalThis.fetch, realCaches = globalThis.caches;
-  globalThis.caches = { default: { match: async r => (store.has(r.url) ? store.get(r.url).clone() : undefined), put: async (r, res) => { store.set(r.url, res); } } };
+  globalThis.caches = { default: { match: async r => (store.has(r.url) ? store.get(r.url).clone() : undefined), put: async (r, res) => { store.set(r.url, res); }, delete: async r => store.delete(r.url) } };
   globalThis.fetch = async u => { upstream.push(String(u)); return new Response('{"events":[]}', { status: String(u).includes('event=9') ? 404 : 200, headers: { 'Content-Type': 'application/json' } }); };
   const env = { SITE_ORIGINS: 'https://leaguelayer.com,http://localhost:5173' };
   const ask = async (path, origin = 'https://leaguelayer.com') => {
@@ -5297,7 +5297,7 @@ test("the Worker's ESPN route: only the site's feeds, only for its pages, kept f
 });
 
 test("the Worker starts the daily data job at 08:00 UTC through GitHub's API, and logs a run it can't start", async () => {
-  const worker = (await import('../worker/yahoo.js')).default;
+  const worker = (await import('../worker/index.js')).default;
   const realFetch = globalThis.fetch, realTimeout = globalThis.setTimeout;
   const asked = [], kv = new Map();
   let answers = [];
@@ -5335,12 +5335,12 @@ test("the Worker starts the daily data job at 08:00 UTC through GitHub's API, an
 });
 
 test("the Worker's live feed: today's scoreboard and box scores cut to what the page reads, built once for everyone", async () => {
-  const worker = (await import('../worker/yahoo.js')).default;
+  const worker = (await import('../worker/index.js')).default;
   const store = new Map(), upstream = [];
   const realFetch = globalThis.fetch, realCaches = globalThis.caches, realNow = Date.now;
   let now = Date.parse('2026-11-15T23:00:00Z'), espnUp = true;
   Date.now = () => now;
-  globalThis.caches = { default: { match: async r => (store.has(r.url) ? store.get(r.url).clone() : undefined), put: async (r, res) => { store.set(r.url, res); } } };
+  globalThis.caches = { default: { match: async r => (store.has(r.url) ? store.get(r.url).clone() : undefined), put: async (r, res) => { store.set(r.url, res); }, delete: async r => store.delete(r.url) } };
   // five games: three on, one over, one to come; ESPN's answers with all they carry (news, plays...) besides what the page reads
   const team = (abbreviation, id) => ({ id, abbreviation, displayName: 'x', logo: 'https://x', color: 'fff' });
   const event = (id, state) => ({ id, date: '2026-11-15T23:00Z', name: 'x', links: [{ href: 'x' }], status: { period: 2, clock: 300, displayClock: '5:00', type: { state, shortDetail: '5:00 - 2nd', description: 'x' } },
@@ -5408,6 +5408,74 @@ test("the Worker's live feed: today's scoreboard and box scores cut to what the 
     assert.equal((await ask('/live/basketball/nba', 'https://elsewhere.example')).status, 404);
     assert.equal((await ask('/live/basketball/nba', null)).status, 404);
     assert.equal((await ask('/live/baseball/mlb')).status, 404);
+  } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; Date.now = realNow; }
+});
+
+test("the Worker's copies: one request rebuilds an old one, the others take it or wait for the new one, ESPN asked once", async () => {
+  const worker = (await import('../worker/index.js')).default;
+  const realFetch = globalThis.fetch, realCaches = globalThis.caches, realNow = Date.now;
+  let now = Date.parse('2026-11-21T00:30:00Z'), espnUp = true, scoreboards = 0;
+  Date.now = () => now;
+  // Cloudflare's cache: an entry lasts its max-age, by the Worker's clock
+  const store = new Map();
+  globalThis.caches = { default: {
+    match: async r => { const e = store.get(r.url); return e && now < e.until ? e.res.clone() : undefined; },
+    put: async (r, res) => { store.set(r.url, { res, until: now + 1e3 * +((res.headers.get('Cache-Control') || '').match(/max-age=(\d+)/) || [0, 0])[1] }); },
+    delete: async r => store.delete(r.url),
+  } };
+  // ESPN: today's scoreboard, no game on yet (a build is one request), answering after 40 ms
+  globalThis.fetch = async u => {
+    if (String(u).includes('/scoreboard')) scoreboards++;
+    await new Promise(r => setTimeout(r, 40));
+    return espnUp ? new Response(JSON.stringify({ day: { date: '2026-11-20' }, events: [] }), { headers: { 'Content-Type': 'application/json' } }) : new Response('{}', { status: 503 });
+  };
+  const env = { SITE_ORIGINS: 'https://leaguelayer.com' };
+  const ask = async () => {
+    const waits = [];
+    const res = await worker.fetch(new Request('https://api.leaguelayer.com/live/basketball/nba', { headers: { Origin: 'https://leaguelayer.com' } }), env, { waitUntil: p => waits.push(p) });
+    await Promise.all(waits);
+    return { status: res.status, at: res.status === 200 ? (await res.json()).at : null };
+  };
+  const crowd = n => Promise.all(Array.from({ length: n }, ask));
+  const copyKey = 'https://api.leaguelayer.com/__live/basketball/nba';
+  const markKey = new Request(`https://api.leaguelayer.com/__rebuilding/${encodeURIComponent(copyKey)}`);
+  try {
+    const t0 = now;
+    assert.equal((await ask()).at, t0);
+    assert.equal(scoreboards, 1);
+    // 6 s on (past its 5): twenty at once. One rebuilds it; the others take the copy it replaces, at once
+    now = t0 + 6e3;
+    let got = await crowd(20);
+    assert.equal(scoreboards, 2, 'ESPN asked once');
+    assert.deepEqual([got.filter(g => g.at === now).length, got.filter(g => g.at === t0).length], [1, 19]);
+    // 40 s on, the copy gone (pages that ask together: at a tip-off, then every 30 s): one rebuilds, the others wait for it
+    now = t0 + 40e3;
+    got = await crowd(20);
+    assert.equal(scoreboards, 3, 'ESPN asked once');
+    assert.ok(got.every(g => g.status === 200 && g.at === now), 'every one the new copy');
+    // another machine in the data center rebuilding it (its mark in the cache, newer than the copy): the old copy...
+    now = t0 + 46e3;
+    await caches.default.put(markKey, new Response(String(now - 100), { headers: { 'Cache-Control': 'max-age=10' } }));
+    assert.equal((await ask()).at, t0 + 40e3);
+    assert.equal(scoreboards, 3, 'ESPN not asked');
+    // ... and with none, its new one, once that machine has put it in
+    store.delete(copyKey);
+    setTimeout(() => caches.default.put(new Request(copyKey), new Response(JSON.stringify({ v: 1, at: now, scoreboard: { events: [] }, boxes: {} }), { headers: { 'Content-Type': 'application/json', 'X-Built': String(now), 'Cache-Control': 'max-age=15' } })), 300);
+    assert.equal((await ask()).at, now);
+    assert.equal(scoreboards, 3, 'ESPN not asked');
+    store.delete(markKey.url);
+    // ESPN down: the rebuild fails, those waiting for it try in turn (each an error: the page then asks ESPN itself)...
+    now = t0 + 100e3;
+    espnUp = false;
+    got = await crowd(3);
+    assert.ok(got.every(g => g.status === 502));
+    assert.equal(await caches.default.match(new Request(copyKey)), undefined, 'nothing kept');
+    // ... and nothing is left holding up the next one
+    espnUp = true;
+    const n = scoreboards, started = realNow();
+    assert.equal((await ask()).status, 200);
+    assert.equal(scoreboards, n + 1);
+    assert.ok(realNow() - started < 200, `answered in ${realNow() - started} ms`);
   } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; Date.now = realNow; }
 });
 

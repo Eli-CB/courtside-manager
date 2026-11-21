@@ -18,7 +18,7 @@ const SANDBOX_MAX = 30, WATCH_MAX = 12;
 // this deploy's version (the commit), stamped in by the publish workflow; '__BUILD__' when run locally
 const BUILD = '__BUILD__';
 
-// Errors in someone's browser go to the error log on the helper server (worker/yahoo.js: POST /errors), so a page
+// Errors in someone's browser go to the error log on League Layer's Worker (worker/index.js: POST /errors), so a page
 // that breaks for a visitor is known without waiting for them to say so: the message, where in the code, the page,
 // the league's site and ID, this version and the browser. Only on the live site; each error once a visit, 5 at most.
 // League Layer's Cloudflare Worker (worker/): the error log, Yahoo's sign-in, and ESPN's feeds should ESPN stop answering

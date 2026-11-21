@@ -2,7 +2,7 @@
 
 Part of the repo's notes: CLAUDE.md says which file covers what and how to keep them current. Read this before changing js/yahoo.js or the Worker's sign-in (see also worker/README.md).
 
-- yahoo: Yahoo leagues through a Yahoo login (OAuth): the helper server `worker/yahoo.js` (Cloudflare Worker at
+- yahoo: Yahoo leagues through a Yahoo login (OAuth): the Worker `worker/index.js` (Cloudflare Worker at
   api.leaguelayer.com, setup in `worker/README.md`) runs the sign-in and passes API requests through (Yahoo's API isn't
   CORS-open); tokens stay in the browser (`league-layer-yahoo`). `yahoo.proxy` empty = Yahoo hidden; while `yahoo.beta`, the sign-in shows only on a device that opened `?yahoo=1` (or is signed in). `yflat` turns Yahoo's
   JSON ("0","1"…+count objects, arrays of one-key objects) into plain lists/objects; `fetchYahooLeague` maps to the league

@@ -4,7 +4,7 @@
 
 // ----- Yahoo leagues -----
 // Yahoo's fantasy API needs each visitor's Yahoo login and doesn't take requests from other sites' pages, so
-// the site's small helper server (worker/yahoo.js, a Cloudflare Worker) runs the sign-in and passes requests
+// the site's Worker (worker/index.js, a Cloudflare Worker) runs the sign-in and passes requests
 // through. Each visitor's tokens stay in their own browser. A league becomes the shape fetchFantraxLeague
 // returns, so every tab works the same. League IDs are Yahoo's league keys: "nba.l.12345" (this season's game)
 // or "466.l.12345".

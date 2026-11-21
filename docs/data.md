@@ -3,7 +3,7 @@
 Part of the repo's notes: CLAUDE.md says which file covers what and how to keep them current. Read this before changing scripts/, data/, or how box scores load (views.js).
 
 - `scripts/update_data.py`: daily data job (GitHub Actions, started at 08:00 UTC = 4 a.m. ET, 3 a.m. in winter, by the Worker's Cron Trigger through
-  GitHub's API, `startDataJob` in worker/yahoo.js: GitHub ran the workflow's own schedule hours late, 14:54-18:12 UTC on Nov 11-16, 2026;
+  GitHub's API, `startDataJob` in worker/index.js: GitHub ran the workflow's own schedule hours late, 14:54-18:12 UTC on Nov 11-16, 2026;
   the workflow's 09:23 UTC schedule is the backstop. Set up Nov 17, 2026 (the owner's fine-grained `GITHUB_TOKEN`, Actions read/write on
   this repo only; renewing it: worker/README.md "Daily data job"; an expired one shows in the error log as "Daily data job not started").
   The page still mustn't wait on the job for last night's games) first saves Fantrax's player list and ADP for the pages (`fantrax_lists`:

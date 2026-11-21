@@ -291,7 +291,7 @@ const feedWait = (feed, base) => Math.min(base * 2 ** Math.min(feedFails[feed] |
 
 // ESPN's site feed (scoreboards, box scores, the injury report), asked of ESPN by each visitor's browser. Should ESPN stop
 // answering the site (ESPN_SWITCH failures in a row while leaguelayer.com itself answers, so not the visitor's own
-// connection), the same feed comes through League Layer's Worker instead (worker/yahoo.js, /espn/), which asks ESPN once
+// connection), the same feed comes through League Layer's Worker instead (worker/index.js, /espn/), which asks ESPN once
 // for everyone and keeps the answer for seconds. The switch lasts ESPN_ROUTE_HOURS on this device, then direct is tried
 // again; it's logged once, so the owner knows.
 const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
@@ -328,7 +328,7 @@ async function noteLiveFailure(msg, feed = 'ESPN live scores') {
   if (here && here.ok) reportError(`${feed} failing (${SPORT.name}): ${msg}`, 'js/live.js');
 }
 
-// ----- The live feed: League Layer's Worker reads ESPN once for everyone (worker/yahoo.js, /live/) -----
+// ----- The live feed: League Layer's Worker reads ESPN once for everyone (worker/index.js, /live/) -----
 // Today's scoreboard and each game's box score, cut to what the page reads, in one small request (about 1 KB a game,
 // where ESPN's box score is 400 KB): the page asks it first. If it can't be had (the Worker down, or not deployed with
 // the route yet), ESPN directly, as before, for LIVE_FEED_OFF before the feed is tried again.

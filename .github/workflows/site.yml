@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   # League Layer's Worker starts the daily run at 08:00 UTC (4 a.m. Eastern, 3 a.m. in winter) through GitHub's API
-  # (worker/yahoo.js, startDataJob): GitHub started this schedule hours late (14:54-18:12 UTC for 08:00, Nov 11-16, 2026).
+  # (worker/index.js, startDataJob): GitHub started this schedule hours late (14:54-18:12 UTC for 08:00, Nov 11-16, 2026).
   # This one stays as the backstop, should the Worker's not come; off the top of the hour, GitHub's busiest minute.
   # When both come, the data is simply refreshed twice.
   schedule:

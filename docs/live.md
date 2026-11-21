@@ -2,8 +2,8 @@
 
 Part of the repo's notes: CLAUDE.md says which file covers what and how to keep them current. Read this before changing js/live.js or the Worker's live feed.
 
-- live: live box scores for the Dashboard matchup's and Performances' Today (and This week). Live scores come first from the Worker's live feed (`liveFeedGet`: `/live/<sport>/<league>`, worker/yahoo.js: today's scoreboard and each game's box score cut to what the page reads, ~8 KB compressed a night, built once and kept 5 s at the edge, at most 3 box scores read a build for the free plan's 10 ms of CPU; `readBoxes(games, feed)` uses a game's box score from it when under 45 s old, else asks ESPN if due; the feed failing = ESPN directly for 10 minutes; keep `liveScoreboard`/`liveBox` in step with what espnGames/espnLines/espnHockeyLines/espnFloor/espnPlayer read). The injury report and finished days go through `/espn/` first (`espnSite(path, tries, pooled)`). Every other ESPN site-feed request goes through `espnSite(path)`:
-  direct from the browser; after `ESPN_SWITCH` (2) misses in a row while leaguelayer.com answers, through the Worker's cached `/espn/` route (worker/yahoo.js)
+- live: live box scores for the Dashboard matchup's and Performances' Today (and This week). Live scores come first from the Worker's live feed (`liveFeedGet`: `/live/<sport>/<league>`, worker/index.js: today's scoreboard and each game's box score cut to what the page reads, ~8 KB compressed a night, built once and kept 5 s at the edge, at most 3 box scores read a build for the free plan's 10 ms of CPU; `readBoxes(games, feed)` uses a game's box score from it when under 45 s old, else asks ESPN if due; the feed failing = ESPN directly for 10 minutes; keep `liveScoreboard`/`liveBox` in step with what espnGames/espnLines/espnHockeyLines/espnFloor/espnPlayer read). The injury report and finished days go through `/espn/` first (`espnSite(path, tries, pooled)`). Every other ESPN site-feed request goes through `espnSite(path)`:
+  direct from the browser; after `ESPN_SWITCH` (2) misses in a row while leaguelayer.com answers, through the Worker's cached `/espn/` route (worker/index.js)
   for 6 hours on that device (`league-layer-espn-route`), logged once. Failing feeds back off (`feedWait`: ×2 per miss, 5 min at most) for live scores,
   ESPN/Sleeper league points and the late finals. Fantrax and Sleeper stay direct on purpose: their limits are per IP, and a proxy would pool everyone's. The browser polls ESPN's site API
   (`site.api.espn.com`, CORS-open; NBA.com's live CDN isn't) every 30 s (60 s with Save-Data) while the Dashboard or Players tab is visible,
@@ -18,8 +18,9 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   400 KB box score about once a minute), all marked as from leaguelayer.com, while the page reads about 1% of each box
   score. Now the Worker's live feed (`/live/<sport>/<league>`, see the live bullet above and worker/README.md "Live feed")
   builds today's scores once for everyone (~8 KB compressed a night, kept 5 s at the edge): ESPN is asked a few times a
-  minute per Cloudflare data center (until hundreds watch through one: nothing stops requests that arrive while the
-  expired copy is rebuilt from each building it too, so ESPN's count then grows with them), each visitor makes one small request every 30 s, and
+  minute per Cloudflare data center whatever the number of visitors (`sharedCopy`, Nov 21, 2026: one request rebuilds an
+  expired copy, the others take the old one or wait for the new; before it, every request during a rebuild built it too,
+  and pages ask together: every open page at a game's tip-off, `scheduleLive`, then every 30 s from it), each visitor makes one small request every 30 s, and
   the injury report and finished days go through `/espn/` first. Direct ESPN stays the fallback, so the site works with
   the Worker down or not yet deployed. The Worker is the owner's to deploy (`npx wrangler deploy` in worker/; never run
   it or `wrangler secret put` yourself): the /live route was written Nov 15, 2026; until it's deployed, pages ask for it,

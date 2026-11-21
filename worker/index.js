@@ -1,5 +1,31 @@
-// League Layer's Yahoo helper: a Cloudflare Worker. Yahoo's fantasy API needs a Yahoo login (OAuth 2.0) and doesn't
-// allow requests from other sites' pages, so this small server does the two things the site can't:
+// League Layer's Worker: the site's one server, a Cloudflare Worker at api.leaguelayer.com (deployed under the name
+// leaguelayer-yahoo, from its first job; README.md). It answers only the site's own pages (SITE_ORIGINS). Its jobs:
+//
+// Today's games for everyone at once, the feed the site's pages read first while games are on (liveFeedGet in
+// js/live.js; ESPN directly when this can't answer):
+//   GET  /live/<sport>/<league>
+// ESPN's scoreboard and each game's box score cut to what the page reads (scores, clocks, every player's line, who's on
+// the floor: about 1 KB a game where ESPN's box score is 400), one small answer kept at the edge for LIVE_TTL seconds.
+// ESPN is asked a few times a minute per Cloudflare data center however many people are watching (sharedCopy), and each
+// visitor's update is one request instead of one per game.
+//
+// ESPN's site feed, should ESPN stop answering the site's pages directly (the page switches here by itself: espnSite
+// in js/live.js), and the feeds the same for everyone (the injury report, finished days), asked here first:
+//   GET  /espn/<sport>/<league>/<scoreboard | summary | injuries>?<dates | event>
+// Only those three feeds of the three sports, each answer kept at Cloudflare's edge for seconds (ESPN_TTL), so ESPN is
+// asked about once per feed every 10 seconds however many people are watching (sharedCopy).
+//
+// The site's error log (a page that crashed in someone's browser):
+//   POST /errors                      the site sends one error: message, where it came from, page, league, version, browser
+//   GET  /errors?key=<ERRORS_KEY>     the last 30 days' errors, newest first, the same ones grouped (for the owner)
+// Kept in the KV namespace bound as ERRORS for 30 days; ERRORS_KEY is a secret. Without them errors are dropped.
+//
+// The daily data job's start: at 08:00 UTC (a Cron Trigger, wrangler.toml) it asks GitHub to run the site workflow
+// (.github/workflows/site.yml), whose own schedule GitHub starts hours late. GITHUB_TOKEN is a secret (README.md);
+// without it nothing happens. A run it can't start goes to the error log.
+//
+// Yahoo's sign-in, waiting on Yahoo's approval (README.md). Yahoo's fantasy API needs a Yahoo login (OAuth 2.0) and
+// doesn't allow requests from other sites' pages, so this does the two things the site can't:
 //   GET  /yahoo/login?return=<page>   sends the visitor to Yahoo to sign in and allow read access
 //   GET  /yahoo/callback              Yahoo sends them back here; trades the code for tokens (that needs the app's
 //                                     secret, which only this server has) and returns them to the page, after #yahoo=
@@ -7,29 +33,6 @@
 //   GET  /yahoo/api/<path>            the fantasy API itself, passed through with the visitor's token
 // Nothing is stored here: each visitor's tokens live in their own browser.
 // Settings (wrangler.toml and `wrangler secret put`): YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET, SITE_ORIGINS.
-//
-// It also keeps the site's error log (a page that crashed in someone's browser):
-//   POST /errors                      the site sends one error: message, where it came from, page, league, version, browser
-//   GET  /errors?key=<ERRORS_KEY>     the last 30 days' errors, newest first, the same ones grouped (for the owner)
-// Kept in the KV namespace bound as ERRORS for 30 days; ERRORS_KEY is a secret. Without them errors are dropped.
-//
-// And ESPN's site feed, should ESPN stop answering the site's pages directly (the page switches here by itself: espnSite
-// in js/live.js):
-//   GET  /espn/<sport>/<league>/<scoreboard | summary | injuries>?<dates | event>
-// Only those three feeds of the three sports, only for the site's own pages, each answer kept at Cloudflare's edge for
-// seconds (ESPN_TTL), so ESPN is asked about once per feed every 20-30 seconds however many people are watching.
-//
-// And today's games for everyone at once, the feed the site's pages read first while games are on (liveFeedGet in
-// js/live.js; ESPN directly when this can't answer):
-//   GET  /live/<sport>/<league>
-// ESPN's scoreboard and each game's box score cut to what the page reads (scores, clocks, every player's line, who's on
-// the floor: about 1 KB a game where ESPN's box score is 400), one small answer kept at the edge for LIVE_TTL seconds.
-// ESPN is asked a few times a minute per Cloudflare data center however many people are watching, and each visitor's
-// update is one request instead of one per game.
-//
-// And the daily data job's start: at 08:00 UTC (a Cron Trigger, wrangler.toml) it asks GitHub to run the site workflow
-// (.github/workflows/site.yml), whose own schedule GitHub starts hours late. GITHUB_TOKEN is a secret (README.md);
-// without it nothing happens. A run it can't start goes to the error log.
 
 const AUTH = 'https://api.login.yahoo.com/oauth2/';
 const API = 'https://fantasysports.yahooapis.com/fantasy/v2/';
@@ -59,15 +62,63 @@ function espnFeed(url) {
   return { upstream: `${ESPN_SITE}${league}/${feed}${q.toString() ? '?' + q : ''}`, ttl };
 }
 
-// One ESPN feed, from Cloudflare's cache if it's fresh, else asked of ESPN (and kept, if ESPN answered)
-async function espnCached(target, ctx) {
-  const cache = caches.default, key = new Request(target.upstream);
-  const hit = await cache.match(key);
-  if (hit) return hit;
-  const r = await fetch(target.upstream, { headers: { Accept: 'application/json' } });
-  const res = new Response(r.body, { status: r.status, headers: { 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': `public, max-age=${target.ttl}` } });
-  if (r.ok) ctx.waitUntil(cache.put(key, res.clone()));
-  return res;
+// One ESPN feed as ESPN answers it (an error too: passed on to the page, never kept)
+async function espnAnswer(upstream) {
+  const r = await fetch(upstream, { headers: { Accept: 'application/json' } });
+  return { status: r.status, type: r.headers.get('Content-Type') || 'application/json', body: await r.text() };
+}
+
+// ----- One copy for everyone (the live feed, each ESPN feed), rebuilt by one request at a time -----
+// Each is one copy per Cloudflare data center, kept in its cache and served while fresh (`fresh` seconds). Once it isn't,
+// one request rebuilds it, and the others meanwhile take the copy being replaced if it's at most COPY_SLACK seconds past
+// fresh, else wait for the new one (COPY_POLLS looks, COPY_POLL ms apart; then they build it too). Without this, every
+// request that came during a rebuild (ESPN's round trips, a few hundred ms) built it as well, so ESPN's count grew with
+// the number watching; and pages ask together (every open page at a game's tip-off, then every 30 s from it).
+// A rebuild under way is marked on this machine (`rebuilding`: its other requests see it at once) and in the cache, for
+// the data center's other machines (when it started, which is later than the copy's X-Built). Every look is a Cache API
+// call, and the free plan allows 50 calls and subrequests a request (a live build makes up to ~25), hence few looks.
+const COPY_SLACK = 10, COPY_POLL = 250, COPY_POLLS = 8, BUILD_MAX = 10e3;
+const rebuilding = new Map(); // this machine's rebuilds under way: the copy's address -> when it started
+const copyOf = async hit => ({ status: 200, type: hit.headers.get('Content-Type') || 'application/json', body: await hit.text() });
+// key: the copy's cache address; build: () -> { status, type, body } (only a 200 is kept), or throws
+async function sharedCopy(key, origin, fresh, build, ctx) {
+  const cache = caches.default, mark = new Request(`${origin}/__rebuilding/${encodeURIComponent(key.url)}`);
+  let elsewhere = 0; // when another machine's request started rebuilding it (the cache's mark, looked at once)
+  for (let i = 0; ; i++) {
+    const now = Date.now(), hit = await cache.match(key), at = hit ? +hit.headers.get('X-Built') || 0 : 0;
+    if (hit && now - at < fresh * 1e3) return copyOf(hit);
+    if (!rebuilding.has(key.url) && !(elsewhere > at && now - elsewhere < BUILD_MAX)) {
+      rebuilding.set(key.url, now); // (before any wait, so this machine's other requests leave it to this one)
+      if (!i) { const m = await cache.match(mark); elsewhere = m ? +(await m.text()) || 0 : 0; }
+      if (!(elsewhere > at && now - elsewhere < BUILD_MAX)) return rebuild(key, mark, fresh, build, ctx, now);
+      rebuilding.delete(key.url); // another machine's request has it
+    }
+    if (hit && now - at < (fresh + COPY_SLACK) * 1e3) return copyOf(hit); // the copy being replaced: seconds older
+    if (i >= COPY_POLLS) return rebuild(key, mark, fresh, build, ctx, now); // that rebuild is slow, or failed: this one too
+    await new Promise(r => setTimeout(r, COPY_POLL));
+  }
+}
+// This request rebuilds the copy: marked as under way, built, kept (a good answer), then unmarked
+async function rebuild(key, mark, fresh, build, ctx, started) {
+  const cache = caches.default;
+  rebuilding.set(key.url, started);
+  const done = () => { if (rebuilding.get(key.url) === started) rebuilding.delete(key.url); };
+  let copy;
+  try {
+    await cache.put(mark, new Response(String(started), { headers: { 'Cache-Control': `public, max-age=${BUILD_MAX / 1e3}` } }));
+    copy = await build();
+  } catch (e) {
+    done();
+    ctx.waitUntil(cache.delete(mark)); // (so those waiting build it themselves at their next look)
+    throw e;
+  }
+  ctx.waitUntil((async () => {
+    try {
+      if (copy.status === 200) await cache.put(key, new Response(copy.body, { headers: { 'Content-Type': copy.type, 'X-Built': String(Date.now()), 'Cache-Control': `public, max-age=${fresh + COPY_SLACK}` } }));
+      await cache.delete(mark);
+    } finally { done(); } // (once the copy is in: this machine's requests waiting for it find it)
+  })());
+  return copy;
 }
 
 // ----- The live feed (/live/<sport>/<league>) -----
@@ -141,7 +192,7 @@ async function startDataJob(env) {
       if (r.status < 500 && r.status !== 429) break; // (the token or the address: asking again won't help)
     } catch (e) { why = e.message || 'GitHub not reached'; }
   }
-  if (env.ERRORS) await putError(env, { t: Date.now(), country: '', msg: `Daily data job not started: ${why}`, at: 'worker/yahoo.js startDataJob', stack: '', page: '', source: 'worker', league: '', build: '', ua: '' });
+  if (env.ERRORS) await putError(env, { t: Date.now(), country: '', msg: `Daily data job not started: ${why}`, at: 'worker/index.js startDataJob', stack: '', page: '', source: 'worker', league: '', build: '', ua: '' });
   return why;
 }
 
@@ -241,10 +292,10 @@ export default {
       if (!origins.includes(origin)) return new Response('Not found', { status: 404 });
       const target = espnFeed(url);
       if (!target) return new Response(JSON.stringify({ error: 'not an ESPN feed the site reads' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
-      let r;
-      try { r = await espnCached(target, ctx); } catch (e) { r = new Response(JSON.stringify({ error: "couldn't reach ESPN" }), { status: 502 }); }
+      let c;
+      try { c = await sharedCopy(new Request(target.upstream), url.origin, target.ttl, () => espnAnswer(target.upstream), ctx); } catch (e) { c = { status: 502, type: 'application/json', body: JSON.stringify({ error: "couldn't reach ESPN" }) }; }
       // to the page: never kept in the browser (its own updates decide when to ask again)
-      return new Response(r.body, { status: r.status, headers: { ...cors, 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': 'no-store' } });
+      return new Response(c.body, { status: c.status, headers: { ...cors, 'Content-Type': c.type, 'Cache-Control': 'no-store' } });
     }
 
     const live = url.pathname.match(/^\/live\/([a-z]+\/[a-z]+)$/);
@@ -252,15 +303,11 @@ export default {
       if (!origins.includes(origin)) return new Response('Not found', { status: 404 }); // (only for the site's own pages)
       const head = { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
       if (!ESPN_LEAGUES.has(live[1])) return new Response(JSON.stringify({ error: 'not a sport the site reads' }), { status: 404, headers: head });
-      const key = liveKey(url.origin, live[1]);
-      let body = await caches.default.match(key).then(r => (r ? r.text() : null));
-      if (!body) {
-        try {
-          body = JSON.stringify(await liveBuild(live[1], url.origin, ctx));
-          ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${LIVE_TTL}` } })));
-        } catch (e) { return new Response(JSON.stringify({ error: "couldn't reach ESPN" }), { status: 502, headers: head }); }
-      }
-      return new Response(body, { headers: head }); // (never kept in the browser: its own updates decide when to ask again)
+      let c;
+      try {
+        c = await sharedCopy(liveKey(url.origin, live[1]), url.origin, LIVE_TTL, async () => ({ status: 200, type: 'application/json', body: JSON.stringify(await liveBuild(live[1], url.origin, ctx)) }), ctx);
+      } catch (e) { return new Response(JSON.stringify({ error: "couldn't reach ESPN" }), { status: 502, headers: head }); }
+      return new Response(c.body, { headers: head }); // (never kept in the browser: its own updates decide when to ask again)
     }
 
     const callback = `${url.origin}/yahoo/callback`;
