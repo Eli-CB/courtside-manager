@@ -54,7 +54,7 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
 | `history.js`: weekly rosters, awards, when a week is over | docs/history.md |
 | `leagues.js`: saved leagues, seasons, the demo, the landing page | docs/leagues.md |
 | `sandbox.js` | docs/sandbox.md |
-| `live.js`, the Worker's /live and /espn/, injuries | docs/live.md |
+| `live.js`, the Worker's /live, /espn/ and /injuries/ (the injury watch), injuries | docs/live.md |
 | scripts/update_data.py, data/, how box scores load | docs/data.md |
 | the logo, 404, home-screen install, error log, analytics, restoring Pages | docs/hosting.md |
 

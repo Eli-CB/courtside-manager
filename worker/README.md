@@ -1,8 +1,9 @@
 # League Layer's Worker
 
 `index.js` is the site's one server, a Cloudflare Worker at `api.leaguelayer.com` on Cloudflare's free plan, for what
-a static page can't do alone: the live feed (Live feed), ESPN's feeds through Cloudflare (ESPN fallback), the error log
-(Error log), the daily data job's start (Daily data job) and Yahoo's sign-in (Yahoo sign-in, waiting on Yahoo). The
+a static page can't do alone: the live feed (Live feed), the injury watch (Injury watch), ESPN's feeds through
+Cloudflare (ESPN fallback), the error log (Error log), the daily data job's start (Daily data job) and Yahoo's sign-in
+(Yahoo sign-in, waiting on Yahoo). The
 owner deploys it, from this folder: `npx wrangler deploy` (Claude never runs wrangler).
 
 It's deployed under the name `leaguelayer-yahoo` (`name` in `wrangler.toml`, from its first job): that's the name in
@@ -115,7 +116,7 @@ The site's live scores, late box scores and injury report come from ESPN's site 
 browser. Should ESPN stop answering the site directly, the page switches by itself (after two misses in a row while
 leaguelayer.com still answers) to `GET /espn/<sport>/<league>/<scoreboard|summary|injuries>` here, which asks ESPN once
 for everyone and keeps each answer at Cloudflare's edge for 10 seconds (an earlier day's scoreboard 10 minutes, the
-injury report 5), rebuilt by one request at a time as the live feed is (Live feed). With ESPN's own servers' copies already a few seconds old, a live score is at most about 30 s behind. Only those feeds, only for the site's own pages (`SITE_ORIGINS`). Nothing to set up beyond deploying:
+injury report 2), rebuilt by one request at a time as the live feed is (Live feed). With ESPN's own servers' copies already a few seconds old, a live score is at most about 30 s behind. Only those feeds, only for the site's own pages (`SITE_ORIGINS`). Nothing to set up beyond deploying:
 
 ```
 npx wrangler deploy
@@ -147,13 +148,49 @@ npx wrangler deploy
 
 Check: `https://api.leaguelayer.com/live/basketball/nba` answers 404 in a browser tab (no page origin), and the site's
 Matchup tab during games asks it once every 30 seconds and ESPN for nothing else (the browser's Network tab). The
-injury report and finished days' scoreboards and box scores also come through `/espn/` first now (one copy for
-everyone), with ESPN directly when the Worker can't answer.
+injury report comes from the injury watch (Injury watch), and finished days' scoreboards and box scores through `/espn/`
+first (one copy for everyone), with ESPN directly when the Worker can't answer.
 
 Cost: the free plan counts each request (100,000 a day): two a minute per visitor watching live is about 800
 visitor-hours a day. Past that, the $5 Workers Paid plan (10 million a month; then $0.30 a million) covers roughly a
 thousand people watching three hours a night all season. If the free plan's CPU limit ever trips a build (an error in
 Cloudflare's dashboard for this Worker), the page just asks ESPN directly for that update.
+
+## Injury watch
+
+`GET /injuries/<sport>/<league>` (`basketball/nba`, `hockey/nhl`): ESPN's injury report as the Worker last read it, cut
+to what the page reads (about 38 KB where ESPN's is 1.2 MB), with when each player's status was first seen (`since`) and
+what it was before (`was`). The page reads it first, every 3 minutes on a game day while it's on screen, and marks a
+change under 3 hours old (js/live.js `refreshInjuries`; docs/live.md). Made Nov 21, 2026 (the owner's ask: injury news
+sooner, still free).
+
+Cron Triggers (`wrangler.toml`) read ESPN: basketball at minutes 0, 3, 6..., hockey a minute later (`*/3 * * * *` and
+`1-59/3 * * * *`), each sport in its own run, as reading ESPN's 1.2 MB answer takes about 5 ms of CPU (measured on a PC
+against real reports, Nov 21, 2026: 4.7 ms to read it, 0.3 ms the rest, 2-3 ms more on a cold start) against the free
+plan's 10 ms. Every 3 minutes from 14:00 to 04:59 UTC (game days' news), else every 15: about 670 ESPN requests a day
+for both sports, whatever the number of visitors (fewer than the 2-minute pooled copies each data center asked for
+before). A run over the CPU limit is stopped and writes nothing: the copy then goes stale and pages read ESPN's report
+through `/espn/` as before, so nothing breaks; many of them (Metrics, errors) would mean the $5 plan.
+
+The copy is kept in KV, in the error log's namespace (`ERRORS`, one key a sport: `watch:basketball/nba`, `watch:hockey/nhl`;
+the log's page skips them), so there's nothing to set up beyond deploying. It's written only when something changed (a
+status at once, a newer note at most every 15 minutes) and once an hour anyway: the free plan allows 1,000 KV writes a day
+for the whole account, and this uses at most about 700, usually far fewer. A copy over 90 minutes old means the watch has
+stopped, and the page is told to read ESPN's instead.
+
+ESPN refusing (an error, a block, or an answer nearly empty where the last had many): not asked again for 15 minutes,
+then 30, doubling to 6 hours at most, so a refusal isn't met with a request every 3 minutes; the second miss in a row
+goes to the error log ("Injury watch: ESPN's basketball/nba report answered 403..."). Meanwhile the page reads ESPN's
+report through `/espn/`, or straight from ESPN in each visitor's browser.
+
+```
+npx wrangler deploy
+```
+
+Check: Cloudflare's dashboard lists this Worker's three cron triggers (Settings, Trigger events), and a few minutes after
+deploying `https://api.leaguelayer.com/injuries/basketball/nba` answers 404 in a browser tab (no page origin) and the
+report from the site (the Matchup or Players tab's Network tab: `injuries/basketball/nba`, about 38 KB, every 3 minutes on
+a game day). Until it's deployed the page gets a 404 and reads ESPN's report, trying the watch again 10 minutes later.
 
 ## Daily data job
 
@@ -201,12 +238,14 @@ Cloudflare's dashboard: https://dash.cloudflare.com, then **Workers & Pages** an
 ESPN and Yahoo) over the last hours and days, nothing to set up. During games, look for:
 
 - **Requests** against the free plan's 100,000 a day (the account's Workers & Pages overview shows the day's total).
-  About two a minute per person watching live, plus the injury report and the odd fallback.
+  About two a minute per person watching live, plus the injury report every 3 minutes on a game day and the odd fallback.
 - **Errors**, and in them **exceeded CPU**: a live feed build over the free plan's 10 ms. The page then asks ESPN
   directly for that update, so nothing breaks, but many of them mean the $5 plan (or a lower LIVE_BOX_PER_BUILD).
 - **CPU time**: most requests are cache hits, well under 1 ms; builds a few ms each.
 - **Subrequests**: the ESPN requests. With the live feed on, a handful a minute per Cloudflare data center, whatever
-  the number of visitors.
+  the number of visitors; the injury watch adds one each run.
+- **Cron Triggers**: the injury watch's runs every 3 minutes (Metrics shows scheduled runs apart from requests). An
+  exceeded CPU there means that run wrote nothing (Injury watch).
 
 Live, request by request, from this folder (Ctrl+C to stop):
 

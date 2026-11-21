@@ -237,23 +237,35 @@ function boxAdded() {
 }
 
 // ----- The injury report, through the day -----
-// The morning's data has ESPN's injury report as it was then; the page reads the report again (ESPN's own feed, about 50 KB)
-// when it's drawn or comes back on screen, at most every 15 minutes (no timer of its own), the same way the job does: Out (suspended too) or Day-To-Day, hockey's
-// questionable and probable as DTD. A player the feed has but the page can't place keeps the morning's entry.
-const INJ_EVERY = 15 * 60e3;
-const injFeed = { at: 0, nba: null, busy: false };
+// The morning's data has ESPN's injury report as it was then; the page reads it again while it's on screen, every
+// INJ_GAME_DAY on a day the sport has games (the news that matters comes before tip-offs: questionable, then ruled out),
+// else every INJ_EVERY, and on coming back on screen when that's due. From League Layer's injury watch first (worker/
+// index.js, /injuries/: the Worker reads ESPN's report every 3 minutes for everyone, cut to what the page reads, with
+// when each status was first seen), else ESPN's own report (1.2 MB, ~55 KB compressed) through the Worker's /espn/ (one
+// copy for everyone), else from ESPN directly; the watch not answering isn't asked again for INJ_WATCH_OFF.
+// Read the way the job does: Out (suspended too) or Day-To-Day, hockey's questionable and probable as DTD. A player the
+// report has but the page can't place keeps the morning's entry.
+const INJ_EVERY = 15 * 60e3, INJ_GAME_DAY = 3 * 60e3, INJ_WATCH_OFF = 10 * 60e3;
+const injFeed = { at: 0, nba: null, busy: false, timer: null, watchOff: 0 };
+const injEvery = () => ([...teamDates.values()].some(ds => ds.has(todayIso())) ? INJ_GAME_DAY : INJ_EVERY);
+// at: when the injury watch first saw this status (else ESPN's time for the entry); was: the status before it ('' newly
+// listed), only from the watch, and only for a change it saw (injFresh, core.js)
 function injuryFrom(i) {
   const s = String(i.status || '').trim(), l = s.toLowerCase();
   const status = isHockey() ? (['day-to-day', 'questionable', 'probable'].includes(l) ? 'DTD' : 'Out') : (['out', 'suspension', 'suspended'].includes(l) ? 'Out' : 'DTD');
-  return { status, label: s || status, note: i.shortComment || '', date: String(i.date || '').slice(0, 10), back: String((i.details || {}).returnDate || '').slice(0, 10) };
+  const out = { status, label: s || status, note: i.shortComment || '', date: String(i.date || '').slice(0, 10), back: String((i.details || {}).returnDate || '').slice(0, 10) };
+  const at = String(i.since || i.date || '');
+  if (at.includes('T') && !Number.isNaN(Date.parse(at))) out.at = at;
+  if (typeof i.was === 'string') out.was = i.was;
+  return out;
 }
-// feed: ESPN's injuries answer -> how many players' entries changed
+// feed: ESPN's injuries answer (or the injury watch's, in its shape) -> how many players' entries changed
 function applyInjuries(feed) {
   const found = new Map(), unplaced = new Set();
   for (const team of feed.injuries || []) for (const i of team.injuries || []) {
     const a = i.athlete || {};
     if (!a.displayName) continue;
-    const id = (String(((a.links || [])[0] || {}).href || '').match(/\/id\/(\d+)/) || [])[1];
+    const id = a.id || (String(((a.links || [])[0] || {}).href || '').match(/\/id\/(\d+)/) || [])[1];
     const raw = espnPlayer({ id, displayName: a.displayName }, a.team ? espnTri(a.team) : '', isHockey() ? hockeyRole((a.position || {}).abbreviation) : '');
     if (raw) found.set(raw, injuryFrom(i)); else unplaced.add(nameKey(a.displayName));
   }
@@ -267,15 +279,30 @@ function applyInjuries(feed) {
   if (n) syncLinked();
   return n;
 }
+// The report as it is now: the injury watch's, else ESPN's (pooled: the Worker keeps one copy for everyone 2 minutes)
+async function injuryReport() {
+  if (Date.now() >= injFeed.watchOff) {
+    try { return await getJson(`${WORKER}/injuries/${espnLeague()}`, 'League Layer', undefined, 1); } catch (e) { injFeed.watchOff = Date.now() + INJ_WATCH_OFF; }
+  }
+  return espnSite('injuries', 1, true);
+}
+// From render, on coming back on screen, and its own timer while the page is on screen (none while it's hidden)
 async function refreshInjuries() {
-  if (!NBA || isFootball() || injFeed.busy || document.hidden || (injFeed.nba === NBA && Date.now() - injFeed.at < INJ_EVERY)) return 0;
-  Object.assign(injFeed, { busy: true, at: Date.now(), nba: NBA }); // (a miss waits its 15 minutes too)
+  if (injFeed.busy) return 0; // (the read under way sets the next)
+  clearTimeout(injFeed.timer);
+  injFeed.timer = null;
+  if (!NBA || isFootball() || document.hidden) return 0;
+  const wait = injEvery() - (Date.now() - injFeed.at);
+  if (injFeed.nba === NBA && wait > 1e3) { injFeed.timer = setTimeout(refreshInjuries, wait); return 0; }
+  Object.assign(injFeed, { busy: true, at: Date.now(), nba: NBA }); // (a miss waits its turn too)
   try {
-    const feed = await espnSite('injuries', 1, true); // (pooled: the Worker keeps one copy for everyone 5 minutes)
-    const n = applyInjuries(feed);
+    const n = applyInjuries(await injuryReport());
     if (n) render();
     return n;
-  } catch (e) { return 0; /* the morning's report stays */ } finally { injFeed.busy = false; }
+  } catch (e) { return 0; /* the morning's report stays */ } finally {
+    injFeed.busy = false;
+    if (!document.hidden) injFeed.timer = setTimeout(refreshInjuries, injEvery());
+  }
 }
 
 // ESPN's feed is unofficial: it can block the site or change shape, and a visitor only sees a note. Failing LIVE_FAILS
@@ -334,10 +361,11 @@ async function noteLiveFailure(msg, feed = 'ESPN live scores') {
 // the route yet), ESPN directly, as before, for LIVE_FEED_OFF before the feed is tried again.
 const LIVE_FEED_OFF = 10 * 60e3, LIVE_FEED_OLD = 45e3;
 const liveFeed = { off: 0 };
+const espnLeague = () => SPORT.espn.slice(ESPN_SITE.length).replace(/\/$/, ''); // (basketball/nba: the Worker's routes name the sport so)
 async function liveFeedGet() {
   if (Date.now() < liveFeed.off) return null;
   try {
-    const f = await getJson(`${WORKER}/live/${SPORT.espn.slice(ESPN_SITE.length).replace(/\/$/, '')}`, 'League Layer', undefined, 1);
+    const f = await getJson(`${WORKER}/live/${espnLeague()}`, 'League Layer', undefined, 1);
     if (!f || !f.scoreboard || !f.boxes) throw new Error('not a live feed');
     return f;
   } catch (e) { liveFeed.off = Date.now() + LIVE_FEED_OFF; return null; }
@@ -417,7 +445,7 @@ function startLive() {
   else if (!live.timer) scheduleLive();
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { clearTimeout(live.timer); live.timer = null; } else { startLive(); refreshInjuries(); }
+  if (document.hidden) { clearTimeout(live.timer); live.timer = null; clearTimeout(injFeed.timer); injFeed.timer = null; } else { startLive(); refreshInjuries(); }
 });
 
 // minutes of a game still to be played: all of them before the start, less the game clock's progress (none left in overtime)

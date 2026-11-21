@@ -15,6 +15,12 @@
 // Only those three feeds of the three sports, each answer kept at Cloudflare's edge for seconds (ESPN_TTL), so ESPN is
 // asked about once per feed every 10 seconds however many people are watching (sharedCopy).
 //
+// The injury watch: ESPN's injury reports read every few minutes for everyone (Cron Triggers), the page's first source
+// for injuries (refreshInjuries in js/live.js; ESPN's own report through /espn/ when this can't answer):
+//   GET  /injuries/<sport>/<league>
+// The report cut to what the page reads (about 25 KB where ESPN's is 1.2 MB), with when each player's status was first
+// seen and what it was before. Kept in KV (the error log's namespace, one key a sport).
+//
 // The site's error log (a page that crashed in someone's browser):
 //   POST /errors                      the site sends one error: message, where it came from, page, league, version, browser
 //   GET  /errors?key=<ERRORS_KEY>     the last 30 days' errors, newest first, the same ones grouped (for the owner)
@@ -43,7 +49,7 @@ const ERROR_FIELDS = { msg: 300, at: 300, stack: 1500, page: 120, source: 20, le
 const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports/';
 const ESPN_LEAGUES = new Set(['basketball/nba', 'hockey/nhl', 'football/nfl']);
 // (10 s: ESPN's own servers already hand out copies several seconds old, so 20 s here held a live scoreboard about 40 s)
-const ESPN_TTL = { scoreboard: 10, pastScoreboard: 600, summary: 10, injuries: 300 };
+const ESPN_TTL = { scoreboard: 10, pastScoreboard: 600, summary: 10, injuries: 120 };
 // The live feed: the whole answer is kept LIVE_TTL seconds; a game's box score is read again once LIVE_BOX_FRESH old, at
 // most LIVE_BOX_PER_BUILD of them for one build (reading one of ESPN's takes ~3 ms of CPU, and the free plan allows 10:
 // the stalest first, so with people watching every game is read every few seconds), a finished game's once; each game's
@@ -196,6 +202,88 @@ async function startDataJob(env) {
   return why;
 }
 
+// ----- The injury watch (/injuries/<sport>/<league>) -----
+// Cron Triggers (wrangler.toml) read one sport's report a run: basketball on minutes 0, 3, 6..., hockey on 1, 4, 7...
+// ESPN's answer is 1.2 MB, about 4 ms of CPU to read, and the free plan allows 10 ms a run, so never two in one run.
+// Every 3 minutes from 14:00 to 04:59 UTC (game days' news: questionable, then ruled out before tip-off), else every 15.
+// The copy is kept in KV, in the error log's namespace (no setup beyond deploying) under WATCH_KEY, and written only when
+// something changed: a status at once, a note or date at most every WATCH_NOTE_EVERY, and once every WATCH_BEAT anyway
+// (so a copy older than WATCH_STALE means the watch has stopped). The free plan allows 1,000 KV writes a day.
+// Each entry carries `since`, when the watch first saw that status, and `was`, the status before ('' for newly listed;
+// none for entries already listed when the watch started, which take ESPN's time for the entry).
+// ESPN failing (an error, blocked, or an answer nearly empty) isn't asked again for WATCH_WAIT, doubling each miss to
+// WATCH_WAIT_MAX (a site that keeps asking once refused is how it stays refused), logged once; the page meanwhile reads
+// ESPN's report through /espn/, or from ESPN directly.
+const WATCH = { '*/3 * * * *': 'basketball/nba', '1-59/3 * * * *': 'hockey/nhl' };
+const WATCH_KEY = league => `watch:${league}`;
+const WATCH_NOTE_EVERY = 15 * 60e3, WATCH_BEAT = 60 * 60e3, WATCH_STALE = 90 * 60e3, WATCH_WAIT = 15 * 60e3, WATCH_WAIT_MAX = 6 * 36e5;
+const WATCH_FRESH = 60; // (seconds a data center keeps its copy of the answer: KV is read about once a minute)
+const watchPeak = d => d.getUTCHours() >= 14 || d.getUTCHours() < 5;
+// One of ESPN's entries cut to what the page reads (applyInjuries, injuryFrom in js/live.js: keep in step)
+function watchEntry(i) {
+  const a = i.athlete || {}, id = String(((a.links || [])[0] || {}).href || '').match(/\/id\/(\d+)/);
+  return {
+    status: i.status, date: i.date, shortComment: i.shortComment, details: { returnDate: (i.details || {}).returnDate },
+    athlete: { id: id ? id[1] : undefined, displayName: a.displayName, team: a.team && { id: a.team.id, abbreviation: a.team.abbreviation }, position: a.position && { abbreviation: a.position.abbreviation } },
+  };
+}
+const watchId = e => e.athlete.id || `${e.athlete.displayName}|${e.athlete.team && e.athlete.team.abbreviation}`;
+const watchNews = e => JSON.stringify([e.status, e.date, e.shortComment, e.details]);
+// ESPN's report against the kept copy (prev, or null the first time) -> { copy, write }, or null for an answer not
+// believed (nearly empty where the last had many)
+function watchNext(prev, feed, now) {
+  const old = new Map(((prev && prev.list) || []).map(e => [watchId(e), e])), at = new Date(now).toISOString();
+  const list = [];
+  for (const t of feed.injuries || []) for (const i of t.injuries || []) {
+    if (!i.athlete || !i.athlete.displayName) continue;
+    const e = watchEntry(i), o = old.get(watchId(e));
+    if (o && o.status === e.status) { e.since = o.since; if ('was' in o) e.was = o.was; }
+    else if (o) { e.since = at; e.was = o.status; }
+    else if (prev && prev.list && prev.list.length) { e.since = at; e.was = ''; }
+    else e.since = e.date || at;
+    list.push(e);
+  }
+  if (list.length < 5 && old.size >= 20) return null;
+  const ids = new Set(list.map(watchId));
+  const moved = list.some(e => e.since === at) || [...old.keys()].some(k => !ids.has(k));
+  const news = moved || list.some(e => { const o = old.get(watchId(e)); return !o || watchNews(o) !== watchNews(e); });
+  const age = prev ? now - prev.at : Infinity;
+  return { copy: { v: 1, at: now, list }, write: !prev || !!prev.fails || moved || (news && age >= WATCH_NOTE_EVERY) || age >= WATCH_BEAT };
+}
+// One run for one sport -> what it did (for the tests and `wrangler tail`)
+async function injuryWatch(league, env, now = Date.now()) {
+  if (!env.ERRORS) return 'not set up';
+  const d = new Date(now);
+  if (!watchPeak(d) && Math.floor(d.getUTCMinutes() / 3) % 5) return 'off-peak';
+  const key = WATCH_KEY(league), prev = await env.ERRORS.get(key, 'json');
+  if (prev && prev.off > now) return 'waiting';
+  let next = null, why = '';
+  try {
+    const r = await fetch(`${ESPN_SITE}${league}/injuries`, { headers: { Accept: 'application/json' } });
+    if (!r.ok) why = `answered ${r.status}`;
+    else if (!(next = watchNext(prev, await r.json(), now))) why = 'came back nearly empty';
+  } catch (e) { why = e.message || 'not reached'; }
+  try {
+    if (!next) {
+      const fails = ((prev && prev.fails) || 0) + 1, wait = Math.min(WATCH_WAIT * 2 ** (fails - 1), WATCH_WAIT_MAX);
+      await env.ERRORS.put(key, JSON.stringify({ ...(prev || { v: 1, at: 0, list: [] }), fails, off: now + wait }));
+      if (fails === 2) await putError(env, { t: now, country: '', msg: `Injury watch: ESPN's ${league} report ${why}; asked again in ${wait / 60e3} minutes, then less often (6 hours at most)`, at: 'worker/index.js injuryWatch', stack: '', page: '', source: 'worker', league: '', build: '', ua: '' });
+      return `failed: ${why}`;
+    }
+    if (next.write) await env.ERRORS.put(key, JSON.stringify(next.copy));
+  } catch (e) { return 'KV refused the write'; } // (the day's 1,000 writes used up: the copy goes stale and the page reads ESPN's)
+  return next.write ? 'written' : 'unchanged';
+}
+// The page's answer: ESPN's shape (applyInjuries reads either), or 503 when the watch has none, is failing or has stopped
+async function watchAnswer(env, league) {
+  const no = why => ({ status: 503, type: 'application/json', body: JSON.stringify({ error: why }) });
+  const w = env.ERRORS ? await env.ERRORS.get(WATCH_KEY(league), 'json') : null;
+  if (!w || !w.list || !w.list.length) return no('the injury watch has no report yet');
+  if (w.fails) return no("ESPN isn't answering the injury watch");
+  if (Date.now() - w.at > WATCH_STALE) return no('the injury watch has stopped');
+  return { status: 200, type: 'application/json', body: JSON.stringify({ v: 1, at: w.at, injuries: [{ injuries: w.list }] }) };
+}
+
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 // One error in the log; the newest sort first in KV's listing (keys count down)
@@ -236,7 +324,7 @@ async function errorPage(env) {
   let cursor;
   do {
     const r = await env.ERRORS.list({ cursor, limit: 1000 });
-    keys.push(...r.keys.map(k => k.name));
+    keys.push(...r.keys.map(k => k.name).filter(k => /^\d/.test(k))); // (errors only: the injury watch's copies share the namespace)
     cursor = r.list_complete ? null : r.cursor;
   } while (cursor && keys.length < 300);
   const recs = (await Promise.all(keys.slice(0, 300).map(k => env.ERRORS.get(k, 'json')))).filter(Boolean);
@@ -296,6 +384,16 @@ export default {
       try { c = await sharedCopy(new Request(target.upstream), url.origin, target.ttl, () => espnAnswer(target.upstream), ctx); } catch (e) { c = { status: 502, type: 'application/json', body: JSON.stringify({ error: "couldn't reach ESPN" }) }; }
       // to the page: never kept in the browser (its own updates decide when to ask again)
       return new Response(c.body, { status: c.status, headers: { ...cors, 'Content-Type': c.type, 'Cache-Control': 'no-store' } });
+    }
+
+    const inj = url.pathname.match(/^\/injuries\/([a-z]+\/[a-z]+)$/);
+    if (inj && req.method === 'GET') {
+      if (!origins.includes(origin)) return new Response('Not found', { status: 404 }); // (only for the site's own pages)
+      const head = { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+      if (!Object.values(WATCH).includes(inj[1])) return new Response(JSON.stringify({ error: 'not a sport the injury watch reads' }), { status: 404, headers: head });
+      let c;
+      try { c = await sharedCopy(new Request(`${url.origin}/__injuries/${inj[1]}`), url.origin, WATCH_FRESH, () => watchAnswer(env, inj[1]), ctx); } catch (e) { c = { status: 503, body: JSON.stringify({ error: "couldn't read the injury watch" }) }; }
+      return new Response(c.body, { status: c.status, headers: head });
     }
 
     const live = url.pathname.match(/^\/live\/([a-z]+\/[a-z]+)$/);
@@ -364,8 +462,9 @@ export default {
     return json({ error: 'not found' }, 404);
   },
 
-  // the Cron Trigger (wrangler.toml): 08:00 UTC, the daily data job
+  // the Cron Triggers (wrangler.toml): every 3 minutes the injury watch, one sport a run; 08:00 UTC the daily data job
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(startDataJob(env));
+    if (WATCH[event.cron]) ctx.waitUntil(injuryWatch(WATCH[event.cron], env, event.scheduledTime || Date.now()));
+    else ctx.waitUntil(startDataJob(env));
   },
 };

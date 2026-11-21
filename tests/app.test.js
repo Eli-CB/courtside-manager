@@ -2948,6 +2948,67 @@ test("ESPN's injury report read again through the day: new entries in, healed pl
   } finally { players.forEach((r, i) => { r.inj = saved[i]; }); g.inj = prevG; }
 });
 
+test("the injury report through the day: the Worker's injury watch first (what changed, and when), ESPN's when it can't answer, on a timer while on screen", async () => {
+  const a = loadApp();
+  await a.ready();
+  const players = a.NBA.players.filter(r => r.team && !r.inj).slice(0, 6);
+  const entry = (r, status, extra = {}) => ({ status, date: '2026-10-26T18:00Z', shortComment: `${r.name} news`, athlete: { displayName: r.name, team: { abbreviation: r.team, id: '0' }, links: [] }, ...extra });
+  const espnReport = { injuries: [{ injuries: players.map(r => entry(r, 'Day-To-Day')) }] };
+  let watch = null; // the watch's answer (null: not deployed yet, 404)
+  const real = a.fetch, asked = [];
+  const answer = body => Promise.resolve(body ? { ok: true, status: 200, text: async () => JSON.stringify(body) } : { ok: false, status: 404 });
+  a.fetch = (u, o) => {
+    const s = String(u);
+    asked.push(s);
+    if (s.includes('/injuries/basketball/nba')) return answer(watch);
+    if (s.endsWith('/espn/basketball/nba/injuries')) return answer(espnReport);
+    return real(u, o);
+  };
+  const injFeed = a.get('injFeed');
+  for (let i = 0; injFeed.busy && i < 200; i++) await new Promise(r => setTimeout(r, 5)); // (the page's own first read, at load)
+  Object.assign(injFeed, { at: 0, watchOff: 0 });
+  try {
+    // the watch not answering: ESPN's report, through the Worker's /espn/
+    await a.refreshInjuries();
+    assert.deepEqual(asked.slice(0, 2), ['https://api.leaguelayer.com/injuries/basketball/nba', 'https://api.leaguelayer.com/espn/basketball/nba/injuries']);
+    const p = players[0];
+    assert.equal(p.inj.status, 'DTD');
+    assert.equal(p.inj.at, '2026-10-26T18:00Z', "ESPN's time for the entry");
+    assert.ok(!('was' in p.inj) && !a.injFresh(p.inj), 'not a change the watch saw');
+    assert.match(a.injWhen(p.inj), /^updated /, 'which may be only a newer note');
+    assert.ok(injFeed.timer, 'the next read set');
+    // read again when due (every 3 minutes on a game day, else 15): the watch not asked again for 10 minutes
+    const gameDay = [...a.get('teamDates').values()].some(ds => ds.has(a.todayIso()));
+    assert.equal(a.injEvery(), gameDay ? 3 * 60e3 : 15 * 60e3);
+    asked.length = 0;
+    injFeed.at = 0;
+    await a.refreshInjuries();
+    assert.ok(!asked.some(u => u.includes('/injuries/basketball/nba')) && asked.length === 1);
+    // the watch answering: ruled out 10 minutes ago, Day-To-Day before
+    a.setClock('2026-10-26T20:11:00-04:00');
+    watch = { v: 1, at: a.Date.now(), injuries: [{ injuries: players.map((r, i) => entry(r, i ? 'Day-To-Day' : 'Out', i ? { since: '2026-10-26T18:00Z' } : { since: '2026-10-27T00:01:00.000Z', was: 'Day-To-Day' })) }] };
+    asked.length = 0;
+    injFeed.at = 0;
+    await a.refreshInjuries();
+    assert.deepEqual(asked, ['https://api.leaguelayer.com/injuries/basketball/nba'], 'the watch alone');
+    assert.deepEqual([p.inj.status, p.inj.was, p.inj.at], ['Out', 'Day-To-Day', '2026-10-27T00:01:00.000Z']);
+    assert.ok(a.injFresh(p.inj));
+    assert.match(a.injWhen(p.inj), /^since \d.*\(was Day-To-Day\)$/, 'a time of today, without the day');
+    const badge = a.injBadge(p.inj);
+    assert.match(badge, /class="badge inj bad fresh"/);
+    assert.match(badge, /title="Out since [^"]*\(was Day-To-Day\): /);
+    assert.ok(!a.injFresh(players[1].inj) && !/fresh/.test(a.injBadge(players[1].inj)));
+    // three hours on: no longer new, still since then
+    a.setClock('2026-10-26T23:30:00-04:00');
+    assert.ok(!a.injFresh(p.inj) && !/fresh/.test(a.injBadge(p.inj)));
+    assert.match(a.injWhen(p.inj), /^since [^(]+$/);
+    // hidden: no timer of its own
+    a.document.hidden = true;
+    await a.refreshInjuries();
+    assert.equal(injFeed.timer, null);
+  } finally { a.fetch = real; a.document.hidden = false; a.setClock(); clearTimeout(injFeed.timer); players.forEach(r => { r.inj = null; }); }
+});
+
 test("what's kept goes when what it was worked out from changes: one league's, or everyone's", () => {
   const recaps = app.get('recaps'), seasonTot = app.get('seasonTot'), pastWeeks = app.get('pastWeeks'), gameLogs = app.get('gameLogs'), weeksLoad = app.get('rosterWeeksLoad');
   const fill = () => { for (const id of ['aaa', 'bbb']) { recaps.set(`${id}|3`, {}); seasonTot[id] = {}; pastWeeks[id] = {}; weeksLoad[id] = Promise.resolve(null); } gameLogs.cur = {}; gameLogs['2024-25'] = {}; };
@@ -5454,6 +5515,135 @@ test("the Worker's live feed: today's scoreboard and box scores cut to what the 
     assert.equal((await ask('/live/basketball/nba', 'https://elsewhere.example')).status, 404);
     assert.equal((await ask('/live/basketball/nba', null)).status, 404);
     assert.equal((await ask('/live/baseball/mlb')).status, 404);
+  } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; Date.now = realNow; }
+});
+
+test("the Worker's injury watch: ESPN's report every 3 minutes, one sport a run, what changed and when, written only when it did", async () => {
+  const worker = (await import('../worker/index.js')).default;
+  const realFetch = globalThis.fetch, realCaches = globalThis.caches, realNow = Date.now;
+  let now = 0;
+  Date.now = () => now;
+  const store = new Map();
+  globalThis.caches = { default: {
+    match: async r => { const e = store.get(r.url); return e && now < e.until ? e.res.clone() : undefined; },
+    put: async (r, res) => { store.set(r.url, { res, until: now + 1e3 * +((res.headers.get('Cache-Control') || '').match(/max-age=(\d+)/) || [0, 0])[1] }); },
+    delete: async r => store.delete(r.url),
+  } };
+  const kv = new Map(), puts = [];
+  let gets = 0;
+  const ERRORS = {
+    get: async (k, type) => { gets++; return kv.has(k) ? (type === 'json' ? JSON.parse(kv.get(k)) : kv.get(k)) : null; },
+    put: async (k, v) => { puts.push(k); kv.set(k, v); },
+    list: async () => ({ keys: [...kv.keys()].sort().map(name => ({ name })), list_complete: true }),
+  };
+  const env = { SITE_ORIGINS: 'https://leaguelayer.com', ERRORS, ERRORS_KEY: 'k' };
+  // ESPN's entries with all they carry (links, logos, long comments...) besides what the page reads
+  const espnEntry = (n, status, note = 'news') => ({ id: String(n), longComment: 'a long comment', shortComment: `${note} ${n}`, status, date: '2026-11-21T15:00Z', source: { id: '1' }, type: { id: '4', name: 'INJURY_STATUS_OUT' },
+    details: { fantasyStatus: { abbreviation: 'GTD' }, returnDate: '2026-11-25' },
+    athlete: { firstName: 'A', displayName: `Player ${n}`, links: [{ href: `https://www.espn.com/nba/player/_/id/${1000 + n}/player` }], headshot: { href: 'x' }, team: { id: '2', abbreviation: 'BOS', logos: [{ href: 'x' }] }, position: { id: '3', abbreviation: 'G', name: 'Guard' }, notes: [] } });
+  let report = Array.from({ length: 24 }, (_, n) => espnEntry(n, n % 3 ? 'Out' : 'Day-To-Day')), espn = 200;
+  const upstream = [];
+  globalThis.fetch = async u => { upstream.push(String(u)); return new Response(espn === 200 ? JSON.stringify({ timestamp: 'x', injuries: [{ id: '2', displayName: 'Celtics', injuries: report }] }) : '{}', { status: espn }); };
+  const run = async (at, cron = '*/3 * * * *') => { const waits = []; await worker.scheduled({ cron, scheduledTime: Date.parse(at) }, env, { waitUntil: p => waits.push(p) }); return (await Promise.all(waits))[0]; };
+  const kept = (league = 'basketball/nba') => JSON.parse(kv.get(`watch:${league}`));
+  const entry = n => kept().list.find(e => e.athlete.displayName === `Player ${n}`);
+  const ask = async (path, origin = 'https://leaguelayer.com') => {
+    const waits = [];
+    const res = await worker.fetch(new Request(`https://api.leaguelayer.com${path}`, { headers: origin ? { Origin: origin } : {} }), env, { waitUntil: p => waits.push(p) });
+    await Promise.all(waits);
+    return res;
+  };
+  try {
+    // the first look (5 p.m. ET): everything kept, at ESPN's times, nothing marked as a change
+    assert.equal(await run('2026-11-21T22:00:00Z'), 'written');
+    assert.deepEqual(upstream, ['https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries']);
+    assert.equal(kept().list.length, 24);
+    assert.deepEqual(entry(0), { status: 'Day-To-Day', date: '2026-11-21T15:00Z', shortComment: 'news 0', details: { returnDate: '2026-11-25' },
+      athlete: { id: '1000', displayName: 'Player 0', team: { id: '2', abbreviation: 'BOS' }, position: { abbreviation: 'G' } }, since: '2026-11-21T15:00Z' }, 'cut to what the page reads');
+    // nothing new 3 minutes on: ESPN asked, nothing written
+    assert.equal(await run('2026-11-21T22:03:00Z'), 'unchanged');
+    assert.equal(puts.length, 1);
+    // ruled out, newly listed, off the report: written at once, with when and what before
+    report[0] = espnEntry(0, 'Out');
+    report.push(espnEntry(30, 'Day-To-Day'));
+    report.splice(2, 1);
+    assert.equal(await run('2026-11-21T22:06:00Z'), 'written');
+    assert.deepEqual([entry(0).since, entry(0).was], ['2026-11-21T22:06:00.000Z', 'Day-To-Day']);
+    assert.deepEqual([entry(30).since, entry(30).was], ['2026-11-21T22:06:00.000Z', '']);
+    assert.ok(!entry(2), 'off the report');
+    assert.ok(entry(1).since === '2026-11-21T15:00Z' && !('was' in entry(1)), 'the others as they were');
+    // only a newer note: written at most every 15 minutes
+    report.find(e => e.id === '3').shortComment = 'newer 3';
+    assert.equal(await run('2026-11-21T22:09:00Z'), 'unchanged');
+    assert.equal(await run('2026-11-21T22:21:00Z'), 'written');
+    assert.equal(entry(3).shortComment, 'newer 3');
+    assert.equal(entry(0).was, 'Day-To-Day', 'a change keeps its time and what it was');
+    // nothing new for an hour: written anyway, so the copy's age says the watch is running
+    assert.equal(await run('2026-11-21T23:18:00Z'), 'unchanged');
+    assert.equal(await run('2026-11-21T23:21:00Z'), 'written');
+    // the night (05:00-14:00 UTC): every 15 minutes
+    const n = upstream.length;
+    assert.equal(await run('2026-11-22T10:03:00Z'), 'off-peak');
+    assert.equal(upstream.length, n, 'ESPN not asked');
+    assert.equal(await run('2026-11-22T10:15:00Z'), 'written');
+    // hockey: its own runs, a minute after basketball's
+    assert.equal(await run('2026-11-22T15:00:00Z'), 'written', '(an hour on: the copy written anyway)');
+    assert.equal(await run('2026-11-22T15:01:00Z', '1-59/3 * * * *'), 'written');
+    assert.equal(upstream[upstream.length - 1], 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries');
+    assert.ok(kept('hockey/nhl').list.length);
+
+    // the page's answer: ESPN's shape, kept a minute for the data center
+    now = Date.parse('2026-11-22T15:02:00Z');
+    let r = await ask('/injuries/basketball/nba');
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://leaguelayer.com');
+    assert.equal(r.headers.get('Cache-Control'), 'no-store');
+    const f = await r.json();
+    assert.equal(f.injuries[0].injuries.length, 24);
+    assert.ok(f.injuries[0].injuries.some(e => e.was === 'Day-To-Day'));
+    const g = gets;
+    await ask('/injuries/basketball/nba');
+    assert.equal(gets, g, 'a second visitor: from the cache, KV not read');
+    assert.equal((await ask('/injuries/basketball/nba', 'https://elsewhere.example')).status, 404);
+    assert.equal((await ask('/injuries/basketball/nba', null)).status, 404);
+    assert.equal((await ask('/injuries/football/nfl')).status, 404, 'not a sport it watches');
+
+    // ESPN refusing: left alone 15 minutes, then 30..., logged once; the page's answer says so (the page reads ESPN's)
+    espn = 403;
+    assert.equal(await run('2026-11-22T15:03:00Z'), 'failed: answered 403');
+    assert.equal(kept().fails, 1);
+    now = Date.parse('2026-11-22T15:04:00Z');
+    assert.equal((await ask('/injuries/basketball/nba')).status, 503);
+    const m = upstream.length;
+    assert.equal(await run('2026-11-22T15:15:00Z'), 'waiting');
+    assert.equal(upstream.length, m, 'not asked while waiting');
+    assert.equal(await run('2026-11-22T15:18:00Z'), 'failed: answered 403');
+    assert.equal(kept().off, Date.parse('2026-11-22T15:48:00Z'), 'then 30 minutes');
+    const logged = [...kv.keys()].filter(k => /^\d/.test(k)).map(k => JSON.parse(kv.get(k)).msg);
+    assert.equal(logged.length, 1);
+    assert.match(logged[0], /^Injury watch: ESPN's basketball\/nba report answered 403/);
+    // answering again: written at once, back to normal
+    espn = 200;
+    assert.equal(await run('2026-11-22T15:48:00Z'), 'written');
+    assert.ok(!kept().fails && !kept().off);
+    // an answer nearly empty where the last had many: not believed
+    const full = report;
+    report = report.slice(0, 2);
+    assert.equal(await run('2026-11-22T15:51:00Z'), 'failed: came back nearly empty');
+    assert.equal(kept().list.length, 24, 'the last good copy kept');
+    report = full;
+    // an hour and a half without a write: the watch has stopped, the page reads ESPN's
+    kv.set('watch:basketball/nba', JSON.stringify({ ...kept(), fails: 0, off: 0, at: Date.parse('2026-11-22T15:00:00Z') }));
+    now = Date.parse('2026-11-22T16:40:00Z');
+    assert.equal((await ask('/injuries/basketball/nba')).status, 503);
+    // the error log's page lists errors only, not the watch's copies beside them
+    const page = await (await ask('/errors?key=k')).text();
+    assert.match(page, /1 reports/);
+    assert.ok(!page.includes('undefined'), "a copy isn't read as an error");
+    // not set up (no KV): nothing asked
+    const o = upstream.length;
+    assert.equal(await worker.scheduled({ cron: '*/3 * * * *', scheduledTime: Date.parse('2026-11-22T16:42:00Z') }, {}, { waitUntil: p => p }), undefined);
+    assert.equal(upstream.length, o);
   } finally { globalThis.fetch = realFetch; globalThis.caches = realCaches; Date.now = realNow; }
 });
 

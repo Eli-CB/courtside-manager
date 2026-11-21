@@ -20,5 +20,7 @@ id = "6237323107d847fa897250456b62c0df"
 
 # The daily data job, started on time (index.js, startDataJob; README.md "Daily data job"): 08:00 UTC every day.
 # Its GitHub token is a secret:  npx wrangler secret put GITHUB_TOKEN
+# The injury watch (index.js, injuryWatch; README.md "Injury watch"): basketball's report every 3 minutes, hockey's a
+# minute later, one sport a run (each is 1.2 MB to read, against the free plan's 10 ms of CPU). Kept in the ERRORS namespace.
 [triggers]
-crons = ["0 8 * * *"]
+crons = ["0 8 * * *", "*/3 * * * *", "1-59/3 * * * *"]

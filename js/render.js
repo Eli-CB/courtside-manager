@@ -321,7 +321,7 @@ function render() {
   gearMenu();
   ctxBar();
   if (landing) { $('#view').innerHTML = viewLanding(); landReveal(); return; }
-  refreshInjuries(); // (ESPN's injury report as it is now: at most every 15 minutes)
+  refreshInjuries(); // (the injury report as it is now when due: every 3 minutes on game days, else 15; live.js)
   if (ui.pendingSeason) { $('#view').innerHTML = loadingCard('Loading that season…'); return; }
   const nav = $('#tabs');
   // (drawn again whenever its tabs change: a past season, the sandbox, a sport's or a league's own, as a roto league's lack of a Recap)

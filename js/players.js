@@ -733,7 +733,7 @@ function showPlayerDetail(nbaId) {
         })()}
       </div>
     </div>
-    ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small"><b>${esc(raw.inj.label)}</b>${raw.inj.note ? `: ${esc(raw.inj.note)}` : ''} <span class="muted">${raw.inj.date ? fmtDay(raw.inj.date) : ''} · ESPN</span></span></div>` : ''}
+    ${raw.inj ? `<div class="alert ${raw.inj.status === 'Out' ? 'bad' : 'warn'}" style="margin-top:12px"><span class="dot"></span><span class="grow small"><b>${esc(raw.inj.label)}</b>${raw.inj.note ? `: ${esc(raw.inj.note)}` : ''} <span class="muted">${[injWhen(raw.inj) || (raw.inj.date ? fmtDay(raw.inj.date) : ''), 'ESPN'].filter(Boolean).join(' · ')}</span></span></div>` : ''}
     <h3 class="sub" style="margin-top:16px">Per-game averages</h3>
     ${avgNarrow}${rows ? `<div class="table-wrap hide-sm pc-log-wrap"><table class="pc-log"><colgroup><col class="c-label"><col class="c-gp">${statCols}</colgroup><thead><tr><th></th>${AVG.map(([h]) => `<th class="num">${h}</th>`).join('')}<th class="num">${VAL}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted small">No ${SPORT.name} regular-season stats yet.</p>`}
     <h3 class="sub" style="margin-top:16px">Games${games.length ? ` <span class="muted small">${games.length}</span>` : ''}</h3>

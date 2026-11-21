@@ -451,14 +451,27 @@ function totals(list, mult = () => 1) {
   return t;
 }
 
+// A status the injury watch saw change in the last INJ_FRESH (worker/index.js; injuryFrom, live.js): marked new
+const INJ_FRESH = 3 * 36e5;
+const injFresh = inj => !!inj && typeof inj.was === 'string' && !!inj.at && Date.now() - Date.parse(inj.at) < INJ_FRESH;
+// When, as words: a change the watch saw "since 6:32 PM (was Day-To-Day)" ("(newly listed)"; the reason only while it's
+// new), else ESPN's time for the entry, which may be only a newer note: "updated Sat, Nov 21, 6:32 PM"; '' without a time
+// (the morning's report)
+function injWhen(inj) {
+  if (!inj || !inj.at) return '';
+  const t = Date.parse(inj.at), day = isoDay(new Date(t));
+  const when = `${day === todayIso() ? '' : fmtDay(day) + ', '}${fmtTime(t)}`;
+  if (typeof inj.was !== 'string') return `updated ${when}`;
+  return `since ${when}${injFresh(inj) ? ` (${inj.was ? `was ${inj.was}` : 'newly listed'})` : ''}`;
+}
 // The injury report in a few letters, for tight rows (the full word and the news on hover): Q, D, IR, SUS, PUP, else OUT or DTD
 function injBadge(inj, where = '') {
   if (!inj) return '';
   const l = String(inj.label || '').toLowerCase();
   const short = l === 'ir' || l.includes('reserve') ? 'IR' : l.startsWith('quest') ? 'Q' : l.startsWith('doubt') ? 'D' : l.startsWith('sus') ? 'SUS' : l === 'pup' ? 'PUP'
     : inj.status === 'Out' ? 'OUT' : 'DTD';
-  const tip = [inj.label || inj.status, inj.note].filter(Boolean).join(': ');
-  return `<span class="badge inj ${inj.status === 'Out' ? 'bad' : 'warn'}${where ? ' ' + where : ''}" title="${esc(tip)}">${short}</span>`;
+  const fresh = injFresh(inj), tip = [[inj.label || inj.status, fresh ? injWhen(inj) : ''].filter(Boolean).join(' '), inj.note].filter(Boolean).join(': ');
+  return `<span class="badge inj ${inj.status === 'Out' ? 'bad' : 'warn'}${fresh ? ' fresh' : ''}${where ? ' ' + where : ''}" title="${esc(tip)}">${short}</span>`;
 }
 
 // A first-year player (no seasons in the league before this one; a football team defense isn't one), and his R by the name

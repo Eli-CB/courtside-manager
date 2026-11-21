@@ -87,8 +87,10 @@ function loadApp(saved = {}) {
     querySelector: () => new El(), querySelectorAll: () => [], getElementById: () => new El(),
     addEventListener() {}, createElement: () => new El(),
   };
+  // the page's own timers (the injury report's every few minutes) don't keep the test run open once its tests are done
+  const pageTimeout = (f, ms, ...a) => { const t = setTimeout(f, ms, ...a); if (ms > 60e3 && t.unref) t.unref(); return t; };
   const ctx = {
-    document, console, setTimeout, clearTimeout, URL, URLSearchParams, Intl, Math, JSON, Promise, Map, Set,
+    document, console, setTimeout: pageTimeout, clearTimeout, URL, URLSearchParams, Intl, Math, JSON, Promise, Map, Set,
     Date: FixedDate,
     location: { hostname: 'example.test', hash: '', search: '', reload() {} },
     localStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k), key: i => [...store.keys()][i] ?? null, get length() { return store.size; } },

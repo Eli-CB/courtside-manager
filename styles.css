@@ -619,6 +619,7 @@ button.dr-award-btn:hover { text-decoration: underline; text-underline-offset: 2
 .perf-table .pf-name .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .badge.inj, .badge.rk { flex: none; margin-left: 5px; padding: 0 5px; font-size: .64rem; line-height: 1.5; letter-spacing: .02em; } /* the name gives way, not the badge */
 .badge.inj.in-meta, .badge.rk.in-meta { display: none; margin: 0 4px 0 0; }
+.badge.inj.fresh { box-shadow: inset 0 0 0 1.5px currentColor; } /* a status changed in the last 3 hours (injFresh) */
 .badge.rk { background: var(--surface-2); color: var(--text); } /* plain grey: a fact about the player, not a warning */
 @media (max-width: 640px) { .badge.inj.by-name, .badge.rk.by-name { display: none; } .badge.inj.in-meta, .badge.rk.in-meta { display: inline-block; } } /* phones: under the name, which keeps its room */
 .perf-table .pf-name .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

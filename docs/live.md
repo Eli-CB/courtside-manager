@@ -1,8 +1,8 @@
-# Live scores and ESPN's feeds: js/live.js, the Worker's /live and /espn/
+# Live scores and ESPN's feeds: js/live.js, the Worker's /live, /espn/ and /injuries/
 
 Part of the repo's notes: CLAUDE.md says which file covers what and how to keep them current. Read this before changing js/live.js or the Worker's live feed.
 
-- live: live box scores for the Dashboard matchup's and Performances' Today (and This week). Live scores come first from the Worker's live feed (`liveFeedGet`: `/live/<sport>/<league>`, worker/index.js: today's scoreboard and each game's box score cut to what the page reads, ~8 KB compressed a night, built once and kept 5 s at the edge, at most 3 box scores read a build for the free plan's 10 ms of CPU; `readBoxes(games, feed)` uses a game's box score from it when under 45 s old, else asks ESPN if due; the feed failing = ESPN directly for 10 minutes; keep `liveScoreboard`/`liveBox` in step with what espnGames/espnLines/espnHockeyLines/espnFloor/espnPlayer read). The injury report and finished days go through `/espn/` first (`espnSite(path, tries, pooled)`). Every other ESPN site-feed request goes through `espnSite(path)`:
+- live: live box scores for the Dashboard matchup's and Performances' Today (and This week). Live scores come first from the Worker's live feed (`liveFeedGet`: `/live/<sport>/<league>`, worker/index.js: today's scoreboard and each game's box score cut to what the page reads, ~8 KB compressed a night, built once and kept 5 s at the edge, at most 3 box scores read a build for the free plan's 10 ms of CPU; `readBoxes(games, feed)` uses a game's box score from it when under 45 s old, else asks ESPN if due; the feed failing = ESPN directly for 10 minutes; keep `liveScoreboard`/`liveBox` in step with what espnGames/espnLines/espnHockeyLines/espnFloor/espnPlayer read). The injury report comes from the Worker's injury watch first (below); finished days go through `/espn/` first (`espnSite(path, tries, pooled)`). Every other ESPN site-feed request goes through `espnSite(path)`:
   direct from the browser; after `ESPN_SWITCH` (2) misses in a row while leaguelayer.com answers, through the Worker's cached `/espn/` route (worker/index.js)
   for 6 hours on that device (`league-layer-espn-route`), logged once. Failing feeds back off (`feedWait`: ×2 per miss, 5 min at most) for live scores,
   ESPN/Sleeper league points and the late finals. Fantrax and Sleeper stay direct on purpose: their limits are per IP, and a proxy would pool everyone's. The browser polls ESPN's site API
@@ -30,7 +30,14 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   ~3 ms CPU each against the free plan's 10 ms). Watch it in Cloudflare's dashboard: Workers & Pages, leaguelayer-yahoo,
   Metrics (requests, errors incl. exceeded CPU, CPU time, subrequests), or `npx wrangler tail` (worker/README.md
   "Watching it"). Fantrax and Sleeper stay direct on purpose (per-IP limits: a proxy would pool everyone's).
-- ESPN's injury report: the morning job's, then the page reads ESPN's feed itself (`refreshInjuries`/`applyInjuries`, live.js; from `render` and on coming back
-  on screen, at most every 15 min, no timer; ~50 KB; same Out/DTD rules as the jobs; one it can't place keeps the morning's entry; under 5 matched = not believed).
+- ESPN's injury report: the morning job's, then the page reads it again (`refreshInjuries`/`applyInjuries`, live.js) while on screen, with a timer of its own:
+  every 3 min on a day the sport has games (`injEvery`: the news that matters is before tip-off, questionable then ruled out), else 15, none while hidden
+  (Nov 21, 2026, the owner's ask: injury news sooner, still free). First from the Worker's injury watch (`/injuries/<sport>/<league>`: the Worker reads
+  ESPN's report every 3 min for everyone, cut to ~38 KB, worker/README.md "Injury watch"), else ESPN's report through `/espn/` (pooled, kept 2 min), else
+  ESPN directly; the watch not answering is skipped 10 min. ESPN's report is 1.2 MB (55 KB compressed), entries stamped to the minute and updated all day
+  (checked Nov 21, 2026). Same Out/DTD rules as the jobs; one it can't place keeps the morning's entry; under 5 matched = not believed.
+  `inj.at` is when the watch first saw that status (else ESPN's time for the entry, which may be only a newer note: "updated"), `inj.was` the status
+  before ('' newly listed; only for a change the watch saw). A change under 3 hours old is new (`injFresh`, core.js): its badge ringed, its time and what it
+  was in the tip and the player card (`injWhen`). Not on the Matchup tab: nothing goes under its card (docs/matchup.md). Football isn't read again (its own job).
   A player listed questionable who then plays loses the tag once he's played on or after his entry's date (`playedSince`/`dropPlayedInjuries`, nba.js:
   saved box scores, or ESPN's live lines of tonight's game).
