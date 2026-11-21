@@ -4473,6 +4473,15 @@ test('the sandbox: a team of any players, marked on Players and Trends, up to 12
   assert.equal((watch.match(/class="mu-p sb-w/g) || []).length, 12);
   assert.ok(watch.includes(`data-action="sb-unwatch" data-id="${p4.nbaId}"`) && !watch.includes('id="sbQ-watch"'), 'each with a ✕; no search while full');
   assert.ok(watch.includes('12 of 12</span><span class="badge sb-max"') && !/Following 12|room for/.test(watch), 'full: a Max badge by the count, no sentence');
+  assert.ok(!watch.includes('>Mine<') && watch.includes('data-action="dash-full" aria-pressed="false"'), 'no Mine badge (the owner\'s ask); the full-screen button');
+  // full screen, as the Matchup tab's: the players alone, no count, search or ✕
+  ui.dashFull = true;
+  try {
+    const fs = a.viewSandboxWatch();
+    assert.ok(fs.includes('class="card sb-watch-card mu-card full"') && fs.includes('aria-pressed="true"'));
+    assert.equal((fs.match(/class="mu-p sb-w/g) || []).length, 12);
+    assert.ok(!fs.includes('data-action="sb-unwatch"') && !fs.includes('12 of 12') && !fs.includes('class="info-btn"'));
+  } finally { ui.dashFull = false; }
   // the week (Monday to Sunday) so far: each player's games played and left, his line added up
   ui.watchRange = 'week';
   const wk = a.viewSandboxWatch();

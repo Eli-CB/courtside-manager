@@ -207,7 +207,7 @@ function viewSandboxTeam() {
 // day: each player's game in its bubble (tip-off, the score and clock, the final), his line in the categories and its value,
 // a bubble flashing as it moves; on now first, then finished, then still to come by tip-off, then sitting out, then no game (his next one). The
 // week: his games played and still to come (a game on now with its clock), the week's line added up and its value; on now
-// first, then by that value. A full list says Max by its count (the search goes).
+// first, then by that value. A full list says Max by its count (the search goes). Full screen as the Matchup tab's.
 function viewSandboxWatch() {
   if (!NBA) return loadingCard('Loading player data…');
   if (!BOX) return `${boxWait('watch', 'Live', 'Loading the latest box scores…')}`;
@@ -222,8 +222,12 @@ function viewSandboxWatch() {
   const updated = live.error ? ` · <span class="pos-bad">ESPN: ${esc(live.error)}</span>` : live.at ? ` · updated ${fmtTime(live.at)}` : '';
   const when = week ? `${fmtDay(all[0])} – ${fmtDay(all[all.length - 1])}${updated}`
     : d === today ? (live.error ? `<span class="pos-bad">ESPN: ${esc(live.error)}</span>` : live.at ? `${fmtDay(d)} · updated ${fmtTime(live.at)}` : fmtDay(d)) : `${d === yesterday ? 'Last night' : ''} ${fmtDay(d)}`.trim();
-  const head = `<div class="card-head"><h2>Live ${infoBtn('watch')}</h2><span class="muted small">${W.length} of ${WATCH_MAX}</span>${room > 0 ? '' : '<span class="badge sb-max" title="As many as Live follows: remove one to follow another">Max</span>'}${toggle}</div>`;
-  const tools = find || addTeam ? `<div class="sb-tools">${find}${addTeam ? `<div class="sb-team-btn">${addTeam}</div>` : ''}</div>` : '';
+  // full screen (the Matchup tab's: dashFull, ui.dashFull): the players alone, each with his full photo; no count, search or ✕
+  const full = !!ui.dashFull && W.length > 0;
+  const end = `<span class="sb-head-end">${toggle}${W.length ? dashFullBtn() : ''}</span>`; // (on a phone they go under the title together)
+  const head = full ? `<div class="card-head"><h2>Live</h2>${end}</div>`
+    : `<div class="card-head"><h2>Live ${infoBtn('watch')}</h2><span class="muted small">${W.length} of ${WATCH_MAX}</span>${room > 0 ? '' : '<span class="badge sb-max" title="As many as Live follows: remove one to follow another">Max</span>'}${end}</div>`;
+  const tools = !full && (find || addTeam) ? `<div class="sb-tools">${find}${addTeam ? `<div class="sb-team-btn">${addTeam}</div>` : ''}</div>` : '';
   if (!W.length) return `<div class="card sb-watch-card">${head}${tools}<div class="empty"><strong>Follow up to ${WATCH_MAX} players</strong>Each one's game and stat line as it's played, updated every 30 seconds while games are on.</div></div>`;
 
   // what each player's cell shows: { game (its words), line (his stats), dim (nothing to show), order }. Sitting (Out, not
@@ -254,15 +258,15 @@ function viewSandboxWatch() {
     const { game, line, dim } = info.get(p);
     const v = line && !isPoints() ? `<span class="mu-chip sb-val" title="${valTip}"><b>${fmtValue(lineValue(line))}</b> VAL</span>` : '';
     return `<div class="mu-p sb-w${dim ? ' out' : ''}">
-      <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}</div></div>
-        <button type="button" class="icon-btn xs sb-x" data-action="sb-unwatch" data-id="${p.nbaId}" aria-label="Stop following ${esc(p.name)}" title="Stop following">✕</button></div>
+      <div class="bplayer">${dashPhoto(p)}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}</div></div>
+        ${full ? '' : `<button type="button" class="icon-btn xs sb-x" data-action="sb-unwatch" data-id="${p.nbaId}" aria-label="Stop following ${esc(p.name)}" title="Stop following">✕</button>`}</div>
       <div class="mu-game">${game}</div>
       ${line ? `<div class="mu-chips">${lineChips(line, flash(p, line))}${v}</div>` : ''}
     </div>`;
   };
   const grid = players.map(cell).join('');
   chipWas = isToday ? chipNext : new Map();
-  return `<div class="card sb-watch-card">${head}${tools}<p class="muted small sb-when">${when}</p><div class="sb-watch">${grid}</div></div>`;
+  return `<div class="card sb-watch-card mu-card${full ? ' full' : ''}">${head}${tools}<p class="muted small sb-when">${when}</p><div class="sb-watch">${grid}</div></div>`;
 }
 
 // ----- Trades: your team's players for anyone -----

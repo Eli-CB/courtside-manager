@@ -228,10 +228,12 @@ function dashWeekRows(C, A, B) {
   return `<div class="mu-rows${C.solo ? ' solo' : ''}">${rows}${bench}</div>${benchBtn}`;
 }
 
-// The matchup alone on the screen (the card's button, in place of its (i): the owner's ask, Nov 2026). While the card is
-// drawn `full` the CSS hides the head, the tabs and everything else, so a live update keeps it; where the browser
-// allows (not an iPhone) the browser's own full screen comes with it. Ends with the button, Esc or leaving the tab.
+// The matchup alone on the screen (the card's button, in place of its (i): the owner's ask, Nov 2026), and the sandbox's
+// Live the same way (viewSandboxWatch). While the card is drawn `mu-card full` the CSS hides the head, the tabs and
+// everything else, so a live update keeps it; where the browser allows (not an iPhone) the browser's own full screen comes
+// with it. Ends with the button, Esc or leaving the tab.
 const FULL_ICON = { on: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>', off: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>' };
+const dashFullBtn = () => `<button type="button" class="mu-full-btn" data-action="dash-full" aria-pressed="${!!ui.dashFull}" aria-label="Full screen" title="${ui.dashFull ? 'Exit full screen (Esc)' : 'Full screen'}">${lineIcon(FULL_ICON[ui.dashFull ? 'on' : 'off'], 'mu-full-ico')}</button>`;
 const browserFull = () => document.fullscreenElement || document.webkitFullscreenElement;
 function dashFull(on, draw = true) {
   ui.dashFull = on;
@@ -260,8 +262,7 @@ function dayToggle({ D, hasToday, week: [label, days], picked, fallback, action 
 
 function dashMatchupCard() {
   const L = fxLeague(), today = todayIso();
-  const fullBtn = `<button type="button" class="mu-full-btn" data-action="dash-full" aria-pressed="${!!ui.dashFull}" aria-label="Full screen" title="${ui.dashFull ? 'Exit full screen (Esc)' : 'Full screen'}">${lineIcon(FULL_ICON[ui.dashFull ? 'on' : 'off'], 'mu-full-ico')}</button>`;
-  const card = (head, body, full) => `<div class="card mu-card${full && ui.dashFull ? ' full' : ''}"><div class="card-head">${head || '<span></span>'}${full ? fullBtn : ''}</div>${body}</div>`;
+  const card = (head, body, full) => `<div class="card mu-card${full && ui.dashFull ? ' full' : ''}"><div class="card-head">${head || '<span></span>'}${full ? dashFullBtn() : ''}</div>${body}</div>`;
   const me = ui.viewing ? ui.viewA : state.fxTeam;
   if (!L) return '';
   if (!me) return card('', '<p class="muted small" style="margin:0">Pick your team at the top to see your matchup.</p>');

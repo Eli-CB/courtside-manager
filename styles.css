@@ -844,7 +844,9 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .sb-hit-add { flex: none; font-size: .8rem; font-weight: 700; white-space: nowrap; }
 .sb-none { margin: 0 0 12px; }
 /* the head: the title, its count (and Max) beside it, then Start over or the day picker at the far end */
-.sb-clear, .sb-watch-card .card-head > .seg { margin-left: auto; }
+.sb-team .card-head, .sb-watch-card .card-head { justify-content: flex-start; }
+.sb-clear, .sb-head-end { margin-left: auto; }
+.sb-head-end { display: flex; align-items: center; }
 /* a player's ✕ (off My team, or Live) at the end of his name: quiet until pointed at, so a list of them doesn't shout */
 .sb-x { flex: none; margin-left: auto; }
 .icon-btn.xs.sb-x:not(.sb-add) { width: 24px; height: 24px; border-color: transparent; box-shadow: none; font-size: .8rem; }
@@ -869,6 +871,9 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .sb-watch .mu-p { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
 .sb-watch .mu-p.out { opacity: .62; }
 .sb-watch .mu-p .bname { flex-wrap: wrap; row-gap: 2px; } /* (a tag that doesn't fit beside the name goes under it, not the name to "T. …") */
+/* full screen (the Matchup's, .mu-card.full: one sheet, each player beside his full photo): no box around each player */
+.sb-watch-card.full .sb-watch .mu-p { border: 0; border-radius: 0; }
+@media (min-width: 641px) { .sb-watch-card.full .sb-watch { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px 28px; } }
 .mu-chip.sb-val { border-color: var(--muted); }
 .sb-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 /* the sport and scoring menus in the head (as the team picker), and your own points (a popup) */
