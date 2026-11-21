@@ -5141,6 +5141,8 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   assert.match(land, /data-tab="players" data-player="1628983"/);
   assert.match(land, /data-tab="trends">Trends</);
   assert.match(land, /Free · No sign-up/);
+  assert.ok(!/Win odds|lp-card/.test(land), 'no picture in the hero');
+  assert.match(land, /class="lf-grid">[^]*?<h3>Trends<\/h3>/);
   assert.ok(!/data-photo/.test(land));
   await a.actions['land-demo']();
   clearTimeout(a.get('live').timer);

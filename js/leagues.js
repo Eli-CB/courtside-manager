@@ -259,28 +259,18 @@ const demoNote = () => (state.demo && state.fxTeam ? `<span><b>Demo league.</b> 
 /* ---------- Landing page: connect a league, then pick your team ---------- */
 const needsLanding = () => ui.addingLeague || (!state.fxTeam && !state.demo && !state.browse);
 
-// The front page's picture of a week's matchup, drawn as the shared link's picture is (icons/og.png): made-up numbers, for the look only.
-// Each category: its label, your bar, your opponent's (TO: fewer wins), so 6 won and 3 lost
-const LAND_PREVIEW = [['PTS', 92, 80], ['REB', 69, 85], ['AST', 88, 61], ['3PM', 73, 65], ['STL', 55, 71], ['BLK', 64, 40], ['TO', 46, 59], ['FG%', 81, 78], ['FT%', 69, 83]];
+// The page's foot: what the site does, a tab's icon each
 const LAND_FEATURES = [
   ['dashboard', 'Matchup odds', 'Your chance to win the week and each category, live during games.'],
   ['week', 'Best lineup', 'Who plays when, and the starters that give you the best chance to win.'],
+  ['trends', 'Trends', "Who's heating up and who's cooling off in each category, and the hottest still on waivers."],
   ['standings', 'Standings', 'How your categories stack up against every team in the league.'],
   ['recap', 'Weekly recap', "The week's awards, as a picture ready for the league chat."],
   ['trade', 'Trades', 'What a deal does to each side, category by category.'],
   ['draft', 'Draft retrospective', 'Which picks paid off, and how your draft is holding up.'],
 ];
-function landPreview() {
-  const rows = LAND_PREVIEW.map(([k, a, b], i) => `<div class="lp-row" style="--i:${i}"><span>${k}</span><i style="--w:${a}%"></i><i class="opp" style="--w:${b}%"></i></div>`).join('');
-  return `<div class="land-preview" aria-hidden="true"><div class="lp-card">
-      <div class="lp-head"><div><b>This week</b><span>Win odds</span></div><strong>68%</strong></div>
-      <div class="lp-legend"><span class="you">You</span><span>Opponent</span></div>
-      <div class="lp-rows">${rows}</div>
-      <div class="lp-foot"><span>Projected <b>6–3</b></span><span class="lp-live">Live</span></div>
-    </div></div>`;
-}
 /* ---------- A look inside: the tabs as they look, under the hero ---------- */
-// Made-up numbers, as landPreview's, drawn with each tab's own pieces (.mu-cats, .mu-chip, .game-pill, .lv-dot, the board's
+// Made-up numbers, drawn with each tab's own pieces (.mu-cats, .mu-chip, .game-pill, .lv-dot, the board's
 // .dr-cell and shade, the share picture's RC_IMG colors), so a restyle of a tab carries here. Each row's moment (a basket
 // going in, the picks coming in) plays once it's in view: landReveal puts .in on it. Its button opens that tab in the demo.
 const landFlip = (was, now) => `<span class="pv-sw"><span>${was}</span><span>${now}</span></span>`; // (a number before, then after the basket)
@@ -466,7 +456,8 @@ document.addEventListener('animationiteration', e => {
   if (words[cur]) words[cur].classList.replace('on', 'out');
   next.classList.add('on');
 });
-// A first visit: what the site does around the form, and the ways in without a league
+// A first visit: what the site does beside the form and the ways in without a league (no picture there: the owner's ask, Nov
+// 20, 2026; the tabs' pictures are the rows under it), then a look inside and what the site does
 function landHome(form) {
   const demo = NBA && NBA.siteLeague;
   const option = (action, icon, title, line) => `<button type="button" class="land-option" data-action="${action}">${lineIcon(icon, 'lo-ico')}<span><b>${title}</b><small>${line}</small></span>${lineIcon('<path d="m9 6 6 6-6 6"/>', 'lo-go')}</button>`;
@@ -476,6 +467,8 @@ function landHome(form) {
         <p class="land-pill">Free · No sign-up</p>
         <h1><span class="sr-only">Plan your fantasy ${LAND_SPORTS.map(s => s[0]).join(' or ')} week</span><span aria-hidden="true">Plan your fantasy<br><span class="land-sport">${LAND_SPORTS.map(([s, icon], i) => `<span data-sport="${s}"${i ? '' : ' class="on"'}>${lineIcon(icon, 'ls-ico')}<span class="ls-w">${s}</span></span>`).join('')}</span> week</span></h1>
         <p class="land-lead">Your odds for this week's matchup, the best starters, how your categories stack up and a recap the whole league can share.</p>
+      </div>
+      <div class="land-start">
         <div class="land-connect">${form}</div>
         <div class="land-alt">
           <p class="land-alt-title">No league to connect?</p>
@@ -485,7 +478,6 @@ function landHome(form) {
           </div>
         </div>
       </div>
-      ${landPreview()}
     </section>
     ${landShow(demo)}
     <section class="land-features" aria-labelledby="landFeat">
