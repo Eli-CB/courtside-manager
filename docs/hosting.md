@@ -23,3 +23,8 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
 - Traffic: Cloudflare Web Analytics (no cookies), its beacon added by core.js on leaguelayer.com only (not inline in index.html: the
   Content-Security-Policy allows no inline script; the domain is DNS-only, so Cloudflare can't inject it). Stats: dash.cloudflare.com → Web Analytics. An ad blocker stops it ("beacon.min.js
   net::ERR_BLOCKED_BY_CLIENT" in the console, the browser's own line): harmless, nothing reads it and `reportError` skips it; that visit just isn't counted, so the numbers run low.
+- Capacity (measured Nov 21, 2026: the published files in Chromium, leagues from the fixtures): a first visit downloads ~1.8 MB
+  compressed from GitHub Pages (hockey 2.2, football 2.3; each month of box scores adds 50-85 KB), over half of it `headshots.webp`.
+  Count it once per visitor per day: a deploy (the daily data run, any push) can make browsers fetch every file again. Pages' soft
+  limit, 100 GB a month, is then ~50,000 visits (~1,500 daily visitors), with no published limit on visitors at once; Cloudflare's
+  static hosting has no bandwidth charge or cap. The Worker's side: worker/README.md "Live feed" (its free plan, ~800 hours of live scores a day).

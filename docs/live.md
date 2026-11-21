@@ -18,7 +18,8 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   400 KB box score about once a minute), all marked as from leaguelayer.com, while the page reads about 1% of each box
   score. Now the Worker's live feed (`/live/<sport>/<league>`, see the live bullet above and worker/README.md "Live feed")
   builds today's scores once for everyone (~8 KB compressed a night, kept 5 s at the edge): ESPN is asked a few times a
-  minute per Cloudflare data center whatever the number of visitors, each visitor makes one small request every 30 s, and
+  minute per Cloudflare data center (until hundreds watch through one: nothing stops requests that arrive while the
+  expired copy is rebuilt from each building it too, so ESPN's count then grows with them), each visitor makes one small request every 30 s, and
   the injury report and finished days go through `/espn/` first. Direct ESPN stays the fallback, so the site works with
   the Worker down or not yet deployed. The Worker is the owner's to deploy (`npx wrangler deploy` in worker/; never run
   it or `wrangler secret put` yourself): the /live route was written Nov 15, 2026; until it's deployed, pages ask for it,
