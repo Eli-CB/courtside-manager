@@ -148,11 +148,21 @@ jobs:
         with:
           path: _site
 
+      # GitHub sometimes doesn't see the artifact just uploaded: "No artifacts named github-pages" (1 run in 3 on Nov 21, 2026,
+      # asked half a second after it was finalized; re-running the job didn't help). So once more, 30 s later
       - id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      - name: Wait for GitHub to see the artifact
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+
+      - if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
 
       # after GitHub Pages, which serves leaguelayer.com until it moves, so a failure here can't hold the live site back; and
-      # whether Pages' step worked or not (it failed 1 run in 3 on Nov 21, 2026: "No artifacts named github-pages", GitHub's side)
+      # whether Pages' steps worked or not
       - uses: actions/setup-node@v7
         if: ${{ !cancelled() && steps.gather.outcome == 'success' && env.TO_CLOUDFLARE == 'true' }}
         with:

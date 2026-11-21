@@ -13,7 +13,8 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
 ## Gotchas
 - Hosting is moving from GitHub Pages to Cloudflare's static hosting (`hosting/`, its README has the owner's steps; begun Nov 21, 2026, for
   the Capacity line below): the deploy job publishes to both until leaguelayer.com points to Cloudflare. How long browsers keep files there: `hosting/_headers`.
-  Pages' own deploy step failed about 1 run in 3 that day ("No artifacts named github-pages", GitHub's side; a re-run failed the same): the site stays on the last good version until a run works.
+  Pages' own deploy step failed about 1 run in 3 that day ("No artifacts named github-pages": GitHub asked for the artifact half a second after
+  it was finalized and didn't see it yet; a re-run failed the same), so it's asked again 30 s later (site.yml). A failed run leaves the site on the last good version.
 - The repo must stay public on GitHub's free plan: making it private deletes the Pages site at once (leaguelayer.com answered 404, Nov 16, 2026), and
   making it public again doesn't bring it back. To restore: `gh api -X POST repos/Eli-CB/league-layer/pages -f build_type=workflow`, then
   `gh api -X PUT .../pages -f cname=leaguelayer.com`, then `gh workflow run site.yml`. Private needs GitHub Pro, and Actions minutes then count.
