@@ -1366,7 +1366,7 @@ body.landing::before {
 
 /* a first visit: what the site does beside the form and the ways in without a league, then a look inside and what it does */
 .landing-wrap.land-home { display: block; place-items: normal; min-height: 0; max-width: 1080px; margin: 0 auto; padding-block: 28px 8px; }
-.land-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+.land-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; } /* (top: the help opening under the form never moves the headline) */
 .land-pill { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 4px 12px 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .78rem; font-weight: 500; color: var(--muted); }
 .land-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
 .land-home h1 { font-size: clamp(2.1rem, 1.3rem + 2.4vw, 3.1rem); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; margin: 0 0 14px; }

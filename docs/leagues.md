@@ -18,7 +18,8 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
 - Landing page (Nov 20, 2026): a first visit gets `landHome` (the headline beside the form, the demo and sandbox as option cards; no picture
   in the hero, the owner's ask: the "This week, Win odds 68%" card was removed; the `LAND_FEATURES` grid at the foot with the tabs' own icons,
-  Trends among them, the owner's ask); adding a league or season and Step 2 (each team with its initials) stay one card. The head shows the site's mark and name there (`leagueMenu`).
+  Trends among them, the owner's ask; the hero's two columns top-aligned, so opening "Where do I find my league ID?" never moves the headline,
+  the owner's ask); adding a league or season and Step 2 (each team with its initials) stay one card. The head shows the site's mark and name there (`leagueMenu`).
   Under the hero, `landShow`'s rows (Nov 20, 2026, the owner's ask): the Matchup tab live, Plan Ahead, the player card (Trends named under it, the
   owner's ask), the draft board and the Recap's picture, made up too but drawn with each tab's own classes (`.mu-chip`, `.game-pill`, `.bmeta`/`.dots`,
   `.swap`, `.pc-photo`/`.cp-row`, `.dr-cell` + `shade`, `RC_IMG`), so check its row after restyling one of those. Players there are real, with their
