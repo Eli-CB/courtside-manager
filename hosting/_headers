@@ -1,0 +1,7 @@
+# How long browsers keep files on Cloudflare (README.md). The code is only ever asked for as ?v=<build> (index.html),
+# a new address whenever it changes, so a browser keeps each copy for good. Everything else takes Cloudflare's default:
+# checked on each visit, and a file unchanged since the browser's copy answers "not modified", with nothing downloaded.
+/js/*
+  Cache-Control: public, max-age=31536000, immutable
+/styles.css
+  Cache-Control: public, max-age=31536000, immutable

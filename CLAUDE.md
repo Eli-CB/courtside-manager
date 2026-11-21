@@ -56,7 +56,7 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
 | `sandbox.js` | docs/sandbox.md |
 | `live.js`, the Worker's /live, /espn/ and /injuries/ (the injury watch), injuries | docs/live.md |
 | scripts/update_data.py, data/, how box scores load | docs/data.md |
-| the logo, 404, home-screen install, error log, analytics, restoring Pages | docs/hosting.md |
+| the logo, 404, home-screen install, error log, analytics, hosting (`hosting/`, moving to Cloudflare) | docs/hosting.md |
 
 ## Layout
 - `index.html`, `styles.css`, `js/*.js`. The js files are ONE script split by area and share one global
@@ -70,7 +70,7 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
   positions only through `posTags` (colors only from `slotColor`). Details: docs/core.md.
 - What a football week is like is said once, in its sport table (sports.js: `weekLineup`, `gameLocks` + `spotLocked`, `oneNumber`,
   `samePosDrops`; hockey's `steadyMinutes`): other pages read those traits, and branch on `isFootball()` only to call football's own functions.
-- Other folders: `scripts/` the daily data jobs (docs/data.md), `worker/` the Cloudflare Worker at api.leaguelayer.com (worker/README.md),
+- Other folders: `scripts/` the daily data jobs (docs/data.md), `worker/` the Cloudflare Worker at api.leaguelayer.com (worker/README.md), `hosting/` the site's Cloudflare hosting (its README),
   `data/` what the jobs write, `icons/`, `fonts/`.
 - `tests/`: `node --test tests/app.test.js` (Node built-ins only). `harness.js` loads the js files in a vm
   in page order with fake fetch (fixtures) and a fixed clock (2026-10-26 20:00 ET). Fixtures in

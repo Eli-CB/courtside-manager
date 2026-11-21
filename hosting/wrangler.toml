@@ -1,0 +1,14 @@
+# League Layer's site on Cloudflare (README.md beside this): the files the site workflow's deploy job gathers into _site,
+# served as they are. No script, so its requests are free and count nowhere (not against api.leaguelayer.com's 100,000 a day).
+# The workflow deploys it (CLOUDFLARE_API_TOKEN secret, CLOUDFLARE_ACCOUNT_ID variable): never run wrangler here yourself.
+name = "leaguelayer-site"
+compatibility_date = "2026-10-01"
+
+# leaguelayer.com is attached in Cloudflare's dashboard (README.md), not here: routes listed here would replace the
+# dashboard's on every deploy, and need more of the token's permissions
+workers_dev = true
+
+[assets]
+directory = "../_site"
+# an address with no file: 404.html, answered 404 (as GitHub Pages did)
+not_found_handling = "404-page"

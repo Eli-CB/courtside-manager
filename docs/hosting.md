@@ -11,6 +11,8 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   visit is the live site. An installed app has no refresh button, so returning after 3 hours reloads it (`appStale`).
 
 ## Gotchas
+- Hosting is moving from GitHub Pages to Cloudflare's static hosting (`hosting/`, its README has the owner's steps; begun Nov 21, 2026, for
+  the Capacity line below): the deploy job publishes to both until leaguelayer.com points to Cloudflare. How long browsers keep files there: `hosting/_headers`.
 - The repo must stay public on GitHub's free plan: making it private deletes the Pages site at once (leaguelayer.com answered 404, Nov 16, 2026), and
   making it public again doesn't bring it back. To restore: `gh api -X POST repos/Eli-CB/league-layer/pages -f build_type=workflow`, then
   `gh api -X PUT .../pages -f cname=leaguelayer.com`, then `gh workflow run site.yml`. Private needs GitHub Pro, and Actions minutes then count.
@@ -30,4 +32,4 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   a new ETag (the deploy's time, unchanged files too: checked Nov 21, 2026), so after any deploy each file comes whole again, `?v=` or not;
   there were 15-30 deploys a day (pushes and data runs) in Nov 2026. Pages' soft limit, 100 GB a month, is then ~60,000 visits
   (~2,000 a day: under 1,000 daily visitors who open it 2-3 times), with no published limit on visitors at once; Cloudflare's
-  static hosting has no bandwidth charge or cap, and its own cache headers could keep the sheet until it changes. The Worker's side: worker/README.md "Live feed" (its free plan, ~800 hours of live scores a day).
+  static hosting has no bandwidth charge or cap, and marks a file by its contents, so an unchanged one isn't sent again (the move above). The Worker's side: worker/README.md "Live feed" (its free plan, ~800 hours of live scores a day).

@@ -114,6 +114,10 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      # Cloudflare's static hosting (hosting/README.md): published there too once the owner has added the token
+      # (only whether it's there: the token itself goes to its one step)
+      TO_CLOUDFLARE: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -145,3 +149,18 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v5
+
+      # after GitHub Pages, which serves leaguelayer.com until it moves: a failure here can't hold the live site back
+      - uses: actions/setup-node@v7
+        if: env.TO_CLOUDFLARE == 'true'
+        with:
+          node-version: 22
+
+      - name: Publish to Cloudflare (hosting/wrangler.toml)
+        if: env.TO_CLOUDFLARE == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cp hosting/_headers _site/
+          npx --yes wrangler@4 deploy --config hosting/wrangler.toml
