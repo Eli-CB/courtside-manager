@@ -1453,10 +1453,6 @@ body.landing::before {
 .lsh-ico { width: 28px; height: 28px; padding: 6px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .land-show h2 { margin: 0 0 10px; font-size: clamp(1.5rem, 1.1rem + 1.1vw, 2rem); font-weight: 800; line-height: 1.12; letter-spacing: -.03em; text-wrap: balance; }
 .lsh-line { margin: 0 0 18px; max-width: 42ch; font-size: 1rem; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
-.lsh-more { display: flex; gap: 10px; align-items: flex-start; max-width: 42ch; margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--border); font-size: .9rem; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
-.lsh-more .lsh-ico { flex: none; margin-top: -3px; }
-.lsh-more b { color: var(--text); font-weight: 600; }
-.lsh-more .link-btn { font: inherit; color: var(--text); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
 .lsh-pic { padding: 28px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface-2); }
 .pv-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 24px 48px -24px rgb(0 0 0 / .22); overflow: hidden; }
 /* the Matchup tab's Today: a three goes in, and its numbers, the category and the score turn over (.pv-sw: before, then after) */
@@ -1621,15 +1617,21 @@ body.landing::before {
 .pv-fcard .pvt-table { margin-top: 8px; }
 .pv-fcard .pvt-table td.pvt-p { width: 85%; }
 .pv-fcard .pvc-head span b { color: var(--text); }
-/* the three cards in turn, 6 s each, the one showing lit above them (a loop of CSS alone); held while the pointer's on them */
-.pvx-seg { display: flex; width: max-content; margin: 0 auto 12px; }
+/* the three cards in turn, 4 s each, the one showing lit above them (a loop of CSS alone); held while the pointer's on them;
+   a tap on a name shows that card and stops the turns ([data-pick], 'land-card') */
+.pvx-seg { display: flex; width: max-content; margin: 0 auto 12px; font-size: .78rem; }
+.pvx-seg > button { padding: 5px 12px; border: 0; border-radius: 6px; background: none; font: inherit; color: var(--muted); cursor: pointer; }
+.pvx-seg > button:hover { color: var(--text); }
 .pvx-deck { display: grid; }
 .pvx-deck > .pv-card { grid-area: 1 / 1; }
 .pvx-deck > .pv-card + .pv-card { opacity: 0; visibility: hidden; }
-.land-show.in .pvx-deck > .pv-card, .land-show.in .pvx-seg > span { animation: pvx-card 18s linear infinite; }
-.land-show.in .pvx-seg > span { animation-name: pvx-seg; }
-.land-show.in .pvx :is(.pvx-deck, .pvx-seg) > :nth-child(2) { animation-delay: -12s; }
-.land-show.in .pvx :is(.pvx-deck, .pvx-seg) > :nth-child(3) { animation-delay: -6s; }
+.land-show.in .pvx-deck > .pv-card, .land-show.in .pvx-seg > button { animation: pvx-card 12s linear infinite; }
+.land-show.in .pvx-seg > button { animation-name: pvx-seg; }
+.land-show.in .pvx :is(.pvx-deck, .pvx-seg) > :nth-child(2) { animation-delay: -8s; }
+.land-show.in .pvx :is(.pvx-deck, .pvx-seg) > :nth-child(3) { animation-delay: -4s; }
+:is(.land-show, .land-show.in) .pvx[data-pick] :is(.pvx-deck, .pvx-seg) > * { animation: none; }
+.pvx[data-pick] .pvx-deck > .pv-card { opacity: 0; visibility: hidden; transition: opacity .25s, visibility .25s; }
+.pvx[data-pick="0"] .pvx-deck > :nth-child(1), .pvx[data-pick="1"] .pvx-deck > :nth-child(2), .pvx[data-pick="2"] .pvx-deck > :nth-child(3) { opacity: 1; visibility: visible; }
 .lsh-pic:hover .pvx :is(.pvx-deck, .pvx-seg) > * { animation-play-state: paused; }
 @keyframes pvx-card { 0%, 31% { opacity: 1; visibility: visible; } 33.4%, 97% { opacity: 0; visibility: hidden; } 100% { opacity: 1; visibility: visible; } }
 @keyframes pvx-seg {

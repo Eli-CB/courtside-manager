@@ -362,6 +362,14 @@ const actions = {
       if (el && el.dataset.player) showPlayerDetail(+el.dataset.player); // (the player cards' row: his card, over the Players tab)
     } catch (e) { toast(e.message); }
   },
+  // the landing page's cards: the one named, and no more turns (landCards)
+  'land-card'(el) {
+    const i = +el.dataset.i, box = el.closest('.pvx');
+    ui.landCard = i;
+    if (!box) return;
+    box.dataset.pick = i;
+    box.querySelectorAll('.pvx-seg > button').forEach((b, j) => { b.classList.toggle('on', i === j); b.setAttribute('aria-pressed', i === j); });
+  },
   // out of the demo, to connect a league of their own
   'demo-exit'() {
     Object.assign(state, { demo: false, leagueChosen: false, fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp() });

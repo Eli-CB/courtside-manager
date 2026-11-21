@@ -5150,15 +5150,20 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   ui.tab = 'standings';
   assert.ok(a.needsLanding());
   assert.match(a.viewLanding(), /Explore a basketball demo league/);
-  // its rows, in order: the cards' button opens a player's card in the demo, Trends is named under it, the three cards take
-  // turns (a CSS loop: no timer), the Recap's picture has the Draft Recap's beside it, and the pictures' photos are only
-  // pictures (no tap to a card, as on the tabs)
+  // its rows, in order: the cards' button opens a player's card in the demo, the three cards take turns (a CSS loop: no
+  // timer) and a tap on a name picks one and stops them, the Recap's picture has the Draft Recap's beside it, Trends
+  // only in the grid at the foot, and the pictures' photos are only pictures (no tap to a card, as on the tabs)
   const land = a.viewLanding();
   assert.deepEqual([...land.matchAll(/class="lsh-tab">[^]*?<\/svg>([^<]+)<\/p>/g)].map(m => m[1]), ['Matchup', 'Plan Ahead', 'Cards', 'Draft', 'Recap']);
-  assert.match(land, /class="pvx-deck">[^]*?pv-pcard[^]*?pv-tcard[^]*?Playoff Games[^]*?pv-fcard/);
+  assert.match(land, /class="pvx-deck"[^>]*>[^]*?pv-pcard[^]*?pv-tcard[^]*?Playoff Games[^]*?pv-fcard/);
+  assert.equal([...land.matchAll(/data-action="land-card" data-i="(\d)"/g)].map(m => m[1]).join(), '0,1,2');
+  assert.ok(!/class="pvx" data-pick/.test(land));
+  a.actions['land-card']({ dataset: { i: '2' }, closest: () => null });
+  assert.match(a.viewLanding(), /class="pvx" data-pick="2"[^]*?class="on" data-action="land-card" data-i="2" aria-pressed="true"/);
+  ui.landCard = undefined;
   assert.match(land, /class="pv-pics"[^]*?Period 6 recap[^]*?Draft Recap/);
   assert.match(land, /data-tab="players" data-player="1628983"/);
-  assert.match(land, /data-tab="trends">Trends</);
+  assert.equal(land.match(/Trends/g).length, 1, 'Trends once, in the grid');
   assert.match(land, /Free · No sign-up/);
   assert.ok(!/Win odds|lp-card/.test(land), 'no picture in the hero');
   assert.match(land, /class="lf-grid">[^]*?<h3>Trends<\/h3>/);

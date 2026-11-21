@@ -460,33 +460,34 @@ function landFantasyCard() {
       <tbody>${roster.map(([id, name, pos, team, v]) => `<tr><td class="pvt-p"><div class="bplayer">${landFace(id, name, 28)}<div class="bmain"><b>${name}</b><div>${posTags(pos)} · ${team}</div></div></div></td><td>${v}</td></tr>`).join('')}</tbody></table>
   </div>`;
 }
-// The three cards in turn (a CSS loop, so nothing runs in the background or the tests), the one showing named above them;
-// held while the pointer's on them
+// The three cards in turn, 4 s each (a CSS loop, so nothing runs in the background or the tests), the one showing lit in
+// the names above them; held while the pointer's on them. A tap on a name shows that card and stops the turns (the owner's
+// ask: 'land-card', ui.landCard, kept through a redraw)
+const LAND_CARDS = ['Player', 'NBA team', 'Fantasy team'];
 function landCards() {
-  return `<div class="pvx" aria-hidden="true">
-    <div class="pvl-seg pvx-seg"><span class="on">Player</span><span>NBA team</span><span>Fantasy team</span></div>
-    <div class="pvx-deck">${landCard()}${landTeamCard()}${landFantasyCard()}</div>
+  const pick = ui.landCard;
+  return `<div class="pvx"${pick != null ? ` data-pick="${pick}"` : ''}>
+    <div class="pvl-seg pvx-seg" role="group" aria-label="Show a card">${LAND_CARDS.map((k, i) => `<button type="button"${i === (pick ?? 0) ? ' class="on"' : ''} data-action="land-card" data-i="${i}" aria-pressed="${i === pick}">${k}</button>`).join('')}</div>
+    <div class="pvx-deck" aria-hidden="true">${landCard()}${landTeamCard()}${landFantasyCard()}</div>
   </div>`;
 }
-// The rows: the tab's icon and name, what it does, the picture, and a way into the demo at that tab (the player cards':
-// the Players tab with his card open). more: a line under the button, for a tab without a row of its own
+// The rows: the tab's icon and name, what it does, the picture, and a way into the demo at that tab (the cards': the
+// Players tab with his card open)
 const LAND_SHOW = [
   ['dashboard', 'Matchup', 'Every game, live', "Each starter's game and line as it happens, who's on the floor, and the categories and the score moving as the games go.", landLive],
   ['week', 'Plan Ahead', "Next period's lineup, planned", "Every player's games day by day, and the lineup that gives you the best chance to win: each swap with what it does to every category.", landPlan],
-  ['players', 'Cards', 'In-depth cards', "Tap any name for its card. A player's: who has him, each category against an average rostered player, his games ahead, his value and every game. An NBA team's: its record, its games in each playoff period and every player. A fantasy team's: each category against every team in the league, and its roster.", landCards,
-    { player: LAND_CARD.id, more: ['trends', 'Trends', "Who's heating up and who's cooling off: each category's biggest risers over the last five games, and the best of them still on waivers."] }],
+  ['players', 'Cards', 'In-depth cards', "Tap any name for its card. A player's: who has him, each category against an average rostered player, his games ahead, his value and every game. An NBA team's: its record, its games in each playoff period and every player. A fantasy team's: each category against every team in the league, and its roster.", landCards, { player: LAND_CARD.id }],
   ['draft', 'Draft', 'Every pick on one board', "Your league's whole draft, each pick green or red by how he's playing against where he went. Then the Draft Recap's awards, from the biggest reach to the quickest trigger finger.", landBoard],
   ['recap', 'Recap', 'Recaps for the league chat', "The period in awards, from the player of the period to the bench regret, with every final, and the draft's, from the biggest reach to the oldest roster. Share each as a picture, or as a link that opens with no sign-up.", landRecap],
 ];
 function landShow(demo) {
-  return `<section class="land-shows" aria-label="A look inside">${LAND_SHOW.map(([key, name, title, line, draw, { player, more } = {}], i) => `
+  return `<section class="land-shows" aria-label="A look inside">${LAND_SHOW.map(([key, name, title, line, draw, { player } = {}], i) => `
     <div class="land-show${i % 2 ? ' flip' : ''}">
       <div class="lsh-copy">
         <p class="lsh-tab">${lineIcon(TAB_ICONS[key], 'lsh-ico')}${name}</p>
         <h2>${title}</h2>
         <p class="lsh-line">${line}</p>
         ${demo ? `<button type="button" class="btn sm" data-action="land-demo" data-tab="${key}"${player ? ` data-player="${player}"` : ''}>See it in the demo</button>` : ''}
-        ${more ? `<p class="lsh-more">${lineIcon(TAB_ICONS[more[0]], 'lsh-ico')}<span><b>${demo ? `<button type="button" class="link-btn" data-action="land-demo" data-tab="${more[0]}">${more[1]}</button>` : more[1]}</b> ${more[2]}</span></p>` : ''}
       </div>
       <div class="lsh-pic">${draw()}</div>
     </div>`).join('')}
