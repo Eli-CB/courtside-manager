@@ -17,7 +17,7 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   `state.players`; shared with the site's address, no league link). Kept in `state.sandbox` { sport, nba: {roster, watch, scoring, points}, nhl: {...} } (`sandboxClean`
   in core.js; `sbState()` is this sport's), apart from any league. My team is the team id `SB_ME`: `myTeamId()` and `fxTeamName` know it, so `teamLink` draws "My team" in orange. Add / Follow live also on every
   player's card (`sbCardLine` via `cardOwner`), and + / ✓ on each Players tab row (`sbAddBtn`, the owner's ask); searches are `sbSearch` (`ui.sbQ`). Leaving: pick a league in the league menu (`switchLeague`, which reads it again and
-  puts its players' league details back, then the Matchup tab). The league underneath stays in `state` (players, lineup, slots), maybe another
+  puts its players' league details back, then the Matchup tab), or with none, its "Home page" (`goHome`, docs/leagues.md). The league underneath stays in `state` (players, lineup, slots), maybe another
   sport's: `validateLineup` and `loadNba`'s startup checks leave it alone in the sandbox (they threw on basketball's PG in hockey's table, and a reload on
   hockey dropped the basketball league's team pick, Nov 18, 2026), the league to go back to is named on entry (`state.sandbox.back`: the other sport's data
   doesn't know the site's own league), and `switchLeague` stashes its state under it first (a pick already lost comes back from that copy). Code reading `state.fxTeam` must expect undefined there (a first visit), not only null.

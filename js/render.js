@@ -18,6 +18,7 @@ const menuIcon = d => lineIcon(d);
 // (the box is the mark's own, 48 × 36, drawn at two thirds, 32 × 24 px (24 × 18 still read as jagged: slopes this shallow need the pixels): its upright edges fall on
 // whole screen pixels. At 22 × 17 in a looser box they fell between them and the mark looked blurred)
 const LOGO_MARK = '<svg class="lm-mark" viewBox="8 18 48 36" aria-hidden="true"><polygon class="m-a" points="36,37 56,27 46,22 36,27 18,18 8,23"/><polygon class="m-b" points="8,31 36,45 56,35 56,43 36,53 8,39"/></svg>';
+const ICON_HOME_D = '<path d="M3.5 11 12 4l8.5 7"/><path d="M6 9v11.5h12V9M10 20.5v-6h4v6"/>';
 const ICON_JERSEY_D = '<path d="M8.5 3 3 6l2 4.5 2.5-1V21h9V9.5l2.5 1L21 6l-5.5-3a3.5 3.5 0 0 1-7 0z"/>';
 const ICON_GEAR_D = '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>';
 // each section's icon, for the phone's bottom bar
@@ -76,6 +77,7 @@ function leagueMenu() {
       <button type="button" class="lm-item" data-action="league-add">+ Add a league</button>
       ${site && !saved.some(l => l.id === site.id) && !state.demo ? '<button type="button" class="lm-item" data-action="land-demo">Explore the demo league</button>' : ''}
       ${sb ? '<div class="lm-row"><span class="lm-item on">✓ Sandbox</span></div>' : '<button type="button" class="lm-item" data-action="land-browse">Sandbox: any players, no league</button>'}
+      ${homeLink() ? `<div class="lm-foot"><button type="button" class="lm-item" data-action="go-home">${menuIcon(ICON_HOME_D)}Home page</button></div>` : ''}
     </div>
   </details>`;
 }

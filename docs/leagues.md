@@ -16,6 +16,9 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
 - Demo (`state.demo`, the landing page's "Explore a basketball demo league"): the daily file's site league, seen as a team (`demoTeam`: the
   best record with a matchup) so every tab has something to show, it and its teams under made-up names (`demoNames`, in memory only); never in `savedLeagues`, the team picker changes the team, `demo-exit` or
   connecting any league ends it and keeps nothing (`switchLeague`'s `fromDemo`).
+- The way home (Nov 21, 2026: the owner found none from the demo or the sandbox): with no league of your own to pick (`homeLink`), their league menu
+  ends with "Home page" (`go-home`), and the browser's Back to the home page's address (no tab) goes home too, if they were entered from it this
+  visit (`ui.fromHome`, checked in `route`). `goHome` does it (and `demo-exit`), back on basketball: the home page's demo and pictures are basketball's.
 - Landing page (Nov 20, 2026): a first visit gets `landHome` (the headline beside the form, the demo and sandbox as option cards; no picture
   in the hero, the owner's ask: the "This week, Win odds 68%" card was removed; the `LAND_FEATURES` grid at the foot with the tabs' own icons,
   Trends among them, the owner's ask; the hero's two columns top-aligned, so opening "Where do I find my league ID?" never moves the headline,

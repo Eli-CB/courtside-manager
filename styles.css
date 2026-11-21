@@ -1781,6 +1781,7 @@ tr.me-row td { background: var(--accent-soft); }
 .lm-item { display: block; width: 100%; text-align: left; font: inherit; font-size: .9rem; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
 .lm-item:hover, .lm-item:focus-visible { background: var(--surface-2); }
 a.lm-item { text-decoration: none; }
+.lm-foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); } /* (the demo's and the sandbox's way home: homeLink) */
 /* Waiver order popup */
 .prose .wo-list, .wo-list { list-style: none; margin: 0 0 10px; padding: 0; }
 .wo-list li { display: flex; align-items: center; gap: 10px; padding: 7px 4px; margin: 0; border-bottom: 1px solid var(--border); }

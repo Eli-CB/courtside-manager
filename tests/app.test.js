@@ -5205,6 +5205,52 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   assert.ok(a.needsLanding());
 });
 
+test("the way home from the demo and the sandbox: the league menu's Home page, and Back to the home page's address", async () => {
+  const a = loadApp();
+  await a.ready();
+  await a.loadBoxes();
+  const st = a.get('state'), ui = a.get('ui'), quietLive = () => clearTimeout(a.get('live').timer);
+  ui.tab = 'standings';
+  const menu = new (a.document.createElement().constructor)(), find = a.document.querySelector;
+  const menuHtml = () => { a.document.querySelector = sel => (sel === '#leagueMenu' ? menu : find(sel)); try { a.leagueMenu(); } finally { a.document.querySelector = find; } return menu.innerHTML; };
+  const back = hash => { a.location.hash = hash; a.route(); quietLive(); }; // (the browser's Back: the address changes, then route)
+  // the demo: Home page in its menu; Back to a tab stays in it, Back to the home page's address (no tab) leaves it, keeping nothing
+  await a.actions['land-demo']();
+  quietLive();
+  assert.ok(st.demo && !a.needsLanding());
+  assert.match(menuHtml(), /class="lm-foot"><button type="button" class="lm-item" data-action="go-home">[^]*Home page</);
+  back('#players');
+  assert.ok(st.demo && ui.tab === 'players');
+  back('');
+  assert.ok(!st.demo && !st.fxTeam && st.players.length === 0 && a.needsLanding(), 'the home page');
+  assert.match(menuHtml(), /lm-brand/);
+  // the sandbox on hockey: Home page, back on basketball (the home page's demo and pictures are), hockey's team kept for next time
+  a.actions['land-browse']();
+  await a.sbSetSport('nhl');
+  const puck = a.sortDesc(a.nbaPlayers().filter(p => p.gp), p => p.val)[0];
+  a.actions['sb-add']({ dataset: { id: String(puck.nbaId) } });
+  assert.match(menuHtml(), /data-action="go-home"/);
+  await a.actions['go-home']();
+  quietLive();
+  assert.ok(!st.browse && a.needsLanding() && a.SPORT.key === 'nba');
+  assert.match(a.viewLanding(), /data-action="land-demo"/);
+  assert.equal(st.sandbox.sport, 'nhl');
+  assert.deepEqual([...st.sandbox.nhl.roster], [puck.nbaId]);
+  // Back only where the home page was this visit: a sandbox already open when the page loaded keeps its own tabs
+  a.actions['land-browse'](); // (on hockey again, its sport last time: loaded first)
+  for (let i = 0; i < 100 && !st.browse; i++) await new Promise(r => setTimeout(r, 0));
+  assert.ok(st.browse && a.SPORT.key === 'nhl');
+  ui.fromHome = false;
+  back('');
+  assert.ok(st.browse && !a.needsLanding() && ui.tab === 'team');
+  // with a league of your own, the menu lists it to go back to: no Home page, and Back doesn't leave
+  st.savedLeagues = [{ id: CATS9, name: 'Mine' }];
+  ui.fromHome = true;
+  assert.ok(!/go-home/.test(menuHtml()));
+  back('');
+  assert.ok(st.browse && !a.needsLanding());
+});
+
 test('a failing feed is asked less and less often: 30 s, then 1, 2, 4 minutes, 5 at most, and back at once when it answers', () => {
   const app2 = loadApp();
   const fails = app2.get('feedFails');

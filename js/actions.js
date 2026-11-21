@@ -288,9 +288,11 @@ const actions = {
     // borrowed team isn't kept
     const L = !state.browse && !state.demo && state.fxTeam ? fxLeague() : null;
     if (!state.browse) state.sandbox.back = L ? { id: currentLeagueId(), name: L.name } : null;
+    const home = needsLanding(); // (from the home page: Back goes there again, route)
     const go = () => {
       if (state.demo) Object.assign(state, { fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp(), leagueChosen: false });
       state.browse = true; state.demo = false; ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
+      if (home) ui.fromHome = true;
       clearLeaguePlayers();
       commit();
       if (location.hash === '#team') route(); else location.hash = '#team'; // (already there, coming back: no hash change to route it)
@@ -353,9 +355,11 @@ const actions = {
   async 'land-demo'(el) {
     const site = NBA && NBA.siteLeague;
     if (!site) return;
+    const home = needsLanding(); // (from the home page: Back goes there again, route)
     try {
       await switchLeague(site.id);
       ui.addingLeague = false;
+      if (home) ui.fromHome = true;
       if (!state.fxTeam) { state.demo = true; demoNames(fxLeague()); adoptTeam(demoTeam()); }
       commit(`Exploring ${fxLeague().name}`);
       location.hash = `#${(el && el.dataset.tab) || 'dashboard'}`; // (the landing page's rows open their own tab)
@@ -370,12 +374,12 @@ const actions = {
     box.dataset.pick = i;
     box.querySelectorAll('.pvx-seg > button').forEach((b, j) => { b.classList.toggle('on', i === j); b.setAttribute('aria-pressed', i === j); });
   },
-  // out of the demo, to connect a league of their own
-  'demo-exit'() {
-    Object.assign(state, { demo: false, leagueChosen: false, fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp() });
-    ui.viewA = null; ui.viewB = null;
-    location.hash = '';
-    commit();
+  // out of the demo, to connect a league of their own: the home page and its form (goHome, leagues.js)
+  'demo-exit'() { return goHome(); },
+  // the league menu's "Home page", in the demo or the sandbox with no league of your own (homeLink)
+  'go-home'() {
+    $('#leagueMenu details')?.removeAttribute('open');
+    return goHome();
   },
   async 'league-switch'(el) {
     const id = el.dataset.id;
@@ -872,6 +876,8 @@ function route() {
     return;
   }
   if (!sid && ui.season) { ui.season = null; ui.pastTeam = null; }
+  // Back, from the demo or the sandbox entered from the home page this visit, to its address (no tab): the home page
+  if (!hashTab && !sid && ui.fromHome && homeLink()) { goHome(); return; }
   let tab = hashTab || 'dashboard';
   if (tab === 'lineup' || tab === 'roster') tab = 'standings'; // the old Lineup and Roster tabs: Category strengths is on a team's card now
   if (tab === 'live') tab = 'dashboard'; // and the old Live tab on Performances (Today)

@@ -259,6 +259,23 @@ const demoNote = () => (state.demo && state.fxTeam ? `<span><b>Demo league.</b> 
 /* ---------- Landing page: connect a league, then pick your team ---------- */
 const needsLanding = () => ui.addingLeague || (!state.fxTeam && !state.demo && !state.browse);
 
+// Back to the home page from the demo or the sandbox, where there's no league of your own to pick instead: the league
+// menu's "Home page", the demo's "Connect your league", or the browser's Back to the home page's address (ui.fromHome:
+// entered from it this visit; route). Nothing of the demo is kept; the sandbox's team stays for next time (state.sandbox).
+// On basketball: the home page's demo and pictures are basketball's.
+const homeLink = () => !!(state.demo || (state.browse && !fxLeague())) && !(state.savedLeagues || []).length;
+async function goHome() {
+  ui.fromHome = false;
+  if (state.demo) Object.assign(state, { fxTeam: null, players: [], il: [], lineup: [], opp: emptyOpp() });
+  Object.assign(state, { demo: false, browse: false, leagueChosen: false });
+  state.sandbox.back = null;
+  ui.addingLeague = false; ui.viewA = null; ui.viewB = null;
+  if (SPORT.key !== 'nba') await useSport('nba').catch(() => {});
+  if (location.hash) location.hash = '';
+  commit();
+  window.scrollTo(0, 0);
+}
+
 // The page's foot: what the site does, a tab's icon each
 const LAND_FEATURES = [
   ['dashboard', 'Matchup odds', 'Your chance to win the week and each category, live during games.'],
