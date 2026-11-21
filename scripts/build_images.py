@@ -77,7 +77,9 @@ def main():
     sheet = Image.new('RGBA', (COLS * SIZE, rows * SIZE), (0, 0, 0, 0))
     for i, (_, img) in enumerate(got):
         sheet.paste(img, ((i % COLS) * SIZE, (i // COLS) * SIZE), img)
-    sheet.save(os.path.join(DATA, 'headshots.webp'), 'WEBP', quality=80, method=6)
+    # quality 72 and the see-through edges at 60: a quarter smaller than 80 and exact edges (over half of what a visit
+    # downloads is this sheet), and no different on screen, even zoomed in on dark mode (Nov 21, 2026)
+    sheet.save(os.path.join(DATA, 'headshots.webp'), 'WEBP', quality=72, alpha_quality=60, method=6)
 
     teams = {}
     for p in players:

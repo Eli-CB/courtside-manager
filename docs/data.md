@@ -8,7 +8,7 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   this repo only; renewing it: worker/README.md "Daily data job"; an expired one shows in the error log as "Daily data job not started").
   The page still mustn't wait on the job for last night's games) first saves Fantrax's player list and ADP for the pages (`fantrax_lists`:
   `data/fantrax.json`; update_nhl.py the NHL's, team players only, in `data/nhl/`), then builds `data/players.json` and
-  `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com; `slpNames`, Sleeper players with no NBA.com match: docs/sleeper.md). `scripts/build_images.py`: headshot sprite (80px)
+  `data/boxscores.json` from NBA.com CDN / ESPN / Fantrax / Sleeper's player list (each player's `nat`: NBA.com country as ISO, for the card's flag from flagcdn.com; `slpNames`, Sleeper players with no NBA.com match: docs/sleeper.md). `scripts/build_images.py`: headshot sprite (80px faces, WebP at quality 72 with its see-through edges at 60: a quarter smaller than 80, no different on screen; Nov 21, 2026)
   + logos, monthly or when >5 players lack one. `scripts/archive_season.py`: one-time past-season archives.
 
 ## Gotchas
