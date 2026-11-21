@@ -22,8 +22,8 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   is dropped for the new sport's (`loadBoxes` checks `SPORT`: it used to put basketball's games on hockey's page, Nov 18, 2026); a tab with only box
   scores to show waits through `boxWait` (views.js: the loading card, or the failure with Try again, never "Loading" for ever).
 - Box scores reach the site by month: each job keeps `boxscores.json` as its own working copy and also writes `box/<YYYY-MM>.json` beside it
-  (`box_months`, update_data.py), with `box: {month: version}` in the players file; the site asks for `box/<month>.json?v=<version>` (`boxFiles`, views.js), so a
-  finished month is downloaded once and only the month underway each day. A players file without `box` falls back to the one file. Nothing on the site reads `boxscores.json` otherwise.
+  (`box_months`, update_data.py), with `box: {month: version}` in the players file; the site asks for `box/<month>.json?v=<version>` (`boxFiles`, views.js), meant so a
+  finished month is downloaded once; on GitHub Pages it still comes whole after any deploy, the daily data run's too (docs/hosting.md, Capacity). A players file without `box` falls back to the one file. Nothing on the site reads `boxscores.json` otherwise.
 - The site has no percentages in its data: FG%, FT% and 3P% are a player's average makes ÷ average attempts (`cur`, `l10`, `prev`), so the job keeps those
   five columns to three decimals (`season_from_boxes`; at one decimal 4-8 over 3 games read .481). The archives' (`prev`, past seasons) are NBA.com's one-decimal averages
   with those columns recomputed from the season's game lines (`fine_shooting`, archive_season.py, run with every archive).

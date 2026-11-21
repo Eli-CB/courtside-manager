@@ -26,6 +26,8 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
 - Capacity (measured Nov 21, 2026: the published files in Chromium, leagues from the fixtures): a first visit downloads ~1.5 MB
   compressed from GitHub Pages (hockey and football 1.9; each month of box scores adds 50-85 KB), about half of it `headshots.webp`
   (740 KB, NHL 900, NFL 1,010, since the sheets went to quality 72 that day: 1.0, 1.2 and 1.4 MB before).
-  Count it once per visitor per day: a deploy (the daily data run, any push) can make browsers fetch every file again. Pages' soft
-  limit, 100 GB a month, is then ~60,000 visits (~2,000 daily visitors), with no published limit on visitors at once; Cloudflare's
-  static hosting has no bandwidth charge or cap. The Worker's side: worker/README.md "Live feed" (its free plan, ~800 hours of live scores a day).
+  Count it on nearly every visit: Pages lets a browser keep a file 10 minutes (`max-age=600`) and each deploy gives every file
+  a new ETag (the deploy's time, unchanged files too: checked Nov 21, 2026), so after any deploy each file comes whole again, `?v=` or not;
+  there were 15-30 deploys a day (pushes and data runs) in Nov 2026. Pages' soft limit, 100 GB a month, is then ~60,000 visits
+  (~2,000 a day: under 1,000 daily visitors who open it 2-3 times), with no published limit on visitors at once; Cloudflare's
+  static hosting has no bandwidth charge or cap, and its own cache headers could keep the sheet until it changes. The Worker's side: worker/README.md "Live feed" (its free plan, ~800 hours of live scores a day).
