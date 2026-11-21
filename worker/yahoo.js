@@ -152,9 +152,23 @@ async function putError(env, rec) {
   const key = `${String(1e13 - rec.t).padStart(13, '0')}-${Math.random().toString(36).slice(2, 8)}`;
   await env.ERRORS.put(key, JSON.stringify(rec), { expirationTtl: ERROR_DAYS * 86400 });
 }
+// Reports one address may add an hour. Each is a KV write (the free plan allows 1,000 a day), and the Origin a request
+// gives is only its word: anyone can send the site's. A page sends 5 at most a visit, so only reports sent on purpose
+// reach this. Counted in Cloudflare's cache (per data center, no writes of its own)
+const ERRORS_PER_IP_HOUR = 20;
+async function errorAllowed(req, url) {
+  const ip = req.headers.get('CF-Connecting-IP');
+  if (!ip) return true;
+  const key = new Request(`${url.origin}/__errors/${encodeURIComponent(ip)}/${Math.floor(Date.now() / 36e5)}`);
+  const hit = await caches.default.match(key);
+  const n = hit ? +(await hit.text()) || 0 : 0;
+  if (n >= ERRORS_PER_IP_HOUR) return false;
+  await caches.default.put(key, new Response(String(n + 1), { headers: { 'Cache-Control': 'public, max-age=3600' } }));
+  return true;
+}
 // One error from the site, cut to size
-async function saveError(req, env, origins) {
-  if (!origins.includes(req.headers.get('Origin') || '') || !env.ERRORS) return;
+async function saveError(req, env, origins, url) {
+  if (!origins.includes(req.headers.get('Origin') || '') || !env.ERRORS || !(await errorAllowed(req, url))) return;
   const text = await req.text();
   if (text.length > 4000) return;
   let e;
@@ -215,7 +229,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     if (url.pathname === '/errors' && req.method === 'POST') {
-      try { await saveError(req, env, origins); } catch (e) { /* a full day's writes, or KV down: drop it */ }
+      try { await saveError(req, env, origins, url); } catch (e) { /* a full day's writes, or KV down: drop it */ }
       return new Response(null, { status: 204, headers: cors });
     }
     if (url.pathname === '/errors' && req.method === 'GET') {

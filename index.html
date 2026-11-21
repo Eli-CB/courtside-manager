@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- where the page may load from: a second guard behind esc(), so text a league's members type can never run as script
+       (no inline script, the site's own files only). A new outside source (a photo server, a site's API) goes in here
+       too, or browsers block it: a test checks every https:// address in js/ is listed, and a blocked one is in the error log -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://cdn.nba.com https://a.espncdn.com https://flagcdn.com; font-src 'self'; connect-src 'self' https://api.leaguelayer.com https://www.fantrax.com https://api.sleeper.app https://lm-api-reads.fantasy.espn.com https://site.api.espn.com https://cloudflareinsights.com; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>League Layer</title>
   <meta name="description" content="Plan your fantasy basketball or hockey week: matchup odds, the best starters, how your categories stack up and a weekly recap for the whole league. Free, no sign-up.">
   <!-- what a shared link shows (Discord, iMessage, Reddit, X...): crawlers don't run the script, so every address shows this; the picture is drawn by scripts/build_icons.py -->
@@ -127,15 +131,5 @@
   <script src="js/leagues.js?v=__BUILD__"></script>
   <script src="js/sandbox.js?v=__BUILD__"></script>
   <script src="js/actions.js?v=__BUILD__"></script>
-  <!-- Cloudflare Web Analytics: visits to the live site only (not the local preview); no cookies -->
-  <script>
-    if (location.hostname === 'leaguelayer.com') {
-      const cf = document.createElement('script');
-      cf.type = 'module';
-      cf.src = 'https://static.cloudflareinsights.com/beacon.min.js';
-      cf.dataset.cfBeacon = '{"token": "82c915ddee8046a88df592730e70ea02"}';
-      document.body.appendChild(cf);
-    }
-  </script>
 </body>
 </html>

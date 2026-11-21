@@ -761,12 +761,28 @@ test('Fantrax: leagues are reused from the device, shared lists fetched once, fa
     app.set('fxShared', null);
     await app.getLeague(POINTS, true);
     await app.getLeague(CATS9, true);
-    assert.equal(calls.filter(u => u.includes('getPlayerIds')).length, 1, 'player list once for both leagues');
-    assert.equal(calls.filter(u => u.includes('getAdp')).length, 1);
+    assert.equal(calls.filter(u => u.endsWith('data/fantrax.json')).length, 1, "the site's own copy of the lists, once for both leagues");
+    assert.equal(calls.filter(u => /getPlayerIds|getAdp/.test(u)).length, 0, 'Fantrax not asked for its lists');
     calls.length = 0;
     await app.getLeague(POINTS);
     assert.equal(calls.length, 0, 'a fresh saved league needs no requests');
   } finally { app.fetch = realFetch; }
+  // the site's copy missing, or over 2 days old (the daily job stopped): Fantrax's own, once, matching the same players
+  const fromFile = Object.keys((await app.fetchFantraxLeague(CATS9)).fxPlayers).sort();
+  for (const answer of [() => Promise.resolve({ ok: false, status: 404 }), () => realFetch('data/fantrax.json').then(r => r.json())
+    .then(f => ({ ok: true, status: 200, json: async () => ({ ...f, at: new Date(app.Date.now() - 3 * 864e5).toISOString() }) }))]) {
+    calls.length = 0;
+    app.fetch = url => { calls.push(String(url)); return String(url).endsWith('data/fantrax.json') ? answer() : realFetch(url); };
+    try {
+      app.localStorage.removeItem('league-layer-fantrax-shared-v1');
+      app.set('fxShared', null);
+      const { fxPlayers } = await app.fetchFantraxLeague(CATS9);
+      assert.equal(calls.filter(u => u.includes('getPlayerIds')).length, 1);
+      assert.equal(calls.filter(u => u.includes('getAdp')).length, 1);
+      assert.deepEqual(Object.keys(fxPlayers).sort(), fromFile, "the site's copy matches the same players as Fantrax's");
+    } finally { app.fetch = realFetch; }
+  }
+  app.set('fxShared', null);
   // a server error is retried, then the request succeeds
   let n = 0;
   app.fetch = url => (++n === 1 ? Promise.resolve({ ok: false, status: 503, headers: { get: () => '0' } }) : realFetch(url));
@@ -6259,6 +6275,29 @@ test('the js files share one scope: no two declare the same function (a later fi
     }
   }
   assert.deepEqual(twice, []);
+});
+
+test("the page's Content-Security-Policy: first in the page, no inline script, and every outside address the code uses is listed", () => {
+  const fs = require('fs'), path = require('path'), root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const meta = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
+  assert.ok(meta, 'index.html has its policy');
+  assert.ok(html.indexOf(meta[0]) < html.search(/<link|<script/), 'before anything it governs loads');
+  const policy = Object.fromEntries(meta[1].split(';').map(s => s.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+  assert.ok(!policy['script-src'].some(v => /unsafe|data:|blob:|\*/.test(v)), "scripts: the site's own files and named servers only");
+  assert.deepEqual([...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>/g)].map(m => m[0]), [], 'no inline script in index.html');
+  const handlers = /\son[a-z]+\s*=\s*["'{`$]/;
+  assert.ok(!handlers.test(html), 'no onclick= and the like in index.html');
+  // every outside address in the code, in the directive its use needs (links people open aren't loads)
+  const LINKS = new Set(['https://ko-fi.com', 'https://mail.google.com']);
+  const allowed = new Set([...policy['img-src'], ...policy['connect-src'], ...policy['script-src']]);
+  const missing = [];
+  for (const f of fs.readdirSync(path.join(root, 'js')).filter(f => f.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(root, 'js', f), 'utf8');
+    assert.ok(!handlers.test(src) && !/javascript:|\beval\(|new Function\(/.test(src), `${f}: no inline handlers or eval (the policy blocks them)`);
+    for (const [origin] of src.matchAll(/https:\/\/[a-z0-9.-]+/g)) if (!LINKS.has(origin) && !allowed.has(origin)) missing.push(`${origin} (${f})`);
+  }
+  assert.deepEqual([...new Set(missing)], [], "outside addresses the page's policy would block: add them to index.html's Content-Security-Policy");
 });
 
 test('positions are drawn by one helper, always in their colors (the page and the share pictures)', () => {

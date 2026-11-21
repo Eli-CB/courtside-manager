@@ -20,6 +20,6 @@ Part of the repo's notes: CLAUDE.md says which file covers what and how to keep 
   `api.leaguelayer.com/errors?key=<ERRORS_KEY>` (setup in `worker/README.md`). The footer says so, with the not-affiliated line.
   Caught errors don't reach it by themselves: ESPN's live feed failing 3 updates in a row does, as "ESPN live scores failing" (`noteLiveFailure`:
   a block, or a new format the site can't read; not the visitor's own connection). If that shows up: `SPORT.espn` in sports.js is where the feed is read.
-- Traffic: Cloudflare Web Analytics (no cookies), its beacon added at the end of index.html on leaguelayer.com only
-  (the domain is DNS-only, so Cloudflare can't inject it). Stats: dash.cloudflare.com → Web Analytics. An ad blocker stops it ("beacon.min.js
+- Traffic: Cloudflare Web Analytics (no cookies), its beacon added by core.js on leaguelayer.com only (not inline in index.html: the
+  Content-Security-Policy allows no inline script; the domain is DNS-only, so Cloudflare can't inject it). Stats: dash.cloudflare.com → Web Analytics. An ad blocker stops it ("beacon.min.js
   net::ERR_BLOCKED_BY_CLIENT" in the console, the browser's own line): harmless, nothing reads it and `reportError` skips it; that visit just isn't counted, so the numbers run low.

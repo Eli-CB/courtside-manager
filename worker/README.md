@@ -77,6 +77,29 @@ npx wrangler deploy
 The log: `https://api.leaguelayer.com/errors?key=<that password>` (each error once, with how many times, when, and on
 which pages and leagues). Until this is set up the site's reports are dropped.
 
+One address adds at most 20 reports an hour (`ERRORS_PER_IP_HOUR`, Nov 20, 2026): each is a KV write, the free plan
+allows 1,000 a day, and the site's Origin is only what a request says, so anyone could send it. A page sends 5 at most a
+visit, so visitors never reach it. Needs `npx wrangler deploy` to take effect.
+
+## Requests from outside the site
+
+The routes only answer the site's own pages (`SITE_ORIGINS`), but a request's Origin is only its word: a script
+anywhere can send `Origin: https://leaguelayer.com` and spend this Worker's requests (100,000 a day on the free plan;
+$0.30 a million on the $5 plan). Nothing inside the Worker can stop that, as the request is counted once it arrives.
+Cloudflare can, before it arrives, for free. One-time setup, in the dashboard (the owner's; nothing to deploy):
+
+1. https://dash.cloudflare.com, the leaguelayer.com domain, **Security**, **Security rules** (older dashboards:
+   **WAF**, **Rate limiting rules**), **Create rule**, **Rate limiting rule**.
+2. Name: `api.leaguelayer.com per visitor`. If incoming requests match: Field **Hostname**, equals,
+   `api.leaguelayer.com`.
+3. With the same characteristics: **IP**. When rate exceeds: **100** requests per **10 seconds**. Then: **Block**, for
+   **10 seconds** (the free plan's choices).
+4. Deploy.
+
+A visitor's page makes about one request every 30 seconds, plus a burst of 10-20 on a morning before the daily data
+(last night's box scores through `/espn/`), so 100 in 10 seconds is only ever a script, or many people behind one
+address (an office). Blocked requests show under Security, Events.
+
 ## ESPN fallback
 
 The site's live scores, late box scores and injury report come from ESPN's site feed, asked by each visitor's

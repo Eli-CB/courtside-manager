@@ -27,6 +27,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'data', 'players.json')
 BOX_CACHE = os.path.join(ROOT, 'data', 'boxscores.json')
+FX_LISTS = os.path.join(ROOT, 'data', 'fantrax.json')  # Fantrax's player list and ADP for the site's pages (fantrax_lists)
 CDN = 'https://cdn.nba.com/static/json/'
 # The same files at the storage the NBA data server serves from. The data server answers GitHub's runners 403; this
 # doesn't, so the box scores stay NBA.com's (official, with stat corrections) rather than ESPN's, which keep some
@@ -641,6 +642,37 @@ def roster_period_days(periods):
     return round(sorted(lens)[len(lens) // 2], 2) if lens else None
 
 
+FX_LIST_KEYS = ('name', 'team', 'position')  # what the site matches a league's players by (matchPlayers, js/fantrax.js)
+
+
+def fantrax_lists(sport, path, on_team=False):
+    """Fantrax's player list and average draft positions for a sport, cut to what the site reads, saved for its pages
+    (fxPlayerLists, js/fantrax.js): every visitor's browser used to ask Fantrax for the same two large lists each day.
+    on_team: only players on a team (the NHL's list holds everyone it has ever listed, over 1 MB). ADP that doesn't
+    come keeps the last file's."""
+    ids = get_json(FX + 'getPlayerIds', {'sport': sport})
+    if not isinstance(ids, dict) or not ids:
+        raise RuntimeError('Fantrax sent no players')
+    players = {fid: {k: v[k] for k in FX_LIST_KEYS if v.get(k) is not None} for fid, v in ids.items()
+               if isinstance(v, dict) and (not on_team or v.get('team') not in (None, '', '(N/A)'))}
+    try:
+        adp = [{'id': a['id'], 'ADP': a.get('ADP')} for a in get_json(FX + 'getAdp', {'sport': sport}) if isinstance(a, dict) and a.get('id')]
+    except Exception:
+        adp = []
+    if not adp and os.path.exists(path):
+        try:
+            with open(path, encoding='utf-8') as f:
+                adp = json.load(f).get('adp') or []
+        except Exception:
+            pass
+    out = {'at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'), 'ids': players, 'adp': adp}
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
+    os.replace(tmp, path)
+    return players
+
+
 def fantrax(league_id, index, saved_league=None):
     """League positions, rosters and matchups from Fantrax's public league API."""
     ids = get_json(FX + 'getPlayerIds', {'sport': 'NBA'})
@@ -782,6 +814,9 @@ def main():
         except Exception as e:
             log(f'  skipped: {e}')
             return default
+
+    # first, so it's saved even on a day NBA.com fails the rest of the job
+    optional("Fantrax's player list and ADP, for the site's pages", lambda: fantrax_lists('NBA', FX_LISTS), {})
 
     log('- Active players (NBA.com)...')
     stats_ok = True

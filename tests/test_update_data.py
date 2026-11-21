@@ -48,6 +48,52 @@ class Sleeper(unittest.TestCase):
         self.assertEqual(D.sleeper_names(slp, {'2'}), {'1': 'Cam Thomas'})
 
 
+class FantraxLists(unittest.TestCase):
+    IDS = {
+        'a1': {'name': 'Jokic, Nikola', 'team': 'DEN', 'position': 'C', 'rotowireId': 1, 'fantraxId': 'a1'},
+        'b2': {'name': 'Gone, Long', 'team': '(N/A)', 'position': 'SF', 'sportRadarId': 'x'},
+    }
+
+    def answer(self, ids, adp):
+        real = D.get_json
+        D.get_json = lambda url, params=None, **kw: ids if 'getPlayerIds' in url else adp()
+        self.addCleanup(setattr, D, 'get_json', real)
+
+    def read(self, path):
+        with open(path, encoding='utf-8') as f:
+            return D.json.load(f)
+
+    def test_cut_to_what_the_site_matches_by(self):
+        path = os.path.join(tempfile.mkdtemp(), 'fantrax.json')
+        self.answer(self.IDS, lambda: [{'id': 'a1', 'name': 'Jokic, Nikola', 'pos': 'C', 'ADP': 1.29}, {'name': 'no id'}])
+        D.fantrax_lists('NBA', path)
+        out = self.read(path)
+        self.assertEqual(out['ids'], {'a1': {'name': 'Jokic, Nikola', 'team': 'DEN', 'position': 'C'}, 'b2': {'name': 'Gone, Long', 'team': '(N/A)', 'position': 'SF'}})
+        self.assertEqual(out['adp'], [{'id': 'a1', 'ADP': 1.29}])
+        self.assertTrue(out['at'].endswith('+00:00'))
+        # hockey: only players on a team
+        D.fantrax_lists('NHL', path, on_team=True)
+        self.assertEqual(list(self.read(path)['ids']), ['a1'])
+
+    def test_adp_that_doesnt_come_keeps_the_last_files(self):
+        path = os.path.join(tempfile.mkdtemp(), 'fantrax.json')
+        self.answer(self.IDS, lambda: [{'id': 'a1', 'ADP': 2.5}])
+        D.fantrax_lists('NBA', path)
+
+        def down():
+            raise RuntimeError('Fantrax busy')
+        self.answer(self.IDS, down)
+        D.fantrax_lists('NBA', path)
+        self.assertEqual(self.read(path)['adp'], [{'id': 'a1', 'ADP': 2.5}])
+
+    def test_no_players_writes_nothing(self):
+        path = os.path.join(tempfile.mkdtemp(), 'fantrax.json')
+        self.answer({}, lambda: [])
+        with self.assertRaises(RuntimeError):
+            D.fantrax_lists('NBA', path)
+        self.assertFalse(os.path.exists(path))
+
+
 class Small(unittest.TestCase):
     def test_season_names(self):
         self.assertEqual(D.season_str(2026), '2026-27')

@@ -21,7 +21,7 @@ import sys
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from update_data import box_months, fetch_json, log, name_key, norm_name, per_game, schedule, season_str, write_season_index  # noqa: E402
+from update_data import box_months, fantrax_lists, fetch_json, log, name_key, norm_name, per_game, schedule, season_str, write_season_index  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data', 'nhl')
@@ -420,6 +420,9 @@ def main():
         except Exception as e:
             log(f'  skipped: {e}')
             return default
+
+    # first, so it's saved even on a day NHL.com fails the rest of the job
+    optional("Fantrax's player list and ADP, for the site's pages", lambda: fantrax_lists('NHL', os.path.join(DATA, 'fantrax.json'), on_team=True), {})
 
     log('- Rosters and schedules (NHL.com)...')
     teams = teams_list()

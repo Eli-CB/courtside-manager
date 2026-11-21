@@ -31,7 +31,14 @@ function fakeFetch(url) {
   if (u.hostname === 'api.leaguelayer.com' && u.pathname.startsWith('/espn/')) return fakeFetch(`https://site.api.espn.com/apis/site/v2/sports/${u.pathname.slice(6)}${u.search}`);
   let body = null;
   const month = u.pathname.match(/\/data\/(nhl\/|nfl\/)?box\/(\d{4}-\d\d)\.json$/);
-  if (month) { // a month of box scores: cut from the saved season, as the daily job does (box_months)
+  const fxLists = u.pathname.match(/\/data\/(nhl\/)?fantrax\.json$/);
+  if (fxLists) { // Fantrax's player list and ADP, cut from the saved answers as the daily job does (fantrax_lists), made this morning
+    const dir = fxLists[1] ? 'fantrax/nhl/' : 'fantrax/', all = JSON.parse(readFixture(`${dir}getPlayerIds.json`));
+    const ids = Object.fromEntries(Object.entries(all).filter(([, v]) => !fxLists[1] || (v.team && v.team !== '(N/A)'))
+      .map(([k, v]) => [k, { name: v.name, team: v.team, position: v.position }]));
+    const adp = JSON.parse(readFixture(`${dir}getAdp.json`)).filter(a => a.id).map(a => ({ id: a.id, ADP: a.ADP }));
+    body = JSON.stringify({ at: new Date(NOW - 12 * 36e5).toISOString(), ids, adp });
+  } else if (month) { // a month of box scores: cut from the saved season, as the daily job does (box_months)
     const all = JSON.parse(readFixture(`${month[1] || ''}boxscores.json`));
     const games = Object.fromEntries(Object.entries(all.games).filter(([, g]) => g.d.startsWith(month[2])));
     body = Object.keys(games).length ? JSON.stringify({ season: all.season, v: all.v, ...(all.keys ? { keys: all.keys } : {}), games }) : null;

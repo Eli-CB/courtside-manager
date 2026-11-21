@@ -50,6 +50,22 @@ if (typeof window.addEventListener === 'function') {
     const at = (r.stack.match(/js\/(\w+\.js)[^:]*:(\d+):(\d+)/) || []).slice(1).join(':');
     reportError(`${r.name}: ${r.message}`, at, r.stack);
   });
+  // The page's Content-Security-Policy (index.html) blocking a photo, feed or font: a source the policy is missing (a
+  // new photo server, say), so that it shows in the log by its host. Scripts aren't sent: a browser extension's are
+  // blocked all the time, and the page's own are all from the site
+  window.addEventListener('securitypolicyviolation', e => {
+    const dir = String(e.effectiveDirective || e.violatedDirective || ''), m = String(e.blockedURI || '').match(/^https?:\/\/[^/?#]+/);
+    if (m && /^(img|connect|font)-src/.test(dir)) reportError(`Blocked by the page's Content-Security-Policy (${dir}): ${m[0]}`, 'index.html');
+  });
+}
+// Cloudflare Web Analytics, on the live site only (not a local preview): visits counted, no cookies. Its script and
+// where it sends a visit are in the page's Content-Security-Policy (index.html)
+if (location.hostname === 'leaguelayer.com' && document.body) {
+  const cf = document.createElement('script');
+  cf.type = 'module';
+  cf.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+  cf.dataset.cfBeacon = '{"token": "82c915ddee8046a88df592730e70ea02"}';
+  document.body.appendChild(cf);
 }
 
 let BASE = { ...BASE_DEFAULT };

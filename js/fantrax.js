@@ -265,20 +265,33 @@ function rosterPeriodDays(periods) {
   return lens.length ? Math.round(lens[Math.floor(lens.length / 2)] * 100) / 100 : null;
 }
 
-// Fantrax's player list (about 200 KB) and ADP are the same for every league and barely change:
-// fetched at most once a day and kept on this device, a list for each sport. The NHL's holds everyone it has ever
-// listed (over 1 MB): only those on a team, with what matching reads, are kept.
+// Fantrax's player list and ADP are the same for every league and barely change. The daily job saves them beside the
+// sport's data (`fantrax.json`, fantrax_lists in scripts/update_data.py), so a site's worth of visitors doesn't each ask
+// Fantrax for the same large lists: Fantrax itself only when that file is missing or over 2 days old (the job stopped).
+// Kept on this device a day from when they were made, a list for each sport, with only what matching reads (name, team,
+// position); the NHL's only those on a team (its whole list, everyone it has ever listed, is over 1 MB).
 const FX_SHARED_KEY = 'league-layer-fantrax-shared-v1';
 const fxSharedKey = sport => (sport === 'nba' ? FX_SHARED_KEY : `${FX_SHARED_KEY}-${sport}`);
+const FX_LISTS_DAY = 864e5;
 let fxShared = null, fxSharedOther = {};
+async function fxListsFile(sport) {
+  try {
+    const r = await fetch(`${SPORTS[sport].data}fantrax.json`, { cache: 'no-cache' });
+    const f = r.ok ? await r.json() : null, at = f && Date.parse(f.at);
+    return f && f.ids && Date.now() - at < 2 * FX_LISTS_DAY ? { at, ids: f.ids, adp: Array.isArray(f.adp) ? f.adp : [] } : null;
+  } catch (e) { return null; }
+}
+async function fxListsAsked(sport) {
+  const [all, adp] = await Promise.all([fxGet(`getPlayerIds?sport=${SPORTS[sport].fantrax}`), fxGet(`getAdp?sport=${SPORTS[sport].fantrax}`).catch(() => [])]);
+  const ids = Object.fromEntries(Object.entries(all).filter(([, v]) => sport === 'nba' || (v.team && v.team !== '(N/A)'))
+    .map(([k, v]) => [k, { name: v.name, team: v.team, position: v.position }]));
+  return { at: Date.now(), ids, adp: (Array.isArray(adp) ? adp : []).filter(a => a && a.id).map(a => ({ id: a.id, ADP: a.ADP })) };
+}
 async function fxPlayerLists(sport = 'nba') {
   let kept = sport === 'nba' ? fxShared : fxSharedOther[sport];
   if (!kept) kept = store.json(fxSharedKey(sport));
-  if (!(kept && Date.now() - kept.at < 864e5 && kept.ids)) {
-    const [all, adp] = await Promise.all([fxGet(`getPlayerIds?sport=${SPORTS[sport].fantrax}`), fxGet(`getAdp?sport=${SPORTS[sport].fantrax}`).catch(() => [])]);
-    const ids = sport === 'nba' ? all : Object.fromEntries(Object.entries(all).filter(([, v]) => v.team && v.team !== '(N/A)')
-      .map(([k, v]) => [k, { name: v.name, team: v.team, position: v.position }]));
-    kept = { at: Date.now(), ids, adp };
+  if (!(kept && Date.now() - kept.at < FX_LISTS_DAY && kept.ids)) {
+    kept = (await fxListsFile(sport)) || (await fxListsAsked(sport));
     store.setJson(fxSharedKey(sport), kept);
   }
   if (sport === 'nba') fxShared = kept; else fxSharedOther[sport] = kept;
