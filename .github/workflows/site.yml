@@ -136,6 +136,7 @@ jobs:
 
       # only what the page reads: not the tests and their fixtures, the scripts, the Worker or the notes (most of the repo's files)
       - name: Gather the site's own files
+        id: gather
         run: |
           mkdir _site
           cp -r index.html 404.html styles.css manifest.webmanifest js data fonts icons _site/
@@ -150,14 +151,15 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v5
 
-      # after GitHub Pages, which serves leaguelayer.com until it moves: a failure here can't hold the live site back
+      # after GitHub Pages, which serves leaguelayer.com until it moves, so a failure here can't hold the live site back; and
+      # whether Pages' step worked or not (it failed 1 run in 3 on Nov 21, 2026: "No artifacts named github-pages", GitHub's side)
       - uses: actions/setup-node@v7
-        if: env.TO_CLOUDFLARE == 'true'
+        if: ${{ !cancelled() && steps.gather.outcome == 'success' && env.TO_CLOUDFLARE == 'true' }}
         with:
           node-version: 22
 
       - name: Publish to Cloudflare (hosting/wrangler.toml)
-        if: env.TO_CLOUDFLARE == 'true'
+        if: ${{ !cancelled() && steps.gather.outcome == 'success' && env.TO_CLOUDFLARE == 'true' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
