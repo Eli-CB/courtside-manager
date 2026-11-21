@@ -97,19 +97,17 @@ visit, so visitors never reach it. Needs `npx wrangler deploy` to take effect.
 The routes only answer the site's own pages (`SITE_ORIGINS`), but a request's Origin is only its word: a script
 anywhere can send `Origin: https://leaguelayer.com` and spend this Worker's requests (100,000 a day on the free plan;
 $0.30 a million on the $5 plan). Nothing inside the Worker can stop that, as the request is counted once it arrives.
-Cloudflare can, before it arrives, for free. One-time setup, in the dashboard (the owner's; nothing to deploy):
-
-1. https://dash.cloudflare.com, the leaguelayer.com domain, **Security**, **Security rules** (older dashboards:
-   **WAF**, **Rate limiting rules**), **Create rule**, **Rate limiting rule**.
-2. Name: `api.leaguelayer.com per visitor`. If incoming requests match: Field **Hostname**, equals,
-   `api.leaguelayer.com`.
-3. With the same characteristics: **IP**. When rate exceeds: **100** requests per **10 seconds**. Then: **Block**, for
-   **10 seconds** (the free plan's choices).
-4. Deploy.
+Cloudflare can, before it arrives, for free: the rate limiting rule `api.leaguelayer.com per visitor` (set up Nov 21,
+2026; dashboard: the leaguelayer.com domain, **Security**, **Security rules**). Per IP address, more than **100**
+requests in **10 seconds** is blocked for **10 seconds** (the free plan's only period and duration; it allows one such rule).
+It matches every path (URI Path starts with `/`): the free plan offers no Hostname field, and it needs none, as the site
+itself is DNS-only (GitHub serves it), so only `api.leaguelayer.com` passes through Cloudflare. Should leaguelayer.com
+ever be proxied, the rule covers its pages too (a page load is about 35 files: still under 100).
 
 A visitor's page makes about one request every 30 seconds, plus a burst of 10-20 on a morning before the daily data
 (last night's box scores through `/espn/`), so 100 in 10 seconds is only ever a script, or many people behind one
-address (an office). Blocked requests show under Security, Events.
+address (an office). Checked when it was set up: a burst of 150 had 99 through and the rest answered 429 by Cloudflare,
+and the same address was answered again 10 seconds later. Blocked requests show under Security, Events.
 
 ## ESPN fallback
 
