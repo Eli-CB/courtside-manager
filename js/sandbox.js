@@ -205,7 +205,7 @@ function viewSandboxTeam() {
 // ----- Live: up to 12 players, each one's game and line as it's played -----
 // Today, the last game day (until today's games start, as the Matchup tab does), or the Week (Monday to Sunday) so far. A
 // day: each player's game in its bubble (tip-off, the score and clock, the final), his line in the categories and its value,
-// a bubble flashing as it moves; on now first, then finished, then still to come by tip-off, then no game (his next one). The
+// a bubble flashing as it moves; on now first, then finished, then still to come by tip-off, then sitting out, then no game (his next one). The
 // week: his games played and still to come (a game on now with its clock), the week's line added up and its value; on now
 // first, then by that value. A full list says Max by its count (the search goes).
 function viewSandboxWatch() {
@@ -226,13 +226,15 @@ function viewSandboxWatch() {
   const tools = find || addTeam ? `<div class="sb-tools">${find}${addTeam ? `<div class="sb-team-btn">${addTeam}</div>` : ''}</div>` : '';
   if (!W.length) return `<div class="card sb-watch-card">${head}${tools}<div class="empty"><strong>Follow up to ${WATCH_MAX} players</strong>Each one's game and stat line as it's played, updated every 30 seconds while games are on.</div></div>`;
 
-  // what each player's cell shows: { game (its words), line (his stats), dim (nothing to show), order }
+  // what each player's cell shows: { game (its words), line (his stats), dim (nothing to show), order }. Sitting (Out, not
+  // starting, or a finished game without him) is dimmed after those playing, as the Matchup tab's day has him
   const dayOf = p => {
     const plays = playsOn(p, d), line = lineOn(p, d), g = liveGame(p, d);
     const over = gameFinal(p, d) || !!(g && g.state === 'post');
+    const sits = plays && !line && (p.status === 'Out' || over || startWords(p, d) === 'not starting');
     const game = plays ? linkTeams(dashGame(p, d)) : `<span class="muted">No game${d === today && p.next ? ` · next ${linkTeams(nextGame(p.next))}` : ''}</span>`;
-    const order = !plays ? [3, 0] : g && g.state === 'in' ? [0, 0] : over ? [1, 0] : [2, g && g.start ? +g.start : Infinity];
-    return { game, line, dim: !plays || (over && !line), order };
+    const order = !plays ? [4, 0] : sits ? [3, 0] : g && g.state === 'in' ? [0, 0] : over ? [1, 0] : [2, g && g.start ? +g.start : Infinity];
+    return { game, line, dim: !plays || sits, order };
   };
   const weekOf = p => {
     const lines = soFar.map(x => lineOn(p, x)).filter(Boolean), line = lines.length ? lines.reduce((t, l) => addLine(t, l), {}) : null;
@@ -252,7 +254,7 @@ function viewSandboxWatch() {
     const { game, line, dim } = info.get(p);
     const v = line && !isPoints() ? `<span class="mu-chip sb-val" title="${valTip}"><b>${fmtValue(lineValue(line))}</b> VAL</span>` : '';
     return `<div class="mu-p sb-w${dim ? ' out' : ''}">
-      <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}${sbOwns(p.nbaId) ? ' <span class="badge accent sb-mine" title="On My team">Mine</span>' : ''}</div></div>
+      <div class="bplayer">${headshot(p, hsPx(38, 32))}<div class="bmain"><div class="bname">${playerName(p)}${p.status !== 'Healthy' ? ' ' + statusBadge(p) : ''}</div></div>
         <button type="button" class="icon-btn xs sb-x" data-action="sb-unwatch" data-id="${p.nbaId}" aria-label="Stop following ${esc(p.name)}" title="Stop following">✕</button></div>
       <div class="mu-game">${game}</div>
       ${line ? `<div class="mu-chips">${lineChips(line, flash(p, line))}${v}</div>` : ''}

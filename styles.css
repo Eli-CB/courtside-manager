@@ -843,11 +843,12 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .sb-hit .pmeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-hit-add { flex: none; font-size: .8rem; font-weight: 700; white-space: nowrap; }
 .sb-none { margin: 0 0 12px; }
-.sb-clear { margin-left: auto; }
-.sb-team .card-head h2, .sb-watch-card .card-head h2 { margin-right: auto; }
-.sb-team .card-head .muted.small, .sb-watch-card .card-head .muted.small { margin-right: 4px; }
-/* a player's ✕ (off My team, or Live) at the end of his name */
+/* the head: the title, its count (and Max) beside it, then Start over or the day picker at the far end */
+.sb-clear, .sb-watch-card .card-head > .seg { margin-left: auto; }
+/* a player's ✕ (off My team, or Live) at the end of his name: quiet until pointed at, so a list of them doesn't shout */
 .sb-x { flex: none; margin-left: auto; }
+.icon-btn.xs.sb-x:not(.sb-add) { width: 24px; height: 24px; border-color: transparent; box-shadow: none; font-size: .8rem; }
+.icon-btn.xs.sb-x:not(.sb-add):hover { background: var(--surface-2); }
 .sb-table .pf-name .bplayer { padding-right: 2px; }
 /* the Players tab's + (add to My team) and ✓ (on it: remove) */
 .icon-btn.xs.sb-add { font-size: .95rem; font-weight: 700; }
@@ -867,6 +868,7 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .sb-watch { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
 .sb-watch .mu-p { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
 .sb-watch .mu-p.out { opacity: .62; }
+.sb-watch .mu-p .bname { flex-wrap: wrap; row-gap: 2px; } /* (a tag that doesn't fit beside the name goes under it, not the name to "T. …") */
 .mu-chip.sb-val { border-color: var(--muted); }
 .sb-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 /* the sport and scoring menus in the head (as the team picker), and your own points (a popup) */
@@ -883,7 +885,7 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
   .sb-watch { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .sb-watch .mu-p { padding: 7px 8px; }
   .sb-q { max-width: none; }
-  .badge.sb-live, .badge.sb-mine { display: none; } /* (the name needs the room) */
+  .badge.sb-live { display: none; } /* (the name needs the room) */
 }
 
 .tp-btns { display: flex; gap: 8px; margin-left: auto; }

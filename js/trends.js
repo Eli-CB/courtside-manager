@@ -134,9 +134,10 @@ function trendsCard(L, end) {
   const fmtOf = st => (st.pct ? v => fmtPct(v) : v => fmt(v, 1));
   const change = (st, x) => (st.pct ? `${x.move > 0 ? '+' : '−'}${fmt(Math.abs(x.move), 1)} makes`
     : x.was > 0 ? `${x.move > 0 ? '+' : '−'}${Math.round(Math.abs(x.move) / x.was * 100)}%` : `${x.move > 0 ? '+' : '−'}${fmt(Math.abs(x.move), 1)}`);
-  const rowHtml = (row, i, num, note) => `<li class="tr-row"><span class="tr-rank">${i + 1}</span>${headshot({ nbaId: row.id, name: row.raw.name }, 28)}
+  // (mine: a list of only My team's players, which needn't say so on each)
+  const rowHtml = (row, i, num, note, mine) => `<li class="tr-row"><span class="tr-rank">${i + 1}</span>${headshot({ nbaId: row.id, name: row.raw.name }, 28)}
       <div class="tr-main"><div class="tr-name">${playerBtn(row.id, row.raw.name)} <span class="muted small">${teamBtn(row.raw.team)}</span></div>
-      <div class="tr-meta">${[K.whose(row.raw), note].filter(Boolean).join(' · ')}</div></div>${num}</li>`;
+      <div class="tr-meta">${[!mine && K.whose(row.raw), note].filter(Boolean).join(' · ')}</div></div>${num}</li>`;
 
   const lists = stats.map(st => {
     const fm = fmtOf(st);
@@ -159,12 +160,12 @@ function trendsCard(L, end) {
   // (the sandbox: My team's, then everyone else's; one list while My team is empty)
   const mineList = L ? [] : byValue(players.filter(G.mine), TREND_TOP);
   const everyone = L ? [] : byValue(players.filter(G.others), TREND_TOP);
-  const valueRows = list => list.map((row, i) => {
+  const valueRows = (list, mine) => list.map((row, i) => {
     // his value a game now, and the change under it (from his usual game: the (i) and the hover say so)
     const num = `<div class="tr-num" title="${esc(`${VAL} a game: ${fmtValue(row.valueNow)} in his last ${TREND_GAMES}, ${fmtValue(row.valueWas)} usually`)}"><b>${fmtValue(row.valueNow)}</b><div class="small ${up ? 'pos-good' : 'pos-bad'}">${fmtValue(row.gain)}</div></div>`;
-    return rowHtml(row, i, num, K.why(row, VS));
+    return rowHtml(row, i, num, K.why(row, VS), mine);
   }).join('');
-  const valueList = (title, whose, list) => (list.length ? `<section class="tr-cat"><h3 class="sub tr-head">${trendOpen('value', title, whose)}<span class="tr-col">${VAL}</span></h3><ol class="tr-list">${valueRows(list)}</ol></section>` : '');
+  const valueList = (title, whose, list) => (list.length ? `<section class="tr-cat"><h3 class="sub tr-head">${trendOpen('value', title, whose)}<span class="tr-col">${VAL}</span></h3><ol class="tr-list">${valueRows(list, whose === 'mine')}</ol></section>` : '');
   const valueLists = [valueList('Rostered', 'rostered', rostered), valueList('Waivers', 'waivers', waivers), valueList('My team', 'mine', mineList),
     K.owner.size ? valueList('Everyone else', 'others', everyone) : valueList('All players', 'all', everyone)].filter(Boolean);
 
@@ -234,7 +235,7 @@ function trendCardHtml() {
     const sub = st.pct ? 'makes' : !st.value && x.was > 0 ? `${x.move > 0 ? '+' : '−'}${Math.round(Math.abs(x.move) / x.was * 100)}%` : '';
     return `<tr><td class="pf-name"><div class="bplayer"><span class="perf-rank">${rank.get(r)}</span>${headshot({ nbaId: row.id, name: raw.name }, 34)}<div class="bmain">
         <div class="bname">${playerBtn(row.id, raw.name)}</div>
-        <div class="pmeta">${[raw.team && teamBtn(raw.team), (raw.pos || []).length && posTags(raw.pos), K.whose(raw)].filter(Boolean).join(' · ')}</div>
+        <div class="pmeta">${[raw.team && teamBtn(raw.team), (raw.pos || []).length && posTags(raw.pos), whose !== 'mine' && K.whose(raw)].filter(Boolean).join(' · ')}</div>
         ${notes ? `<div class="pmeta tr-why">${notes}</div>` : ''}</div></div></td>
       ${row.recent.map(g => gameCell(x, g)).join('')}
       <td class="sc"><b>${fm(x.now)}</b></td><td class="sc">${fm(x.was)}</td><td class="sc">${fm(r.season)}</td>
