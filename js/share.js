@@ -1,4 +1,4 @@
-// League Layer: the share pictures (the Recap's, the Draft Retrospective's, a trade's) and the share popup.
+// League Layer: the share pictures (the Recap's, the Draft Recap's, a trade's) and the share popup.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
@@ -361,7 +361,7 @@ const canvasBlob = cv => new Promise(res => cv.toBlob(res, 'image/png'));
 // ----- Sharing: the Recap's week and the Draft tab's awards, as a picture in a popup, or as text and a link -----
 // S: { title (the popup's), name (the share sheet's), what ('Recap': the toast's), text, url, link ('Full recap': before
 // the url), file, alt, draw: () => its canvas }
-// The Share button (the Recap's, the Draft Retrospective's, a trade's): a spinner in it while its picture is drawn, which
+// The Share button (the Recap's, the Draft Recap's, a trade's): a spinner in it while its picture is drawn, which
 // takes a moment (photos and logos load first): shareWith. A redraw meanwhile draws it turning again; a second tap waits
 const shareBtn = (action, attrs = '') => `<button type="button" class="btn sm primary${ui.sharing ? ' busy' : ''}" data-action="${action}"${attrs}${ui.sharing ? ' disabled aria-busy="true"' : ''}>Share</button>`;
 function shareBusy(on, el) {

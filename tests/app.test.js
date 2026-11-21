@@ -3340,8 +3340,8 @@ test("Draft awards: Reach is the pick taken furthest ahead of consensus ADP, kee
     } finally { doc.querySelector = realQuery; }
     const S = app.draftShare(L, d, [award]);
     assert.ok(S.url.endsWith(`?league=${L.id}#draft`), S.url);
-    assert.equal(S.text, `${L.name} · ${app.seasonLabel(L.year)} Draft Retrospective\n\nReach: ${award.text}`);
-    assert.match(S.file, /-draft-retrospective\.png$/);
+    assert.equal(S.text, `${L.name} · ${app.seasonLabel(L.year)} Draft Recap\n\nReach: ${award.text}`);
+    assert.match(S.file, /-draft-recap\.png$/);
     // the Recap shares the same way
     assert.equal(typeof app.recapShare, 'function');
     // an ESPN or Sleeper league's players have the daily file's ADP (Fantrax's) instead
@@ -5151,12 +5151,12 @@ test('the demo: every tab filled in as a team, and leaving it keeps nothing', as
   assert.ok(a.needsLanding());
   assert.match(a.viewLanding(), /Explore a basketball demo league/);
   // its rows, in order: the cards' button opens a player's card in the demo, Trends is named under it, the three cards take
-  // turns (a CSS loop: no timer), the Recap's picture has the Draft Retrospective's beside it, and the pictures' photos are only
+  // turns (a CSS loop: no timer), the Recap's picture has the Draft Recap's beside it, and the pictures' photos are only
   // pictures (no tap to a card, as on the tabs)
   const land = a.viewLanding();
   assert.deepEqual([...land.matchAll(/class="lsh-tab">[^]*?<\/svg>([^<]+)<\/p>/g)].map(m => m[1]), ['Matchup', 'Plan Ahead', 'Cards', 'Draft', 'Recap']);
   assert.match(land, /class="pvx-deck">[^]*?pv-pcard[^]*?pv-tcard[^]*?Playoff Games[^]*?pv-fcard/);
-  assert.match(land, /class="pv-pics"[^]*?Period 6 recap[^]*?Draft Retrospective/);
+  assert.match(land, /class="pv-pics"[^]*?Period 6 recap[^]*?Draft Recap/);
   assert.match(land, /data-tab="players" data-player="1628983"/);
   assert.match(land, /data-tab="trends">Trends</);
   assert.match(land, /Free · No sign-up/);

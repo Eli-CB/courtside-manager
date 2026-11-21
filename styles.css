@@ -554,7 +554,7 @@ label [data-photo], #detailBody [data-photo] { cursor: inherit; }
 .rc-t:last-child .rc-badge { margin-left: 6px; }
 .rc-badge.rc-top { background: var(--good-soft); color: var(--good); }
 .rc-badge.rc-bottom { background: var(--bad-soft); color: var(--bad); }
-/* its standouts as cards (the Draft Retrospective's awards too), each with the small round faces of the players it names
+/* its standouts as cards (the Draft Recap's awards too), each with the small round faces of the players it names
    on the right, a player's own card too */
 .rx-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); }
 .rx-card { display: flex; min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
@@ -1535,7 +1535,7 @@ body.landing::before {
 .pvr-foot .m-b { fill: #7f8a9c; }
 .pvr-foot b { font-size: .7rem; color: var(--r-text); }
 .pvr-foot span { margin-left: auto; font-size: .6rem; color: var(--r-muted); }
-/* beside it the Draft Retrospective's, tipped the other way; on phones a row to swipe, the second peeking in at the edge */
+/* beside it the Draft Recap's, tipped the other way; on phones a row to swipe, the second peeking in at the edge */
 .pv-pics { display: flex; justify-content: center; align-items: flex-start; gap: 14px; }
 .pv-pics > .pv-pic { flex: 1 1 0; min-width: 0; max-width: 270px; margin: 0; }
 .pv-pics > .pv-pic + .pv-pic { margin-top: 26px; rotate: 2deg; }

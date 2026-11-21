@@ -267,7 +267,7 @@ const LAND_FEATURES = [
   ['standings', 'Standings', 'How your categories stack up against every team in the league.'],
   ['recap', 'Weekly recap', "The week's awards, as a picture ready for the league chat."],
   ['trade', 'Trades', 'What a deal does to each side, category by category.'],
-  ['draft', 'Draft retrospective', 'Which picks paid off, and how your draft is holding up.'],
+  ['draft', 'Draft recap', 'Which picks paid off, and how your draft is holding up.'],
 ];
 /* ---------- A look inside: the tabs as they look, under the hero ---------- */
 // Made-up numbers, drawn with each tab's own pieces (.mu-cats, .mu-chip, .game-pill, .lv-dot, the board's
@@ -328,7 +328,7 @@ const LAND_RECAP = [
   ['Game of the period', '', 'J. Brunson', 1628973, 'Bench Mob', [['44', 'PTS'], ['6', '3PM'], ['9', 'AST'], ['.684', 'FG%']]],
   ['Bench regret', '', '', 0, '', '<b>Sixth Men</b>: starting <b>D. Vassell</b> over <b>B. Hield</b> would have won 5–4'],
 ];
-// The Draft Retrospective's picture beside it (draftShare in draft.js: the same shareCanvas): a player's award, or a team's with
+// The Draft Recap's picture beside it (draftShare in draft.js: the same shareCanvas): a player's award, or a team's with
 // its standout player on a lighter line of his own. [award, NBA.com id, his name, the team, its line, a team award's standout]
 const LAND_DRAFT_AWARDS = [
   ['Reach', 1642907, 'C. Coward', 'Bench Mob', 'Taken #58, 41 picks early: consensus #99 (ADP 104.2)'],
@@ -356,7 +356,7 @@ function landRecap() {
     ${pic('Period 6 recap', '', `${LAND_RECAP.map(card).join('')}
     <small class="pvr-sec">Results</small>
     ${finals.map(([a, s, b, ma, mb]) => `<div class="pvr-final"><span>${badge(ma)}<b>${a}</b></span><strong>${s}</strong><span><b>${b}</b>${badge(mb)}</span></div>`).join('')}`)}
-    ${pic('Draft Retrospective', 'Snake draft · 144 picks', LAND_DRAFT_AWARDS.map(award).join(''))}
+    ${pic('Draft Recap', 'Snake draft · 144 picks', LAND_DRAFT_AWARDS.map(award).join(''))}
   </div>
   <div class="pvr-share" aria-hidden="true"><span class="on">Share image</span><span>Copy text and link</span></div>`;
 }
@@ -475,7 +475,7 @@ const LAND_SHOW = [
   ['week', 'Plan Ahead', "Next period's lineup, planned", "Every player's games day by day, and the lineup that gives you the best chance to win: each swap with what it does to every category.", landPlan],
   ['players', 'Cards', 'In-depth cards', "Tap any name for its card. A player's: who has him, each category against an average rostered player, his games ahead, his value and every game. An NBA team's: its record, its games in each playoff period and every player. A fantasy team's: each category against every team in the league, and its roster.", landCards,
     { player: LAND_CARD.id, more: ['trends', 'Trends', "Who's heating up and who's cooling off: each category's biggest risers over the last five games, and the best of them still on waivers."] }],
-  ['draft', 'Draft', 'Every pick on one board', "Your league's whole draft, each pick green or red by how he's playing against where he went. Then the Draft Retrospective's awards, from the biggest reach to the quickest trigger finger.", landBoard],
+  ['draft', 'Draft', 'Every pick on one board', "Your league's whole draft, each pick green or red by how he's playing against where he went. Then the Draft Recap's awards, from the biggest reach to the quickest trigger finger.", landBoard],
   ['recap', 'Recap', 'Recaps for the league chat', "The period in awards, from the player of the period to the bench regret, with every final, and the draft's, from the biggest reach to the oldest roster. Share each as a picture, or as a link that opens with no sign-up.", landRecap],
 ];
 function landShow(demo) {

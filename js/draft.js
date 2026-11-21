@@ -1,4 +1,4 @@
-// League Layer: The Draft tab: the board, how every pick is playing, each team's draft and the Draft Retrospective.
+// League Layer: The Draft tab: the board, how every pick is playing, each team's draft and the Draft Recap.
 // The site loads js/*.js in order (see index.html); they share one scope, like one file.
 'use strict';
 
@@ -111,7 +111,7 @@ function draftData() {
     slots: L.draft.slots || null, rostered: L.draft.rostered || null, rookies: !!L.draft.rookies }; // (Sleeper: its draft order; a dynasty rookie draft's kept players; rookies only)
 }
 
-// ----- Draft Retrospective (was Draft awards): this season's draft, for the league to share -----
+// ----- Draft Recap (was Draft awards): this season's draft, for the league to share -----
 // The ADP ones (Reach, Fall) go against consensus ADP (Fantrax's average draft position over its
 // drafts): a pick is compared with where consensus would take its player in this draft. The league's keepers come off the
 // board first (in a keeper league pick #1 is the first player after them), so a player's consensus spot is his place in
@@ -365,19 +365,19 @@ function draftAwardsCard(d) {
   };
   // (drawn as the Recap's standouts: the owner's ask)
   return `<div class="card dr-awards dr-gap">
-    <div class="card-head"><h2>Draft Retrospective ${infoBtn('draftAwards')}</h2>${shareBtn('draft-share')}</div>
+    <div class="card-head"><h2>Draft Recap ${infoBtn('draftAwards')}</h2>${shareBtn('draft-share')}</div>
     <div class="rx-grid">${items.map(x => standoutCard(x, label(x))).join('')}</div>
   </div>`;
 }
 // Sharing them (shareWith, recap.js): a picture, or the text and a link that opens the league's Draft tab
 const draftUrl = L => `${location.origin}${location.pathname}?league=${encodeURIComponent(L.id)}#draft`;
-const draftText = (L, items) => [`${L.name} · ${L.year ? `${seasonLabel(L.year)} ` : ''}Draft Retrospective`, ...items.map(x => `${x.label}: ${x.text}`)].join('\n\n');
+const draftText = (L, items) => [`${L.name} · ${L.year ? `${seasonLabel(L.year)} ` : ''}Draft Recap`, ...items.map(x => `${x.label}: ${x.text}`)].join('\n\n');
 function draftShare(L, d, items) {
   const kind = d.type ? `${d.type[0].toUpperCase()}${d.type.slice(1)} draft` : 'Draft';
   return {
-    title: 'Draft Retrospective', name: `${L.name} · Draft Retrospective`, what: 'Draft Retrospective', link: 'Full draft', text: draftText(L, items), url: draftUrl(L),
-    file: `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-draft-retrospective.png`, alt: `Draft Retrospective for ${L.name}`,
-    draw: () => shareCanvas({ kicker: `${L.year ? `${seasonLabel(L.year)} ` : ''}DRAFT RETROSPECTIVE`, title: L.name, items, sub: `${kind}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks` }),
+    title: 'Draft Recap', name: `${L.name} · Draft Recap`, what: 'Draft Recap', link: 'Full draft', text: draftText(L, items), url: draftUrl(L),
+    file: `${L.name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'league'}-draft-recap.png`, alt: `Draft Recap for ${L.name}`,
+    draw: () => shareCanvas({ kicker: `${L.year ? `${seasonLabel(L.year)} ` : ''}DRAFT RECAP`, title: L.name, items, sub: `${kind}${d.date ? `, ${fmtDay(d.date)}` : ''} · ${d.picks.length} picks` }),
   };
 }
 

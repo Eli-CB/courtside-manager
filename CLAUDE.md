@@ -50,7 +50,7 @@ line in the notes pointing to it. `docs/` isn't published: the deploy copies onl
 | `views.js`: Trades, draft picks in a deal | docs/trades.md |
 | `recap.js`, `share.js`: the Recap, every share picture | docs/recap.md |
 | `trends.js` | docs/trends.md |
-| `draft.js`: the board, Draft Retrospective, keepers | docs/draft.md |
+| `draft.js`: the board, Draft Recap, keepers | docs/draft.md |
 | `history.js`: weekly rosters, awards, when a week is over | docs/history.md |
 | `leagues.js`: saved leagues, seasons, the demo, the landing page | docs/leagues.md |
 | `sandbox.js` | docs/sandbox.md |
